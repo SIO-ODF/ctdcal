@@ -1,8 +1,10 @@
-%pylab inline
+#%pylab inline
 import xml.etree.ElementTree as ET
 import struct
 import numpy as np
 import re
+import sys
+import math
 #import ipdb
 
 def parse_frequency_hex(s):
@@ -156,6 +158,7 @@ def temp_its90_dict(calib, freq):
     Temperature ITS-90 = 1/{g+h[ln(f0/f )]+i[ln2(f0/f)]+j[ln3(f0/f)]} - 273.15 (°C)
 
     """
+    print("0 freq. record errors not reported for now.")
     f = freq
     #array mode
     try:
@@ -164,7 +167,7 @@ def temp_its90_dict(calib, freq):
             #Hack for dealing with 0 frequencies, needs additional reporting later
             if f_x == 0:
                 f_x = 1
-                print("Zero (0) frequency temperature record being processed as 1. Record: ", i)
+                #print("Zero (0) frequency temperature record being processed as 1. Record: ", i)
             temp = 1/(calib['G']
                       + calib['H'] * (math.log(calib['F0']/f_x))
                       + calib['I'] * math.pow((math.log(calib['F0']/f_x)),2)
@@ -176,7 +179,7 @@ def temp_its90_dict(calib, freq):
     except:
         if f == 0:
             f = 1
-            print("Zero (0) frequency temperature record [singleton] being processed.")
+            #print("Zero (0) frequency temperature record [singleton] being processed.")
         ITS90 = 1/(calib['G']
                    + calib['H'] * (math.log(calib['F0']/f))
                    + calib['I'] * math.pow((math.log(calib['F0']/f)),2)
@@ -434,86 +437,23 @@ def float_convert(string):
     except:
         return string
 
-    ######################### Change filenames here #######################
+    ########################################
+    ########## Start CLI Script ############
+    ########################################
 
+if __name__ == "__main__":
+    sbe_reader = SBEReader.from_paths(sys.argv[1], sys.argv[2])
+    temperature_array_1 = sbe_reader.parsed_scans[:,0]
+    sensor_dictionary = sbe_xml_reader_a(sys.argv[2])
 
-sbe_reader = SBEReader.from_paths("GS3601101.hex", "GS3601101.XMLCON")
+    temperature_array_1_final = temp_its90_dict(sensor_dictionary['0'], temperature_array_1)
+    pressure_array_final = pressure_dict(sensor_dictionary['2'], sbe_reader.parsed_scans[:,2],temperature_array_1_final)
+    conductivity_array_1_final = cond_dict(sensor_dictionary['1'], sbe_reader.parsed_scans[:,1],temperature_array_1_final, pressure_array_final)
+    temperature_array_2_final = temp_its90_dict(sensor_dictionary['3'], sbe_reader.parsed_scans[:,3])
+    conductivity_array_2_final = cond_dict(sensor_dictionary['4'], sbe_reader.parsed_scans[:,4],temperature_array_1_final, pressure_array_final)
+    kelvin_array = [273.15+gg for gg in temperature_array_1_final]
+    sbe43_array_final = oxy_dict(sensor_dictionary['7'], pressure_array_final,kelvin_array,temperature_array_1_final,conductivity_array_1_final, sbe_reader.parsed_scans[:,7])
 
-
-    ######################### Change filenames here #######################
-
-temperature_array_1 = sbe_reader.parsed_scans[:,0]
-
-
-sensor_dictionary = sbe_xml_reader_a('GS3601101.XMLCON')
-#print(sensor_dictionary)
-temperature_array_1_final = temp_its90_dict(sensor_dictionary['0'], temperature_array_1)
-plot(temperature_array_1_final)
-pressure_array_final = pressure_dict(sensor_dictionary['2'], sbe_reader.parsed_scans[:,2],temperature_array_1_final)
-plot(pressure_array_final)
-conductivity_array_1_final = cond_dict(sensor_dictionary['1'], sbe_reader.parsed_scans[:,1],temperature_array_1_final, pressure_array_final)
-plot(conductivity_array_1_final)
-temperature_array_2_final = temp_its90_dict(sensor_dictionary['3'], sbe_reader.parsed_scans[:,3])
-plot(temperature_array_2_final)
-conductivity_array_2_final = cond_dict(sensor_dictionary['4'], sbe_reader.parsed_scans[:,4],temperature_array_1_final, pressure_array_final)
-plot(conductivity_array_2_final)
-kelvin_array = [273.15+gg for gg in temperature_array_1_final]
-sbe43_array_final = oxy_dict(sensor_dictionary['7'], pressure_array_final,kelvin_array,temperature_array_1_final,conductivity_array_1_final, sbe_reader.parsed_scans[:,7])
-
-
-
-def cnv_handler(hex_file, xmlcon_file):
-    """Handler to deal with converting eng. data to sci units automatically.
-    When not given a format file/json, default to putting out data in order of instruments in xmlcon.
-    Format file makes assumptions: duplicate sensors are ranked by channel they use, with lower value more important.
-    Ex: For two SBE 3, the temp. sensor on freq. channel 1 is primary temp, and temp. sensor on channel 4 is secondary.
-
-    After reading in format/XMLCON, determine order to put out data.
-    Read sensor dictionary, pull out SensorID number, then match with correct method.
-
-    Read in
-
-    VALUES HARDCODED, TRY TO SETUP A DICT TO MAKE NEATER
-
-    """
-    sbe_reader = SBEReader.from_paths(hex_file, xmlcon_file)
-
-    sensor_dictionary = sbe_xml_reader_a(xmlcon_file)
-    #array_1 =
-
-    #needs to search sensor dictionary, and compute in order:
-    #temp, pressure, cond, salinity, oxygen, all aux.
-    #run one loop that builds a queue to determine order of processing, must track which column to pull
-    #process queue, store results in seperate arrays for reuse later
-    #once queue is empty, attach results together according to format order or xmlcon order - structure to keep track
-    queue_metadata = []
-    results = {}
-    temp_counter = 0
-    cond_counter = 0
-    oxygen_counter = 0
-    for i, x in enumerate(sensor_dictionary):
-        #print(sensor_dictionary[str(i)]['SensorID'])
-        sensor_id = sensor_dictionary[str(i)]['SensorID']
-        if str(sensor_id) == '55': #temp
-            temp_counter += 1
-            queue_metadata.append({'list_id': i, 'channel_pos': temp_counter, 'ranking': 1, 'data': sbe_reader.parsed_scans[:,i]})
-            #results[i] = (temp_its90_dict(sensor_dictionary[str(i)], sbe_reader.parsed_scans[:,i]))
-        if str(sensor_id) == '3': #cond
-            cond_counter += 1
-            queue_metadata.append({'list_id': i, 'channel_pos': cond_counter, 'ranking': 3, 'data': sbe_reader.parsed_scans[:,i]})
-            queue.insert(1, x)
-        if str(sensor_id) == '45': #pressure
-            queue.insert(0, x)
-            queue_metadata.append({'list_id': i, 'channel_pos': 1, 'ranking': 2, 'data': sbe_reader.parsed_scans[:,i]})
-        if str(sensor_id) == '38': #oxygen
-            oxygen_counter += 1
-            queue_metadata.append({'list_id': i, 'channel_pos': oxygen_counter, 'ranking': 4, 'data': sbe_reader.parsed_scans[:,i]})
-            queue.append(x)
-    queue_metadata = sorted(queue_metadata, key = lambda sensor: sensor['ranking'])
-    while queue_metadata:
-        temp_meta = queue_metadata.pop(0)
-        if temp_meta[list_id] == '55':
-            temp_its90_dict(sensor_dictionary[list_id], sbe_reader.parsed_scans[:,list_id])
-    #print(results)
-
-#cnv_handler("GS3601101.hex", "GS3601101.XMLCON")
+    ##########################################
+    ####### Add processing code below ########
+    ##########################################
