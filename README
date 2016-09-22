@@ -1,0 +1,8 @@
+Run "python run.py hexfile xmlconfile" to convert the data to engineering units.
+
+Dependency requirements:
+numpy
+scipy
+gsw
+
+22 Sept 2016
