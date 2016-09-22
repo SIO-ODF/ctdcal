@@ -1,4 +1,7 @@
-def temp_its90_dict(calib, freq):
+import math
+import gsw.gibbs.practical_salinity
+
+def temp_its90_dict(calib, freq, verbose = 0):
     """SBE equation for converting engineering units to Celcius according to ITS-90.
     SensorID: 55
 
@@ -19,7 +22,8 @@ def temp_its90_dict(calib, freq):
             #Hack for dealing with 0 frequencies, needs additional reporting later
             if f_x == 0:
                 f_x = 1
-                print("Zero (0) frequency temperature record being processed as 1. Record: ", i)
+                if verbose > 0:
+                    print("Zero (0) frequency temperature record being processed as 1. Record: ", i)
             temp = 1/(calib['G']
                       + calib['H'] * (math.log(calib['F0']/f_x))
                       + calib['I'] * math.pow((math.log(calib['F0']/f_x)),2)
@@ -31,7 +35,8 @@ def temp_its90_dict(calib, freq):
     except:
         if f == 0:
             f = 1
-            print("Zero (0) frequency temperature record [singleton] being processed.")
+            if verbose > 0:
+                print("Zero (0) frequency temperature record [singleton] being processed.")
         ITS90 = 1/(calib['G']
                    + calib['H'] * (math.log(calib['F0']/f))
                    + calib['I'] * math.pow((math.log(calib['F0']/f)),2)
