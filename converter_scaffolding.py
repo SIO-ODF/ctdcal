@@ -83,16 +83,17 @@ def cnv_handler_2(hex_file, xmlcon_file):
     k_array = []
 
     #lookup table for sensor data
+    ###DOUBLE CHECK TYPE IS CORRECT###
     short_lookup = {
-        '55':{'short_name': 't', 'units': 'C', 'type': 'float'},
-        '45':{'short_name': 'p', 'units': 'dbar', 'type': 'float'},
-        '3':{'short_name': 'c', 'units': 'S/m', 'type':'float'},
-        '38':{'short_name': 'o', 'units': 'ml/l', 'type':'float'},
-        '11':{'short_name': 'fluoro', 'units': 'ug/l', 'type':'float'},
+        '55':{'short_name': 't', 'units': 'C', 'type': 'float64'},
+        '45':{'short_name': 'p', 'units': 'dbar', 'type': 'float64'},
+        '3':{'short_name': 'c', 'units': 'S/m', 'type':'float64'},
+        '38':{'short_name': 'o', 'units': 'ml/l', 'type':'float64'},
+        '11':{'short_name': 'fluoro', 'units': 'ug/l', 'type':'float64'},
         '27':{'short_name': 'empty', 'units':'NA', 'type':'NA'},
-        '0':{'short_name': 'alti', 'units':'m', 'type':'float'},
-        '71':{'short_name': 'cstar', 'units': 'ug/l', 'type':'float'},
-        '61':{'short_name': 'u_def', 'units':'V', 'type':'float'}
+        '0':{'short_name': 'alti', 'units':'m', 'type':'float64'},
+        '71':{'short_name': 'cstar', 'units': 'ug/l', 'type':'float64'},
+        '61':{'short_name': 'u_def', 'units':'V', 'type':'float64'}
     }
 
     ######
@@ -193,6 +194,11 @@ def cnv_handler_2(hex_file, xmlcon_file):
     header_2 = ''
     header_3 = ''
 
+    """Start writing a .csv file with extension .converted
+
+    First part - compose the header.
+    """
+
     data_list_of_lists = []
     for x in processed_data:
         header_string.append(x['sensor_id'])
@@ -206,16 +212,7 @@ def cnv_handler_2(hex_file, xmlcon_file):
 
     transposed_data = zip(*data_list_of_lists)
 
-    #print(header_1.rstrip(','))
-    #print(header_2)
-    #print(header_3)
-    #print(header_string)
-
-    """
-    #IT WORKS
-    for x in transposed_data:
-        print(','.join([str(y) for y in x]))
-    """
+    """Write header and body of .csv"""
 
     with open(namesplit, 'w') as f:
         f.write(header_1.rstrip(',') + '\n')

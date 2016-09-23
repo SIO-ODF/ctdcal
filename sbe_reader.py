@@ -5,17 +5,19 @@ import numpy as np
 import re
 import sys
 
+#not currently used
 def parse_frequency_hex(s):
     #return int(s[0:2], 16) * 256 + int(s[2:4], 16) + int(s[4:6], 16)/256
     return int(s, 16) / 256
 
+#Not currently used
 def parse_volt_hex(s):
     return (5 * (1 - (int(s, 16) / 4095)))
 
 class SBEReader():
-
+    """Code originally written by Andrew Barna, January-March 2016."""
     def __init__(self, raw_hex, xml_config):
-        '''expects long charicter string inputs'''
+        '''expects long character string inputs'''
         self.raw_hex = raw_hex
         self.xml_config = xml_config
         self._parse_config()
@@ -89,6 +91,7 @@ class SBEReader():
         num_frequencies = 5 - self.config["FrequencyChannelsSuppressed"]
         num_voltages = 8 - self.config["VoltageWordsSuppressed"]
 
+        #flags to determine how many bytes to break by
         flag_nmea_pos = 0
         flag_nmea_depth = 0
         flag_nmea_time = 0
@@ -112,6 +115,7 @@ class SBEReader():
         the_bytes = b"".join(self.raw_bytes)
 
         #specify how each line of raw data should be broken down
+        #this format is fed directly into _breakdown, so it needs to be tracked there
         unpack_str = (str(num_frequencies * 6 + num_voltages * 3 + flag_spar * 6) + "s" +
             "2s2s2s" * flag_nmea_pos + "2s2s2s" * flag_nmea_pos + "2s" + flag_nmea_pos +
             "6s" * flag_nmea_depth +
@@ -134,14 +138,18 @@ class SBEReader():
     1. Throw away away first part of the line
     2. Start processing the rest of the line
     3. Return a sequence (tuple? list?)
+
+    Reduce magic numbers? Possible?
     '''
     def _breakdown(line):
         # skip line[0]
         #convert to lat/lon
-        lat = (byte_1 * 65536 + byte_2 * 256 + byte_3)/50000
-        lon = (byte_1 * 65536 + byte_2 * 256 + byte_3)/50000
+        lat = (line[1] * 65536 + line[2] * 256 + line[3])/50000
+        lon = (line[4] * 65536 + line[5] * 256 + line[6])/50000
 
         '''
+        Are these flags even needed? Or just the new fix and masks?
+        ----
         If bit 1 in byte_pos is 1, this is a new position
         If bit 8 in byte_pos is 1, lat is negative
         If bit 7 in byte_pos is 1, lon is negative
@@ -156,24 +164,39 @@ class SBEReader():
         mask_lon_pos = 0x40
         mask_new_fix = 0x01
 
-        if byte_pos & mask_lat_pos:
-            flag_lat_pos = 1
-        if byte_pos & mask_lon_pos:
-            flag_lon_pos = 1
-        if byte_pos & mask_new_fix:
+        if line[7] & mask_lat_pos:
+            flag_lat_neg = 1
+            lat = lat * -1
+        if line[7] & mask_lon_pos:
+            flag_lon_neg = 1
+            lon = lon * -1
+        if line[7] & mask_new_fix:
             flag_new_fix = 1
+
+        print('Latitude: ' + lat)
+        print('Longitude: ' + lon)
 
         '''
         Depth is not implemented yet, SBE does not know how they did it.
         '''
+        #skip line[8]
 
         '''
         NMEA time is LSB, in seconds since January 1, 2000. check it works correctly or break down bytes again.
         '''
+        #fill in here
+
+        '''
+        Pressure temp, status and modulo required by SBE format.
+        '''
+        #skip line[n+1]
 
         '''
         Scan time is LSB, 8 char long, in seconds since January 1, 1970
         '''
+        #fill in here
+
+        return None
 
     """Only for values in bools and numeric. """
     def _parse_config(self):
