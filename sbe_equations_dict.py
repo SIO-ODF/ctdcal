@@ -1,5 +1,6 @@
 import math
 import gsw.gibbs.practical_salinity
+import numpy as np
 
 def temp_its90_dict(calib, freq, verbose = 0):
     """SBE equation for converting engineering units to Celcius according to ITS-90.
@@ -158,6 +159,20 @@ def cond_dict(calib, F, t, p):
                         / (1 + calib['CTcor'] * t + calib['CPcor'] * p))
         Conductivity = round(Conductivity,5)
     return Conductivity
+
+def sp_dict(c, t, p):
+    """Wrapper of SP_from_C from gsw library.
+    Inputs:
+    c: array, Conductivity in mS/cm
+    t: array, in-situ temp in Celcius
+    p: array, sea pressure
+
+    Output:
+    SP: array, practical salinity (PSS-78)
+
+    """
+    SP = np.array()
+    return SP
 
 def pressure_dict(calib, f, t):
     """SBE/STS(?) equation for converting pressure frequency to temperature.

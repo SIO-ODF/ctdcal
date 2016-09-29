@@ -164,6 +164,7 @@ class SBEReader():
         mask_lon_pos = 0x40
         mask_new_fix = 0x01
 
+        #collapse each if from 3 to 2 lines
         if line[7] & mask_lat_pos:
             flag_lat_neg = 1
             lat = lat * -1
@@ -184,7 +185,8 @@ class SBEReader():
         '''
         NMEA time is LSB, in seconds since January 1, 2000. check it works correctly or break down bytes again.
         '''
-        #fill in here
+        #line[9]
+        _sbe_time(_reverse_bytes(line[9]), 'nmea')
 
         '''
         Pressure temp, status and modulo required by SBE format.
@@ -194,9 +196,72 @@ class SBEReader():
         '''
         Scan time is LSB, 8 char long, in seconds since January 1, 1970
         '''
-        #fill in here
+        #line[13]
+        _sbe_time(_reverse_bytes(line[13]), 'scan')
 
         return None
+
+    def _reverse_bytes(hex_time):
+        """Reverse hex time according to SBE docs.
+        Split number by every two chars, then recombine them in reverse order.
+
+        This makes no assumptions about length or whatever. If there are an odd number of characters
+        it adds a 0 before the string to pad it out.
+
+        The final output is guaranteed to have '0x' at the beginning.
+        """
+        time = hex_time
+        if re.match('0x', time):
+            time = time[2:]
+        print(time)
+        if (len(time) % 2) == 1:
+            time = '0' + time
+
+        """Start flipping."""
+        list_1 = []
+        reverse_hex = ''
+        for y in range(0, len(time), 2):
+            list_1.append(time[y:y + 2])
+        for y in range(len(list_1) - 1, -1, -1):
+            reverse_hex = reverse_hex + list_1[y]
+        """Add prefix to make python hex compatible"""
+        reverse_hex = '0x' + reverse_hex
+        return reverse_hex
+
+    def _sbe_time(hex_time, sbe_type):
+        """Convert raw data from sbe .hex file to appropriate datetime, then return string.
+        Assumes hex_string has already been reversed by every two chars.
+        Needs to be checked for timezone problems in the future.
+
+        Input:
+        hex_time: raw hex corresponding to nmea time or scan time. Must be 8 characters.
+        sbe_type: either "nmea" or "scan"
+
+        Output:
+        A string to be ready printed to csv.
+
+        """
+        scan_start = datetime.datetime(1970, 1, 1, 0, 0, 0)
+        nmea_start = datetime.datetime(2000, 1, 1, 0, 0, 0)
+
+        #catch if 8 characters was not input
+        if re.match('0x', hex_time):
+            hex_time = hex_time[2:]
+        if len(hex_time) > 8:
+            raise Exception('Hex string too long to be SBE formatted time')
+        if len(hex_time) < 8:
+            raise Exception('Hex string too short to be SBE formatted time')
+
+        seconds = datetime.timedelta(seconds = int(hex_time, 16))
+
+        if sbe_type == "scan":
+            time = scan_start + seconds
+            return str(time)
+        elif sbe_type == "nmea":
+            time = nmea_start + seconds
+            return str(time)
+        else:
+            raise Exception('Please choose "nmea" or "scan" for second input to _sbe_time()')
 
     """Only for values in bools and numeric. """
     def _parse_config(self):
