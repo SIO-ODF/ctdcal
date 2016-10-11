@@ -139,43 +139,19 @@ class SBEReader():
     2. Start processing the rest of the line
     3. Return a sequence (tuple? list?)
 
-    Reduce magic numbers? Possible?
+    Input:
+    line - a sequence specified by format in _parse_scans_meta
+
+    Output:
+    __untitled - a string of converted data
+
+    Format:
+    Lat, Lon, bottle fire status, NMEA time, Scan time
     '''
     def _breakdown(line):
         # skip line[0]
         #convert to lat/lon
-        lat = (line[1] * 65536 + line[2] * 256 + line[3])/50000
-        lon = (line[4] * 65536 + line[5] * 256 + line[6])/50000
-
-        '''
-        Are these flags even needed? Or just the new fix and masks?
-        ----
-        If bit 1 in byte_pos is 1, this is a new position
-        If bit 8 in byte_pos is 1, lat is negative
-        If bit 7 in byte_pos is 1, lon is negative
-
-        Code is written such that all values are 0 at start, and 1 after being flipped.
-        '''
-        flag_lat_neg = 0
-        flag_lon_neg = 0
-        flag_new_fix = 0
-
-        mask_lat_pos = 0x80
-        mask_lon_pos = 0x40
-        mask_new_fix = 0x01
-
-        #collapse each if from 3 to 2 lines
-        if line[7] & mask_lat_pos:
-            flag_lat_neg = 1
-            lat = lat * -1
-        if line[7] & mask_lon_pos:
-            flag_lon_neg = 1
-            lon = lon * -1
-        if line[7] & mask_new_fix:
-            flag_new_fix = 1
-
-        print('Latitude: ' + lat)
-        print('Longitude: ' + lon)
+        _location_fix(line[1], line[2], line[3], line[4], line[5], line[6], line[7])
 
         '''
         Depth is not implemented yet, SBE does not know how they did it.
@@ -200,6 +176,46 @@ class SBEReader():
         _sbe_time(_reverse_bytes(line[13]), 'scan')
 
         return None
+
+    def _location_fix(b1, b2, b3, b4, b5, b6, b7):
+        """Determine location from SBE format.
+
+        Input:
+        b1, b2, b3: three components of Latitude
+        b4, b5, b6: three components of Longitude
+        b7: sign for lat/lon, is it a new fix
+
+        Output:
+        Tuple with three components in order:
+        latitude, longitude, new fix?
+        Latitude is a float
+        Longitude is a float
+        If it is a new fix it will be true, otherwise false
+        """
+        lat = (b1 * 65536 + b2 * 256 + b3)/50000
+        lon = (b4 * 65536 + b5 * 256 + b6)/50000
+
+        '''
+        If bit 1 in byte_pos is 1, this is a new position
+        If bit 8 in byte_pos is 1, lat is negative
+        If bit 7 in byte_pos is 1, lon is negative
+        '''
+        flag_new_fix = False
+
+        mask_lat_pos = 0x80
+        mask_lon_pos = 0x40
+        mask_new_fix = 0x01
+
+        if b7 & mask_lat_pos:
+            lat = lat * -1
+        if b7 & mask_lon_pos:
+            lon = lon * -1
+        if b7 & mask_new_fix:
+            flag_new_fix = True
+
+        #print('Latitude: ' + lat)
+        #print('Longitude: ' + lon)
+        return (lat, lon, flag_new_fix)
 
     def _reverse_bytes(hex_time):
         """Reverse hex time according to SBE docs.
@@ -241,6 +257,7 @@ class SBEReader():
         A string to be ready printed to csv.
 
         """
+        #values as state by SBE in manual
         scan_start = datetime.datetime(1970, 1, 1, 0, 0, 0)
         nmea_start = datetime.datetime(2000, 1, 1, 0, 0, 0)
 
@@ -262,6 +279,53 @@ class SBEReader():
             return str(time)
         else:
             raise Exception('Please choose "nmea" or "scan" for second input to _sbe_time()')
+
+    def _flag_status(flag_char, scan_number):
+        """An attempt to reverse engineer what the single status character means.
+
+        bit 1 = pump status, 1 = on, 0 = off
+        bit 2 = bottom contact status, no bottom contact sensor to test with
+        bit 4 = bottle fire status, 1 = fired, 0 = not fired
+        bit 8 = not used?, default to 0
+
+        bit 2 seems to default to 1 when no bottom contact sensor is installed
+        bit 4 when set notes a bottle has been fired, no positional info
+
+        NOT FINISHED
+        """
+
+        mask_pump = 0x1
+        mask_bottom_contact = 0x2
+        mask_bottle_fire = 0x4
+
+        if flag_char & mask_bottle_fire:
+            print("Bottle fire at scan: " + str(scan_number))
+        if flag_char & mask_pump:
+            print("Pump on")
+
+    def _bottle_fire(flag_char):
+        """Determine if a scan is around a bottle firing as marked by SBE.
+        A simplification of _flag_status.
+
+        bit 4 = bottle fire status, 1 = fired, 0 = not fired
+        bit 4 when set notes a bottle has been fired, no positional info
+
+        Input:
+        flag_char - a single hex char that
+
+        Output:
+        Returns True if scan is a part of a bottle fire,
+        or False if scan is not a part of a bottle fire.
+
+        Need to check for off-by-one errors
+        """
+
+        mask_bottle_fire = 0x4
+
+        if flag_char & mask_bottle_fire:
+            return(True)
+        else:
+            return(False)
 
     """Only for values in bools and numeric. """
     def _parse_config(self):
