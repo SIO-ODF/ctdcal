@@ -93,7 +93,8 @@ def cnv_handler_2(hex_file, xmlcon_file):
         '27':{'short_name': 'empty', 'units':'NA', 'type':'NA'},
         '0':{'short_name': 'alti', 'units':'m', 'type':'float64'},
         '71':{'short_name': 'cstar', 'units': 'ug/l', 'type':'float64'},
-        '61':{'short_name': 'u_def', 'units':'V', 'type':'float64'}
+        '61':{'short_name': 'u_def', 'units':'V', 'type':'float64'},
+        '1000':{'short_name': 'sal', 'units':'PSU', 'type':'float64'}
     }
 
     ######
@@ -133,6 +134,9 @@ def cnv_handler_2(hex_file, xmlcon_file):
         #aux block
         else:
             queue_metadata.append({'sensor_id': sensor_id, 'list_id': i, 'channel_pos': '', 'ranking': 5, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
+
+    #a temporary block in order to append basic salinity (t1, c1) to file. If additional salinity is needed (different combinations), it'll need a full reworking
+    queue_metadata.append({'sensor_id': '1000', 'list_id': 1000, 'channel_pos':'', 'ranking': 6, 'data': '', 'sensor_info':''})
 
     queue_metadata = sorted(queue_metadata, key = lambda sensor: sensor['ranking'])
 
@@ -179,6 +183,12 @@ def cnv_handler_2(hex_file, xmlcon_file):
         ### Fluorometer Seapoint block
         elif temp_meta['sensor_id'] == '11':
             temp_meta['sci_data'] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], temp_meta['data'])
+            processed_data.append(temp_meta)
+            print('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'])
+
+        ###Salinity block
+        elif temp_meta['sensor_id'] == '1000':
+            temp_meta['sci_data'] = sbe_eq.sp_dict(c_array, t_array, p_array)
             processed_data.append(temp_meta)
             print('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'])
 

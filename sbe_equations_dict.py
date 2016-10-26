@@ -1,5 +1,17 @@
+"""
+October 12, 2016
+Joseph Gum
+
+A module for SBE conversion equations and related helper equations.
+Eventual goal is to convert all outputs to numpy arrays to make compatible with
+gsw libraries, and remove written wrappers.
+
+"""
+
+
 import math
-import gsw.gibbs.practical_salinity
+#import gsw.gibbs.practical_salinity as psal
+import gsw
 import numpy as np
 
 def temp_its90_dict(calib, freq, verbose = 0):
@@ -162,6 +174,9 @@ def cond_dict(calib, F, t, p):
 
 def sp_dict(c, t, p):
     """Wrapper of SP_from_C from gsw library.
+    Take in non-numpy data, format to numpy array, then run through.
+    Goal to eventually deprecate this.
+
     Inputs:
     c: array, Conductivity in mS/cm
     t: array, in-situ temp in Celcius
@@ -171,7 +186,12 @@ def sp_dict(c, t, p):
     SP: array, practical salinity (PSS-78)
 
     """
-    SP = np.array()
+    c = np.array(c)
+    t = np.array(t)
+    p = np.array(p)
+
+    SP = gsw.SP_from_C(c,t,p)
+
     return SP
 
 def pressure_dict(calib, f, t):
