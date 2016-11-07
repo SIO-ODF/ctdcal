@@ -1,6 +1,10 @@
 Convert SBE CTD data into engineering units
 
+<<<<<<< HEAD
 usage: run.py [-h] [-o output file] [-d] hex File XMLCON File
+=======
+usage: run.py [-h] [-o output file] [-d] [-w [dest dir]] hex File XMLCON File
+>>>>>>> 28a2d75203eb877881da0c90191b8999fc86af4f
 
 positional arguments:
   hex File        the .hex data file to process
@@ -10,6 +14,8 @@ optional arguments:
   -h, --help      show this help message and exit
   -o output file  name and location of output file
   -d, --debug     display debug messages
+  -w [dest dir]   build web viewer, optionally specify the destination
+                  directory for the webviewer files
 
 Dependency requirements:
 python3
@@ -17,4 +23,4 @@ numpy
 scipy
 gsw
 
-06 Nov 2016
+07 Nov 2016

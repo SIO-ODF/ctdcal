@@ -278,9 +278,9 @@ def cnv_handler_2(hex_file, xmlcon_file, debug=False):
     ##### ------------HACKY DATETIME INSERTION------------ #####
     #assumes date/time will always be at end, and adds header accordingly
     #should be rewritten to have cleaner integration with rest of code
-    header_1 = header_1 + 'lat,lon,new_pos,nmea_time,scan_time\n'
-    header_2 = header_2 + 'dec_deg,dec_deg,boolean,ISO8601,ISO8601\n'
-    header_3 = header_3 + 'float64,float64,bool_,string,string\n'
+    header_1 = header_1 + 'lat,lon,new_pos,nmea_time,scan_time'
+    header_2 = header_2 + 'dec_deg,dec_deg,boolean,ISO8601,ISO8601'
+    header_3 = header_3 + 'float64,float64,bool_,string,string'
 
     ### pos/time/date block
     data_list_of_lists.append(sbe_reader.parsed_scans[:,(sbe_reader.parsed_scans.shape[1]-1)])
