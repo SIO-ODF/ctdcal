@@ -2,7 +2,7 @@ import sys
 import os
 import argparse
 import converter_scaffolding as cnv
-import web_viewer as wv
+import converter
 
 DEBUG = False
 
@@ -17,6 +17,7 @@ def errPrint(*args, **kwargs):
 # Main function of the script should it be run as a stand-alone utility.
 # -------------------------------------------------------------------------------------
 def main(argv):
+'''
     parser = argparse.ArgumentParser(description='Convert SBE CTD data into engineering units')
     parser.add_argument('hexFile', metavar='hex File', help='the .hex data file to process')
     parser.add_argument('xmlconFile', metavar='XMLCON File', help='the .XMLCON data file to process')
@@ -56,50 +57,6 @@ def main(argv):
         with open(outputFile, 'w') as f:
             f.write(output)
 
-    if args.wvDir:
-        debugPrint('Adding webviewer')
-        webView = wv.WebViewer()
-        if DEBUG:
-            webView._setDebug()
-
-        debugPrint('\tSetting webviewer directory to: ', end='')
-        if args.wvDir == 'default':
-            wvDir = os.path.join(os.path.dirname(outputFile),'webviewer')
-            debugPrint(wvDir + '... ', end='')
-        else:
-            wvDir = args.wvDir
-            debugPrint(wvDir + '... ', end='')
-
-        try:
-            os.mkdir(wvDir, 0o755);
-        except FileExistsError as exception:
-            pass
-        except PermissionError as exception:
-            errPrint('ERROR: do not have write permission at destination directory')
-            sys.exit(1)
-
-        debugPrint('Success!')
-
-        webView._setWebviewerFolder(wvDir)
-
-        debugPrint('\tCreating webviewer directory structure... ', end='')
-
-        if webView._buildScaffolding():
-            debugPrint('Success!')
-        else:
-            debugPrint('ERROR!')
-            errPrint('Unable to created webviewer directories')
-            sys.exit(1)
-
-        debugPrint("Building data file for webviewer... ", end='')
-        output = webView._buildData(outputFile)
-        debugPrint('Success!')
-
-        debugPrint('Saving webviewer data to file... ', end='')
-        webView._saveData(output)
-        debugPrint('Success!')
-
-
 DEBUG = False
 
 def debugPrint(*args, **kwargs):
@@ -108,7 +65,8 @@ def debugPrint(*args, **kwargs):
 
 def errPrint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
-
+'''
+    converter.main(hexFile,xmlconFile,DEBUG)
 # -------------------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility
 # -------------------------------------------------------------------------------------
