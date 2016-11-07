@@ -1,10 +1,6 @@
 Convert SBE CTD data into engineering units
 
-<<<<<<< HEAD
-usage: run.py [-h] [-o output file] [-d] hex File XMLCON File
-=======
 usage: run.py [-h] [-o output file] [-d] [-w [dest dir]] hex File XMLCON File
->>>>>>> 28a2d75203eb877881da0c90191b8999fc86af4f
 
 positional arguments:
   hex File        the .hex data file to process
