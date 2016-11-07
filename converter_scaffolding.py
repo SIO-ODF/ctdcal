@@ -120,16 +120,16 @@ def cnv_handler_2(hex_file, xmlcon_file, debug=False):
     #lookup table for sensor data
     ###DOUBLE CHECK TYPE IS CORRECT###
     short_lookup = {
-        '55':{'short_name': 't', 'long_name':'Temperature', 'units': 'C', 'type': 'float64'},
-        '45':{'short_name': 'p', 'long_name':'Pressure', 'units': 'dbar', 'type': 'float64'},
-        '3':{'short_name': 'c', 'long_name':'Conductivity', 'units': 'S/m', 'type':'float64'},
-        '38':{'short_name': 'o', 'long_name':'o', 'units': 'ml/l', 'type':'float64'},
-        '11':{'short_name': 'fluoro', 'long_name':'Fluorometer', 'units': 'ug/l', 'type':'float64'},
+        '55':{'short_name': 't', 'long_name':'SBE 3+ Temperature', 'units': 'C', 'type': 'float64'},
+        '45':{'short_name': 'p', 'long_name':'SBE 9+ Pressure', 'units': 'dbar', 'type': 'float64'},
+        '3':{'short_name': 'c', 'long_name':'SBE 4 Conductivity', 'units': 'S/m', 'type':'float64'},
+        '38':{'short_name': 'o', 'long_name':'SBE 43 Oxygen', 'units': 'ml/l', 'type':'float64'},
+        '11':{'short_name': 'fluoro', 'long_name':'Seapoint Fluorometer', 'units': 'ug/l', 'type':'float64'},
         '27':{'short_name': 'empty', 'long_name':'empty', 'units':'NA', 'type':'NA'},
         '0':{'short_name': 'alti', 'long_name':'Altitude', 'units':'m', 'type':'float64'},
-        '71':{'short_name': 'cstar', 'long_name':'cstart', 'units': 'ug/l', 'type':'float64'},
-        '61':{'short_name': 'u_def', 'long_name':'u_def', 'units':'V', 'type':'float64'},
-        '1000':{'short_name': 'sal', 'long_name':'Salinity', 'units':'PSU', 'type':'float64'}
+        '71':{'short_name': 'cstar', 'long_name':'CStar', 'units': 'ug/l', 'type':'float64'},
+        '61':{'short_name': 'u_def', 'long_name':'user defined', 'units':'V', 'type':'float64'},
+        '1000':{'short_name': 'sal', 'long_name':'Salinity (C1 T1)', 'units':'PSU', 'type':'float64'}
     }
 
     ######
