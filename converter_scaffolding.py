@@ -1,9 +1,20 @@
 import xml.etree.ElementTree as ET
 import struct
 import sys
+import os
+import json
 
 import sbe_reader as sbe_rd
 import sbe_equations_dict as sbe_eq
+
+DEBUG = False
+
+def debugPrint(*args, **kwargs):
+    if DEBUG:
+        errPrint(*args, **kwargs)
+
+def errPrint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 def sbe_xml_reader_a(file):
     """Function to read .XMLCON file from Seabird.
@@ -43,7 +54,7 @@ def float_convert(string):
     except:
         return string
 
-def cnv_handler_2(hex_file, xmlcon_file):
+def cnv_handler_2(hex_file, xmlcon_file, debug=False):
     """Handler to deal with converting eng. data to sci units automatically.
     When not given a format file/json, default to putting out data in order of instruments in xmlcon.
     Format file makes assumptions: duplicate sensors are ranked by channel they use, with lower value more important.
@@ -57,11 +68,35 @@ def cnv_handler_2(hex_file, xmlcon_file):
     VALUES HARDCODED, TRY TO SETUP A DICT TO MAKE NEATER
 
     """
+
+    global DEBUG
+    DEBUG = debug
+
+    debugPrint("Verifying input files... ", end='')
+
+    if not os.path.isfile(hex_file):
+        errPrint("Error: .hex file", hex_file, "not found.")
+        return False
+
+    if not os.path.isfile(xmlcon_file):
+        errPrint("Error: .XMLCOM file", xmlcon_file, "not found.")
+        return False
+
+    debugPrint("Success!")
+
+
+    debugPrint('Reading/Parsing input files...')
     sbe_reader = sbe_rd.SBEReader.from_paths(hex_file, xmlcon_file)
 
+    debugPrint('Retrieving sensor info from xmlcon file...')
     sensor_info = sbe_xml_reader_a(xmlcon_file)
-    namesplit = xmlcon_file.split('.')
-    namesplit = namesplit[0] + '.converted'
+    #debugPrint('Sensor Info:', json.dumps(sensor_info, indent=2))
+
+    #namesplit = xmlcon_file.split('.')
+    #namesplit = namesplit[0] + '.converted'
+    #outputFile = os.path.splitext(xmlcon_file)[0] + '.converted'
+    #debugPrint('Output will be saved to:', outputFile)
+
     #sensor_dictionary = sbe_xml_reader_a('GS3601101.XMLCON')
 
     #needs to search sensor dictionary, and compute in order:
@@ -85,16 +120,16 @@ def cnv_handler_2(hex_file, xmlcon_file):
     #lookup table for sensor data
     ###DOUBLE CHECK TYPE IS CORRECT###
     short_lookup = {
-        '55':{'short_name': 't', 'units': 'C', 'type': 'float64'},
-        '45':{'short_name': 'p', 'units': 'dbar', 'type': 'float64'},
-        '3':{'short_name': 'c', 'units': 'mS/cm', 'type':'float64'},
-        '38':{'short_name': 'o', 'units': 'ml/l', 'type':'float64'},
-        '11':{'short_name': 'fluoro', 'units': 'ug/l', 'type':'float64'},
-        '27':{'short_name': 'empty', 'units':'NA', 'type':'NA'},
-        '0':{'short_name': 'alti', 'units':'m', 'type':'float64'},
-        '71':{'short_name': 'cstar', 'units': 'ug/l', 'type':'float64'},
-        '61':{'short_name': 'u_def', 'units':'V', 'type':'float64'},
-        '1000':{'short_name': 'sal', 'units':'PSU', 'type':'float64'}
+        '55':{'short_name': 't', 'long_name':'Temperature', 'units': 'C', 'type': 'float64'},
+        '45':{'short_name': 'p', 'long_name':'Pressure', 'units': 'dbar', 'type': 'float64'},
+        '3':{'short_name': 'c', 'long_name':'Conductivity', 'units': 'S/m', 'type':'float64'},
+        '38':{'short_name': 'o', 'long_name':'o', 'units': 'ml/l', 'type':'float64'},
+        '11':{'short_name': 'fluoro', 'long_name':'Fluorometer', 'units': 'ug/l', 'type':'float64'},
+        '27':{'short_name': 'empty', 'long_name':'empty', 'units':'NA', 'type':'NA'},
+        '0':{'short_name': 'alti', 'long_name':'Altitude', 'units':'m', 'type':'float64'},
+        '71':{'short_name': 'cstar', 'long_name':'cstart', 'units': 'ug/l', 'type':'float64'},
+        '61':{'short_name': 'u_def', 'long_name':'u_def', 'units':'V', 'type':'float64'},
+        '1000':{'short_name': 'sal', 'long_name':'Salinity', 'units':'PSU', 'type':'float64'}
     }
 
     ######
@@ -147,56 +182,62 @@ def cnv_handler_2(hex_file, xmlcon_file):
 
         ###Temperature block
         if temp_meta['sensor_id'] == '55':
-            #print(temp_meta['sensor_info'])
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             temp_meta['sci_data'] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], temp_meta['data'])
             if temp_meta['list_id'] == 0:
                 t_array = temp_meta['sci_data']
                 k_array = [273.15+celcius for celcius in t_array]
-                print('Primary temperature used: ', t_array[0])
+                debugPrint('\tPrimary temperature used:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             processed_data.append(temp_meta)
-            print('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'])
+            #debugPrint('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'], short_lookup[temp_meta['sensor_id']]['long_name'])
 
         ### Pressure block
         elif temp_meta['sensor_id'] == '45':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             temp_meta['sci_data'] = sbe_eq.pressure_dict(temp_meta['sensor_info'], temp_meta['data'], t_array)
             if temp_meta['list_id'] == 2:
                 p_array = temp_meta['sci_data']
-                print('Pressure used: ', p_array[0])
+                debugPrint('\tPressure used:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             processed_data.append(temp_meta)
-            print('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'])
+            #debugPrint('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'], short_lookup[temp_meta['sensor_id']]['long_name'])
 
         ### Conductivity block
         elif temp_meta['sensor_id'] == '3':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             temp_meta['sci_data'] = sbe_eq.cond_dict(temp_meta['sensor_info'], temp_meta['data'], t_array, p_array)
             if temp_meta['list_id'] == 1:
                 c_array = temp_meta['sci_data']
-                print('Primary cond used: ', c_array[0])
+                debugPrint('\tPrimary cond used:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             processed_data.append(temp_meta)
-            print('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'])
+            #debugPrint('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'], short_lookup[temp_meta['sensor_id']]['long_name'])
 
         ### Oxygen block
         elif temp_meta['sensor_id'] == '38':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             temp_meta['sci_data'] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, temp_meta['data'])
             processed_data.append(temp_meta)
-            print('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'])
+            #debugPrint('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'], short_lookup[temp_meta['sensor_id']]['long_name'])
 
         ### Fluorometer Seapoint block
         elif temp_meta['sensor_id'] == '11':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             temp_meta['sci_data'] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], temp_meta['data'])
             processed_data.append(temp_meta)
-            print('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'])
+            #debugPrint('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'], short_lookup[temp_meta['sensor_id']]['long_name'])
 
         ###Salinity block
         elif temp_meta['sensor_id'] == '1000':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             temp_meta['sci_data'] = sbe_eq.sp_dict(c_array, t_array, p_array)
             processed_data.append(temp_meta)
-            print('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'])
+            #debugPrint('Processed ', temp_meta['ranking'], temp_meta['list_id'], temp_meta['sensor_id'], short_lookup[temp_meta['sensor_id']]['long_name'])
 
         ### Aux block
         else:
+            debugPrint('Skipping Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             temp_meta['sci_data'] = temp_meta['data']
             processed_data.append(temp_meta)
-            print('Currently skipping (not processing, raw voltages only) sensor list_id: ', temp_meta['list_id'])
+            #debugPrint('Currently skipping (not processing, raw voltages only) sensor list_id: ', temp_meta['sensor_id'], short_lookup[temp_meta['sensor_id']]['long_name'])
 
     ### Create a single unified object with all data in there
     header_string = []
@@ -209,16 +250,30 @@ def cnv_handler_2(hex_file, xmlcon_file):
     First part - compose the header.
     """
 
+    output = ''
+
+    debugPrint('Compiling header information')
     data_list_of_lists = []
     for x in processed_data:
         header_string.append(x['sensor_id'])
         data_list_of_lists.append(x['sci_data'])
         try:
             header_1 = header_1 + '{0}{1},'.format(short_lookup[x['sensor_id']]['short_name'], x['channel_pos'])
+        except:
+            header_1 = header_1 + 'error,'
+            errPrint('Error in lookup table: channel_pos for sensor ID:', x['sensor_id'])
+
+        try:
             header_2 = header_2 + '{0},'.format(short_lookup[x['sensor_id']]['units'])
+        except:
+            header_2 = header_2 + 'error,'
+            errPrint('Error in lookup table: units for sensor ID:', x['sensor_id'])
+
+        try:
             header_3 = header_3 + '{0},'.format(short_lookup[x['sensor_id']]['type'])
         except:
-            print(None)
+            header_3 = header_3 + 'error,'
+            errPrint('Error in lookup table: type for sensor ID:', x['sensor_id'])
 
     ##### ------------HACKY DATETIME INSERTION------------ #####
     #assumes date/time will always be at end, and adds header accordingly
@@ -231,16 +286,27 @@ def cnv_handler_2(hex_file, xmlcon_file):
     data_list_of_lists.append(sbe_reader.parsed_scans[:,(sbe_reader.parsed_scans.shape[1]-1)])
     ##### ----------HACKY DATETIME INSERTION END---------- #####
 
+    debugPrint('Transposing data')
     transposed_data = zip(*data_list_of_lists)
 
     """Write header and body of .csv"""
 
-    with open(namesplit, 'w') as f:
-        f.write(header_1.rstrip(',') + '\n')
-        f.write(header_2.rstrip(',') + '\n')
-        f.write(header_3.rstrip(',') + '\n')
-        for x in transposed_data:
-            f.write(','.join([str(y) for y in x]) + '\n')
+#    with open(namesplit, 'w') as f:
+#    with open(outputFile, 'w') as f:
+#        f.write(header_1.rstrip(',') + '\n')
+#        f.write(header_2.rstrip(',') + '\n')
+#        f.write(header_3.rstrip(',') + '\n')
+#        for x in transposed_data:
+#            f.write(','.join([str(y) for y in x]) + '\n')
 
-    print('Done, look for file with ".converted" extension')
-    return None
+#    with open(namesplit, 'w') as f:
+#    with open(outputFile, 'w') as f:
+    output += header_1.rstrip(',') + '\n'
+    output += header_2.rstrip(',') + '\n'
+    output += header_3.rstrip(',') + '\n'
+    for x in transposed_data:
+        output += ','.join([str(y) for y in x]) + '\n'
+
+#    print('Done, output saved to:', outputFile)
+    debugPrint('Processing complete')
+    return output

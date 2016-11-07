@@ -1,8 +1,20 @@
-Run "python run.py hexfile xmlconfile" to convert the data to engineering units.
+Convert SBE CTD data into engineering units
+
+usage: run.py [-h] [-o output file] [-d] hex File XMLCON File
+
+positional arguments:
+  hex File        the .hex data file to process
+  XMLCON File     the .XMLCON data file to process
+
+optional arguments:
+  -h, --help      show this help message and exit
+  -o output file  name and location of output file
+  -d, --debug     display debug messages
 
 Dependency requirements:
+python3
 numpy
 scipy
 gsw
 
-22 Sept 2016
+06 Nov 2016
