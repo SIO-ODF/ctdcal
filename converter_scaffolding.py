@@ -87,7 +87,7 @@ def cnv_handler_2(hex_file, xmlcon_file):
     short_lookup = {
         '55':{'short_name': 't', 'units': 'C', 'type': 'float64'},
         '45':{'short_name': 'p', 'units': 'dbar', 'type': 'float64'},
-        '3':{'short_name': 'c', 'units': 'S/m', 'type':'float64'},
+        '3':{'short_name': 'c', 'units': 'mS/cm', 'type':'float64'},
         '38':{'short_name': 'o', 'units': 'ml/l', 'type':'float64'},
         '11':{'short_name': 'fluoro', 'units': 'ug/l', 'type':'float64'},
         '27':{'short_name': 'empty', 'units':'NA', 'type':'NA'},
@@ -129,14 +129,14 @@ def cnv_handler_2(hex_file, xmlcon_file):
         #oxygen block
         elif str(sensor_id) == '38':
             oxygen_counter += 1
-            queue_metadata.append({'sensor_id': '38', 'list_id': i, 'channel_pos': oxygen_counter, 'ranking': 4, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
+            queue_metadata.append({'sensor_id': '38', 'list_id': i, 'channel_pos': oxygen_counter, 'ranking': 5, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
 
         #aux block
         else:
-            queue_metadata.append({'sensor_id': sensor_id, 'list_id': i, 'channel_pos': '', 'ranking': 5, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
+            queue_metadata.append({'sensor_id': sensor_id, 'list_id': i, 'channel_pos': '', 'ranking': 6, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
 
     #a temporary block in order to append basic salinity (t1, c1) to file. If additional salinity is needed (different combinations), it'll need a full reworking
-    queue_metadata.append({'sensor_id': '1000', 'list_id': 1000, 'channel_pos':'', 'ranking': 6, 'data': '', 'sensor_info':''})
+    queue_metadata.append({'sensor_id': '1000', 'list_id': 1000, 'channel_pos':'', 'ranking': 4, 'data': '', 'sensor_info':''})
 
     queue_metadata = sorted(queue_metadata, key = lambda sensor: sensor['ranking'])
 
@@ -219,6 +219,17 @@ def cnv_handler_2(hex_file, xmlcon_file):
             header_3 = header_3 + '{0},'.format(short_lookup[x['sensor_id']]['type'])
         except:
             print(None)
+
+    ##### ------------HACKY DATETIME INSERTION------------ #####
+    #assumes date/time will always be at end, and adds header accordingly
+    #should be rewritten to have cleaner integration with rest of code
+    header_1 = header_1 + 'lat,lon,new_pos,nmea_time,scan_time\n'
+    header_2 = header_2 + 'dec_deg,dec_deg,boolean,ISO8601,ISO8601\n'
+    header_3 = header_3 + 'float64,float64,bool_,string,string\n'
+
+    ### pos/time/date block
+    data_list_of_lists.append(sbe_reader.parsed_scans[:,(sbe_reader.parsed_scans.shape[1]-1)])
+    ##### ----------HACKY DATETIME INSERTION END---------- #####
 
     transposed_data = zip(*data_list_of_lists)
 

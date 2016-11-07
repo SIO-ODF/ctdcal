@@ -1,9 +1,14 @@
+"""
+Code to break down a string of SBE raw data into parseable chunks to be converted by methods later on. No conversion to sci data is done here.
+"""
+
 #%pylab inline
 import xml.etree.ElementTree as ET
 import struct
 import numpy as np
 import re
 import sys
+import datetime
 
 #not currently used
 def parse_frequency_hex(s):
@@ -67,6 +72,7 @@ class SBEReader():
         #this uses numpy magic to just "apply" the needed operations to the correct part of the array all in one go
         measurements[:,:num_frequencies] = measurements[:,:num_frequencies] / 256
         measurements[:,num_frequencies:num_frequencies+num_voltages] = (5 * (1 - (measurements[:,num_frequencies:num_frequencies+num_voltages] / 4095)))
+        #print(measurements.shape)
         return measurements
 
     def _parse_scans_meta(self):
@@ -117,15 +123,18 @@ class SBEReader():
         #specify how each line of raw data should be broken down
         #this format is fed directly into _breakdown, so it needs to be tracked there
         unpack_str = (str(num_frequencies * 6 + num_voltages * 3 + flag_spar * 6) + "s" +
-            "2s2s2s" * flag_nmea_pos + "2s2s2s" * flag_nmea_pos + "2s" + flag_nmea_pos +
+            "2s2s2s" * flag_nmea_pos + "2s2s2s" * flag_nmea_pos + "2s" * flag_nmea_pos +
             "6s" * flag_nmea_depth +
             "8s" * flag_nmea_time +
-            "3s" * flag_pressure_temp + "1s" * flag_status + "2s" * flag_modulo + #may be excessive
+            "3s" * flag_pressure_temp +
+            "1s" * flag_status +
+            "2s" * flag_modulo +
             "8s" * flag_scan_time)
         #breaks down line according to columns specified by unpack_str and converts from hex to decimal MSB first
         #needs to be adjusted for LSB fields (NMEA time, scan time), break into two lines? move int(x,16) outside
         measurements = [line for line in struct.iter_unpack(unpack_str, the_bytes)]
-        measurements_2 = [_breakdown(line) for line in measurements]
+        measurements_2 = np.array([self._breakdown(line) for line in measurements])
+        #print(measurements_2.shape)
 
         return measurements_2
 
@@ -148,10 +157,12 @@ class SBEReader():
     Format:
     Lat, Lon, bottle fire status, NMEA time, Scan time
     '''
-    def _breakdown(line):
+    def _breakdown(self, line):
+        output = ''
+
         # skip line[0]
         #convert to lat/lon
-        _location_fix(line[1], line[2], line[3], line[4], line[5], line[6], line[7])
+        output = output + str(self._location_fix(line[1], line[2], line[3], line[4], line[5], line[6], line[7])) + ','
 
         '''
         Depth is not implemented yet, SBE does not know how they did it.
@@ -162,7 +173,7 @@ class SBEReader():
         NMEA time is LSB, in seconds since January 1, 2000. check it works correctly or break down bytes again.
         '''
         #line[9]
-        _sbe_time(_reverse_bytes(line[9]), 'nmea')
+        output = output + str(self._sbe_time(self._reverse_bytes(line[9]), 'nmea')) + ','
 
         '''
         Pressure temp, status and modulo required by SBE format.
@@ -173,11 +184,11 @@ class SBEReader():
         Scan time is LSB, 8 char long, in seconds since January 1, 1970
         '''
         #line[13]
-        _sbe_time(_reverse_bytes(line[13]), 'scan')
+        output = output + str(self._sbe_time(self._reverse_bytes(line[13]), 'scan'))
 
-        return None
+        return output
 
-    def _location_fix(b1, b2, b3, b4, b5, b6, b7):
+    def _location_fix(self, b1, b2, b3, b4, b5, b6, b7):
         """Determine location from SBE format.
 
         Input:
@@ -192,8 +203,8 @@ class SBEReader():
         Longitude is a float
         If it is a new fix it will be true, otherwise false
         """
-        lat = (b1 * 65536 + b2 * 256 + b3)/50000
-        lon = (b4 * 65536 + b5 * 256 + b6)/50000
+        lat = (int(b1, 16) * 65536 + int(b2, 16) * 256 + int(b3, 16))/50000
+        lon = (int(b4, 16) * 65536 + int(b5, 16) * 256 + int(b6, 16))/50000
 
         '''
         If bit 1 in byte_pos is 1, this is a new position
@@ -206,18 +217,17 @@ class SBEReader():
         mask_lon_pos = 0x40
         mask_new_fix = 0x01
 
-        if b7 & mask_lat_pos:
+        if int(b7, 16) & mask_lat_pos:
             lat = lat * -1
-        if b7 & mask_lon_pos:
+        if int(b7, 16) & mask_lon_pos:
             lon = lon * -1
-        if b7 & mask_new_fix:
+        if int(b7, 16) & mask_new_fix:
             flag_new_fix = True
 
-        #print('Latitude: ' + lat)
-        #print('Longitude: ' + lon)
-        return (lat, lon, flag_new_fix)
+        output = '{0},{1},{2}'.format(lat, lon, flag_new_fix)
+        return output
 
-    def _reverse_bytes(hex_time):
+    def _reverse_bytes(self, hex_time):
         """Reverse hex time according to SBE docs.
         Split number by every two chars, then recombine them in reverse order.
 
@@ -226,10 +236,11 @@ class SBEReader():
 
         The final output is guaranteed to have '0x' at the beginning.
         """
-        time = hex_time
+        time = hex_time.decode("utf-8")
+        #print(time)
         if re.match('0x', time):
             time = time[2:]
-        print(time)
+        #print(time)
         if (len(time) % 2) == 1:
             time = '0' + time
 
@@ -244,7 +255,7 @@ class SBEReader():
         reverse_hex = '0x' + reverse_hex
         return reverse_hex
 
-    def _sbe_time(hex_time, sbe_type):
+    def _sbe_time(self, hex_time, sbe_type):
         """Convert raw data from sbe .hex file to appropriate datetime, then return string.
         Assumes hex_string has already been reversed by every two chars.
         Needs to be checked for timezone problems in the future.
@@ -265,22 +276,22 @@ class SBEReader():
         if re.match('0x', hex_time):
             hex_time = hex_time[2:]
         if len(hex_time) > 8:
-            raise Exception('Hex string too long to be SBE formatted time')
+            raise Exception('Hex string too long to be SBE formatted time: ' + hex_time)
         if len(hex_time) < 8:
-            raise Exception('Hex string too short to be SBE formatted time')
+            raise Exception('Hex string too short to be SBE formatted time: ' + hex_time)
 
         seconds = datetime.timedelta(seconds = int(hex_time, 16))
 
         if sbe_type == "scan":
             time = scan_start + seconds
-            return str(time)
+            return time.isoformat()
         elif sbe_type == "nmea":
             time = nmea_start + seconds
-            return str(time)
+            return time.isoformat()
         else:
             raise Exception('Please choose "nmea" or "scan" for second input to _sbe_time()')
 
-    def _flag_status(flag_char, scan_number):
+    def _flag_status(self, flag_char, scan_number):
         """An attempt to reverse engineer what the single status character means.
 
         bit 1 = pump status, 1 = on, 0 = off
@@ -302,8 +313,9 @@ class SBEReader():
             print("Bottle fire at scan: " + str(scan_number))
         if flag_char & mask_pump:
             print("Pump on")
+        return None
 
-    def _bottle_fire(flag_char):
+    def _bottle_fire(self, flag_char):
         """Determine if a scan is around a bottle firing as marked by SBE.
         A simplification of _flag_status.
 
@@ -326,6 +338,8 @@ class SBEReader():
             return(True)
         else:
             return(False)
+
+        return None
 
     """Only for values in bools and numeric. """
     def _parse_config(self):
@@ -392,7 +406,7 @@ class SBEReader():
         try:
             return self._parsed_scans
         except AttributeError:
-            self._parsed_scans = self._parse_scans()
+            self._parsed_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
             return self._parsed_scans
 
     def to_dict(self, parse_cache=True):

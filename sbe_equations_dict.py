@@ -136,21 +136,24 @@ def oxy_dict(calib, P, K, T, S, V):
     return oxygen
 
 def cond_dict(calib, F, t, p):
-    """SBE equation for converting frequency to conductivity.
+    """SBE equation for converting frequency to conductivity. Calculates mS/cm
     SensorID: 3
 
     Inputs:
-
-    G: coefficient
-    H: coefficient
-    I: coefficient
-    J: coefficient
-    CPcor: coefficient (nominal)
-    CTcor: coefficient (nominal)
+    calib:
+        G: coefficient
+        H: coefficient
+        I: coefficient
+        J: coefficient
+        CPcor: coefficient (nominal)
+        CTcor: coefficient (nominal)
 
     F: instrument frequency
     t: temperature (ITS-90 degrees C)
     p: pressure (decibars)
+
+    Output:
+    sequence or float of mS/cm
     """
     try:
         Conductivity = []
@@ -160,6 +163,8 @@ def cond_dict(calib, F, t, p):
                      + calib['I'] * math.pow(F_0,3)
                      + calib['J'] * math.pow(F_0,4))
                     / (1 + calib['CTcor'] * t_0 + calib['CPcor'] * p_0))
+            #S/m to mS/cm
+            temp = temp * 0.1
             temp = round(temp, 5)
             Conductivity.append(temp)
     #single mode
@@ -169,6 +174,8 @@ def cond_dict(calib, F, t, p):
                          + calib['I'] * math.pow(f,3)
                          + calib['J'] * math.pow(f,4))
                         / (1 + calib['CTcor'] * t + calib['CPcor'] * p))
+        #S/m to mS/cm
+        Conductivity = Conductivity * 0.1
         Conductivity = round(Conductivity,5)
     return Conductivity
 
@@ -314,8 +321,8 @@ def fluoro_seapoint_dict(calib, signal):
         fluoro = []
         for signal_x in signal:
             temp = signal_x
-            fluoro.append(temp)
+            fluoro.append(round(temp,6))
     #single mode
     except:
-        fluoro = signal
+        fluoro = round(signal,6)
     return fluoro
