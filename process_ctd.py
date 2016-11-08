@@ -403,8 +403,7 @@ def pressure_sequence(inMat=None, intP=2.0, startT=-1.0, startP=0.0, up='down', 
         p_bin_index = np.digitize(roll_filter_matrix['Pdbar'],pressure_bins)
 
         # Define output array
-        inMat_dtype = inMat.dtype
-        binned_matrix = np.empty(shape=(len(pressure_bins),), dtype=inMat_dtype)
+        binned_matrix = np.empty(shape=(len(pressure_bins),), dtype=inMat.dtype)
 
         # todo: remove explicit column 'Pdbar' call here
         for col in binned_matrix.dtype.names:
