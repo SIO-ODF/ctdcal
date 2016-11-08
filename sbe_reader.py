@@ -353,7 +353,8 @@ class SBEReader():
         numeric = [
             "FrequencyChannelsSuppressed",
             "VoltageWordsSuppressed",
-            ]
+        ]
+        sensors = {}
 
         config = ET.fromstring(self.xml_config)
         self.config = {}
@@ -373,6 +374,32 @@ class SBEReader():
                 raise AttributeError("Could not find {} in XMLCONF".format(key))
             except ValueError:
                 raise ValueError("{} Value is not truthy".format(key))
+
+        """Pokedex is a dict of {Sensor index numbers from the config:sensor info}
+        Assume that sensor index number is the order the sensors have been entered into the file.
+        Therefore, it will be Frequency instruments first, then Voltage instruments.
+        Call their index number (starting at 0) in order to pull out the info.
+
+        """
+        #pokedex = {}
+        for x in config.iter('Sensor'):
+            #print(ET.tostring(x))
+            """Start creating single sensor dictionary."""
+            bulbasaur = {}
+            bulbasaur['SensorID'] = x.attrib['SensorID']
+            #load all values into dict - beware of overwriting #NEED TO FIX
+            for children in x:
+                for y in children.iter():
+                    try:
+                        bulbasaur[y.tag] = float(y.text)
+                    except:
+                        bulbasaur[y.tag] = str(y.text).replace('\n', '').replace(' ','')
+                    
+                """Add sensor to big dictionary."""
+                #pokedex[x.attrib['index']] = bulbasaur
+                sensors[int(x.attrib['index'])] = bulbasaur
+        #sensors.append(pokedex)
+        self.config['Sensors'] = sensors
 
     @classmethod
     def from_paths(cls, raw_hex_path, xml_config_path, encoding="cp437"):
@@ -404,10 +431,13 @@ class SBEReader():
     @property
     def parsed_scans(self):
         try:
-            return self._parsed_scans
+            return self._parse_scans
         except AttributeError:
-            self._parsed_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
-            return self._parsed_scans
+            self._parse_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
+            return self._parse_scans
+
+    def parsed_config(self):
+        return self.config
 
     def to_dict(self, parse_cache=True):
         return {

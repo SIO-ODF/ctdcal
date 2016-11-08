@@ -1,17 +1,20 @@
-Convert SBE CTD data into engineering units
+General Utility for processing SBE Data
 
-usage: run.py [-h] [-o output file] [-d] [-w [dest dir]] hex File XMLCON File
+usage: run.py [-h] [-d] [-r] [-p iniFile] [-o destDir] [-w [destDir]]
+              hex File XMLCON File
 
 positional arguments:
-  hex File        the .hex data file to process
-  XMLCON File     the .XMLCON data file to process
+  hex File      the .hex data file to process
+  XMLCON File   the .XMLCON data file to process
 
 optional arguments:
-  -h, --help      show this help message and exit
-  -o output file  name and location of output file
-  -d, --debug     display debug messages
-  -w [dest dir]   build web viewer, optionally specify the destination
-                  directory for the webviewer files
+  -h, --help    show this help message and exit
+  -d, --debug   display debug messages
+  -r, --raw     return the raw data values
+  -p iniFile    process the ctd data, requires and addition ini file
+  -o destDir    location to save output files
+  -w [destDir]  build web viewer, optionally specify the destination directory
+                for the webviewer files
 
 Dependency requirements:
 python3
@@ -19,4 +22,4 @@ numpy
 scipy
 gsw
 
-07 Nov 2016
+08 Nov 2016
