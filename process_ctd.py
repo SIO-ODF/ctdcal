@@ -1,22 +1,10 @@
 #!/usr/bin/env python
-# Python script with tested CTD signal filters
-# Ideal default CTD filter is the Triangle filter
-# Other filters may be added if they are theoretically sound and tested first
-# 
-# EXAMPLE:
-# import filters  
-# data_array = []
-# filters.traingle(data_array, 24)
-# ** This means triangle filter with a 12 frame window size, filtered twice with over passed array
-#  
 import numpy as np
 import scipy.signal as sig
 import scipy.stats as st
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
-# This function manages the start time of cast post standard 10m start-up soak and return to surface.
 def cast_details(inMat):
     """cast_details function 
 
@@ -75,13 +63,6 @@ def cast_details(inMat):
     # Remove everything after cast end
     inMat = inMat[:tmp]
   
-    print('start time '+str(s))
-    print('start pres '+str(sp))
-    print('bottom time '+str(b))
-    print('max press '+str(mp))
-    print('end time' +str(e))
-    print(inMat)
-
     return s, e, b, sp, mp, inMat
 
 def ctd_align(inMat, col, time=0.0):
@@ -133,9 +114,6 @@ def dataToDataFrame(inFile):
     df = pd.read_csv(inFile, header=[0,1])
     return df
 
-# Read in csv file to data object
-# dtype is defined below
-# https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
 def dataToMatrix(inFile, dtype=None, separator=','):
     """dataToMatrix function 
 
@@ -154,9 +132,6 @@ def dataToMatrix(inFile, dtype=None, separator=','):
 
     Reference Page:
         https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
-    print(dtype)
-    if dtype is None: 
-        return 
     """
 
     arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, skip_header=2)
@@ -236,7 +211,7 @@ def ondeck_pressure(inMat, scond):
     sdelay = fl*ms
 
     # Searches first quarter of matrix, uses start conductivity  
-    # condition min to capture startup Press
+    # condition min to capture startup pressure
     for j in range(0,int(len(inMat)/4)):
         if ((inMat['TIMEs'][j] > 0.0) and (inMat['C1mScm'][j] < scond) and (inMat['C2mScm'][j] < scond)):
             tmp = j
@@ -264,9 +239,178 @@ def ondeck_pressure(inMat, scond):
     else: end_p = np.average(ep[(len(ep)):])
 
     # Remove on-deck ending 
-    inMat = inMat[:tmp]
+    outMat = inMat[:tmp]
 
     # Store ending on-deck pressure
     print("Sta/Cast ondeck start "+str(start_p)+" "+str(end_p))
 
-    return inMat
+    return outMat
+
+def roll_filter(inMat=None, up='down', frames_per_sec=24, search_time=15):
+    """roll_filter function 
+
+    Function takes full NUMPY ndarray with predefined dtype array 
+    and subsample arguments to return a roll filtered ndarray. 
+
+    Args:
+        param1 (ndarray): inMat, numpy ndarray with dtype array 
+        param2 (str): up, direction to filter cast (up vs down)
+        param3 (int): frames_per_sec, subsample selection rate
+        param4 (int): seach_time, search time past pressure inversion  
+
+    Returns:
+        Narray: The return value ndarray of data with ship roll removed
+    """
+    remove = [] 
+    frequency = 24 # Hz of package
+
+    if (frames_per_sec > 0) & (frames_per_sec <= 24):
+        sample = int(frequency/frames_per_sec) # establish subsample rate to time ratio 
+    else: sample = frequency
+
+    # Adjusted search time with subsample rate
+    search_time = int(sample*frequency*int(search_time)) 
+
+    if inMat is None:
+        print("Roll filter function: No input data.")
+        return
+    else:
+        P = inMat['Pdbar']
+        dP = np.diff(P,1) 
+
+        if up is 'down':
+            index_to_remove = np.where(dP < 0)[0] # Differential filter
+            subMat = np.delete(inMat, index_to_remove, axis=0)
+
+            P = subMat['Pdbar']
+            tmp = np.array([])
+            for i in range(0,len(P)-1):
+               if P[i] > P[i+1]:
+                   deltaP = P[i+1] + abs(P[i] - P[i+1])
+                   # Remove aliasing
+                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
+                   tmp = np.arange(i+1,k[0]+1,1)
+               remove = np.append(remove,tmp)
+               deltaP = 0
+        elif up is 'up':
+            index_to_remove = np.where(dP > 0)[0] # Differential filter
+            subMat = np.delete(inMat, index_to_remove, axis=0)
+
+            P = subMat['Pdbar']
+            tmp = np.array([])
+            for i in range(0,len(P)-1):
+               if P[i] < P[i+1]:
+                   deltaP = P[i+1] - abs(P[i] - P[i+1])
+                   # Remove aliasing
+                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
+                   tmp = np.arange(i+1,k[0]+1,1)
+               remove = np.append(remove,tmp)
+               deltaP = 0
+
+        subMat = np.delete(subMat,remove,axis=0)
+
+    return subMat
+
+def pressure_sequence(inMat=None, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=1, search_time=15):
+    """pressure_sequence function 
+
+    Function takes full NUMPY ndarray with predefined dtype array 
+    and several arguments to return a pressure sequenced data ndarray. 
+
+    Pressure sequencing includes rollfilter.
+
+    Necissary inputs are input Matrix (inMat) and pressure interval (intP). 
+    The other inputs have default settings. The program will figure out 
+    specifics for those settings if left blank. 
+    Start time (startT), start pressure (startP) and up are mutually exclusive.
+    If sensors are not not fully functional when ctd starts down cast 
+    analyst can select a later start time or start pressure but not both. 
+    There is no interpolation to the surface for other sensor values. 
+    'up' indicates direction for pressure sequence. If up is set startT and startP 
+    are void. 
+    
+    Args:
+        param1 (ndarray): input matrix (inMat), numpy ndarray with dtype array 
+        param2 (float): pressure interval (intP), default 2.0 dbar 
+        param3 (float): starting pressure interval 
+        param4 (float): start time (startT) for pressure sequence 
+        param5 (float): start pressure (startP) for pressure sequence
+        param5 (str): pressure sequence direction (down/up)
+        param6 (int): sample_rate, sub sample rate for roll_filter. Cleans & speeds processing.
+        param7 (int): search_time, truncate search index for the aliasing part of ship roll. 
+
+    Returns:
+        Narray: The return value is a matrix of pressure sequenced data 
+
+    todo: implement the following as fail safe surface treatment, 
+          repeatPt: the point in the matrix that is repeated back to the surface.
+          repeatVal: the values in the matrix that is repeated back to the surface.
+          
+    todo: deep data bin interpolation to manage empty slices
+    """
+
+    # Passed Time-Series, Create Pressure Series
+    if inMat is None:
+        print("Pressure sequence function: No input data.")
+        return
+    else:
+        pF = inMat['Pdbar']
+        full_length = len(pF)-1
+
+        btm = max(pF) # bottom max P
+        indBtm = np.argmax(pF) # bottom index
+        btmTime = inMat['TIMEs'][indBtm] # bottom time 
+
+        # Initialise input parameters
+        if ((startT > 0.0) and (startT > inMat['TIMEs'][0])):
+            repeatPt = (np.abs(inMat['TIMEs'] - startT)).argmin()
+            repeatVal = inMat[:][repeatPt]
+            lenP = np.arange(repeatPt,indBtm,1)
+            start = repeatPt
+            end = len(lenP)
+            prvPrs = inMat['Pdbar'][repeatPt]
+            if btmTime <= startT:
+                print("-startT start time is greater than down cast time. Cast issue.")
+                return
+        elif ((startP > 0.0) and (startP > pF[0])):
+            repeatPt = (np.abs(inMat['Pdbar'] - startP)).argmin()
+            repeatVal = inMat[:][repeatPt]
+            lenP = np.arange(repeatPt,indBtm,1)
+            start = repeatPt
+            end = len(lenP) 
+            prvPrs = inMat['Pdbar'][repeatPt]
+            if btm <= startP:
+                print("-startP start pressure is greater than bottom pressure. Cast issue.")
+                return
+        elif up is 'up':
+            repeatPt = full_length
+            repeatVal = inMat[:][repeatPt]
+            lenP = np.arange(indBtm,repeatPt,1) 
+            start = indBtm
+            end = full_length 
+            prvPrs = btm
+        else:
+            lenP = np.arange(0,indBtm,1)
+            start = 0
+            end = len(lenP)
+            prvPrs = 0.0
+        
+        # Roll Filter 
+        roll_filter_matrix = roll_filter(inMat[:][start:end:sample_rate], up, sample_rate, search_time)
+
+        # Frame Pressure Bins
+        pressure_bins = np.arange(0,int(btm),2)
+        p_bin_index = np.digitize(roll_filter_matrix['Pdbar'],pressure_bins)
+
+        # Define output array
+        inMat_dtype = inMat.dtype
+        binned_matrix = np.empty(shape=(len(pressure_bins),), dtype=inMat_dtype)
+
+        # todo: remove explicit column 'Pdbar' call here
+        for col in binned_matrix.dtype.names:
+            if col == 'Pdbar':
+                binned_matrix[col] = pressure_bins
+            elif binned_matrix[col].dtype is np.dtype(np.float64):
+                binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean() for i in range(0,len(pressure_bins))]
+
+    return binned_matrix
