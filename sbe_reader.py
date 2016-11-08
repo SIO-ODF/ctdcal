@@ -184,7 +184,12 @@ class SBEReader():
         Scan time is LSB, 8 char long, in seconds since January 1, 1970
         '''
         #line[13]
-        output = output + str(self._sbe_time(self._reverse_bytes(line[13]), 'scan'))
+        output = output + str(self._sbe_time(self._reverse_bytes(line[13]), 'scan')) + ','
+
+        '''
+        Bottle fire - should match up exactly, might not.
+        '''
+        output = output + str(self._bottle_fire(line[11]))
 
         return output
 
@@ -333,8 +338,7 @@ class SBEReader():
         """
 
         mask_bottle_fire = 0x4
-
-        if flag_char & mask_bottle_fire:
+        if int(flag_char, 16) & mask_bottle_fire:
             return(True)
         else:
             return(False)
