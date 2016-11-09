@@ -133,9 +133,11 @@ class SBEReader():
         #breaks down line according to columns specified by unpack_str and converts from hex to decimal MSB first
         #needs to be adjusted for LSB fields (NMEA time, scan time), break into two lines? move int(x,16) outside
         measurements = [line for line in struct.iter_unpack(unpack_str, the_bytes)]
-        measurements_2 = np.array([self._breakdown(line) for line in measurements])
-        #print(measurements_2.shape)
+        measurements_2 = np.array([self._breakdown(line) for line in measurements]) 
+        #measurements_2 = [self._breakdown(line) for line in measurements]
+                #print(measurements_2.shape)
 
+#        return measurements
         return measurements_2
 
     '''
@@ -184,9 +186,23 @@ class SBEReader():
         Scan time is LSB, 8 char long, in seconds since January 1, 1970
         '''
         #line[13]
-        output = output + str(self._sbe_time(self._reverse_bytes(line[13]), 'scan'))
+        output = output + str(self._sbe_time(self._reverse_bytes(line[13]), 'scan')) + ','
+
+        '''
+        Bottle fire - should match up exactly, might not.
+        '''
+        output = output + str(self._bottle_fire(line[11]))
 
         return output
+
+    def _breakdown_header(self):
+        output = [
+            ['lat_ddeg', 'lon_ddeg', 'new_fix_bool', 'nmea_datetime', 'scan_datetime', 'btl_fire_bool'],
+            ['float64', 'float64', 'bool_', 'datetime64', 'datetime64', 'bool_']
+        ]
+
+        return output
+
 
     def _location_fix(self, b1, b2, b3, b4, b5, b6, b7):
         """Determine location from SBE format.
@@ -334,7 +350,7 @@ class SBEReader():
 
         mask_bottle_fire = 0x4
 
-        if flag_char & mask_bottle_fire:
+        if int(flag_char, 16) & mask_bottle_fire:
             return(True)
         else:
             return(False)

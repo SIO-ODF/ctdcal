@@ -106,12 +106,17 @@ def main(argv):
     raw_df = pd.DataFrame(rawData)
     raw_df.index.name = 'index'
     raw_df = raw_df.apply(pd.to_numeric, errors="ignore")
+
     #debugPrint("Raw Data Types:", raw_df.dtypes)
     #debugPrint("Raw Data:", raw_df.head)
 
     # Retrieve Config data
     rawConfig = sbeReader.parsed_config()
     #debugPrint("Raw Config:", json.dumps(rawConfig, indent=2))
+
+    #Show the following sensor configuration data
+    #sensorID = 5
+    #debugPrint("Sensor #" + sensorID + ":", rawConfig['Sensors'][sensorID])
 
     # Save the raw scans as csv
     if args.raw:
@@ -124,14 +129,35 @@ def main(argv):
         except:
             errPrint('ERROR: Could not save raw data to:', rawfilePath)
 
-    #Show the following sensor configuration data
-    #sensorID = 5
-    #debugPrint("Sensor #" + sensorID + ":", rawConfig['Sensors'][sensorID])
 
+    debugPrint("Building meta data dataframe")
+    metaArray = [line.split(',') for line in sbeReader._parse_scans_meta().tolist()]
+    metaArrayheaders = sbeReader._breakdown_header()
+    meta_df = pd.DataFrame(metaArray)
+
+    meta_df.columns = metaArrayheaders[0]
+    meta_df.index.name = 'index'
+
+    for i, x in enumerate(metaArrayheaders[0]):
+        #debugPrint('Set', metaArrayheaders[0][i], 'to', metaArrayheaders[1][i])
+        if not metaArrayheaders[1][i] == 'bool_':
+            meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].astype(metaArrayheaders[1][i])
+        else:
+            d = {'True': True, 'False': False}
+            meta_df[metaArrayheaders[0][i]].map(d)
+
+    #debugPrint("Meta Data Types:\n", meta_df.dtypes)
+    #debugPrint("Meta Data Types:\n", meta_df.head())
+    
     debugPrint("Converting raw scans to scientific units")
     rare_df = cnv.cnv_handler_1(raw_df, rawConfig, DEBUG)
 
     #debugPrint('rare_df:', rare_df.head())
+
+    debugPrint("Joining with meta array")
+    rare_df = rare_df.join(meta_df)
+
+    #debugPrint('rare_df:', rare_df.head())    
 
     rarefileName  = filename_base + RARE_SUFFIX + '.' + FILE_EXT
     rarefilePath = os.path.join(outputDir, rarefileName)

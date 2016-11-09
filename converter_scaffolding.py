@@ -341,6 +341,8 @@ def cnv_handler_1(raw_df, rawConfig, debug=False):
     temp_counter = 0
     cond_counter = 0
     oxygen_counter = 0
+    u_def_counter = 0
+    empty_counter = 0
     processed_data = []
 
     #Temporary arrays to hold sci_data in order to compute following sci_data (pressure, cond, temp, etc)
@@ -384,9 +386,19 @@ def cnv_handler_1(raw_df, rawConfig, debug=False):
             oxygen_counter += 1
             queue_metadata.append({'sensor_id': '38', 'list_id': i, 'channel_pos': oxygen_counter, 'ranking': 5, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
 
+        #empty block
+        elif str(sensor_id) == '27':
+            empty_counter += 1
+            queue_metadata.append({'sensor_id': '27', 'list_id': i, 'channel_pos': empty_counter, 'ranking': 6, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
+        #u_def block
+        elif str(sensor_id) == '61':
+            u_def_counter += 1
+            queue_metadata.append({'sensor_id': '61', 'list_id': i, 'channel_pos': u_def_counter, 'ranking': 6, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
         #aux block
         else:
-            queue_metadata.append({'sensor_id': sensor_id, 'list_id': i, 'channel_pos': '', 'ranking': 6, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+            queue_metadata.append({'sensor_id': sensor_id, 'list_id': i, 'channel_pos': '', 'ranking': 7, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
 
     #a temporary block in order to append basic salinity (t1, c1) to file. If additional salinity is needed (different combinations), it'll need a full reworking
     queue_metadata.append({'sensor_id': '1000', 'list_id': 1000, 'channel_pos':'', 'ranking': 4, 'column': '', 'sensor_info':''})
@@ -397,7 +409,7 @@ def cnv_handler_1(raw_df, rawConfig, debug=False):
     #queue sorting forces it to be in order, so we don't worry about order here
     #assumes first channel for each sensor is primary for computing following data, rework to accept file to determine which is primary
 
-    proc_df = pd.DataFrame()
+    rare_df = pd.DataFrame()
 
 #    debugPrint(raw_df.head())
 
@@ -411,9 +423,9 @@ def cnv_handler_1(raw_df, rawConfig, debug=False):
         ###Temperature block
         if temp_meta['sensor_id'] == '55':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            proc_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            rare_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             if temp_meta['list_id'] == 0:
-                t_array = proc_df[column_name].astype(type('float', (float,), {}))
+                t_array = rare_df[column_name].astype(type('float', (float,), {}))
                 k_array = [273.15+celcius for celcius in t_array]
                 debugPrint('\tPrimary temperature used:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
@@ -421,47 +433,47 @@ def cnv_handler_1(raw_df, rawConfig, debug=False):
         ### Pressure block
         elif temp_meta['sensor_id'] == '45':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            proc_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array)
+            rare_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array)
             if temp_meta['list_id'] == 2:
-                p_array = proc_df[column_name].astype(type('float', (float,), {}))
+                p_array = rare_df[column_name].astype(type('float', (float,), {}))
                 debugPrint('\tPressure used:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Conductivity block
         elif temp_meta['sensor_id'] == '3':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            proc_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
+            rare_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
             if temp_meta['list_id'] == 1:
-                c_array = proc_df[column_name].astype(type('float', (float,), {}))
+                c_array = rare_df[column_name].astype(type('float', (float,), {}))
                 debugPrint('\tPrimary cond used:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Oxygen block
         elif temp_meta['sensor_id'] == '38':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            proc_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
+            rare_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
             #processed_data.append(temp_meta)
 
         ### Fluorometer Seapoint block
         elif temp_meta['sensor_id'] == '11':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            proc_df[column_name] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            rare_df[column_name] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             #processed_data.append(temp_meta)
 
         ###Salinity block
         elif temp_meta['sensor_id'] == '1000':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            proc_df[column_name] = sbe_eq.sp_dict(c_array, t_array, p_array)
+            rare_df[column_name] = sbe_eq.sp_dict(c_array, t_array, p_array)
             #processed_data.append(temp_meta)
 
         ### Aux block
         else:
             debugPrint('Skipping Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            proc_df[column_name] = raw_df[temp_meta['column']]
+            rare_df[column_name] = raw_df[temp_meta['column']]
             #processed_data.append(temp_meta)
 
-    proc_df.index.name = 'index'
-    return proc_df
+    rare_df.index.name = 'index'
+    return rare_df
 
     '''
     ### Create a single unified object with all data in there
