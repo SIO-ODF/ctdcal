@@ -32,14 +32,14 @@ Create a bottle file for fitting
 usage: bottle.py [-h] [-o output file] [-d] converted_file
 
 positional arguments:
-  converted_file  the .converted file to process 
+  converted_file  the .converted file to process
 
 optional arguments:
   -h, --help      show this help message and exit
   -o output_file  name and location of output file
   -d, --debug     display debug messages
 
---- 
+---
 
 Dependency requirements:
 python3

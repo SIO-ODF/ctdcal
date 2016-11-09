@@ -133,9 +133,11 @@ class SBEReader():
         #breaks down line according to columns specified by unpack_str and converts from hex to decimal MSB first
         #needs to be adjusted for LSB fields (NMEA time, scan time), break into two lines? move int(x,16) outside
         measurements = [line for line in struct.iter_unpack(unpack_str, the_bytes)]
-        measurements_2 = np.array([self._breakdown(line) for line in measurements])
-        #print(measurements_2.shape)
+        measurements_2 = np.array([self._breakdown(line) for line in measurements]) 
+        #measurements_2 = [self._breakdown(line) for line in measurements]
+                #print(measurements_2.shape)
 
+#        return measurements
         return measurements_2
 
     '''
@@ -192,6 +194,15 @@ class SBEReader():
         output = output + str(self._bottle_fire(line[11]))
 
         return output
+
+    def _breakdown_header(self):
+        output = [
+            ['lat_ddeg', 'lon_ddeg', 'new_fix_bool', 'nmea_datetime', 'scan_datetime', 'btl_fire_bool'],
+            ['float64', 'float64', 'bool_', 'datetime64', 'datetime64', 'bool_']
+        ]
+
+        return output
+
 
     def _location_fix(self, b1, b2, b3, b4, b5, b6, b7):
         """Determine location from SBE format.
@@ -338,6 +349,7 @@ class SBEReader():
         """
 
         mask_bottle_fire = 0x4
+
         if int(flag_char, 16) & mask_bottle_fire:
             return(True)
         else:
@@ -357,7 +369,8 @@ class SBEReader():
         numeric = [
             "FrequencyChannelsSuppressed",
             "VoltageWordsSuppressed",
-            ]
+        ]
+        sensors = {}
 
         config = ET.fromstring(self.xml_config)
         self.config = {}
@@ -377,6 +390,32 @@ class SBEReader():
                 raise AttributeError("Could not find {} in XMLCONF".format(key))
             except ValueError:
                 raise ValueError("{} Value is not truthy".format(key))
+
+        """Pokedex is a dict of {Sensor index numbers from the config:sensor info}
+        Assume that sensor index number is the order the sensors have been entered into the file.
+        Therefore, it will be Frequency instruments first, then Voltage instruments.
+        Call their index number (starting at 0) in order to pull out the info.
+
+        """
+        #pokedex = {}
+        for x in config.iter('Sensor'):
+            #print(ET.tostring(x))
+            """Start creating single sensor dictionary."""
+            bulbasaur = {}
+            bulbasaur['SensorID'] = x.attrib['SensorID']
+            #load all values into dict - beware of overwriting #NEED TO FIX
+            for children in x:
+                for y in children.iter():
+                    try:
+                        bulbasaur[y.tag] = float(y.text)
+                    except:
+                        bulbasaur[y.tag] = str(y.text).replace('\n', '').replace(' ','')
+                    
+                """Add sensor to big dictionary."""
+                #pokedex[x.attrib['index']] = bulbasaur
+                sensors[int(x.attrib['index'])] = bulbasaur
+        #sensors.append(pokedex)
+        self.config['Sensors'] = sensors
 
     @classmethod
     def from_paths(cls, raw_hex_path, xml_config_path, encoding="cp437"):
@@ -408,10 +447,13 @@ class SBEReader():
     @property
     def parsed_scans(self):
         try:
-            return self._parsed_scans
+            return self._parse_scans
         except AttributeError:
-            self._parsed_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
-            return self._parsed_scans
+            self._parse_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
+            return self._parse_scans
+
+    def parsed_config(self):
+        return self.config
 
     def to_dict(self, parse_cache=True):
         return {
