@@ -1,27 +1,20 @@
-Summary:
-Package to process CTD data from raw data to data product to be submitted to a data repository, ex. CCHDO. run.py will eventually be a superscript allowing for an analyst to push one button to process data. The other scripts in this directory are the subscripts called from run.py
+General Utility for processing SBE Data
 
-run.py
-Currently not working, to be fixed in future
-
----
-
-converter.py
-
-Convert SBE CTD data into engineering units
-
-usage: converter.py [-h] [-o output file] [-d] [-w [dest dir]] hex File XMLCON File
+usage: run.py [-h] [-d] [-r] [-p iniFile] [-o destDir] [-w [destDir]]
+              hex File XMLCON File
 
 positional arguments:
-  hex File        the .hex data file to process
-  XMLCON File     the .XMLCON data file to process
+  hex File      the .hex data file to process
+  XMLCON File   the .XMLCON data file to process
 
 optional arguments:
-  -h, --help      show this help message and exit
-  -o output file  name and location of output file
-  -d, --debug     display debug messages
-  -w [dest dir]   build web viewer, optionally specify the destination
-                  directory for the webviewer files
+  -h, --help    show this help message and exit
+  -d, --debug   display debug messages
+  -r, --raw     return the raw data values
+  -p iniFile    process the ctd data, requires and addition ini file
+  -o destDir    location to save output files
+  -w [destDir]  build web viewer, optionally specify the destination directory
+                for the webviewer files
 
 ---
 

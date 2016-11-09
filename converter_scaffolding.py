@@ -3,11 +3,28 @@ import struct
 import sys
 import os
 import json
+import pandas as pd
 
 import sbe_reader as sbe_rd
 import sbe_equations_dict as sbe_eq
 
 DEBUG = False
+
+#lookup table for sensor data
+###DOUBLE CHECK TYPE IS CORRECT###
+short_lookup = {
+    '55':{'short_name': 't', 'long_name':'SBE 3+ Temperature', 'units': 'C', 'type': 'float64'},
+    '45':{'short_name': 'p', 'long_name':'SBE 9+ Pressure', 'units': 'dbar', 'type': 'float64'},
+    '3':{'short_name': 'c', 'long_name':'SBE 4 Conductivity', 'units': 'S/m', 'type':'float64'},
+    '38':{'short_name': 'o', 'long_name':'SBE 43 Oxygen', 'units': 'ml/l', 'type':'float64'},
+    '11':{'short_name': 'fluoro', 'long_name':'Seapoint Fluorometer', 'units': 'ug/l', 'type':'float64'},
+    '27':{'short_name': 'empty', 'long_name':'empty', 'units':'NA', 'type':'NA'},
+    '0':{'short_name': 'alti', 'long_name':'Altitude', 'units':'m', 'type':'float64'},
+    '71':{'short_name': 'cstar', 'long_name':'CStar', 'units': 'ug/l', 'type':'float64'},
+    '61':{'short_name': 'u_def', 'long_name':'user defined', 'units':'V', 'type':'float64'},
+    '1000':{'short_name': 'sal', 'long_name':'Salinity (C1 T1)', 'units':'PSU', 'type':'float64'}
+}
+
 
 def debugPrint(*args, **kwargs):
     if DEBUG:
@@ -88,8 +105,8 @@ def cnv_handler_2(hex_file, xmlcon_file, debug=False):
     debugPrint('Reading/Parsing input files...')
     sbe_reader = sbe_rd.SBEReader.from_paths(hex_file, xmlcon_file)
 
-    debugPrint('Retrieving sensor info from xmlcon file...')
-    sensor_info = sbe_xml_reader_a(xmlcon_file)
+    #debugPrint('Retrieving sensor info from xmlcon file...')
+    #sensor_info = sbe_xml_reader_a(xmlcon_file)
     #debugPrint('Sensor Info:', json.dumps(sensor_info, indent=2))
 
     #namesplit = xmlcon_file.split('.')
@@ -117,21 +134,6 @@ def cnv_handler_2(hex_file, xmlcon_file, debug=False):
     c_array = []
     k_array = []
 
-    #lookup table for sensor data
-    ###DOUBLE CHECK TYPE IS CORRECT###
-    short_lookup = {
-        '55':{'short_name': 't', 'long_name':'SBE 3+ Temperature', 'units': 'C', 'type': 'float64'},
-        '45':{'short_name': 'p', 'long_name':'SBE 9+ Pressure', 'units': 'dbar', 'type': 'float64'},
-        '3':{'short_name': 'c', 'long_name':'SBE 4 Conductivity', 'units': 'S/m', 'type':'float64'},
-        '38':{'short_name': 'o', 'long_name':'SBE 43 Oxygen', 'units': 'ml/l', 'type':'float64'},
-        '11':{'short_name': 'fluoro', 'long_name':'Seapoint Fluorometer', 'units': 'ug/l', 'type':'float64'},
-        '27':{'short_name': 'empty', 'long_name':'empty', 'units':'NA', 'type':'NA'},
-        '0':{'short_name': 'alti', 'long_name':'Altitude', 'units':'m', 'type':'float64'},
-        '71':{'short_name': 'cstar', 'long_name':'CStar', 'units': 'ug/l', 'type':'float64'},
-        '61':{'short_name': 'u_def', 'long_name':'user defined', 'units':'V', 'type':'float64'},
-        '1000':{'short_name': 'sal', 'long_name':'Salinity (C1 T1)', 'units':'PSU', 'type':'float64'}
-    }
-
     ######
     # The following are definitions for every key in the dict below:
     #
@@ -143,32 +145,32 @@ def cnv_handler_2(hex_file, xmlcon_file, debug=False):
     # sensor_info = xml sensor info to convert from eng units to sci units
     ######
 
-    for i, x in enumerate(sensor_info):
+    for i, x in enumerate(sbe_reader.parsed_config):
         #print(i, sensor_dictionary[str(i)]['SensorID'])
-        sensor_id = sensor_info[str(i)]['SensorID']
+        sensor_id = sbe_reader.parsed_config[str(i)]['SensorID']
 
         #temp block
         if str(sensor_id) == '55':
             temp_counter += 1
-            queue_metadata.append({'sensor_id': '55', 'list_id': i, 'channel_pos': temp_counter, 'ranking': 1, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)] })
+            queue_metadata.append({'sensor_id': '55', 'list_id': i, 'channel_pos': temp_counter, 'ranking': 1, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sbe_reader.parsed_config[str(i)] })
 
         #cond block
         elif str(sensor_id) == '3':
             cond_counter += 1
-            queue_metadata.append({'sensor_id': '3', 'list_id': i, 'channel_pos': cond_counter, 'ranking': 3, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
+            queue_metadata.append({'sensor_id': '3', 'list_id': i, 'channel_pos': cond_counter, 'ranking': 3, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sbe_reader.parsed_config[str(i)]})
 
         #pressure block
         elif str(sensor_id) == '45':
-            queue_metadata.append({'sensor_id': '45', 'list_id': i, 'channel_pos': '', 'ranking': 2, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
+            queue_metadata.append({'sensor_id': '45', 'list_id': i, 'channel_pos': '', 'ranking': 2, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sbe_reader.parsed_config[str(i)]})
 
         #oxygen block
         elif str(sensor_id) == '38':
             oxygen_counter += 1
-            queue_metadata.append({'sensor_id': '38', 'list_id': i, 'channel_pos': oxygen_counter, 'ranking': 5, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
+            queue_metadata.append({'sensor_id': '38', 'list_id': i, 'channel_pos': oxygen_counter, 'ranking': 5, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sbe_reader.parsed_config[str(i)]})
 
         #aux block
         else:
-            queue_metadata.append({'sensor_id': sensor_id, 'list_id': i, 'channel_pos': '', 'ranking': 6, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sensor_info[str(i)]})
+            queue_metadata.append({'sensor_id': sensor_id, 'list_id': i, 'channel_pos': '', 'ranking': 6, 'data': sbe_reader.parsed_scans[:,i], 'sensor_info':sbe_reader.parsed_config[str(i)]})
 
     #a temporary block in order to append basic salinity (t1, c1) to file. If additional salinity is needed (different combinations), it'll need a full reworking
     queue_metadata.append({'sensor_id': '1000', 'list_id': 1000, 'channel_pos':'', 'ranking': 4, 'data': '', 'sensor_info':''})
@@ -310,3 +312,187 @@ def cnv_handler_2(hex_file, xmlcon_file, debug=False):
 #    print('Done, output saved to:', outputFile)
     debugPrint('Processing complete')
     return output
+
+def cnv_handler_1(raw_df, rawConfig, debug=False):
+    """Handler to deal with converting eng. data to sci units automatically.
+    When not given a format file/json, default to putting out data in order of instruments in xmlcon.
+    Format file makes assumptions: duplicate sensors are ranked by channel they use, with lower value more important.
+    Ex: For two SBE 3, the temp. sensor on freq. channel 1 is primary temp, and temp. sensor on channel 4 is secondary.
+
+    After reading in format/XMLCON, determine order to put out data.
+    Read sensor dictionary, pull out SensorID number, then match with correct method.
+
+    Read in
+
+    VALUES HARDCODED, TRY TO SETUP A DICT TO MAKE NEATER
+
+    """
+
+    global DEBUG
+    DEBUG = debug
+
+    #needs to search sensor dictionary, and compute in order:
+    #temp, pressure, cond, salinity, oxygen, all aux.
+    #run one loop that builds a queue to determine order of processing, must track which column to pull
+    #process queue, store results in seperate arrays for reuse later
+    #once queue is empty, attach results together according to format order or xmlcon order - structure to keep track
+    queue_metadata = []
+    results = {}
+    temp_counter = 0
+    cond_counter = 0
+    oxygen_counter = 0
+    u_def_counter = 0
+    empty_counter = 0
+    processed_data = []
+
+    #Temporary arrays to hold sci_data in order to compute following sci_data (pressure, cond, temp, etc)
+    t_array = []
+    p_array = []
+    c_array = []
+    k_array = []
+
+    ######
+    # The following are definitions for every key in the dict below:
+    #
+    # sensor_id = number assigned by SBE for identification in XML
+    # list_id = place in XML array by SBE for determining which sensor is which, alternatively channel number (freq+volt)
+    # channel_pos = is it the first, second, third, etc sensor of its type in the data file, aux sensors default to 0
+    # ranking = data processing ranking - temp first, then pressure, then conductivity, then oxygen, then aux
+    # data = eng units to be converted to sci units
+    # sensor_info = xml sensor info to convert from eng units to sci units
+    ######
+
+    for i, x in enumerate(rawConfig['Sensors']):
+        #print(i)
+        #print(rawConfig['Sensors'][i])
+        sensor_id = rawConfig['Sensors'][i]['SensorID']
+
+        #temp block
+        if sensor_id == '55':
+            temp_counter += 1
+            queue_metadata.append({'sensor_id': '55', 'list_id': i, 'channel_pos': temp_counter, 'ranking': 1, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
+        #cond block
+        elif str(sensor_id) == '3':
+            cond_counter += 1
+            queue_metadata.append({'sensor_id': '3', 'list_id': i, 'channel_pos': cond_counter, 'ranking': 3, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
+        #pressure block
+        elif str(sensor_id) == '45':
+            queue_metadata.append({'sensor_id': '45', 'list_id': i, 'channel_pos': '', 'ranking': 2, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
+        #oxygen block
+        elif str(sensor_id) == '38':
+            oxygen_counter += 1
+            queue_metadata.append({'sensor_id': '38', 'list_id': i, 'channel_pos': oxygen_counter, 'ranking': 5, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
+        #empty block
+        elif str(sensor_id) == '27':
+            empty_counter += 1
+            queue_metadata.append({'sensor_id': '27', 'list_id': i, 'channel_pos': empty_counter, 'ranking': 6, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
+        #u_def block
+        elif str(sensor_id) == '61':
+            u_def_counter += 1
+            queue_metadata.append({'sensor_id': '61', 'list_id': i, 'channel_pos': u_def_counter, 'ranking': 6, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
+        #aux block
+        else:
+            queue_metadata.append({'sensor_id': sensor_id, 'list_id': i, 'channel_pos': '', 'ranking': 7, 'column': i, 'sensor_info':rawConfig['Sensors'][i]})
+
+    #a temporary block in order to append basic salinity (t1, c1) to file. If additional salinity is needed (different combinations), it'll need a full reworking
+    queue_metadata.append({'sensor_id': '1000', 'list_id': 1000, 'channel_pos':'', 'ranking': 4, 'column': '', 'sensor_info':''})
+
+    queue_metadata = sorted(queue_metadata, key = lambda sensor: sensor['ranking'])
+    #debugPrint("Queue Metadata:", json.dumps(queue_metadata, indent = 2))
+
+    #queue sorting forces it to be in order, so we don't worry about order here
+    #assumes first channel for each sensor is primary for computing following data, rework to accept file to determine which is primary
+
+    rare_df = pd.DataFrame()
+
+#    debugPrint(raw_df.head())
+
+    for temp_meta in queue_metadata:
+#        print(temp_meta)
+#    while queue_metadata:
+#        temp_meta = queue_metadata.pop(0)
+
+        column_name = '{0}{1}_{2}'.format(short_lookup[temp_meta['sensor_id']]['short_name'], temp_meta['channel_pos'], short_lookup[temp_meta['sensor_id']]['units'])
+
+        ###Temperature block
+        if temp_meta['sensor_id'] == '55':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            rare_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            if temp_meta['list_id'] == 0:
+                t_array = rare_df[column_name].astype(type('float', (float,), {}))
+                k_array = [273.15+celcius for celcius in t_array]
+                debugPrint('\tPrimary temperature used:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+            #processed_data.append(temp_meta)
+
+        ### Pressure block
+        elif temp_meta['sensor_id'] == '45':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            rare_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array)
+            if temp_meta['list_id'] == 2:
+                p_array = rare_df[column_name].astype(type('float', (float,), {}))
+                debugPrint('\tPressure used:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+            #processed_data.append(temp_meta)
+
+        ### Conductivity block
+        elif temp_meta['sensor_id'] == '3':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            rare_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
+            if temp_meta['list_id'] == 1:
+                c_array = rare_df[column_name].astype(type('float', (float,), {}))
+                debugPrint('\tPrimary cond used:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+            #processed_data.append(temp_meta)
+
+        ### Oxygen block
+        elif temp_meta['sensor_id'] == '38':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            rare_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
+            #processed_data.append(temp_meta)
+
+        ### Fluorometer Seapoint block
+        elif temp_meta['sensor_id'] == '11':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            rare_df[column_name] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            #processed_data.append(temp_meta)
+
+        ###Salinity block
+        elif temp_meta['sensor_id'] == '1000':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            rare_df[column_name] = sbe_eq.sp_dict(c_array, t_array, p_array)
+            #processed_data.append(temp_meta)
+
+        ### Aux block
+        else:
+            debugPrint('Skipping Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            rare_df[column_name] = raw_df[temp_meta['column']]
+            #processed_data.append(temp_meta)
+
+    rare_df.index.name = 'index'
+    return rare_df
+
+def importConvertedData(fileName):
+    output_df = pd.read_csv(fileName, index_col=0, parse_dates=False)
+    header_raw = output_df.columns.values.tolist()
+    header_type = [header.split('_')[-1] for header in header_raw]
+
+    for i, x in enumerate(header_type):
+        debugPrint('Set', header_raw[i], 'to', header_type[i])
+        if header_type[i] == 'bool':
+            d = {'True': True, 'False': False}
+            output_df[header_raw[i]].map(d)
+
+        elif header_type[i] == 'datetime':
+            output_df[header_raw[i]] = output_df[header_raw[i]].astype('datetime64')
+
+        elif header_type[i] != 'index':
+            output_df[header_raw[i]] = output_df[header_raw[i]].astype('float64')
+
+    return output_df
+
+
+

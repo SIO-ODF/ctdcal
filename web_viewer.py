@@ -136,6 +136,42 @@ class WebViewer():
 
 		return json.dumps(output)
 
+	def _buildDataFromDF(self, dataframe, castName):
+
+		output = {
+			'castName':castName,
+			'visualizerData':[],
+			'stats':[]
+		}
+
+		total_rows = len(dataframe.index)
+		#debugPrint('total_rows:', total_rows)
+
+		#get name/units
+		headers = dataframe.columns.values.tolist()
+
+		proc_units = []
+		proc_short_name = []
+		for header in headers:
+			header_array = header.split('_')
+			proc_units.append(header_array.pop())
+			proc_short_name.append('_'.join(header_array))
+
+		
+		# The row indices to skip - make sure 0 is not included to keep the header!
+		skip_idx = [x for x in range(3, total_rows) if x % subSampleRate == 0]
+		#debugPrint(skip_idx)
+
+		for idx, val in enumerate(proc_short_name):
+			if proc_short_name != 'index':
+				stat = {'statName': proc_short_name[idx] + ' Bounds','statUnit': proc_units[idx], 'statType':'bounds', 'statData':[round(dataframe.iloc[:,idx].min(),3), round(dataframe.iloc[:,idx].max(),3)]}
+				output['stats'].append(stat)
+
+				data = {'data': dataframe.iloc[skip_idx,idx].tolist(), 'unit':proc_units[idx], 'label':proc_short_name[idx]}
+				output['visualizerData'].append(data)
+
+		return json.dumps(output)
+
 	def _saveData(self, output):
 		dataFilename = 'data.json'
 		dataFilePath = os.path.join(self.parentDir, dataDir, dataFilename)
