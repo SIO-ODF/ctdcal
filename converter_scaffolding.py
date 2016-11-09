@@ -475,77 +475,24 @@ def cnv_handler_1(raw_df, rawConfig, debug=False):
     rare_df.index.name = 'index'
     return rare_df
 
-    '''
-    ### Create a single unified object with all data in there
-    header_string = []
-    header_1 = ''
-    header_2 = ''
-    header_3 = ''
+def importConvertedData(fileName):
+    output_df = pd.read_csv(fileName, index_col=0, parse_dates=False)
+    header_raw = output_df.columns.values.tolist()
+    header_type = [header.split('_')[-1] for header in header_raw]
 
-    """Start writing a .csv file with extension .converted
+    for i, x in enumerate(header_type):
+        debugPrint('Set', header_raw[i], 'to', header_type[i])
+        if header_type[i] == 'bool':
+            d = {'True': True, 'False': False}
+            output_df[header_raw[i]].map(d)
 
-    First part - compose the header.
-    """
+        elif header_type[i] == 'datetime':
+            output_df[header_raw[i]] = output_df[header_raw[i]].astype('datetime64')
 
-    output = ''
+        elif header_type[i] != 'index':
+            output_df[header_raw[i]] = output_df[header_raw[i]].astype('float64')
 
-    debugPrint('Compiling header information')
-    data_list_of_lists = []
-    for x in processed_data:
-        header_string.append(x['sensor_id'])
-        data_list_of_lists.append(x['sci_data'])
-        try:
-            header_1 = header_1 + '{0}{1},'.format(short_lookup[x['sensor_id']]['short_name'], x['channel_pos'])
-        except:
-            header_1 = header_1 + 'error,'
-            errPrint('Error in lookup table: channel_pos for sensor ID:', x['sensor_id'])
-
-        try:
-            header_2 = header_2 + '{0},'.format(short_lookup[x['sensor_id']]['units'])
-        except:
-            header_2 = header_2 + 'error,'
-            errPrint('Error in lookup table: units for sensor ID:', x['sensor_id'])
-
-        try:
-            header_3 = header_3 + '{0},'.format(short_lookup[x['sensor_id']]['type'])
-        except:
-            header_3 = header_3 + 'error,'
-            errPrint('Error in lookup table: type for sensor ID:', x['sensor_id'])
+    return output_df
 
 
-    ##### ------------HACKY DATETIME INSERTION------------ #####
-    #assumes date/time will always be at end, and adds header accordingly
-    #should be rewritten to have cleaner integration with rest of code
-    #header_1 = header_1 + 'lat,lon,new_pos,nmea_time,scan_time'
-    #header_2 = header_2 + 'dec_deg,dec_deg,boolean,ISO8601,ISO8601'
-    #header_3 = header_3 + 'float64,float64,bool_,string,string'
 
-    ### pos/time/date block
-    #data_list_of_lists.append(sbe_reader.parsed_scans[:,(sbe_reader.parsed_scans.shape[1]-1)])
-    ##### ----------HACKY DATETIME INSERTION END---------- #####
-
-    debugPrint('Transposing data')
-    transposed_data = zip(*data_list_of_lists)
-
-    """Write header and body of .csv"""
-
-#    with open(namesplit, 'w') as f:
-#    with open(outputFile, 'w') as f:
-#        f.write(header_1.rstrip(',') + '\n')
-#        f.write(header_2.rstrip(',') + '\n')
-#        f.write(header_3.rstrip(',') + '\n')
-#        for x in transposed_data:
-#            f.write(','.join([str(y) for y in x]) + '\n')
-
-#    with open(namesplit, 'w') as f:
-#    with open(outputFile, 'w') as f:
-    output += header_1.rstrip(',') + '\n'
-    output += header_2.rstrip(',') + '\n'
-    output += header_3.rstrip(',') + '\n'
-    for x in transposed_data:
-        output += ','.join([str(y) for y in x]) + '\n'
-
-#    print('Done, output saved to:', outputFile)
-    debugPrint('Processing complete')
-    return output
-'''
