@@ -2,8 +2,6 @@ import sys
 import os
 import argparse
 import sbe_reader
-import json
-import numpy as np
 import pandas as pd
 import web_viewer as wv
 import converter_scaffolding as cnv
@@ -19,7 +17,7 @@ FILE_EXT = 'csv'
 RAW_SUFFIX = '_raw'
 
 #File extension to use for converted output
-RARE_SUFFIX = '_converted'
+CONVERTED_SUFFIX = '_converted'
 
 #File extension to use for processed output
 PROC_SUFFIX = '_proc'
@@ -96,77 +94,58 @@ def main(argv):
             sys.exit(1)
 
     # Parse the input files
-    debugPrint("Parsing", args.hexFile, "and", args.xmlconFile)
+    debugPrint("Parsing", args.hexFile, "and", args.xmlconFile + '... ', end='')
     sbeReader = sbe_reader.SBEReader.from_paths(args.hexFile, args.xmlconFile)
-
-    # Retrieve parsed scans
-    rawData = sbeReader.parsed_scans()
-
-    # Convert raw data to dataframe
-    raw_df = pd.DataFrame(rawData)
-    raw_df.index.name = 'index'
-    raw_df = raw_df.apply(pd.to_numeric, errors="ignore")
-
-    #debugPrint("Raw Data Types:", raw_df.dtypes)
-    #debugPrint("Raw Data:", raw_df.head)
-
-    # Retrieve Config data
-    rawConfig = sbeReader.parsed_config()
-    #debugPrint("Raw Config:", json.dumps(rawConfig, indent=2))
-
-    #Show the following sensor configuration data
-    #sensorID = 5
-    #debugPrint("Sensor #" + sensorID + ":", rawConfig['Sensors'][sensorID])
+    debugPrint("Success!")
 
     # Save the raw scans as csv
     if args.raw:
+
+        debugPrint('Building raw dataset... ', end='')
+
+        # Retrieve parsed scans
+        rawData = sbeReader.parsed_scans()
+
+        # Convert raw data to dataframe
+        raw_df = pd.DataFrame(rawData)
+        raw_df.index.name = 'index'
+        raw_df = raw_df.apply(pd.to_numeric, errors="ignore")
+
+        debugPrint('Success!')
+
+        #debugPrint("Raw Data Types:", raw_df.dtypes)
+        #debugPrint("Raw Data:", raw_df.head)
+
+        # Retrieve Config data
+        #rawConfig = sbeReader.parsed_config()
+
         rawfileName = str(filename_base + RAW_SUFFIX + '.' + FILE_EXT)
         rawfilePath = os.path.join(outputDir, rawfileName)
 
-        debugPrint('Saving raw data to:', rawfilePath)
+        debugPrint('Saving raw data to:', rawfilePath + '... ', end='')
         try:
             raw_df.to_csv(rawfilePath)
         except:
-            errPrint('ERROR: Could not save raw data to:', rawfilePath)
-
-
-    debugPrint("Building meta data dataframe")
-    metaArray = [line.split(',') for line in sbeReader._parse_scans_meta().tolist()]
-    metaArrayheaders = sbeReader._breakdown_header()
-    meta_df = pd.DataFrame(metaArray)
-
-    meta_df.columns = metaArrayheaders[0]
-    meta_df.index.name = 'index'
-
-    for i, x in enumerate(metaArrayheaders[0]):
-        #debugPrint('Set', metaArrayheaders[0][i], 'to', metaArrayheaders[1][i])
-        if not metaArrayheaders[1][i] == 'bool_':
-            meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].astype(metaArrayheaders[1][i])
+            errPrint('ERROR: Could not save raw data to file')
         else:
-            d = {'True': True, 'False': False}
-            meta_df[metaArrayheaders[0][i]].map(d)
+            debugPrint('Success!')
 
-    #debugPrint("Meta Data Types:\n", meta_df.dtypes)
-    #debugPrint("Meta Data Types:\n", meta_df.head())
-    
-    debugPrint("Converting raw scans to scientific units")
-    rare_df = cnv.cnv_handler_1(raw_df, rawConfig, DEBUG)
 
-    #debugPrint('rare_df:', rare_df.head())
+    debugPrint("Converting raw scans to scientific units... ")
+    converted_df = cnv.convertFromSBEReader(sbeReader, DEBUG)
 
-    debugPrint("Joining with meta array")
-    rare_df = rare_df.join(meta_df)
+    #debugPrint('converted_df:\n', converted_df.head())
 
-    #debugPrint('rare_df:', rare_df.head())    
+    convertedfileName  = filename_base + CONVERTED_SUFFIX + '.' + FILE_EXT
+    convertedfilePath = os.path.join(outputDir, convertedfileName)
 
-    rarefileName  = filename_base + RARE_SUFFIX + '.' + FILE_EXT
-    rarefilePath = os.path.join(outputDir, rarefileName)
-
-    debugPrint('Saving rare data to:', rarefilePath)
+    debugPrint('Saving converted data to:', convertedfilePath + '... ', end='')
     try:
-        rare_df.to_csv(rarefilePath)
+        converted_df.to_csv(convertedfilePath)
     except:
-        errPrint('ERROR: Could not save rare data to:', rarefilePath)
+        errPrint('ERROR: Could not save converted data to file')
+    else:
+        debugPrint('Success!')
 
 
     if args.iniFile:
@@ -179,10 +158,10 @@ def main(argv):
             #
             #  Here's where you can make a call to any CTD processing classes
             #  of functions.
-            #  
+            #
             #  The raw scans are available at: raw_df, (pandas dataframe)
-            #  The sensor config is available as: rawConfig, (object) 
-            #  The cooked data is available at: rare_df, (pandas dataframe)
+            #  The sensor config is available as: rawConfig, (object)
+            #  The cooked data is available at: converted_df, (pandas dataframe)
             #  The ini file needed for processing is available at: args.iniFile
             #
             # -----------------------------------------------------------------#
@@ -223,12 +202,14 @@ def main(argv):
             sys.exit(1)
 
         debugPrint("Building data file for webviewer... ", end='')
-        output = webView._buildDataFromDF(rare_df, args.hexFile)
+
+        output = webView._buildDataFromDF(converted_df, args.hexFile)
         debugPrint('Success!')
 
         debugPrint('Saving webviewer data to file... ', end='')
         webView._saveData(output)
         debugPrint('Success!')
+    debugPrint('Done!')
 
 # -------------------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility
