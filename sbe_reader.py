@@ -197,7 +197,7 @@ class SBEReader():
 
     def _breakdown_header(self):
         output = [
-            ['lat_ddeg', 'lon_ddeg', 'new_fix_bool', 'nmea_datetime', 'scan_datetime', 'btl_fire_bool'],
+            ['lat_ddeg', 'lon_ddeg', 'new_fix', 'nmea_datetime', 'scan_datetime', 'btl_fire'],
             ['float64', 'float64', 'bool_', 'datetime64', 'datetime64', 'bool_']
         ]
 

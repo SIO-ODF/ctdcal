@@ -10,6 +10,38 @@ import sys
 import csv
 import datetime
 import statistics
+import converter_scaffolding as cnv
+import pandas as pd
+
+
+BOTTLE_FIRE_COL_NAME = 'btl_fire'
+
+DEBUG = False
+
+def debugPrint(*args, **kwargs):
+    if DEBUG:
+        errPrint(*args, **kwargs)
+
+def errPrint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+# Retrieve the bottle data from a converted file.
+def retrieveBottleDataFromFile(converted_file, debug=False):
+
+    converted_df = cnv.importConvertedFile(converted_file, DEBUG)
+    
+    return retrieveBottleData(converted_df, debug)
+
+
+# Retrieve the bottle data from a dataframe created from a converted file.
+def retrieveBottleData(converted_df, debug=False):
+    if BOTTLE_FIRE_COL_NAME in converted_df.columns:
+        return converted_df.loc[converted_df[BOTTLE_FIRE_COL_NAME] == True]
+    else:
+        debugPrint("Bottle fire column:", BOTTLE_FIRE_COL_NAME, "not found")
+    
+    return pd.DataFrame() #empty dataframe
+
 
 
 def handler(converted_file, config_file=False, debug=False):
