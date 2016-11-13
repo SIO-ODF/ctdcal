@@ -36,7 +36,11 @@ def retrieveBottleDataFromFile(converted_file, debug=False):
 # Retrieve the bottle data from a dataframe created from a converted file.
 def retrieveBottleData(converted_df, debug=False):
     if BOTTLE_FIRE_COL_NAME in converted_df.columns:
+        converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL_NAME] == True) & (converted_df[BOTTLE_FIRE_COL_NAME] != converted_df[BOTTLE_FIRE_COL_NAME].shift(1))).astype(int).cumsum()
+        #converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL_NAME] == False)).astype(int).cumsum()
+
         return converted_df.loc[converted_df[BOTTLE_FIRE_COL_NAME] == True]
+        #return converted_df
     else:
         debugPrint("Bottle fire column:", BOTTLE_FIRE_COL_NAME, "not found")
     

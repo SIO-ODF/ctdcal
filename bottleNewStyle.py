@@ -64,10 +64,10 @@ def main(argv):
             sys.exit(1)
 
     debugPrint("Import converted data to dataframe... ", end='')
-    imported_df = cnv.importConvertedFile(args.convertedFile, DEBUG)
+    imported_df = cnv.importConvertedFile(args.convertedFile, False)
     debugPrint("Success!")
 
-    #debugPrint(imported_df.head())
+    debugPrint(imported_df.head())
     #debugPrint(imported_df.dtypes)
 
     # Retrieve the rows from the imported dataframe where the btl_fire_bool column == True
@@ -78,8 +78,14 @@ def main(argv):
         errPrint("Bottle fire data not found in converted file")
         sys.exit(1)
     else:
-        debugPrint(bottle_df.head())
-        debugPrint(bottle_df.dtypes)
+        total_bottles_fired = bottle_df["bottle_fire_num"].iloc[-1]
+        debugPrint(total_bottles_fired, "bottle fire(s) detected")
+        bottle_num = 1
+
+        while bottle_num <= total_bottles_fired:
+            debugPrint('Bottle:', bottle_num)
+            debugPrint(bottle_df.loc[bottle_df['bottle_fire_num'] == bottle_num].head())
+            bottle_num += 1
 
     # Build the filename for the bottle fire data
     bottlefileName  = filename_base.replace(CONVERTED_SUFFIX,'') + BOTTLE_SUFFIX + '.' + FILE_EXT
