@@ -10,6 +10,42 @@ import sys
 import csv
 import datetime
 import statistics
+import converter_scaffolding as cnv
+import pandas as pd
+
+
+BOTTLE_FIRE_COL_NAME = 'btl_fire'
+
+DEBUG = False
+
+def debugPrint(*args, **kwargs):
+    if DEBUG:
+        errPrint(*args, **kwargs)
+
+def errPrint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+# Retrieve the bottle data from a converted file.
+def retrieveBottleDataFromFile(converted_file, debug=False):
+
+    converted_df = cnv.importConvertedFile(converted_file, DEBUG)
+    
+    return retrieveBottleData(converted_df, debug)
+
+
+# Retrieve the bottle data from a dataframe created from a converted file.
+def retrieveBottleData(converted_df, debug=False):
+    if BOTTLE_FIRE_COL_NAME in converted_df.columns:
+        converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL_NAME] == True) & (converted_df[BOTTLE_FIRE_COL_NAME] != converted_df[BOTTLE_FIRE_COL_NAME].shift(1))).astype(int).cumsum()
+        #converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL_NAME] == False)).astype(int).cumsum()
+
+        return converted_df.loc[converted_df[BOTTLE_FIRE_COL_NAME] == True]
+        #return converted_df
+    else:
+        debugPrint("Bottle fire column:", BOTTLE_FIRE_COL_NAME, "not found")
+    
+    return pd.DataFrame() #empty dataframe
+
 
 
 def handler(converted_file, config_file=False, debug=False):

@@ -140,12 +140,10 @@ def main(argv):
     convertedfilePath = os.path.join(outputDir, convertedfileName)
 
     debugPrint('Saving converted data to:', convertedfilePath + '... ', end='')
-    try:
-        converted_df.to_csv(convertedfilePath)
-    except:
-        errPrint('ERROR: Could not save converted data to file')
-    else:
+    if cnv.saveConvertedDataToFile(converted_df, convertedfilePath, DEBUG):
         debugPrint('Success!')
+    else:
+        errPrint('ERROR: Could not save converted data to file')
 
 
     if args.iniFile:
