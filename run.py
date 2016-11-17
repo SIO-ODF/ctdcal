@@ -1,10 +1,14 @@
+#! /usr/bin/env python
 import sys
 import os
 import argparse
 import sbe_reader
+import numpy as np
 import pandas as pd
 import web_viewer as wv
 import converter_scaffolding as cnv
+import configparser
+import process_ctd 
 #import converter
 #import raw_converter
 
@@ -145,24 +149,50 @@ def main(argv):
     else:
         errPrint('ERROR: Could not save converted data to file')
 
+    #Import Cruise Configuration File 
+    config = configparser.ConfigParser()
+    config.read('configuration.ini')
 
-    if args.iniFile:
-        # Verify xmlcon file exists
-        if not os.path.isfile(args.iniFile):
-            errPrint('ERROR: Input ini file:', args.iniFile, 'not found\n\tSkipping processing')
-        else:
-            debugPrint('Processing data')
-            # ---------------------------------------------------------------- #
-            #
-            #  Here's where you can make a call to any CTD processing classes
-            #  of functions.
-            #
-            #  The raw scans are available at: raw_df, (pandas dataframe)
-            #  The sensor config is available as: rawConfig, (object)
-            #  The cooked data is available at: converted_df, (pandas dataframe)
-            #  The ini file needed for processing is available at: args.iniFile
-            #
-            # -----------------------------------------------------------------#
+    #Initialise Configuration Parameters
+    raw_directory = config['ctd_processing']['raw_data_directory']
+    time_directory = config['ctd_processing']['time_data_directory']
+    pressure_directory = config['ctd_processing']['pressure_data_directory']
+    infile = convertedfilePath 
+    tc1_align = config['ctd_processing']['TC_primary_align']
+    tc2_align = config['ctd_processing']['TC_secondary_align']
+    do_align = config['ctd_processing']['DO_align']
+    sample_rate = config['ctd_processing']['sample_rate']
+    search_time = config['ctd_processing']['roll_filter_time']
+    H1 = config['ctd_processing']['hysteresis_1']
+    H2 = config['ctd_processing']['hysteresis_2']
+    H3 = config['ctd_processing']['hysteresis_3']
+
+    # CTD Processing
+    debugPrint('Processing data')
+    raw_matrix = process_ctd.dataToMatrix(infile,None,list(converted_df.columns.insert(0,'index')),',') 
+    print(raw_matrix.dtype)
+    
+    align_matrix = process_ctd.ctd_align(raw_matrix,'c1_Sm', float(tc1_align))
+    align_matrix = process_ctd.ctd_align(raw_matrix,'c2_Sm', float(tc2_align))
+    align_matrix = process_ctd.ctd_align(raw_matrix,'o1_mll', float(do_align))
+
+    #data_matrix = process_ctd.ondeck_pressure(align_matrix, float(config['ctd_processing']['conductivity_start']))
+    #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
+    
+    
+
+   
+    # ---------------------------------------------------------------- #
+    #
+    #  Here's where you can make a call to any CTD processing classes
+    #  of functions.
+    #
+    #  The raw scans are available at: raw_df, (pandas dataframe)
+    #  The sensor config is available as: rawConfig, (object)
+    #  The cooked data is available at: converted_df, (pandas dataframe)
+    #  The ini file needed for processing is available at: args.iniFile
+    #
+    # -----------------------------------------------------------------#
 
     if args.wvDir:
         debugPrint('Building webviewer')
