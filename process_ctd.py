@@ -4,6 +4,7 @@ import scipy.signal as sig
 import scipy.stats as st
 import matplotlib.pyplot as plt
 import pandas as pd
+import math
 
 def cast_details(inMat):
     """cast_details function 
@@ -65,7 +66,7 @@ def cast_details(inMat):
   
     return s, e, b, sp, mp, inMat
 
-def ctd_align(inMat, col, time=0.0):
+def ctd_align(inMat=None, col=None, time=0.0):
     """ctd_align function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -85,12 +86,13 @@ def ctd_align(inMat, col, time=0.0):
     # Num of frames per second.
     fl = 24
     
-    # Time to advance 
-    advnc = int(fl * time)
-    tmp = np.arange(advnc, dtype=np.float)
-    last = inMat[col][len(inMat)-1]
-    tmp.fill(float(last))
-    inMat[col] = np.concatenate((inMat[col][advnc:],tmp))
+    if (inMat is not None) & (col is not None) & ( time > 0.0):
+        # Time to advance 
+        advnc = int(fl * time)
+        tmp = np.arange(advnc, dtype=np.float)
+        last = inMat[col][len(inMat)-1]
+        tmp.fill(float(last))
+        inMat[col] = np.concatenate((inMat[col][advnc:],tmp))
 
     return inMat
 
@@ -114,7 +116,7 @@ def dataToDataFrame(inFile):
     df = pd.read_csv(inFile, header=[0,1])
     return df
 
-def dataToMatrix(inFile, dtype=None, separator=','):
+def dataToMatrix(inFile, dtype=None, names=None, separator=','):
     """dataToMatrix function 
 
     Function takes full file path to csv type data file and returns NUMPY
@@ -134,9 +136,44 @@ def dataToMatrix(inFile, dtype=None, separator=','):
         https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
     """
 
-    arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, skip_header=2)
+    arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=2)
     
     return arr 
+
+def hysteresis_correction(H1=0.033, H2=5000, H3=1450, inMat = None):
+    """Hysteresis Correction function 
+
+    Function takes data matrix and hysteresis coefficiants 
+    and returns hysteresis corrected oxygen data.
+
+    Args:
+        param1 (float): H1, hysteresis correction coefficiant 1 
+        param2 (float): H2, hysteresis correction coefficiant 2 
+        param3 (float): H3, hysteresis correction coefficiant 3 
+        param5 (array): inMat, raw ctd data. 
+
+    Returns:
+        array: Return dissolved oxygen hysteresis corrected data.
+
+    .. REF PAGE:
+       http://http://www.seabird.com/document/an64-3-sbe-43-dissolved-oxygen-do-sensor-hysteresis-corrections
+    """
+    Oxnewconc = np.arange(0,len(inMat),1)
+
+    Oxnewconc[0] = inMat['o1_mll'][1]
+
+    if inMat is None:
+       print("Hysteresis Correction function: No data")
+       return
+    else:
+        for i in range(1,len(inMat)-1):
+            D = 1 + H1 * (math.exp(inMat['p_dbar'][i] / H2) - 1)
+            C = math.exp(-1 * 0.04167/ H3)
+            Oxnewconc[i] = ((inMat['o1_mll'][i] + (Oxnewconc[i-1] * C * D)) - (inMat['o1_mll'][i-1] * C)) / D
+
+        inMat['SBE43FV'] = Oxnewconc[:]
+
+    return inMat
 
 def raw_ctd_filter(arr = None, filter_type='triangle',win_size=24):
     """raw_ctd_filter function 
@@ -201,7 +238,7 @@ def ondeck_pressure(inMat, scond):
     ep = []
     end_p = 0.0 
 
-    # Frame Length
+    # Frequency
     fl = 24 
     fl2 = fl*2 
     # One minute
@@ -311,7 +348,7 @@ def roll_filter(inMat=None, up='down', frames_per_sec=24, search_time=15):
 
     return subMat
 
-def pressure_sequence(inMat=None, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=1, search_time=15):
+def pressure_sequence(inMat=None, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15):
     """pressure_sequence function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
