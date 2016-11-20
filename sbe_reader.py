@@ -97,6 +97,7 @@ class SBEReader():
         num_frequencies = 5 - self.config["FrequencyChannelsSuppressed"]
         num_voltages = 8 - self.config["VoltageWordsSuppressed"]
 
+        string_order = ['scan']
         #flags to determine how many bytes to break by
         flag_nmea_pos = 0
         flag_nmea_depth = 0
@@ -107,33 +108,42 @@ class SBEReader():
         flag_pressure_temp = 1
         flag_status = 1
         flag_modulo = 1
-        if self.config["NmeaPositionDataAdded"]:
-            flag_nmea_pos = 1
-        if self.config["NmeaDepthDataAdded"]:
-            flag_nmea_depth = 1
-        if self.config["NmeaTimeAdded"]:
-            flag_nmea_time = 1
-        if self.config["ScanTimeAdded"]:
-            flag_scan_time = 1
         if self.config["SurfaceParVoltageAdded"]:
             flag_spar = 1
+            string_order.append('spar')
+        if self.config["NmeaPositionDataAdded"]:
+            flag_nmea_pos = 1
+            string_order.append('nmea_pos')
+        if self.config["NmeaDepthDataAdded"]:
+            flag_nmea_depth = 1
+            string_order.append('nmea_depth')
+        if self.config["NmeaTimeAdded"]:
+            flag_nmea_time = 1
+            string_order.append('nmea_time')
+        string_order.append('pressure_temp')
+        string_order.append('btl_status')
+        string_order.append('modulo')
+        if self.config["ScanTimeAdded"]:
+            flag_scan_time = 1
+            string_order.append('scan_time')
 
         the_bytes = b"".join(self.raw_bytes)
 
         #specify how each line of raw data should be broken down
         #this format is fed directly into _breakdown, so it needs to be tracked there
         unpack_str = (str(num_frequencies * 6 + num_voltages * 3 + flag_spar * 6) + "s" +
-            "2s2s2s" * flag_nmea_pos + "2s2s2s" * flag_nmea_pos + "2s" * flag_nmea_pos +
-            "6s" * flag_nmea_depth +
-            "8s" * flag_nmea_time +
-            "3s" * flag_pressure_temp +
-            "1s" * flag_status +
-            "2s" * flag_modulo +
-            "8s" * flag_scan_time)
+            "14s" * flag_nmea_pos +
+            #"2s2s2s" * flag_nmea_pos + "2s2s2s" * flag_nmea_pos + "2s" * flag_nmea_pos + #1
+            "6s" * flag_nmea_depth + #2
+            "8s" * flag_nmea_time + #3
+            "3s" * flag_pressure_temp + #4
+            "1s" * flag_status + #4
+            "2s" * flag_modulo + #4
+            "8s" * flag_scan_time) #5
         #breaks down line according to columns specified by unpack_str and converts from hex to decimal MSB first
         #needs to be adjusted for LSB fields (NMEA time, scan time), break into two lines? move int(x,16) outside
         measurements = [line for line in struct.iter_unpack(unpack_str, the_bytes)]
-        measurements_2 = np.array([self._breakdown(line) for line in measurements]) 
+        measurements_2 = np.array([self._breakdown(line, string_order) for line in measurements])
         #measurements_2 = [self._breakdown(line) for line in measurements]
                 #print(measurements_2.shape)
 
@@ -159,47 +169,48 @@ class SBEReader():
     Format:
     Lat, Lon, bottle fire status, NMEA time, Scan time
     '''
-    def _breakdown(self, line):
+    def _breakdown(self, line, ordering):
         output = ''
 
-        # skip line[0]
+        for x, y in zip(ordering, line):
         #convert to lat/lon
-        output = output + str(self._location_fix(line[1], line[2], line[3], line[4], line[5], line[6], line[7])) + ','
-
-        '''
-        Depth is not implemented yet, SBE does not know how they did it.
-        '''
-        #skip line[8]
-
-        '''
-        NMEA time is LSB, in seconds since January 1, 2000. check it works correctly or break down bytes again.
-        '''
-        #line[9]
-        output = output + str(self._sbe_time(self._reverse_bytes(line[9]), 'nmea')) + ','
-
-        '''
-        Pressure temp, status and modulo required by SBE format.
-        '''
-        #skip line[n+1]
-
-        '''
-        Scan time is LSB, 8 char long, in seconds since January 1, 1970
-        '''
-        #line[13]
-        output = output + str(self._sbe_time(self._reverse_bytes(line[13]), 'scan')) + ','
-
-        '''
-        Bottle fire - should match up exactly, might not.
-        '''
-        output = output + str(self._bottle_fire(line[11]))
-
+            if x == 'nmea_pos':
+                tokens = []
+                for t in struct.iter_unpack("2s2s2s2s2s2s2s", y):
+                    for tt in t:
+                        tokens.append(tt)
+                output = output + str(self._location_fix(tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], tokens[6])) + ','
+                #print(output)
+            elif x == 'nmea_time':
+                output = output + str(self._sbe_time(self._reverse_bytes(y), 'nmea')) + ','
+            elif x == 'scan_time':
+                output = output + str(self._sbe_time(self._reverse_bytes(y), 'scan'))
+            elif x == 'btl_status':
+                output = output + str(self._bottle_fire(y)) + ','
+        #print(output)
         return output
+        '''
+        Depth is not implemented, after emails showed SBE no longer knows how they did it.
+        '''
 
     def _breakdown_header(self):
-        output = [
+        #temp fix, need to adjust to take in file to adjust as wanted?
+        output = [[],[]]
+        if self.config["NmeaPositionDataAdded"]:
+            output[0] = ['lat_ddeg', 'lon_ddeg', 'new_fix']
+            output[1] = ['float64', 'float64', 'bool_']
+        if self.config["NmeaTimeAdded"]:
+            output[0].append('nmea_datetime')
+            output[1].append('datetime64')
+        output[0].append('btl_fire')
+        output[1].append('bool_')
+        if self.config["ScanTimeAdded"]:
+            output[0].append('scan_datetime')
+            output[1].append('datetime64')
+        '''output = [
             ['lat_ddeg', 'lon_ddeg', 'new_fix', 'nmea_datetime', 'scan_datetime', 'btl_fire'],
             ['float64', 'float64', 'bool_', 'datetime64', 'datetime64', 'bool_']
-        ]
+        ]'''
 
         return output
 
@@ -410,7 +421,7 @@ class SBEReader():
                         bulbasaur[y.tag] = float(y.text)
                     except:
                         bulbasaur[y.tag] = str(y.text).replace('\n', '').replace(' ','')
-                    
+
                 """Add sensor to big dictionary."""
                 #pokedex[x.attrib['index']] = bulbasaur
                 sensors[int(x.attrib['index'])] = bulbasaur
