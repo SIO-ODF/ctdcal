@@ -13,6 +13,8 @@ CONVERTED_SUFFIX = '_converted'
 
 #File extension to use for processed output
 BOTTLE_SUFFIX = '_btl'
+MEAN_SUFFIX = '_mean'
+MEDIAN_SUFFIX = '_median'
 
 DEBUG = False
 
@@ -95,6 +97,32 @@ def main(argv):
     debugPrint('Saving bottle data to:', bottlefilePath + '... ', end='')
     if not cnv.saveConvertedDataToFile(bottle_df, bottlefilePath, DEBUG):
         errPrint('ERROR: Could not save bottle fire data to file')
+    else:
+        debugPrint('Success!')
+
+    mean_df = btl.bottle_mean(bottle_df)
+
+    # Build the filename for the bottle fire mean data
+    meanfileName  = filename_base.replace(CONVERTED_SUFFIX,'') + BOTTLE_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT
+    meanfilePath = os.path.join(outputDir, meanfileName)
+
+    # Save the bottle fire mean dataframe to file.
+    debugPrint('Saving mean data to:', meanfilePath + '... ', end='')
+    if not cnv.saveConvertedDataToFile(mean_df, meanfilePath, DEBUG):
+        errPrint('ERROR: Could not save mean fire data to file')
+    else:
+        debugPrint('Success!')
+
+    median_df = btl.bottle_median(bottle_df)
+
+    # Build the filename for the bottle fire median data
+    medianfileName  = filename_base.replace(CONVERTED_SUFFIX,'') + BOTTLE_SUFFIX + MEDIAN_SUFFIX + '.' + FILE_EXT
+    medianfilePath = os.path.join(outputDir, medianfileName)
+
+    # Save the bottle fire median dataframe to file.
+    debugPrint('Saving median data to:', medianfilePath + '... ', end='')
+    if not cnv.saveConvertedDataToFile(median_df, medianfilePath, DEBUG):
+        errPrint('ERROR: Could not save median fire data to file')
     else:
         debugPrint('Success!')
 
