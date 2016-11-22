@@ -2,7 +2,7 @@ import sys
 import os
 import argparse
 import pandas as pd
-import converter_scaffolding as cnv
+import libODF_convert as cnv
 
 DEBUG = False
 
@@ -19,7 +19,7 @@ def errPrint(*args, **kwargs):
 def main(argv):
 
     parser = argparse.ArgumentParser(description='Sample Script for importing converted SBE Data')
-    parser.add_argument('convertedFile', metavar='converted File', help='the converted data file to process')
+    parser.add_argument('convertedFile', metavar='converted_File', help='the converted data file to process')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')

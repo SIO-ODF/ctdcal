@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scipy.signal as sig
 import configparser 
-import process_ctd 
+import libODF_process_ctd as process_ctd 
 
 # todo: Migrate testing.py to run.py next 
 
