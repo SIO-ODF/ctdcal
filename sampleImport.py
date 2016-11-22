@@ -18,8 +18,8 @@ def errPrint(*args, **kwargs):
 # -------------------------------------------------------------------------------------
 def main(argv):
 
-    parser = argparse.ArgumentParser(description='Sample Script for importing converted SBE Data')
-    parser.add_argument('convertedFile', metavar='converted_File', help='the converted data file to process')
+    parser = argparse.ArgumentParser(description='Sample Script for importing converted SBE raw data to a Pandas dataframe')
+    parser.add_argument('convertedFile', metavar='cnv_file', help='the converted data file to process')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')

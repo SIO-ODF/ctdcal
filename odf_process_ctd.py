@@ -30,17 +30,17 @@ def errPrint(*args, **kwargs):
 # -------------------------------------------------------------------------------------
 def main(argv):
 
-    parser = argparse.ArgumentParser(description='General Utility for processing SBE Data')
-    parser.add_argument('iniFile', metavar='ini File', help='the .ini file to use for processing')
+    parser = argparse.ArgumentParser(description='General Utility for processing CTD sensors data from converted, csv-formatted text files')
+    parser.add_argument('iniFile', metavar='ini_file', help='the .ini file to use for processing')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
 
     # input file
-    parser.add_argument('-i', metavar='inFile', dest='inFile', help='the converted ctd data to process, overrides the input file defined in the .ini file')
+    parser.add_argument('-i', metavar='cnv_file', dest='inFile', help='the converted ctd data to process, overrides the input file defined in the .ini file')
 
     # output directory
-    parser.add_argument('-o', metavar='destDir', dest='outDir', help='location to save output files')
+    parser.add_argument('-o', metavar='dest_dir', dest='outDir', help='location to save output files')
 
     # Process Command-line args
     args = parser.parse_args()

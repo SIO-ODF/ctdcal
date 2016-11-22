@@ -16,6 +16,9 @@ BOTTLE_SUFFIX = '_btl'
 MEAN_SUFFIX = '_mean'
 MEDIAN_SUFFIX = '_median'
 
+#Column name for the bottle fire number
+BOTTLE_FIRE_NUM_COL = 'btl_fire_num'
+
 DEBUG = False
 
 def debugPrint(*args, **kwargs):
@@ -30,14 +33,14 @@ def errPrint(*args, **kwargs):
 # -------------------------------------------------------------------------------------
 def main(argv):
 
-    parser = argparse.ArgumentParser(description='Build bottle file from converted file')
-    parser.add_argument('convertedFile', metavar='converted File', help='the converted data file to process')
+    parser = argparse.ArgumentParser(description='Process bottle fire data from a converted, csv-formatted text file')
+    parser.add_argument('cnv_file', metavar='cnv_file', help='the converted data file to process')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
 
     # output directory
-    parser.add_argument('-o', metavar='destDir', dest='outDir', help='location to save output files')
+    parser.add_argument('-o', metavar='dest_dir', dest='outDir', help='location to save output files')
 
     args = parser.parse_args()
     if args.debug:
@@ -46,15 +49,15 @@ def main(argv):
         debugPrint("Running in debug mode")
 
     # Verify converted exists
-    if not os.path.isfile(args.convertedFile):
-        errPrint('ERROR: Input converted file:', args.convertedFile, 'not found\n')
+    if not os.path.isfile(args.cnv_file):
+        errPrint('ERROR: Input converted file:', args.cnv_file, 'not found\n')
         sys.exit(1)
 
     # Set the default output directory to be the same directory as the hex file
-    outputDir = os.path.dirname(args.convertedFile)
+    outputDir = os.path.dirname(args.cnv_file)
 
     # Used later for building output file names
-    filename_ext = os.path.basename(args.convertedFile) # original filename with ext
+    filename_ext = os.path.basename(args.cnv_file) # original filename with ext
     filename_base = os.path.splitext(filename_ext)[0] # original filename w/o ext
 
     # Verify Output Directory exists
@@ -66,7 +69,7 @@ def main(argv):
             sys.exit(1)
 
     debugPrint("Import converted data to dataframe... ", end='')
-    imported_df = cnv.importConvertedFile(args.convertedFile, False)
+    imported_df = cnv.importConvertedFile(args.cnv_file, False)
     debugPrint("Success!")
 
     debugPrint(imported_df.head())
@@ -74,19 +77,19 @@ def main(argv):
 
     # Retrieve the rows from the imported dataframe where the btl_fire_bool column == True
     # Returns a new dataframe
-    bottle_df = btl.retrieveBottleData(imported_df, DEBUG)
+    bottle_df = btl.retrieveBottleData(imported_df, False)
 
     if bottle_df.empty:
         errPrint("Bottle fire data not found in converted file")
         sys.exit(1)
     else:
-        total_bottles_fired = bottle_df["bottle_fire_num"].iloc[-1]
+        total_bottles_fired = bottle_df[BOTTLE_FIRE_NUM_COL].iloc[-1]
         debugPrint(total_bottles_fired, "bottle fire(s) detected")
         bottle_num = 1
 
         while bottle_num <= total_bottles_fired:
             debugPrint('Bottle:', bottle_num)
-            debugPrint(bottle_df.loc[bottle_df['bottle_fire_num'] == bottle_num].head())
+            debugPrint(bottle_df.loc[bottle_df[BOTTLE_FIRE_NUM_COL] == bottle_num].head())
             bottle_num += 1
 
     # Build the filename for the bottle fire data
