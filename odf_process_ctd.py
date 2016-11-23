@@ -156,8 +156,8 @@ def main(argv):
     else:
         align_matrix = process_ctd.ctd_align(raw_matrix,'o1_mll', float(do_align))
 
-    #data_matrix = process_ctd.ondeck_pressure(align_matrix, float(config['ctd_processing']['conductivity_start']))
-    #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
+    data_matrix = process_ctd.ondeck_pressure(align_matrix, float(config['ctd_processing']['conductivity_start']))
+    hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
     
     debugPrint('Done!')
 
