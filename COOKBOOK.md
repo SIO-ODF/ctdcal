@@ -63,7 +63,7 @@ After running these three scripts there will be a new directory: ./procdata/RR20
  - RR2001_CAST001_btl.csv
  - RR2001_CAST001_btl_mean.csv
  - RR2001_CAST001_btl_median.csv
- 
+
  ### Additional steps:
  
 1. Copy the raw data files for the cast to the output directory
