@@ -2,7 +2,7 @@ import sys
 import os
 import argparse
 import pandas as pd
-import converter_scaffolding as cnv
+import libODF_convert as cnv
 
 DEBUG = False
 
@@ -18,9 +18,9 @@ def errPrint(*args, **kwargs):
 # -------------------------------------------------------------------------------------
 def main(argv):
 
-    parser = argparse.ArgumentParser(description='Sample Script for importing converted SBE Data as a pandas dataframe and then exporting the dataframe as a new csv file')
-    parser.add_argument('convertedFile', metavar='converted File', help='the converted data file to import to a dataframe')
-    parser.add_argument('outputFile', metavar='output File', help='the filename to export the dataframe to')
+    parser = argparse.ArgumentParser(description='Sample Script for importing converted, csv-formatted data to a pandas dataframe and then exporting the dataframe as a new csv-formatted file')
+    parser.add_argument('convertedFile', metavar='cnv_file', help='the converted data file to import to a dataframe')
+    parser.add_argument('outputFile', metavar='output_file', help='the filename to export the dataframe to')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
@@ -48,8 +48,8 @@ def main(argv):
     imported_df = cnv.importConvertedFile(args.convertedFile, False)
     debugPrint("Success!")
 
-    errPrint(imported_df.head())
-    errPrint(imported_df.dtypes)
+    #debugPrint(imported_df.head())
+    #debugPrint(imported_df.dtypes)
 
     debugPrint('Saving output data to:', args.outputFile + '... ', end='')
     if cnv.saveConvertedDataToFile(imported_df, args.outputFile, False):

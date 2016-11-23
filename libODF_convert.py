@@ -1,8 +1,8 @@
 import sys
 import csv
 import pandas as pd
-import sbe_reader as sbe_rd
-import sbe_equations_dict as sbe_eq
+import libODF_sbe_reader as sbe_rd
+import libODF_sbe_equations_dict as sbe_eq
 
 DEBUG = False
 

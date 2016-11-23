@@ -2,7 +2,7 @@ import sys
 import os
 import argparse
 import pandas as pd
-import converter_scaffolding as cnv
+import libODF_convert as cnv
 
 DEBUG = False
 
@@ -19,8 +19,8 @@ def errPrint(*args, **kwargs):
 def main(argv):
 
     parser = argparse.ArgumentParser(description='Sample Script for converting raw SBE Data')
-    parser.add_argument('hexFile', metavar='hex File', help='the .hex data file to process')
-    parser.add_argument('xmlconFile', metavar='XMLCON File', help='the .XMLCON data file to process')
+    parser.add_argument('hexFile', metavar='hex_file', help='the .hex data file to process')
+    parser.add_argument('xmlconFile', metavar='XMLCON_file', help='the .XMLCON data file to process')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')

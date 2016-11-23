@@ -2,10 +2,10 @@
 import sys
 import os
 import argparse
-import sbe_reader
+import libODF_sbe_reader as sbe_reader
 import numpy as np
 import pandas as pd
-import converter_scaffolding as cnv
+import libODF_convert as cnv
 
 DEBUG = False
 
@@ -16,7 +16,7 @@ FILE_EXT = 'csv'
 RAW_SUFFIX = '_raw'
 
 #File extension to use for converted output
-CONVERTED_SUFFIX = '_converted'
+CONVERTED_SUFFIX = '_cnv'
 
 
 def debugPrint(*args, **kwargs):
@@ -31,9 +31,9 @@ def errPrint(*args, **kwargs):
 # -------------------------------------------------------------------------------------
 def main(argv):
 
-    parser = argparse.ArgumentParser(description='General Utility for processing SBE Data')
-    parser.add_argument('hexFile', metavar='hex File', help='the .hex data file to process')
-    parser.add_argument('xmlconFile', metavar='XMLCON File', help='the .XMLCON data file to process')
+    parser = argparse.ArgumentParser(description='Convert SBE raw data to a converted, csv-formatted text file')
+    parser.add_argument('hexFile', metavar='hex_file', help='the .hex data file to process')
+    parser.add_argument('xmlconFile', metavar='XMLCON_file', help='the .XMLCON data file to process')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
@@ -42,7 +42,7 @@ def main(argv):
     parser.add_argument('-r', '--raw', action='store_true', help='return the raw data values')
 
     # output directory
-    parser.add_argument('-o', metavar='destDir', dest='outDir', help='location to save output files')
+    parser.add_argument('-o', metavar='dest_dir', dest='outDir', help='location to save output files')
 
     # Process Command-line args
     args = parser.parse_args()

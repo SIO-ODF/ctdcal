@@ -13,12 +13,13 @@ import sys
 import csv
 import datetime
 import statistics
-import converter_scaffolding as cnv
+import libODF_convert as cnv
 import pandas as pd
 import time
 
 
-BOTTLE_FIRE_COL_NAME = 'btl_fire'
+BOTTLE_FIRE_COL = 'btl_fire'
+BOTTLE_FIRE_NUM_COL = 'btl_fire_num'
 
 DEBUG = False
 
@@ -39,34 +40,34 @@ def retrieveBottleDataFromFile(converted_file, debug=False):
 
 # Retrieve the bottle data from a dataframe created from a converted file.
 def retrieveBottleData(converted_df, debug=False):
-    if BOTTLE_FIRE_COL_NAME in converted_df.columns:
-        converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL_NAME] == True) & (converted_df[BOTTLE_FIRE_COL_NAME] != converted_df[BOTTLE_FIRE_COL_NAME].shift(1))).astype(int).cumsum()
-        #converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL_NAME] == False)).astype(int).cumsum()
+    if BOTTLE_FIRE_COL in converted_df.columns:
+        converted_df[BOTTLE_FIRE_NUM_COL] = ((converted_df[BOTTLE_FIRE_COL] == True) & (converted_df[BOTTLE_FIRE_COL] != converted_df[BOTTLE_FIRE_COL].shift(1))).astype(int).cumsum()
+        #converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL] == False)).astype(int).cumsum()
 
-        return converted_df.loc[converted_df[BOTTLE_FIRE_COL_NAME] == True]
+        return converted_df.loc[converted_df[BOTTLE_FIRE_COL] == True]
         #return converted_df
     else:
-        debugPrint("Bottle fire column:", BOTTLE_FIRE_COL_NAME, "not found")
+        debugPrint("Bottle fire column:", BOTTLE_FIRE_COL, "not found")
 
     return pd.DataFrame() #empty dataframe
 
 def bottle_mean(btl_df):
     '''Compute the mean for each bottle from a dataframe.'''
-    btl_max = int(btl_df['bottle_fire_num'].tail(n=1))
+    btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
     i = 1
     output = pd.DataFrame()
     while i <= btl_max:
-        output = pd.concat((output,btl_df[btl_df['bottle_fire_num'] == i].mean().to_frame(name=i).transpose()))
+        output = pd.concat((output,btl_df[btl_df[BOTTLE_FIRE_NUM_COL] == i].mean().to_frame(name=i).transpose()))
         i += 1
     return output
 
 def bottle_median(btl_df):
     '''Compute the median for each bottle from a dataframe.'''
-    btl_max = int(btl_df['bottle_fire_num'].tail(n=1))
+    btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
     i = 1
     output = pd.DataFrame()
     while i <= btl_max:
-        output = pd.concat((output,btl_df[btl_df['bottle_fire_num'] == i].median().to_frame(name=i).transpose()))
+        output = pd.concat((output,btl_df[btl_df[BOTTLE_FIRE_NUM_COL] == i].median().to_frame(name=i).transpose()))
         i += 1
     return output
 

@@ -2,15 +2,12 @@
 import sys
 import os
 import argparse
-import sbe_reader
 import numpy as np
 import pandas as pd
-import web_viewer as wv
-import converter_scaffolding as cnv
 import configparser
-import process_ctd 
-#import converter
-#import raw_converter
+import libODF_process_ctd as process_ctd
+import libODF_sbe_reader as sbe_reader
+import libODF_convert as cnv
 
 DEBUG = False
 
@@ -33,17 +30,17 @@ def errPrint(*args, **kwargs):
 # -------------------------------------------------------------------------------------
 def main(argv):
 
-    parser = argparse.ArgumentParser(description='General Utility for processing SBE Data')
-    parser.add_argument('iniFile', metavar='ini File', help='the .ini file to use for processing')
+    parser = argparse.ArgumentParser(description='General Utility for processing CTD sensors data from converted, csv-formatted text files')
+    parser.add_argument('iniFile', metavar='ini_file', help='the .ini file to use for processing')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
 
     # input file
-    parser.add_argument('-i', metavar='inFile', dest='inFile', help='the converted ctd data to process, overrides the input file defined in the .ini file')
+    parser.add_argument('-i', metavar='cnv_file', dest='inFile', help='the converted ctd data to process, overrides the input file defined in the .ini file')
 
     # output directory
-    parser.add_argument('-o', metavar='destDir', dest='outDir', help='location to save output files')
+    parser.add_argument('-o', metavar='dest_dir', dest='outDir', help='location to save output files')
 
     # Process Command-line args
     args = parser.parse_args()
@@ -144,9 +141,20 @@ def main(argv):
     raw_matrix = process_ctd.dataToMatrix(inputFile,None,list(imported_df.columns.insert(0,'index')),',')
     debugPrint("Martix DTypes:",raw_matrix.dtype)
     
-    align_matrix = process_ctd.ctd_align(raw_matrix,'c1_Sm', float(tc1_align))
-    align_matrix = process_ctd.ctd_align(raw_matrix,'c2_Sm', float(tc2_align))
-    align_matrix = process_ctd.ctd_align(raw_matrix,'o1_mll', float(do_align))
+    if not 'c1_Sm' in raw_matrix.dtype.names:
+        errPrint('c1_Sm data not found, skipping')
+    else:
+        align_matrix = process_ctd.ctd_align(raw_matrix,'c1_Sm', float(tc1_align))
+
+    if not 'c2_Sm' in raw_matrix.dtype.names:
+        errPrint('c2_Sm data not found, skipping')
+    else:
+        align_matrix = process_ctd.ctd_align(raw_matrix,'c2_Sm', float(tc2_align))
+
+    if not 'o1_mll' in raw_matrix.dtype.names:
+        errPrint('o1_mll data not found, skipping')
+    else:
+        align_matrix = process_ctd.ctd_align(raw_matrix,'o1_mll', float(do_align))
 
     #data_matrix = process_ctd.ondeck_pressure(align_matrix, float(config['ctd_processing']['conductivity_start']))
     #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
