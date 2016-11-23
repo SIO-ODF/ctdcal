@@ -2,7 +2,7 @@
 import numpy as np
 import scipy.signal as sig
 import scipy.stats as st
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import pandas as pd
 import math
 
@@ -171,8 +171,7 @@ def hysteresis_correction(H1=0.033, H2=5000, H3=1450, inMat = None):
             C = math.exp(-1 * 0.04167/ H3)
             Oxnewconc[i] = ((inMat['o1_mll'][i] + (Oxnewconc[i-1] * C * D)) - (inMat['o1_mll'][i-1] * C)) / D
 
-        inMat['SBE43FV'] = Oxnewconc[:]
-
+        inMat['o1_mll'][:] = Oxnewconc[:]
     return inMat
 
 def raw_ctd_filter(arr = None, filter_type='triangle',win_size=24):
@@ -213,7 +212,7 @@ def raw_ctd_filter(arr = None, filter_type='triangle',win_size=24):
             rtn = 2*sig.convolve(arr, win, mode='same')/len(win)
     return rtn 
 
-def ondeck_pressure(inMat, scond):
+def ondeck_pressure(inMat=None, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -245,41 +244,45 @@ def ondeck_pressure(inMat, scond):
     mt = 60
     # Half minute 
     ms = 30
-    sdelay = fl*ms
+    time_delay = fl*ms
 
-    # Searches first quarter of matrix, uses start conductivity  
-    # condition min to capture startup pressure
-    for j in range(0,int(len(inMat)/4)):
-        if ((inMat['TIMEs'][j] > 0.0) and (inMat['C1mScm'][j] < scond) and (inMat['C2mScm'][j] < scond)):
-            tmp = j
-            sp.append(inMat['Pdbar'][j])
+    if inMat is None:
+        print("Ondeck_pressure function: No data.")
+        return
+    else:
+        # Searches first quarter of matrix, uses conductivity 
+        # threshold min to capture startup pressure
+        for j in range(0,int(len(inMat)/4)):
+            if ((inMat['c1_Sm'][j] < conductivity_startup) and (inMat['c2_Sm'][j] < conductivity_startup)):
+                tmp = j
+                sp.append(inMat['p_dbar'][j])
     
-    # Evaluate starting pressures
-    if not sp: start_p = "Started in Water"
-    else: 
-        n = len(sp)
-        if (n > sdelay): start_p = np.average(sp[fl2:n-(sdelay)])
-        else: start_p = np.average(sp[fl2:n])
+        # Evaluate starting pressures
+        if not sp: start_p = "Started in Water"
+        else: 
+            n = len(sp)
+            if (n > time_delay): start_p = np.average(sp[fl2:n-(time_delay)])
+            else: start_p = np.average(sp[fl2:n])
 
-    # Remove on-deck startup
-    inMat = inMat[tmp:]
+        # Remove on-deck startup
+        inMat = inMat[tmp:]
 
-    tmp = len(inMat); 
-    # Searches last half of Matrix for conductivity threshold 
-    for j in range(int(len(inMat)*0.5), len(inMat)):
-        if ((inMat['C1mScm'][j] < scond) and (inMat['C2mScm'][j] < scond)):
-            ep.append(inMat['Pdbar'][j])
-            if (tmp > j): tmp = j 
+        tmp = len(inMat); 
+        # Searches last half of Matrix for conductivity threshold 
+        for j in range(int(len(inMat)*0.5), len(inMat)):
+            if ((inMat['c1_Sm'][j] < conductivity_startup) and (inMat['c2_Sm'][j] < conductivity_startup)):
+                ep.append(inMat['p_dbar'][j])
+                if (tmp > j): tmp = j 
 
-    # Evaluate ending pressures
-    if (len(ep) > (sdelay)): end_p = np.average(ep[(sdelay):])
-    else: end_p = np.average(ep[(len(ep)):])
+        # Evaluate ending pressures
+        if (len(ep) > (time_delay)): end_p = np.average(ep[(time_delay):])
+        else: end_p = np.average(ep[(len(ep)):])
 
-    # Remove on-deck ending 
-    outMat = inMat[:tmp]
+        # Remove on-deck ending 
+        outMat = inMat[:tmp]
 
-    # Store ending on-deck pressure
-    print("Sta/Cast ondeck start "+str(start_p)+" "+str(end_p))
+        # Store ending on-deck pressure
+        print("Sta/Cast ondeck start "+str(start_p)+" "+str(end_p))
 
     return outMat
 
