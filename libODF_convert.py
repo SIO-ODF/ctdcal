@@ -69,6 +69,26 @@ def convertFromSBEReader(sbeReader, debug=False):
     # Retrieve Config data
     rawConfig = sbeReader.parsed_config()
 
+    # The meta data field needs to be processed seperately and then joined with the converted_df
+    debugPrint("Building meta data dataframe... ", end='')
+    metaArray = [line.split(',') for line in sbeReader._parse_scans_meta().tolist()]
+    metaArrayheaders = sbeReader._breakdown_header()
+    meta_df = pd.DataFrame(metaArray)
+
+    meta_df.columns = metaArrayheaders[0]
+    meta_df.index.name = 'index'
+
+    for i, x in enumerate(metaArrayheaders[0]):
+        #debugPrint('Set', metaArrayheaders[0][i], 'to', metaArrayheaders[1][i])
+        if not metaArrayheaders[1][i] == 'bool_':
+            meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].astype(metaArrayheaders[1][i])
+        else:
+            meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].str.match('True', na=False)
+            #debugPrint(meta_df[metaArrayheaders[0][i]].head())
+
+    debugPrint('Success!')
+
+    pressure_temp = meta_df['pressure_temp_int'].tolist()
     #needs to search sensor dictionary, and compute in order:
     #temp, pressure, cond, salinity, oxygen, all aux.
     #run one loop that builds a queue to determine order of processing, must track which column to pull
@@ -166,7 +186,7 @@ def convertFromSBEReader(sbeReader, debug=False):
         ### Pressure block
         elif temp_meta['sensor_id'] == '45':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array)
+            converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
             if temp_meta['list_id'] == 2:
                 p_array = converted_df[column_name].astype(type('float', (float,), {}))
                 debugPrint('\tPressure used:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
@@ -208,24 +228,7 @@ def convertFromSBEReader(sbeReader, debug=False):
     # Set the column name for the index
     converted_df.index.name = 'index'
 
-    # The meta data field needs to be processed seperately and then joined with the converted_df
-    debugPrint("Building meta data dataframe... ", end='')
-    metaArray = [line.split(',') for line in sbeReader._parse_scans_meta().tolist()]
-    metaArrayheaders = sbeReader._breakdown_header()
-    meta_df = pd.DataFrame(metaArray)
 
-    meta_df.columns = metaArrayheaders[0]
-    meta_df.index.name = 'index'
-
-    for i, x in enumerate(metaArrayheaders[0]):
-        #debugPrint('Set', metaArrayheaders[0][i], 'to', metaArrayheaders[1][i])
-        if not metaArrayheaders[1][i] == 'bool_':
-            meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].astype(metaArrayheaders[1][i])
-        else:
-            meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].str.match('True', na=False)
-            #debugPrint(meta_df[metaArrayheaders[0][i]].head())
-
-    debugPrint('Success!')
 
     debugPrint("Joining meta data dataframe with converted data... ", end='')
     converted_df = converted_df.join(meta_df)
@@ -316,4 +319,3 @@ def saveConvertedDataToFile(converted_df, filename, debug=False):
         debugPrint('Success!')
 
     return True
-

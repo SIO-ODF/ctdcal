@@ -218,25 +218,30 @@ def pressure_dict(calib, f, t):
     C3: coefficient
     D1: coefficient
     D2: coefficient
-    AD590M: not used
-    AD590B: not used
+    AD590M: used in digiquartz temeperature correction
+    AD590B: used in digiquartz temperature correction
 
     f: sensor frequency (usually between 30kHz and 42kHz)
     t: sensor temperature in C
 
     """
     #array mode
+    #print(t)
     try:
+        t_converted = []
+        for x in t:
+            t_converted.append((calib['AD590M'] * int(x)) + calib['AD590B'])
         pressure = []
         """Equation expecting pressure period in microseconds, so divide f by 1,000,000. """
         uf = [x/1000000 for x in f]
-        for f_x, t_x in zip(uf, t):
+        for f_x, t_x in zip(uf, t_converted):
             T0 = calib['T1'] + calib['T2']*t_x + calib['T3']*math.pow(t_x,2) + calib['T4']*math.pow(t_x,3)
             w = 1-T0*T0*f_x*f_x
             temp = (0.6894759*((calib['C1']+calib['C2']*t_x+calib['C3']*t_x*t_x)*w*(1-(calib['D1']+calib['D2']*t_x)*w)-14.7))
             pressure.append(round(temp,2))
     #single mode
     except:
+        t = (calib['AD590M'] * t) + calib['AD590B']
         T0 = calib['T1'] + calib['T2']*t + calib['T3']*math.pow(t,2) + calib['T4']*math.pow(t,3)
         w = 1-T0*T0*f*f
         pressure = (0.6894759*((calib['C1']+calib['C2']*t+calib['C3']*t*t)*w*(1-(calib['D1']+calib['D2']*t)*w)-14.7))

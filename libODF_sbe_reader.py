@@ -187,6 +187,9 @@ class SBEReader():
                 output = output + str(self._sbe_time(self._reverse_bytes(y), 'scan'))
             elif x == 'btl_status':
                 output = output + str(self._bottle_fire(y)) + ','
+            elif x == 'pressure_temp':
+                #print(y)
+                output = output + str(int(y, 16)) + ','
         #print(output)
         return output
         '''
@@ -202,6 +205,8 @@ class SBEReader():
         if self.config["NmeaTimeAdded"]:
             output[0].append('nmea_datetime')
             output[1].append('datetime64')
+        output[0].append('pressure_temp_int')
+        output[1].append('int_')
         output[0].append('btl_fire')
         output[1].append('bool_')
         if self.config["ScanTimeAdded"]:
@@ -367,6 +372,13 @@ class SBEReader():
             return(False)
 
         return None
+
+    def _digiquartz_temp_correction(self, hex_in):
+        '''Digiquartz pressure sensor temperature correction for internal probe.'''
+        charm = format(hex_in, 'd')
+        T_d = (AD590M * charm) + AD590B
+        return T_d
+
 
     """Only for values in bools and numeric. """
     def _parse_config(self):
