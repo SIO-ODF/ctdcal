@@ -238,7 +238,7 @@ def pressure_dict(calib, f, t):
             T0 = calib['T1'] + calib['T2']*t_x + calib['T3']*math.pow(t_x,2) + calib['T4']*math.pow(t_x,3)
             w = 1-T0*T0*f_x*f_x
             temp = (0.6894759*((calib['C1']+calib['C2']*t_x+calib['C3']*t_x*t_x)*w*(1-(calib['D1']+calib['D2']*t_x)*w)-14.7))
-            pressure.append(round(temp,2))
+            pressure.append(round(temp,4))
     #single mode
     except:
         t = (calib['AD590M'] * t) + calib['AD590B']
