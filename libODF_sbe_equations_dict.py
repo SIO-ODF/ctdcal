@@ -1,5 +1,5 @@
 """
-October 12, 2016
+November 23, 2016
 Joseph Gum
 
 A module for SBE conversion equations and related helper equations.
@@ -8,9 +8,7 @@ gsw libraries, and remove written wrappers.
 
 """
 
-
 import math
-#import gsw.gibbs.practical_salinity as psal
 import gsw
 import numpy as np
 
@@ -58,6 +56,7 @@ def temp_its90_dict(calib, freq, verbose = 0):
         ITS90 = round(ITS90,4)
     return ITS90
 
+
 def OxSol(T,S):
     """Eq. 8 from Garcia and Gordon, 1992.
 
@@ -100,6 +99,7 @@ def OxSol(T,S):
     O2sol = math.exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
     return O2sol
 
+
 def oxy_dict(calib, P, K, T, S, V):
     """SBE equation for converting engineering units to oxygen (ml/l).
     SensorID: 38
@@ -117,8 +117,7 @@ def oxy_dict(calib, P, K, T, S, V):
 
     """
 
-    """Assumes all are arrays, or none are arrays. Need way to test for them. """
-
+    #array mode
     try:
         oxygen = []
         for P_x, K_x, T_x, S_x, V_x in zip(P, K, T, S, V):
@@ -135,6 +134,7 @@ def oxy_dict(calib, P, K, T, S, V):
                   * OxSol(T,S)
                   * math.exp(calib['E'] * P / K))
     return oxygen
+
 
 def cond_dict(calib, F, t, p):
     """SBE equation for converting frequency to conductivity. Calculates mS/cm
@@ -180,6 +180,7 @@ def cond_dict(calib, F, t, p):
         Conductivity = round(Conductivity,5)
     return Conductivity
 
+
 def sp_dict(c, t, p):
     """Wrapper of SP_from_C from gsw library.
     Take in non-numpy data, format to numpy array, then run through.
@@ -202,6 +203,7 @@ def sp_dict(c, t, p):
 
     return SP
 
+
 def pressure_dict(calib, f, t):
     """SBE/STS(?) equation for converting pressure frequency to temperature.
     SensorID: 45
@@ -222,11 +224,10 @@ def pressure_dict(calib, f, t):
     AD590B: used in digiquartz temperature correction
 
     f: sensor frequency (usually between 30kHz and 42kHz)
-    t: sensor temperature in C
+    t: sensor integer from the digiquartz temperature probe
 
     """
     #array mode
-    #print(t)
     try:
         t_converted = []
         for x in t:
@@ -241,11 +242,12 @@ def pressure_dict(calib, f, t):
             pressure.append(round(temp,4))
     #single mode
     except:
-        t = (calib['AD590M'] * t) + calib['AD590B']
+        t = (calib['AD590M'] * int(t)) + calib['AD590B']
         T0 = calib['T1'] + calib['T2']*t + calib['T3']*math.pow(t,2) + calib['T4']*math.pow(t,3)
         w = 1-T0*T0*f*f
         pressure = (0.6894759*((calib['C1']+calib['C2']*t+calib['C3']*t*t)*w*(1-(calib['D1']+calib['D2']*t)*w)-14.7))
     return pressure
+
 
 def wetlabs_flrtd_chl_dict(calib, counts):
     """Wetlabs
@@ -255,6 +257,7 @@ def wetlabs_flrtd_chl_dict(calib, counts):
     """
     chl = calib['scale_factor'] * (output - calib['darkcounts'])
     return chl
+
 
 def wetlabs_transmissometer_cstar_dict(calib, signal):
     """Wetlabs CStar Transmissiometer.
@@ -284,6 +287,7 @@ def wetlabs_transmissometer_cstar_dict(calib, signal):
         tx = (signal - calib['dark'])/(calib['reference'] - calib['dark'])
     return tx
 
+
 def benthos_psa916_dict(calib, signal):
     """Equation for determining altitude from a Benthos PSA-916 altimeter.
     Equation provided by SBE as AN95, or here: http://www.seabird.com/document/an95-setting-teledyne-benthos-altimeter-sea-bird-profiling-ctd
@@ -308,6 +312,7 @@ def benthos_psa916_dict(calib, signal):
     except:
         altitude = (300 * signal / calib['ScaleFactor']) + calib['Offset']
     return altitude
+
 
 def fluoro_seapoint_dict(calib, signal):
     """

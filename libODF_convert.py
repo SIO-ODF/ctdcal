@@ -121,8 +121,6 @@ def convertFromSBEReader(sbeReader, debug=False):
     ######
 
     for i, x in enumerate(rawConfig['Sensors']):
-        #print(i)
-        #print(rawConfig['Sensors'][i])
         sensor_id = rawConfig['Sensors'][i]['SensorID']
 
         #temp block
@@ -180,7 +178,7 @@ def convertFromSBEReader(sbeReader, debug=False):
             if temp_meta['list_id'] == 0:
                 t_array = converted_df[column_name].astype(type('float', (float,), {}))
                 k_array = [273.15+celcius for celcius in t_array]
-                debugPrint('\tPrimary temperature used:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                debugPrint('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Pressure block
@@ -189,7 +187,7 @@ def convertFromSBEReader(sbeReader, debug=False):
             converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
             if temp_meta['list_id'] == 2:
                 p_array = converted_df[column_name].astype(type('float', (float,), {}))
-                debugPrint('\tPressure used:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                debugPrint('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Conductivity block
@@ -198,7 +196,7 @@ def convertFromSBEReader(sbeReader, debug=False):
             converted_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
             if temp_meta['list_id'] == 1:
                 c_array = converted_df[column_name].astype(type('float', (float,), {}))
-                debugPrint('\tPrimary cond used:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                debugPrint('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Oxygen block
@@ -227,8 +225,6 @@ def convertFromSBEReader(sbeReader, debug=False):
 
     # Set the column name for the index
     converted_df.index.name = 'index'
-
-
 
     debugPrint("Joining meta data dataframe with converted data... ", end='')
     converted_df = converted_df.join(meta_df)

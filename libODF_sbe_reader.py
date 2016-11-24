@@ -15,9 +15,11 @@ def parse_frequency_hex(s):
     #return int(s[0:2], 16) * 256 + int(s[2:4], 16) + int(s[4:6], 16)/256
     return int(s, 16) / 256
 
+
 #Not currently used
 def parse_volt_hex(s):
     return (5 * (1 - (int(s, 16) / 4095)))
+
 
 class SBEReader():
     """Code originally written by Andrew Barna, January-March 2016."""
@@ -29,13 +31,16 @@ class SBEReader():
         self._load_hex()
         self._check_scan_lengths()
 
+
     def _load_hex(self):
         split_lines = self.raw_hex.splitlines()
         self.raw_bytes = [l.strip().encode("utf-8") for l in split_lines if not l.startswith("*")]
 
+
     def _check_scan_lengths(self):
         if not all([len(scan) == self.scan_length for scan in self.raw_bytes]):
             raise ValueError("The data length does not match the expected length from the config")
+
 
     def _parse_scans(self):
         '''The order according to the SBE docs are:
@@ -74,6 +79,7 @@ class SBEReader():
         measurements[:,num_frequencies:num_frequencies+num_voltages] = (5 * (1 - (measurements[:,num_frequencies:num_frequencies+num_voltages] / 4095)))
         #print(measurements.shape)
         return measurements
+
 
     def _parse_scans_meta(self):
         '''The order according to the SBE docs are:
@@ -114,6 +120,8 @@ class SBEReader():
         if self.config["NmeaPositionDataAdded"]:
             flag_nmea_pos = 1
             string_order.append('nmea_pos')
+            #Depth is here for completeness but not implemented,
+            #after email chain showed SBE no longer knows how they did it.
         if self.config["NmeaDepthDataAdded"]:
             flag_nmea_depth = 1
             string_order.append('nmea_depth')
@@ -133,27 +141,23 @@ class SBEReader():
         #this format is fed directly into _breakdown, so it needs to be tracked there
         unpack_str = (str(num_frequencies * 6 + num_voltages * 3 + flag_spar * 6) + "s" +
             "14s" * flag_nmea_pos +
-            #"2s2s2s" * flag_nmea_pos + "2s2s2s" * flag_nmea_pos + "2s" * flag_nmea_pos + #1
-            "6s" * flag_nmea_depth + #2
-            "8s" * flag_nmea_time + #3
-            "3s" * flag_pressure_temp + #4
-            "1s" * flag_status + #4
-            "2s" * flag_modulo + #4
-            "8s" * flag_scan_time) #5
+            "6s" * flag_nmea_depth +
+            "8s" * flag_nmea_time +
+            "3s" * flag_pressure_temp +
+            "1s" * flag_status +
+            "2s" * flag_modulo +
+            "8s" * flag_scan_time)
         #breaks down line according to columns specified by unpack_str and converts from hex to decimal MSB first
         #needs to be adjusted for LSB fields (NMEA time, scan time), break into two lines? move int(x,16) outside
         measurements = [line for line in struct.iter_unpack(unpack_str, the_bytes)]
         measurements_2 = np.array([self._breakdown(line, string_order) for line in measurements])
-        #measurements_2 = [self._breakdown(line) for line in measurements]
-                #print(measurements_2.shape)
 
-#        return measurements
         return measurements_2
 
-    '''
-    Breakdown the NMEA strings and internal scan time. SBE is shit at this.
 
-    Assumes a tuple is being pushed in, length 14.
+    def _breakdown(self, line, ordering):
+    '''
+    Convert hex metadata to science useable data.
 
     Steps:
     1. Throw away away first part of the line
@@ -162,25 +166,23 @@ class SBEReader():
 
     Input:
     line - a sequence specified by format in _parse_scans_meta
+    ordering - the order the string comes in
 
     Output:
-    __untitled - a string of converted data
+    output - a string of converted data according to format
 
     Format:
-    Lat, Lon, bottle fire status, NMEA time, Scan time
+    Lat, Lon, pressure temp, bottle fire status, NMEA time, Scan time
     '''
-    def _breakdown(self, line, ordering):
         output = ''
 
         for x, y in zip(ordering, line):
-        #convert to lat/lon
             if x == 'nmea_pos':
                 tokens = []
                 for t in struct.iter_unpack("2s2s2s2s2s2s2s", y):
                     for tt in t:
                         tokens.append(tt)
                 output = output + str(self._location_fix(tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], tokens[6])) + ','
-                #print(output)
             elif x == 'nmea_time':
                 output = output + str(self._sbe_time(self._reverse_bytes(y), 'nmea')) + ','
             elif x == 'scan_time':
@@ -188,15 +190,17 @@ class SBEReader():
             elif x == 'btl_status':
                 output = output + str(self._bottle_fire(y)) + ','
             elif x == 'pressure_temp':
-                #print(y)
                 output = output + str(int(y, 16)) + ','
-        #print(output)
+
         return output
-        '''
-        Depth is not implemented, after emails showed SBE no longer knows how they did it.
-        '''
+
 
     def _breakdown_header(self):
+        '''Creates header for metadata. Arrays below are what is expected.
+
+        ['lat_ddeg', 'lon_ddeg', 'new_fix', 'nmea_datetime', 'pressure_temp_int', 'btl_fire', 'scan_datetime'],
+        ['float64', 'float64', 'bool_', 'datetime64', 'int_', 'bool_', 'datetime64']
+        '''
         #temp fix, need to adjust to take in file to adjust as wanted?
         output = [[],[]]
         if self.config["NmeaPositionDataAdded"]:
@@ -212,10 +216,6 @@ class SBEReader():
         if self.config["ScanTimeAdded"]:
             output[0].append('scan_datetime')
             output[1].append('datetime64')
-        '''output = [
-            ['lat_ddeg', 'lon_ddeg', 'new_fix', 'nmea_datetime', 'scan_datetime', 'btl_fire'],
-            ['float64', 'float64', 'bool_', 'datetime64', 'datetime64', 'bool_']
-        ]'''
 
         return output
 
@@ -230,7 +230,7 @@ class SBEReader():
 
         Output:
         Tuple with three components in order:
-        latitude, longitude, new fix?
+        latitude, longitude, new fix
         Latitude is a float
         Longitude is a float
         If it is a new fix it will be true, otherwise false
@@ -259,6 +259,7 @@ class SBEReader():
         output = '{0},{1},{2}'.format(lat, lon, flag_new_fix)
         return output
 
+
     def _reverse_bytes(self, hex_time):
         """Reverse hex time according to SBE docs.
         Split number by every two chars, then recombine them in reverse order.
@@ -286,6 +287,7 @@ class SBEReader():
         """Add prefix to make python hex compatible"""
         reverse_hex = '0x' + reverse_hex
         return reverse_hex
+
 
     def _sbe_time(self, hex_time, sbe_type):
         """Convert raw data from sbe .hex file to appropriate datetime, then return string.
@@ -323,6 +325,7 @@ class SBEReader():
         else:
             raise Exception('Please choose "nmea" or "scan" for second input to _sbe_time()')
 
+
     def _flag_status(self, flag_char, scan_number):
         """An attempt to reverse engineer what the single status character means.
 
@@ -346,6 +349,7 @@ class SBEReader():
         if flag_char & mask_pump:
             print("Pump on")
         return None
+
 
     def _bottle_fire(self, flag_char):
         """Determine if a scan is around a bottle firing as marked by SBE.
@@ -372,6 +376,7 @@ class SBEReader():
             return(False)
 
         return None
+
 
     def _digiquartz_temp_correction(self, hex_in):
         '''Digiquartz pressure sensor temperature correction for internal probe.'''
@@ -440,21 +445,26 @@ class SBEReader():
         #sensors.append(pokedex)
         self.config['Sensors'] = sensors
 
+
     @classmethod
     def from_paths(cls, raw_hex_path, xml_config_path, encoding="cp437"):
         with open(raw_hex_path, encoding=encoding) as raw_hex_file, open(xml_config_path, encoding=encoding) as xml_config_file:
             return cls(raw_hex_file.read(), xml_config_file.read())
 
+
     @property
     def scan_length(self):
         return self.calculate_scan_byte_length()
+
 
     @property
     def frequency_channels(self):
         pass
 
+
     def voltage_channels(self):
         pass
+
 
     def calculate_scan_byte_length(self):
         length = 6 # Extra info alway present takes 6 "chars"
@@ -467,6 +477,7 @@ class SBEReader():
         length += 6 * self.config["SurfaceParVoltageAdded"]
         return int(length)
 
+
     @property
     def parsed_scans(self):
         try:
@@ -475,8 +486,10 @@ class SBEReader():
             self._parse_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
             return self._parse_scans
 
+
     def parsed_config(self):
         return self.config
+
 
     def to_dict(self, parse_cache=True):
         return {
@@ -484,6 +497,7 @@ class SBEReader():
             "xml_config": self.xml_config,
             "_parsed_scans": self.parsed_scans,
             }
+
 
     @classmethod
     def from_dict(cls, data):
