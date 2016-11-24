@@ -327,28 +327,46 @@ class SBEReader():
 
 
     def _flag_status(self, flag_char, scan_number):
-        """An attempt to reverse engineer what the single status character means.
+        '''Decode SBE flag bit, as referenced on SBE 11pV2, pg 66.
+        CTD status:
+            Bit 0 Pump status- 1=pump on, 0=pump off.
+            Bit 1 Bottom contact switch status -
+                1 = switch open (no contact), 0 = switch closed.
+            Bit 2 G.O. 1015 water sampler interface confirm signal or
+                manual pump control signal -
+                1 = Deck Unit detects confirm signal from G.O. 1015 or detects manual pump control installed in 9plus,
+                0 = not detected.
+            Bit 3 CTD modem carrier detect -
+                0 = CTD modem detects Deck Unit modem carrier signal, 1 = not detected.
 
-        bit 1 = pump status, 1 = on, 0 = off
-        bit 2 = bottom contact status, no bottom contact sensor to test with
-        bit 4 = bottle fire status, 1 = fired, 0 = not fired
-        bit 8 = not used?, default to 0
-
-        bit 2 seems to default to 1 when no bottom contact sensor is installed
-        bit 4 when set notes a bottle has been fired, no positional info
-
-        NOT FINISHED
-        """
+        Output could be cleaned up if it ever needs to be used.
+        '''
 
         mask_pump = 0x1
         mask_bottom_contact = 0x2
-        mask_bottle_fire = 0x4
+        mask_water_sampler_interface = 0x4
+        mask_modem_carrier_detect = 0x8
 
-        if flag_char & mask_bottle_fire:
-            print("Bottle fire at scan: " + str(scan_number))
+        output = ''
+
         if flag_char & mask_pump:
-            print("Pump on")
-        return None
+            output += 'pump on, '
+        else:
+            output += 'pump off, '
+        if flag_char & mask_bottom_contact:
+            output += 'no bottom contact, '
+        else:
+            output += 'bottom contact, '
+        if flag_char & mask_water_sampler_interface:
+            output += 'G.O. 1015 water sampler confirm signal OR manual pump installed, '
+        else:
+            output += 'no signal from G.O. 1015 water sampler OR no manual pump, '
+        if flag_char & mask_modem_carrier_detect:
+            output += 'modem carrier signal detected'
+        else:
+            output += 'no modem carrier signal detected'
+
+        return output
 
 
     def _bottle_fire(self, flag_char):
