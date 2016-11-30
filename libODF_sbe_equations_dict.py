@@ -59,6 +59,7 @@ def temp_its90_dict(calib, freq, verbose = 0):
 
 def OxSol(T,S):
     """Eq. 8 from Garcia and Gordon, 1992.
+    Harded coded to do ml/l for now. If requeste, add in new mode for ug/l.
 
     Inputs:
     T = ITS-90 Temperature
@@ -80,7 +81,6 @@ def OxSol(T,S):
     b2 = -1.13864e-2
     b3 = -9.51519e-3
     c0 = -2.75915e-7
-
     """
 
     """ml/l coefficients"""
@@ -98,6 +98,28 @@ def OxSol(T,S):
 
     O2sol = math.exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
     return O2sol
+
+
+def oxy_hysteresis_voltage(calib, voltage, scan_window=48):
+    '''SBE equation for computing hysteresis from raw voltage.
+    Must be run before oxy_dict.
+    Because of looking backwards, must skip i = 0.
+
+    Input:
+    calib: a dict holding H1, H2, H3, Voffset
+    voltage: a sequence of engineering voltages
+    scan_window: an int for scans to skip between, default 48 scans at 24Hz OR 2 seconds
+    '''
+    output = []
+
+    for i, x in enumerate(voltage):
+        if i == 0:
+            continue
+
+        D = 1 + calib['H1']*(exp(P(i)/calib['H2']) - 1)
+        C = exp(-1 * ())
+
+    return output
 
 
 def oxy_dict(calib, P, K, T, S, V):
@@ -136,7 +158,7 @@ def oxy_dict(calib, P, K, T, S, V):
     return oxygen
 
 
-def cond_dict(calib, F, t, p):
+def cond_dict(calib, F, t, p, units='mS'):
     """SBE equation for converting frequency to conductivity. Calculates mS/cm
     SensorID: 3
 
@@ -165,7 +187,10 @@ def cond_dict(calib, F, t, p):
                      + calib['J'] * math.pow(F_0,4))
                     / (1 + calib['CTcor'] * t_0 + calib['CPcor'] * p_0))
             #S/m to mS/cm
-            temp = temp * 0.1
+            if units == 'mS':
+                temp = temp * 0.01
+            elif units == 'S':
+                temp = temp * 0.1
             temp = round(temp, 5)
             Conductivity.append(temp)
     #single mode
