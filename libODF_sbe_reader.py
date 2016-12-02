@@ -9,6 +9,7 @@ import numpy as np
 import re
 import sys
 import datetime
+from pytz import timezone
 
 #not currently used
 def parse_frequency_hex(s):
@@ -156,24 +157,24 @@ class SBEReader():
 
 
     def _breakdown(self, line, ordering):
-    '''
-    Convert hex metadata to science useable data.
+        '''
+        Convert hex metadata to science useable data.
 
-    Steps:
-    1. Throw away away first part of the line
-    2. Start processing the rest of the line
-    3. Return a sequence (tuple? list?)
+        Steps:
+        1. Throw away away first part of the line
+        2. Start processing the rest of the line
+        3. Return a sequence (tuple? list?)
 
-    Input:
-    line - a sequence specified by format in _parse_scans_meta
-    ordering - the order the string comes in
+        Input:
+        line - a sequence specified by format in _parse_scans_meta
+        ordering - the order the string comes in
 
-    Output:
-    output - a string of converted data according to format
+        Output:
+        output - a string of converted data according to format
 
-    Format:
-    Lat, Lon, pressure temp, bottle fire status, NMEA time, Scan time
-    '''
+        Format:
+        Lat, Lon, pressure temp, bottle fire status, NMEA time, Scan time
+        '''
         output = ''
 
         for x, y in zip(ordering, line):
@@ -208,14 +209,14 @@ class SBEReader():
             output[1] = ['float64', 'float64', 'bool_']
         if self.config["NmeaTimeAdded"]:
             output[0].append('nmea_datetime')
-            output[1].append('datetime64')
+            output[1].append('float64')
         output[0].append('pressure_temp_int')
         output[1].append('int_')
         output[0].append('btl_fire')
         output[1].append('bool_')
         if self.config["ScanTimeAdded"]:
             output[0].append('scan_datetime')
-            output[1].append('datetime64')
+            output[1].append('float64')
 
         return output
 
@@ -316,12 +317,18 @@ class SBEReader():
 
         seconds = datetime.timedelta(seconds = int(hex_time, 16))
 
+        #changed to epoch time at request of analysts
+        #epoch time assumes it is UTC all way through
         if sbe_type == "scan":
+            #time = scan_start + seconds
+            #return time.isoformat()
             time = scan_start + seconds
-            return time.isoformat()
+            return time.replace(tzinfo=timezone('UTC')).timestamp()
         elif sbe_type == "nmea":
-            time = nmea_start + seconds
-            return time.isoformat()
+            #time = nmea_start + seconds
+            #return time.isoformat()
+            time = scan_start + seconds
+            return time.replace(tzinfo=timezone('UTC')).timestamp()
         else:
             raise Exception('Please choose "nmea" or "scan" for second input to _sbe_time()')
 
