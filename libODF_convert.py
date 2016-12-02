@@ -11,7 +11,7 @@ DEBUG = False
 short_lookup = {
     '55':{'short_name': 't', 'long_name':'SBE 3+ Temperature', 'units': 'C', 'type': 'float64'},
     '45':{'short_name': 'p', 'long_name':'SBE 9+ Pressure', 'units': 'dbar', 'type': 'float64'},
-    '3':{'short_name': 'c', 'long_name':'SBE 4 Conductivity', 'units': 'S/m', 'type':'float64'},
+    '3':{'short_name': 'c', 'long_name':'SBE 4 Conductivity', 'units': 'mS/cm', 'type':'float64'},
     '38':{'short_name': 'o', 'long_name':'SBE 43 Oxygen', 'units': 'ml/l', 'type':'float64'},
     '11':{'short_name': 'fluoro', 'long_name':'Seapoint Fluorometer', 'units': 'ug/l', 'type':'float64'},
     '27':{'short_name': 'empty', 'long_name':'empty', 'units':'NA', 'type':'NA'},

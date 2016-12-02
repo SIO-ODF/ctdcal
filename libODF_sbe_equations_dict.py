@@ -188,7 +188,7 @@ def cond_dict(calib, F, t, p, units='mS'):
                     / (1 + calib['CTcor'] * t_0 + calib['CPcor'] * p_0))
             #S/m to mS/cm
             if units == 'mS':
-                temp = temp * 0.01
+                temp = temp * 1
             elif units == 'S':
                 temp = temp * 0.1
             temp = round(temp, 5)
