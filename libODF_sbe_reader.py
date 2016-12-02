@@ -327,7 +327,7 @@ class SBEReader():
         elif sbe_type == "nmea":
             #time = nmea_start + seconds
             #return time.isoformat()
-            time = scan_start + seconds
+            time = nmea_start + seconds
             return time.replace(tzinfo=timezone('UTC')).timestamp()
         else:
             raise Exception('Please choose "nmea" or "scan" for second input to _sbe_time()')
