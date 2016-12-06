@@ -141,6 +141,8 @@ def main(argv):
     raw_matrix = process_ctd.dataToMatrix(inputFile,None,list(imported_df.columns.insert(0,'index')),',')
     debugPrint("Martix DTypes:",raw_matrix.dtype)
     
+    data_matrix = process_ctd.ondeck_pressure(raw_matrix, float(config['ctd_processing']['conductivity_start']))
+
     if not 'c1_Sm' in raw_matrix.dtype.names:
         errPrint('c1_Sm data not found, skipping')
     else:
@@ -154,10 +156,9 @@ def main(argv):
     if not 'o1_mll' in raw_matrix.dtype.names:
         errPrint('o1_mll data not found, skipping')
     else:
-        align_matrix = process_ctd.ctd_align(raw_matrix,'o1_mll', float(do_align))
+        hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
+        align_matrix = process_ctd.ctd_align(hysteresis_matrix,'o1_mll', float(do_align))
 
-    data_matrix = process_ctd.ondeck_pressure(align_matrix, float(config['ctd_processing']['conductivity_start']))
-    hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
     
     debugPrint('Done!')
 
