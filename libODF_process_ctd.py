@@ -2,11 +2,12 @@
 import numpy as np
 import scipy.signal as sig
 import scipy.stats as st
-import matplotlib.pyplot as plt
+import time, os
 import pandas as pd
 import math
+import libODF_report_ctd as report_ctd
 
-def cast_details(inMat):
+def cast_details(stacast, log_file, p_col, time_col, inMat=None):
     """cast_details function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -15,55 +16,68 @@ def cast_details(inMat):
     cleaned up matrix.
 
     Args:
-        param1 (ndarray): inMat, numpy ndarray with dtype array 
+        param1 (str): stacast, station cast input 
+        param2 (str): log_file, log file to write cast data.
+        param3 (str): p_col, pressure data column name 
+        param4 (str): time_col, time data column name 
+        param5 (ndarray): inMat, numpy ndarray with dtype array 
 
     Returns:
         Narray: The return value is ndarray with adjusted time of parameter 
           specified. 
 
     """
-    # Top of cast time, bottom of cast time, end of cast time, 
-    s = 0.0
-    b = 0.0
-    e = 0.0
-    # Test cycle time constant
-    fl = 24
-    # starting P 
-    sp = 2.0
-    # Max P 
-    mp = 10000.0
-    lm = len(inMat)
-    rev = np.arange(int(lm/4),0,-1)
+
+    if inMat is None:
+       print("In cast_details: No data")
+       return
+    else:
+        # Top of cast time, bottom of cast time, end of cast time, 
+        s = 0.0
+        b = 0.0
+        e = 0.0
+        # Test cycle time constant
+        fl = 24
+        # starting P 
+        sp = 2.0
+        # Max P 
+        mp = 10000.0
+        lm = len(inMat)-1
+        rev = np.arange(int(lm/4),0,-1)
     
-    # Find starting top of cast
-    # Smallest P from reverse array search 
-    for i in rev: 
-        if sp > inMat['Pdbar'][i]:
-           sp = inMat['Pdbar'][i]
-           tmp = i
-           break
+        # Find starting top of cast
+        # Smallest P from reverse array search 
+        for i in rev:
+            if sp < inMat[p_col][i]:
+               tmp = i
+            elif sp > inMat[p_col][i]:
+               sp = inMat[p_col][i]
+               tmp = i - 24
+               break
 
-    s = inMat['TIMEs'][tmp]
+        s = inMat[time_col][tmp]
 
-    # Remove everything before cast start
-    inMat = inMat[tmp:]
+        # Remove everything before cast start
+        inMat = inMat[tmp:]
   
-    # Max P and bottom time
-    mp = max(inMat['Pdbar'])    
-    tmp = np.argmax((inMat['Pdbar'])) 
-    b = inMat['TIMEs'][tmp]
+        # Max P and bottom time
+        mp = max(inMat[p_col])    
+        tmp = np.argmax((inMat[p_col])) 
+        b = inMat[time_col][tmp]
 
-    tmp = len(inMat)
-    # Find ending top of cast time
-    for i in range(int(lm/2),lm):
-        if sp > inMat['Pdbar'][i]:
-            e = inMat['TIMEs'][i]
-            tmp = i
-            break
+        tmp = len(inMat)
+        # Find ending top of cast time
+        for i in range(int(lm/2),lm):
+            if sp > inMat[p_col][i]:
+                e = inMat[time_col][i]
+                tmp = i + 24
+                break
      
-    # Remove everything after cast end
-    inMat = inMat[:tmp]
+        # Remove everything after cast end
+        inMat = inMat[:tmp]
   
+    report_ctd.report_cast_details(stacast, log_file, s, e, b, sp, mp)
+    
     return s, e, b, sp, mp, inMat
 
 def ctd_align(inMat=None, col=None, time=0.0):
@@ -96,6 +110,52 @@ def ctd_align(inMat=None, col=None, time=0.0):
 
     return inMat
 
+def ctd_quality_codes(p_range=None, qual_code=None, oxy_fit=False, inMat=None)
+    """ctd_quality_codes function 
+
+    Function takes full NUMPY ndarray with predefined dtype array 
+
+    Args:
+        param1 (ndarray): 
+        param2 (float): 
+
+    Returns:
+        Narray: The return value is ndarray with adjusted time of parameter 
+          specified. 
+
+    """
+    # If p_range set apply qual codes to part of array and return
+    # Else create new ndarray with quality codes 
+    # if oxyfit is false set qual array 1
+
+    return inMat
+
+def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
+    """formatTimeEpoc function 
+
+    Function takes pattern of time input, relative time zone, and
+    date time data array and returns array of epoc time.
+
+    title and the second row are the units for each column.
+    Args:
+        param1 (str): relative time zone for data.
+        param2 (str): pattern of incoming data. 
+        param3 (ndarray): input_time, numpy 1d ndarray time array 
+
+    Returns:
+        1D ndarray: The return array of epoch time
+    """
+    if input_time is None:
+        print("In formatTimeEpoc: No data entered.")
+        return
+    else:
+        os.environ['TZ'] = 'UTC'
+        epoch_time = input_time
+        for i in range(0,len(input_time)):
+            epoch_time[i] = int(time.mktime(time.strptime(str(input_time[i], "utf-8"), time_pattern)))
+            
+    return epoch_time
+
 def dataToDataFrame(inFile):
     """dataToDataFrame function 
 
@@ -113,14 +173,15 @@ def dataToDataFrame(inFile):
     .. REF PAGE:
        http://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html#pandas.read_csv 
     """
-    df = pd.read_csv(inFile, header=[0,1])
+    #df = pd.read_csv(inFile, header=[0,2])
+    df = pd.read_csv(inFile)
     return df
 
-def dataToMatrix(inFile, dtype=None, names=None, separator=','):
-    """dataToMatrix function 
+def dataToNDarray(inFile, dtype=None, names=None, separator=',', ):
+    """dataToNDarray function 
 
     Function takes full file path to csv type data file and returns NUMPY
-    ndarray type matrix for data manipulation with a two row header. 
+    ndarray type ndarray for data manipulation with a two row header. 
 
     Data file should have a two row header. The first row being the column 
     title and the second row are the units for each column.
@@ -130,7 +191,7 @@ def dataToMatrix(inFile, dtype=None, names=None, separator=','):
         param3 (str): separator, default comma ','  
 
     Returns:
-        Narray: The return value is a full data matrix with two row header.
+        Narray: The return value is a full data ndarray with two row header.
 
     Reference Page:
         https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
@@ -140,10 +201,10 @@ def dataToMatrix(inFile, dtype=None, names=None, separator=','):
     
     return arr 
 
-def hysteresis_correction(H1=0.033, H2=5000, H3=1450, inMat = None):
+def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
     """Hysteresis Correction function 
 
-    Function takes data matrix and hysteresis coefficiants 
+    Function takes data ndarray and hysteresis coefficiants 
     and returns hysteresis corrected oxygen data.
 
     Args:
@@ -174,7 +235,7 @@ def hysteresis_correction(H1=0.033, H2=5000, H3=1450, inMat = None):
         inMat['o1_mll'][:] = Oxnewconc[:]
     return inMat
 
-def raw_ctd_filter(arr = None, filter_type='triangle',win_size=24):
+def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
     """raw_ctd_filter function 
 
     Function takes NUMPY array 
@@ -184,35 +245,41 @@ def raw_ctd_filter(arr = None, filter_type='triangle',win_size=24):
 
     Args:
         param1 (ndarray): Numpy ndarray with predefined header with at 
-          "TIMEs, Pdbar, T1C, T2C, C1mScm, C2mScm, SBE43FV, V1V ..., V7V" 
         param2 (str): One of three tested filter types
           boxcar, gaussian_std, triangle.
           default is triangle
         param3 (int): A window size for the filter. Default is 24, which 
           is the number of frames per second from a SBE9+/11 CTD/Dech unit.
+        param4 (ndarray): parameters the dtype names used in filtering the 
+          analytical inputs.
 
     Returns:
         Narray: The return value is a matrix of filtered ctd data with 
           the above listed header values.
 
     """
-    
-    if arr is None:
+    if input_array is None:
+        print("In raw_ctd_filter: No data array.")
         return
     else:  
-        if filter_type is 'boxcar':
-            win = sig.boxcar(win_size)
-            rtn = sig.convolve(arr, win, mode='same')/len(win)
-        elif filter_type is 'gaussian':
-            sigma = np.std(arr)
-            win = sig.general_gaussian(win_size, 1.0, sigma)
-            rtn = sig.convolve(arr, win, mode='same')/(len(win))
-        elif filter_type is 'triangle':
-            win = sig.triang(win_size)
-            rtn = 2*sig.convolve(arr, win, mode='same')/len(win)
-    return rtn 
+        return_array = input_array
+        if parameters is None:
+            print("In raw_ctd_filter: Empty parameter list.")
+        else:
+            for p in parameters:
+                if filter_type is 'boxcar':
+                    win = sig.boxcar(win_size)
+                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/len(win)
+                elif filter_type is 'gaussian':
+                    sigma = np.std(arr)
+                    win = sig.general_gaussian(win_size, 1.0, sigma)
+                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/(len(win))
+                elif filter_type is 'triangle':
+                    win = sig.triang(win_size)
+                    return_array[str(p)] = 2*sig.convolve(input_array[str(p)], win, mode='same')/len(win)
+    return return_array 
 
-def ondeck_pressure(inMat=None, conductivity_startup=20.0, log_file=None):
+def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -220,12 +287,18 @@ def ondeck_pressure(inMat=None, conductivity_startup=20.0, log_file=None):
     values from data. 
 
     Args:
-        param1 (ndarray): numpy ndarray with dtype array 
-        param2 (float): in water startup conductivity value 
+        param1 (str): stacast, station cast info 
+        param1 (str): p_col, pressure data column name 
+        param2 (str): c1_col, cond1 data column name 
+        param3 (str): c2_col, cond2 data column name 
+        param4 (str): time_col, time data column name 
+        param5 (ndarray): numpy ndarray with dtype array 
+        param6 (float): conductivity_startup, threshold value 
+        param7 (str): log_file, log file name
 
     Returns:
-        Narray: The return value is a matrix of filtered ctd data with 
-          the above listed header values.
+        Narray: The return ndarray with ondeck data removed. 
+        Also output start/end ondeck pressure. 
 
     """
     sp = []
@@ -253,9 +326,9 @@ def ondeck_pressure(inMat=None, conductivity_startup=20.0, log_file=None):
         # Searches first quarter of matrix, uses conductivity 
         # threshold min to capture startup pressure
         for j in range(0,int(len(inMat)/4)):
-            if ((inMat['c1_Sm'][j] < conductivity_startup) and (inMat['c2_Sm'][j] < conductivity_startup)):
+            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
                 tmp = j
-                sp.append(inMat['p_dbar'][j])
+                sp.append(inMat[p_col][j])
     
         # Evaluate starting pressures
         if not sp: start_p = "Started in Water"
@@ -268,10 +341,10 @@ def ondeck_pressure(inMat=None, conductivity_startup=20.0, log_file=None):
         inMat = inMat[tmp:]
 
         tmp = len(inMat); 
-        # Searches last half of Matrix for conductivity threshold 
+        # Searches last half of NDarray for conductivity threshold 
         for j in range(int(len(inMat)*0.5), len(inMat)):
-            if ((inMat['c1_Sm'][j] < conductivity_startup) and (inMat['c2_Sm'][j] < conductivity_startup)):
-                ep.append(inMat['p_dbar'][j])
+            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
+                ep.append(inMat[p_col][j])
                 if (tmp > j): tmp = j 
 
         # Evaluate ending pressures
@@ -282,21 +355,22 @@ def ondeck_pressure(inMat=None, conductivity_startup=20.0, log_file=None):
         outMat = inMat[:tmp]
 
         # Store ending on-deck pressure
-        print("Sta/Cast ondeck start "+str(start_p)+" "+str(end_p))
+        report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
     return outMat
 
-def roll_filter(inMat=None, up='down', frames_per_sec=24, search_time=15):
+def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15):
     """roll_filter function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
     and subsample arguments to return a roll filtered ndarray. 
 
     Args:
-        param1 (ndarray): inMat, numpy ndarray with dtype array 
-        param2 (str): up, direction to filter cast (up vs down)
-        param3 (int): frames_per_sec, subsample selection rate
-        param4 (int): seach_time, search time past pressure inversion  
+        param1 (str): stacast, station cast info 
+        param2 (ndarray): inMat, numpy ndarray with dtype array 
+        param3 (str): up, direction to filter cast (up vs down)
+        param4 (int): frames_per_sec, subsample selection rate
+        param5 (int): seach_time, search time past pressure inversion  
 
     Returns:
         Narray: The return value ndarray of data with ship roll removed
@@ -315,14 +389,14 @@ def roll_filter(inMat=None, up='down', frames_per_sec=24, search_time=15):
         print("Roll filter function: No input data.")
         return
     else:
-        P = inMat['Pdbar']
+        P = inMat[p_col]
         dP = np.diff(P,1) 
 
         if up is 'down':
             index_to_remove = np.where(dP < 0)[0] # Differential filter
             subMat = np.delete(inMat, index_to_remove, axis=0)
 
-            P = subMat['Pdbar']
+            P = subMat[p_col]
             tmp = np.array([])
             for i in range(0,len(P)-1):
                if P[i] > P[i+1]:
@@ -336,7 +410,7 @@ def roll_filter(inMat=None, up='down', frames_per_sec=24, search_time=15):
             index_to_remove = np.where(dP > 0)[0] # Differential filter
             subMat = np.delete(inMat, index_to_remove, axis=0)
 
-            P = subMat['Pdbar']
+            P = subMat[p_col]
             tmp = np.array([])
             for i in range(0,len(P)-1):
                if P[i] < P[i+1]:
@@ -351,7 +425,7 @@ def roll_filter(inMat=None, up='down', frames_per_sec=24, search_time=15):
 
     return subMat
 
-def pressure_sequence(inMat=None, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15):
+def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15, inMat=None):
     """pressure_sequence function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -370,14 +444,16 @@ def pressure_sequence(inMat=None, intP=2.0, startT=-1.0, startP=0.0, up='down', 
     are void. 
     
     Args:
-        param1 (ndarray): input matrix (inMat), numpy ndarray with dtype array 
-        param2 (float): pressure interval (intP), default 2.0 dbar 
-        param3 (float): starting pressure interval 
-        param4 (float): start time (startT) for pressure sequence 
-        param5 (float): start pressure (startP) for pressure sequence
-        param5 (str): pressure sequence direction (down/up)
-        param6 (int): sample_rate, sub sample rate for roll_filter. Cleans & speeds processing.
-        param7 (int): search_time, truncate search index for the aliasing part of ship roll. 
+        param1 (str): stacast, station cast input  
+        param2 (str): p_col, pressure column name  
+        param3 (str): time_col, time column name 
+        param4 (float): starting pressure interval 
+        param5 (float): start time (startT) for pressure sequence 
+        param6 (float): start pressure (startP) for pressure sequence
+        param7 (str): pressure sequence direction (down/up)
+        param8 (int): sample_rate, sub sample rate for roll_filter. Cleans & speeds processing.
+        param9 (int): search_time, truncate search index for the aliasing part of ship roll. 
+        param10 (ndarray): inMat, input data ndarray
 
     Returns:
         Narray: The return value is a matrix of pressure sequenced data 
@@ -394,31 +470,31 @@ def pressure_sequence(inMat=None, intP=2.0, startT=-1.0, startP=0.0, up='down', 
         print("Pressure sequence function: No input data.")
         return
     else:
-        pF = inMat['Pdbar']
+        pF = inMat[p_col]
         full_length = len(pF)-1
 
         btm = max(pF) # bottom max P
         indBtm = np.argmax(pF) # bottom index
-        btmTime = inMat['TIMEs'][indBtm] # bottom time 
+        btmTime = inMat[time_col][indBtm] # bottom time 
 
         # Initialise input parameters
-        if ((startT > 0.0) and (startT > inMat['TIMEs'][0])):
-            repeatPt = (np.abs(inMat['TIMEs'] - startT)).argmin()
+        if ((startT > 0.0) and (startT > inMat[time_col][0])):
+            repeatPt = (np.abs(inMat[time_col] - startT)).argmin()
             repeatVal = inMat[:][repeatPt]
             lenP = np.arange(repeatPt,indBtm,1)
             start = repeatPt
             end = len(lenP)
-            prvPrs = inMat['Pdbar'][repeatPt]
+            prvPrs = inMat[p_col][repeatPt]
             if btmTime <= startT:
                 print("-startT start time is greater than down cast time. Cast issue.")
                 return
         elif ((startP > 0.0) and (startP > pF[0])):
-            repeatPt = (np.abs(inMat['Pdbar'] - startP)).argmin()
+            repeatPt = (np.abs(inMat[p_col] - startP)).argmin()
             repeatVal = inMat[:][repeatPt]
             lenP = np.arange(repeatPt,indBtm,1)
             start = repeatPt
             end = len(lenP) 
-            prvPrs = inMat['Pdbar'][repeatPt]
+            prvPrs = inMat[p_col][repeatPt]
             if btm <= startP:
                 print("-startP start pressure is greater than bottom pressure. Cast issue.")
                 return
@@ -436,20 +512,21 @@ def pressure_sequence(inMat=None, intP=2.0, startT=-1.0, startP=0.0, up='down', 
             prvPrs = 0.0
         
         # Roll Filter 
-        roll_filter_matrix = roll_filter(inMat[:][start:end:sample_rate], up, sample_rate, search_time)
+        roll_filter_matrix = roll_filter(p_col, inMat[:][start:end:sample_rate], up, sample_rate, search_time)
 
         # Frame Pressure Bins
         pressure_bins = np.arange(0,int(btm),2)
-        p_bin_index = np.digitize(roll_filter_matrix['Pdbar'],pressure_bins)
+        p_bin_index = np.digitize(roll_filter_matrix[p_col],pressure_bins)
 
         # Define output array
         binned_matrix = np.empty(shape=(len(pressure_bins),), dtype=inMat.dtype)
 
-        # todo: remove explicit column 'Pdbar' call here
         for col in binned_matrix.dtype.names:
-            if col == 'Pdbar':
+            if col == p_col:
                 binned_matrix[col] = pressure_bins
             elif binned_matrix[col].dtype is np.dtype(np.float64):
                 binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean() for i in range(0,len(pressure_bins))]
+
+    print(binned_matrix.dtype.names)
 
     return binned_matrix

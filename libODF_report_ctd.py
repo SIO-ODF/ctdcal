@@ -6,6 +6,53 @@ import datetime
 import pandas as pd
 import math
 
+def report_pressure_details(stacast, log_file, start, end):
+    """report_cast_details function 
+
+    Function takes deck pressure and writes them to a file in log 
+    directory 
+
+    Args:
+        param1 (str): stacast, station cast data for file 
+        param2 (str): c_file, file name location for cast details 
+        param3 (str): start, cast start time from top of cast after 10m soak 
+        param4 (str): end, cast end time when instrument leaves water 
+
+    Prints formatted csv file. 
+
+    Returns:
+        No return
+    """
+    outfile = open(log_file, "w+")
+    outfile.write("stacast:%s, ondeck_start_p:%s, ondeck_end_p:%s\n" % (stacast, start, end))
+    return
+
+def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p):
+    """report_cast_details function 
+
+    Function takes cast details and writes them to a file in log 
+    directory 
+
+    Args:
+        param1 (str): stacast, station cast data for file 
+        param2 (str): c_file, file name location for cast details 
+        param3 (str): start, cast start time from top of cast after 10m soak 
+        param4 (str): end, cast end time when instrument leaves water 
+        param5 (str): bottom, bottom of cast time when instrument reaches max depth 
+        param6 (str): start_p, starting pressure at the time the cast begins 
+        param7 (str): max_p, maximum pressure for entire cast 
+
+    Prints formatted csv file. 
+
+    Returns:
+        No return
+    """
+    
+    outfile = open(c_file, "w+")
+    outfile.write("stacast:%s, , begin:%s, , bottom:%s, end:%s \
+        , start_pressure:%s, max_pressure:%s\n" % (stacast, start, bottom, end, start_p, max_p))
+    return
+
 def report_time_series_data(stacast, printdir, expocode, column_names, column_units, column_data, column_format, inMat=None):
     """report_time_series_data function 
 
@@ -59,7 +106,7 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
   
     return
 
-def report_pressure_series_data(inMat=None):
+def report_pressure_series_data(stacast, expocode, section_id, btm_lat, btm_lon, depth, btm_alt, ctd, inMat=None):
     """report_time_series_data function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -75,7 +122,7 @@ def report_pressure_series_data(inMat=None):
     """
 
     if input_array is None:
-        print("In report_pressure_series_data: Not data array.")
+        print("In report_pressure_series_data: No data array.")
         return
     #else:  
 
