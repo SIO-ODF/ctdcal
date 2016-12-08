@@ -49,8 +49,9 @@ def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p):
     """
     
     outfile = open(c_file, "w+")
-    outfile.write("stacast:%s, , begin:%s, , bottom:%s, end:%s \
-        , start_pressure:%s, max_pressure:%s\n" % (stacast, start, bottom, end, start_p, max_p))
+    outfile.write("stacast:%s, , begin:%s, , bottom:%s, end:%s, start_pressure:%s, max_pressure:%s\n" % (stacast, start, bottom, end, start_p, max_p))
+    outfile.close()
+
     return
 
 def report_time_series_data(stacast, printdir, expocode, column_names, column_units, column_data, column_format, inMat=None):

@@ -153,7 +153,7 @@ def main(argv):
 
     lat_col = config['inputs']['lat']
     lon_col = config['inputs']['lon']
-    parameter_array = config['analytical_inputs']['input_array'].split("\n")
+    input_parameters = config['analytical_inputs']['input_array'].split("\n")
     p_col = config['analytical_inputs']['p']
     t1_col = config['analytical_inputs']['t1']
     t2_col = config['analytical_inputs']['t2']
@@ -171,6 +171,13 @@ def main(argv):
     time_column_names = config['time_series_output']['column_name'].split(',')
     time_column_units = config['time_series_output']['column_units'].split(',')
     time_column_format = config['time_series_output']['format']
+
+    #pressure_column_data = config['time_series_output']['data_names'].split(',')
+    p_column_data = config['pressure_series_output']['data_output']
+    p_column_names = config['pressure_series_output']['column_name'].split(',')
+    p_column_units = config['pressure_series_output']['column_units'].split(',')
+    p_column_format = config['pressure_series_output']['format']
+    p_column_qual = config['pressure_series_output']['qual_columns']
 
     if nmea_time_col in converted_df.columns:
         time_col = nmea_time_col
@@ -198,7 +205,7 @@ def main(argv):
         #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
 
     # Filter data
-    filter_data = process_ctd.raw_ctd_filter(raw_data, 'triangle', 24, parameter_array)
+    filter_data = process_ctd.raw_ctd_filter(raw_data, 'triangle', 24, input_parameters)
 
     # Cast Details
     stime, etime, btime, startP, maxP, cast_data = process_ctd.cast_details(filename_base, log_directory+'cast_details.csv', p_col, time_col, filter_data)
@@ -210,7 +217,7 @@ def main(argv):
     pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, time_col, 2.0, stime, startP, 'down', int(sample_rate), int(search_time), cast_data)
 
     # Add quality codes to data
-    # qual_pseq_data = process_ctd.ctd_quality_codes(p_range, qual_code, pressure_seq_data)
+    # qual_pseq_data = process_ctd.ctd_quality_codes(p_range, qual_code, False, pressure_seq_data)
 
     debugPrint('Done!')
 

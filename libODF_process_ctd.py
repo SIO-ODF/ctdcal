@@ -110,7 +110,7 @@ def ctd_align(inMat=None, col=None, time=0.0):
 
     return inMat
 
-def ctd_quality_codes(p_range=None, qual_code=None, oxy_fit=False, inMat=None)
+def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, inMat=None):
     """ctd_quality_codes function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -125,6 +125,15 @@ def ctd_quality_codes(p_range=None, qual_code=None, oxy_fit=False, inMat=None)
 
     """
     # If p_range set apply qual codes to part of array and return
+    if p_range is not None:
+        print("Some algoirythm for formatting qual codes per pressure range")
+    else: 
+        if oxy_fit:
+            oxy_tmp = np.array().fill(2)
+        else:
+            oxy_tmp = np.array().fill(1)
+            
+        tmp = np.array().fill(2)
     # Else create new ndarray with quality codes 
     # if oxyfit is false set qual array 1
 
@@ -258,6 +267,7 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
           the above listed header values.
 
     """
+    print(input_array.dtype.names)
     if input_array is None:
         print("In raw_ctd_filter: No data array.")
         return
@@ -267,6 +277,8 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
             print("In raw_ctd_filter: Empty parameter list.")
         else:
             for p in parameters:
+                #indices = [i for i, s in input_array.dtype.names if p in s]
+                #print(indices)
                 if filter_type is 'boxcar':
                     win = sig.boxcar(win_size)
                     return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/len(win)
@@ -276,7 +288,7 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
                     return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/(len(win))
                 elif filter_type is 'triangle':
                     win = sig.triang(win_size)
-                    return_array[str(p)] = 2*sig.convolve(input_array[str(p)], win, mode='same')/len(win)
+                    return_array[p] = 2*sig.convolve(input_array[p], win, mode='same')/len(win)
     return return_array 
 
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
