@@ -9,16 +9,16 @@ DEBUG = False
 #lookup table for sensor data
 ###DOUBLE CHECK TYPE IS CORRECT###
 short_lookup = {
-    '55':{'short_name': 't', 'long_name':'SBE 3+ Temperature', 'units': 'C', 'type': 'float64'},
-    '45':{'short_name': 'p', 'long_name':'SBE 9+ Pressure', 'units': 'dbar', 'type': 'float64'},
-    '3':{'short_name': 'c', 'long_name':'SBE 4 Conductivity', 'units': 'mS/cm', 'type':'float64'},
-    '38':{'short_name': 'o', 'long_name':'SBE 43 Oxygen', 'units': 'ml/l', 'type':'float64'},
-    '11':{'short_name': 'fluoro', 'long_name':'Seapoint Fluorometer', 'units': 'ug/l', 'type':'float64'},
-    '27':{'short_name': 'empty', 'long_name':'empty', 'units':'NA', 'type':'NA'},
-    '0':{'short_name': 'alti', 'long_name':'Altitude', 'units':'m', 'type':'float64'},
-    '71':{'short_name': 'cstar', 'long_name':'CStar', 'units': 'ug/l', 'type':'float64'},
-    '61':{'short_name': 'u_def', 'long_name':'user defined', 'units':'V', 'type':'float64'},
-    '1000':{'short_name': 'sal', 'long_name':'Salinity (C1 T1)', 'units':'PSU', 'type':'float64'}
+    '55':{'short_name': 'CTDTMP', 'long_name':'SBE 3+ Temperature', 'units': 'ITS-90', 'type': 'float64'},
+    '45':{'short_name': 'CTDPRS', 'long_name':'SBE 9+ Pressure', 'units': 'DBAR', 'type': 'float64'},
+    '3':{'short_name': 'CTDCOND', 'long_name':'SBE 4 Conductivity', 'units': 'MSPCM', 'type':'float64'},
+    '38':{'short_name': 'CTDOXY', 'long_name':'SBE 43 Oxygen', 'units': 'MLPL', 'type':'float64'},
+    '11':{'short_name': 'FLUOR', 'long_name':'Seapoint Fluorometer', 'units': 'UGPL', 'type':'float64'},
+    '27':{'short_name': 'FREE', 'long_name':'empty', 'units':'NA', 'type':'NA'},
+    '0':{'short_name': 'ALT', 'long_name':'Altitude', 'units':'M', 'type':'float64'},
+    '71':{'short_name': 'CTDXMISS', 'long_name':'CStar', 'units': 'UGPL', 'type':'float64'},
+    '61':{'short_name': 'U_DEF', 'long_name':'user defined', 'units':'0-5VDC', 'type':'float64'},
+    '1000':{'short_name': 'CTDSAL', 'long_name':'Salinity (C1 T1)', 'units':'PSU', 'type':'float64'}
 }
 
 

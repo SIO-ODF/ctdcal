@@ -6,6 +6,10 @@ import libODF_sbe_reader as sbe_reader
 import numpy as np
 import pandas as pd
 import libODF_convert as cnv
+import libODF_process_ctd as process_ctd
+import libODF_report_ctd as report_ctd
+import configparser
+import matplotlib.pyplot as plt
 
 DEBUG = False
 
@@ -14,7 +18,7 @@ FILE_EXT = 'csv'
 
 #File extension to use for raw output
 RAW_SUFFIX = '_raw'
-
+ 
 #File extension to use for converted output
 CONVERTED_SUFFIX = '_cnv'
 
@@ -103,12 +107,6 @@ def main(argv):
 
         debugPrint('Success!')
 
-        #debugPrint("Raw Data Types:", raw_df.dtypes)
-        #debugPrint("Raw Data:", raw_df.head)
-
-        # Retrieve Config data
-        #rawConfig = sbeReader.parsed_config()
-
         rawfileName = str(filename_base + RAW_SUFFIX + '.' + FILE_EXT)
         rawfilePath = os.path.join(outputDir, rawfileName)
 
@@ -123,9 +121,7 @@ def main(argv):
 
     debugPrint("Converting raw scans to scientific units... ")
     converted_df = cnv.convertFromSBEReader(sbeReader, False)
-
-    #debugPrint('converted_df:\n', converted_df.head())
-
+   
     convertedfileName  = filename_base + CONVERTED_SUFFIX + '.' + FILE_EXT
     convertedfilePath = os.path.join(outputDir, convertedfileName)
 
@@ -134,6 +130,94 @@ def main(argv):
         debugPrint('Success!')
     else:
         errPrint('ERROR: Could not save converted data to file')
+    
+    #Import Cruise Configuration File 
+    iniFile = 'data/ini-files/configuration.ini' 
+    config = configparser.RawConfigParser()
+    config.read(iniFile)
+
+    #Initialise Configuration Parameters
+    expocode = config['cruise']['expocode']
+    time_directory = config['ctd_processing']['time_data_directory']
+    pressure_directory = config['ctd_processing']['pressure_data_directory']
+    log_directory = config['ctd_processing']['log_directory']
+    conductivity_startup = config['ctd_processing']['conductivity_start']
+    tc1_align = config['ctd_processing']['TC_primary_align']
+    tc2_align = config['ctd_processing']['TC_secondary_align']
+    do_align = config['ctd_processing']['DO_align']
+    sample_rate = config['ctd_processing']['sample_rate']
+    search_time = config['ctd_processing']['roll_filter_time']
+    H1 = config['ctd_processing']['hysteresis_1']
+    H2 = config['ctd_processing']['hysteresis_2']
+    H3 = config['ctd_processing']['hysteresis_3']
+
+    lat_col = config['inputs']['lat']
+    lon_col = config['inputs']['lon']
+    input_parameters = config['analytical_inputs']['input_array'].split("\n")
+    p_col = config['analytical_inputs']['p']
+    t1_col = config['analytical_inputs']['t1']
+    t2_col = config['analytical_inputs']['t2']
+    c1_col = config['analytical_inputs']['c1']
+    c2_col = config['analytical_inputs']['c2']
+    do_col = config['analytical_inputs']['do']
+    xmis_col = config['analytical_inputs']['xmis']
+    fluor_col = config['analytical_inputs']['fluor']
+    time_zone = config['inputs']['time_zone']
+    nmea_time_col = config['inputs']['nmea_datetime']
+    scan_time_col = config['inputs']['scan_datetime']
+    
+    #time_column_data = config['time_series_output']['data_names'].split(',')
+    time_column_data = config['time_series_output']['data_output']
+    time_column_names = config['time_series_output']['column_name'].split(',')
+    time_column_units = config['time_series_output']['column_units'].split(',')
+    time_column_format = config['time_series_output']['format']
+
+    #pressure_column_data = config['time_series_output']['data_names'].split(',')
+    p_column_data = config['pressure_series_output']['data_output']
+    p_column_names = config['pressure_series_output']['column_name'].split(',')
+    p_column_units = config['pressure_series_output']['column_units'].split(',')
+    p_column_format = config['pressure_series_output']['format']
+    p_column_qual = config['pressure_series_output']['qual_columns']
+
+    if nmea_time_col in converted_df.columns:
+        time_col = nmea_time_col
+    else:
+        time_col = scan_time_col
+
+    # Construct NDarray
+    raw_data = process_ctd.dataToNDarray(convertedfilePath,None,list(converted_df.columns.insert(0,'index')),',')
+    raw_data = process_ctd.ondeck_pressure(filename_base, p_col, c1_col, c2_col, time_col, raw_data, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
+
+    if not c1_col in raw_data.dtype.names:
+        errPrint('c1_col data not found, skipping')
+    else:
+        raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
+
+    if not c2_col in raw_data.dtype.names:
+        errPrint('c2_col data not found, skipping')
+    else:
+        raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
+
+    if not do_col in raw_data.dtype.names:
+        errPrint('do_col data not found, skipping')
+    else:
+        raw_data = process_ctd.ctd_align(raw_data, do_col, float(do_align))
+        #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
+
+    # Filter data
+    filter_data = process_ctd.raw_ctd_filter(raw_data, 'triangle', 24, input_parameters)
+
+    # Cast Details
+    stime, etime, btime, startP, maxP, cast_data = process_ctd.cast_details(filename_base, log_directory+'cast_details.csv', p_col, time_col, filter_data)
+    
+    # Write time data to file
+    report_ctd.report_time_series_data(time_directory, expocode, time_column_names, time_column_units, time_column_data, time_column_format, cast_data)
+
+    # Pressure Sequence
+    pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, time_col, 2.0, stime, startP, 'down', int(sample_rate), int(search_time), cast_data)
+
+    # Add quality codes to data
+    # qual_pseq_data = process_ctd.ctd_quality_codes(p_range, qual_code, False, pressure_seq_data)
 
     debugPrint('Done!')
 
