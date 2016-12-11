@@ -1,6 +1,9 @@
 '''
 Needs to be discussed, normalization? better schema design? Tables currently
 reflect what is expected in the report post cruise.
+
+Needs to be squared away with bottle_db database design to cutdown on redundant
+tables, must be fixed post-cruise
 '''
 
 from sqlalchemy import Column, Integer, String, Float

@@ -1,6 +1,10 @@
 '''Written in get/set methods for now, should be updated to be more pythonic later.
 Need to standardize naming too.
 
+Convenience library for working with db via scripts. Will automatically write to disk
+after each method call that works on table. If it's thrashing the disk too much consider
+writing code instead of using library.
+
 Need uniqueness constraints on rows too
 
 Joseph Gum
@@ -20,9 +24,11 @@ def start_talk():
     return session
 
 def end_talk(session):
+    '''Close session to db.'''
     session.close()
 
 def reset_tables():
+    '''Resets tables in case of complete screwedness.'''
     engine = create_engine('sqlite:///db/odf.db')
     db_tables.Base.metadata.drop_all(engine)
     db_tables.Base.metadata.create_all(engine)
@@ -31,6 +37,8 @@ def reset_tables():
 #Start set/get methods
 
 def setBottleFire(session, in_station, in_cast, in_position, in_pressure, in_time):
+    '''Given a row of bottle fire info and pressure, add to table.
+    '''
     temp = db_tables.BottleFire(station = in_station, cast = in_cast, position = in_position, pressure = in_pressure, time = in_time)
     session.add(temp)
     session.commit()
@@ -48,10 +56,28 @@ def setBottleFireBulk(session, in_station, in_cast, in_position, in_pressure, in
     session.commit()
     return True
 
+def updateBottleFire(session, in_station, in_cast, in_position, in_pressure, in_time=None):
+    '''Updates the pressure for a given bottle fire.
+    Optionally, if a time is given, update the time as well.
+    '''
+    temp = session.query(db_tables.BottleFire).filter(
+        and_(
+            db_tables.BottleFire.station == in_station,
+            db_tables.BottleFire.cast == in_cast,
+            db_tables.BottleFire.position == in_position,
+            )
+        ).first()
+    temp.pressure = in_pressure
+    if in_time:
+        temp.time = in_time
+    session.commit()
+
 def getBottleFireAll(session):
     return session.query(db_tables.BottleFire).all()
 
 def setSBE35(session, in_station, in_cast, in_position, in_temperature):
+    '''Given a row of SBE35 info and pressure, add to table.
+    '''
     temp = db_tables.SBE35(station = in_station, cast = in_cast, position = in_position, temperature = in_temperature)
     session.add(temp)
     session.commit()
@@ -68,6 +94,22 @@ def setSBE35Bulk(session, in_station, in_cast, in_position, in_temperature):
         session.add(x)
     session.commit()
     return True
+
+def updateSBE35(session, in_station, in_cast, in_position, in_temperature):
+    '''Updates the pressure for a given bottle fire.
+    Optionally, if a time is given, update the time as well.
+    '''
+    temp = session.query(db_tables.SBE35).filter(
+        and_(
+            db_tables.SBE35.station == in_station,
+            db_tables.SBE35.cast == in_cast,
+            db_tables.SBE35.position == in_position,
+            )
+        ).first()
+    temp.temperature = in_temperature
+    if in_time:
+        temp.time = in_time
+    session.commit()
 
 def getSBE35All(session):
     return session.query(db_tables.SBE35).all()
@@ -90,6 +132,20 @@ def setCoefficientsTempBulk(session, in_station, in_cast, in_t0, in_t1, in_tp1, 
     session.commit()
     return True
 
+def updateCoefficientsTemp(session, in_station, in_cast, in_t0, in_t1, in_tp1, in_tp2):
+
+        temp = session.query(db_tables.CoefficientsTemp).filter(
+            and_(
+                db_tables.CoefficientsTemp.station == in_station,
+                db_tables.CoefficientsTemp.cast == in_cast,
+                )
+            ).first()
+        temp.t0 = in_t0
+        temp.t1 = in_t1
+        temp.tp1 = in_tp1
+        temp.tp2 = in_tp2
+        session.commit()
+
 def getCoefficientsTempAll(session):
     return session.query(db_tables.CoefficientsTemp).all()
 
@@ -100,7 +156,7 @@ def setCoefficientsCond(session, in_station, in_cast, in_c0, in_c1, in_c2, in_ct
     session.commit()
     return True
 
-def setCoefficientsCond(session, in_station, in_cast, in_c0, in_c1, in_c2, in_ct1, in_ct2, in_cp1, in_cp2):
+def setCoefficientsCondBulk(session, in_station, in_cast, in_c0, in_c1, in_c2, in_ct1, in_ct2, in_cp1, in_cp2):
     '''Bulk load instead of add one by one. need to test difference between .add_all() and multiple .adds()
     Assumes inputs other than session are lists to be iterated over separately.
     '''
@@ -112,6 +168,23 @@ def setCoefficientsCond(session, in_station, in_cast, in_c0, in_c1, in_c2, in_ct
     session.commit()
     return True
 
+def updateCoefficientsCond(session, in_station, in_cast, in_c0, in_c1, in_c2, in_ct1, in_ct2, in_cp1, in_cp2):
+
+    temp = session.query(db_tables.CoefficientsCond).filter(
+        and_(
+            db_tables.CoefficientsCond.station == in_station,
+            db_tables.CoefficientsCond.cast == in_cast,
+            )
+        ).first()
+    temp.c0 = in_c0
+    temp.c1 = in_c1
+    temp.c2 = in_c2
+    temp.ct1 = in_ct1
+    temp.ct2 = in_ct2
+    temp.cp1 = in_cp1
+    temp.cp2 = in_cp2
+    session.commit()
+
 def getCoefficientsCondAll(session):
     return session.query(db_tables.CoefficientsCond).all()
 
@@ -122,7 +195,7 @@ def setCoefficientsOxygen(session, in_station, in_cast, ic1, ic2, ic3, ic4, ic5,
     session.commit()
     return True
 
-def setCoefficientsOxygen(session, in_station, in_cast, ic1, ic2, ic3, ic4, ic5, ic6, ic7, ic8, ic9):
+def setCoefficientsOxygenBulk(session, in_station, in_cast, ic1, ic2, ic3, ic4, ic5, ic6, ic7, ic8, ic9):
     '''Bulk load instead of add one by one. need to test difference between .add_all() and multiple .adds()
     Assumes inputs other than session are lists to be iterated over separately.
     '''
@@ -133,6 +206,25 @@ def setCoefficientsOxygen(session, in_station, in_cast, ic1, ic2, ic3, ic4, ic5,
         session.add(x)
     session.commit()
     return True
+
+def updateCoefficientsOxygen(session, in_station, in_cast, ic1, ic2, ic3, ic4, ic5, ic6, ic7, ic8, ic9):
+
+    temp = session.query(db_tables.CoefficientsOxygen).filter(
+        and_(
+            db_tables.CoefficientsOxygen.station == in_station,
+            db_tables.CoefficientsOxygen.cast == in_cast,
+            )
+        ).first()
+    temp.c1 = ic1
+    temp.c2 = ic2
+    temp.c3 = ic3
+    temp.c4 = ic4
+    temp.c5 = ic5
+    temp.c6 = ic6
+    temp.c7 = ic7
+    temp.c8 = ic8
+    temp.c9 = ic9
+    session.commit()
 
 def getCoefficientsOxygenAll(session):
     return session.query(db_tables.CoefficientsOxygen).all()
@@ -156,7 +248,9 @@ def setBottleQCBulk(session, in_station, in_cast, in_position, in_codeproperty, 
     return True
 
 def updateBottleQC(session, in_station, in_cast, in_position, in_codeproperty, in_qc, in_comment=False):
-
+    '''Updates the QC code for a given bottle fire.
+    Optionally, if a comment is given, update that as well.
+    '''
     temp = session.query(db_tables.BottleQC).filter(
         and_(
             db_tables.BottleQC.station == in_station,
@@ -164,22 +258,11 @@ def updateBottleQC(session, in_station, in_cast, in_position, in_codeproperty, i
             db_tables.BottleQC.position == in_position,
             db_tables.BottleQC.codeproperty == in_codeproperty,
             )
-            ).first()
+        ).first()
     temp.qc = in_qc
     if in_comment:
         temp.comment = in_comment
     session.commit()
-'''    if in_comment == False:
-        temp = session.query().\
-            filter(db_tables.BottleQC.station == in_station and db_tables.BottleQC.cast == in_cast
-                and db_tables.BottleQC.position == in_position and db_tables.BottleQC.codeproperty == in_codeproperty)
-        temp.qc = in_qc
-    else:
-        session.query().\
-            filter(db_tables.BottleQC.station == in_station and db_tables.BottleQC.cast == in_cast
-                and db_tables.BottleQC.position == in_position and db_tables.BottleQC.codeproperty == in_codeproperty).\
-                update({"qc":in_qc, "comment":in_comment})
-    session.commit()'''
 
 def getBottleQCAll(session):
     return session.query(db_tables.BottleQC).all()
