@@ -111,6 +111,17 @@ def updateSBE35(session, in_station, in_cast, in_position, in_temperature):
         temp.time = in_time
     session.commit()
 
+def getSBE35pressure(session, in_station, in_cast, in_position):
+    '''Query for a single pressure.'''
+    temp = session.query(db_tables.BottleFire).filter(
+        and_(
+        db_tables.BottleFire.station == in_station,
+        db_tables.BottleFire.cast == in_cast,
+        db_tables.BottleFire.position == in_position,
+        )
+    ).first()
+    return temp.pressure
+
 def getSBE35All(session):
     return session.query(db_tables.SBE35).all()
 
