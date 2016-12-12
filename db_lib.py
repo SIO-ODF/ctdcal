@@ -34,7 +34,7 @@ def reset_tables():
     db_tables.Base.metadata.create_all(engine)
     return True
 
-#Start set/get methods
+#Start set/get/update methods
 
 def setBottleFire(session, in_station, in_cast, in_position, in_pressure, in_time):
     '''Given a row of bottle fire info and pressure, add to table.
