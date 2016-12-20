@@ -1,5 +1,7 @@
 #!/usr/bin/env python
+from scipy import interpolate
 import numpy as np
+from numpy.lib.recfunctions import append_fields
 import scipy.signal as sig
 import scipy.stats as st
 import time, os
@@ -7,7 +9,7 @@ import pandas as pd
 import math
 import libODF_report_ctd as report_ctd
 
-def cast_details(stacast, log_file, p_col, time_col, inMat=None):
+def cast_details(stacast, log_file, p_col, time_col, blat_col, blon_col, alt_col, inMat=None):
     """cast_details function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -64,6 +66,9 @@ def cast_details(stacast, log_file, p_col, time_col, inMat=None):
         mp = max(inMat[p_col])    
         tmp = np.argmax((inMat[p_col])) 
         b = inMat[time_col][tmp]
+        b_lat = inMat[blat_col][tmp]
+        b_lon = inMat[blon_col][tmp]
+        b_a = inMat[alt_col][tmp]
 
         tmp = len(inMat)
         # Find ending top of cast time
@@ -76,9 +81,9 @@ def cast_details(stacast, log_file, p_col, time_col, inMat=None):
         # Remove everything after cast end
         inMat = inMat[:tmp]
   
-    report_ctd.report_cast_details(stacast, log_file, s, e, b, sp, mp)
+    report_ctd.report_cast_details(stacast, log_file, s, e, b, sp, mp, b_a, b_lat, b_lon)
     
-    return s, e, b, sp, mp, inMat
+    return s, e, b, sp, mp, b_lat, b_lon, b_a, inMat
 
 def ctd_align(inMat=None, col=None, time=0.0):
     """ctd_align function 
@@ -110,7 +115,7 @@ def ctd_align(inMat=None, col=None, time=0.0):
 
     return inMat
 
-def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, inMat=None):
+def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, p_qual_col=None, qual_one=None, inMat=None):
     """ctd_quality_codes function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -124,20 +129,21 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
           specified. 
 
     """
-    # If p_range set apply qual codes to part of array and return
+    #print(p_qual_col)
+    #If p_range set apply qual codes to part of array and return
     if p_range is not None:
         print("Some algoirythm for formatting qual codes per pressure range")
+        return
     else: 
-        if oxy_fit:
-            oxy_tmp = np.array().fill(2)
-        else:
-            oxy_tmp = np.array().fill(1)
-            
-        tmp = np.array().fill(2)
-    # Else create new ndarray with quality codes 
-    # if oxyfit is false set qual array 1
+        q_df = pd.DataFrame(index=np.arange(len(inMat)), columns=p_qual_col)
+        for pq in p_qual_col:
+            if pq in list(qual_one):
+                q_df[pq] = q_df[pq].fillna(1)
+            else:
+                q_df[pq] = q_df[pq].fillna(2)
 
-    return inMat
+        q_nd = q_df.as_matrix(columns=q_df.columns)
+    return q_nd
 
 def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
     """formatTimeEpoc function 
@@ -267,7 +273,7 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
           the above listed header values.
 
     """
-    print(input_array.dtype.names)
+
     if input_array is None:
         print("In raw_ctd_filter: No data array.")
         return
