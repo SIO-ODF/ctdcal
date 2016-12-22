@@ -476,10 +476,6 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
     Returns:
         Narray: The return value is a matrix of pressure sequenced data 
 
-    todo: implement the following as fail safe surface treatment, 
-          repeatPt: the point in the matrix that is repeated back to the surface.
-          repeatVal: the values in the matrix that is repeated back to the surface.
-          
     todo: deep data bin interpolation to manage empty slices
     """
 
@@ -497,31 +493,25 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
 
         # Initialise input parameters
         if ((startT > 0.0) and (startT > inMat[time_col][0])):
-            repeatPt = (np.abs(inMat[time_col] - startT)).argmin()
-            repeatVal = inMat[:][repeatPt]
-            lenP = np.arange(repeatPt,indBtm,1)
-            start = repeatPt
+            start = (np.abs(inMat[time_col] - startT)).argmin()
+            lenP = np.arange(start,indBtm,1)
             end = len(lenP)
-            prvPrs = inMat[p_col][repeatPt]
+            prvPrs = inMat[p_col][start]
             if btmTime <= startT:
                 print("-startT start time is greater than down cast time. Cast issue.")
                 return
         elif ((startP > 0.0) and (startP > pF[0])):
-            repeatPt = (np.abs(inMat[p_col] - startP)).argmin()
-            repeatVal = inMat[:][repeatPt]
-            lenP = np.arange(repeatPt,indBtm,1)
-            start = repeatPt
+            start = (np.abs(inMat[p_col] - startP)).argmin()
+            lenP = np.arange(start,indBtm,1)
             end = len(lenP) 
-            prvPrs = inMat[p_col][repeatPt]
+            prvPrs = inMat[p_col][start]
             if btm <= startP:
                 print("-startP start pressure is greater than bottom pressure. Cast issue.")
                 return
         elif up is 'up':
-            repeatPt = full_length
-            repeatVal = inMat[:][repeatPt]
-            lenP = np.arange(indBtm,repeatPt,1) 
             start = indBtm
             end = full_length 
+            lenP = np.arange(start,end,1) 
             prvPrs = btm
         else:
             lenP = np.arange(0,indBtm,1)
@@ -531,6 +521,9 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         
         # Roll Filter 
         roll_filter_matrix = roll_filter(p_col, inMat[:][start:end:sample_rate], up, sample_rate, search_time)
+
+        # Treat surface data.
+        roll_filter_matrix = treat_surface_data(p_col, sample_rate,roll_filter_matrix)
 
         # Frame Pressure Bins
         pressure_bins = np.arange(0,int(btm),2)
@@ -543,8 +536,49 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
             if col == p_col:
                 binned_matrix[col] = pressure_bins
             elif binned_matrix[col].dtype is np.dtype(np.float64):
+                #for i in range(0,len(pressure_bins)):
+                #    binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean()]
                 binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean() for i in range(0,len(pressure_bins))]
 
-    print(binned_matrix.dtype.names)
+    #print(binned_matrix.dtype.names)
 
     return binned_matrix
+
+
+def treat_surface_data(p_col,sample_rate,inMat):
+    """pressure_sequence function 
+
+    Function takes full NUMPY ndarray with predefined dtype array 
+    and several arguments to treat missing sirface bin data. It
+    basically takes the first valid data row and repeats that row 
+    with the sample rate defined used in roll filter and constructs 
+    an interval based on a normal surface decent rate back to the surface. 
+
+    implement the following as fail safe surface treatment, 
+    Args:
+        param1 (str): p_col,
+        param1 (int): sample_rate,
+        param2 (int): 
+        param3 (array): 
+        param4 (ndarray): 
+
+    Returns:
+        Narray: The return value is a matrix of pressure sequenced data 
+    """
+
+    fl = 24
+    fps = fl / sample_rate # Number of frames per second
+    dr = 2 # dbar/sec 
+    fpdb = fps / dr # Frames per dbar
+    sp = inMat[p_col][0] # Start p
+    fn = math.ceil(sp * fpdb)
+    dp = sp / fn  # Delta pressure
+    
+    surface_vals = np.empty(shape=(fn,), dtype=inMat.dtype)
+   
+    for i in range(0,fn):
+        surface_vals[i] = inMat[0] 
+        surface_vals[p_col][i] = surface_vals[p_col][i] - (sp - i*dp)
+
+    inMat = np.concatenate((surface_vals, inMat), axis=0)
+    return
