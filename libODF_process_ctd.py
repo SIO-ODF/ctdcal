@@ -8,6 +8,9 @@ import time, os
 import pandas as pd
 import math
 import libODF_report_ctd as report_ctd
+import warnings
+
+warnings.filterwarnings("ignore", 'Mean of empty slice.')
 
 def cast_details(stacast, log_file, p_col, time_col, blat_col, blon_col, alt_col, inMat=None):
     """cast_details function 
@@ -249,6 +252,25 @@ def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
 
         inMat['o1_mll'][:] = Oxnewconc[:]
     return inMat
+
+
+def data_interpolater(inArr):
+    """data_interpolater to handle indices and logical indices of NaNs.
+
+    Input:
+        - inArr, 1d numpy array with return True np.isnans()
+    Output:
+        - nans, logical indices of NaNs
+        - index, a function, with signature indices= index(logical_indices),
+          to convert logical indices of NaNs to 'equivalent' indices
+        - interpolated array
+    Example:
+        >>> # linear interpolation of NaNs
+        >>> outArray = data_interpolater(inArr) 
+    """
+    nans, tmp= np.isnan(inArr), lambda z: z.nonzero()[0]
+    inArr[nans] = np.interp(tmp(nans), tmp(~nans), inArr[~nans])
+    return inArr 
 
 def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
     """raw_ctd_filter function 
@@ -526,21 +548,21 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         roll_filter_matrix = treat_surface_data(p_col, sample_rate,roll_filter_matrix)
 
         # Frame Pressure Bins
-        pressure_bins = np.arange(0,int(btm),2)
+        pressure_bins = np.arange(0,int(btm),intP)
         p_bin_index = np.digitize(roll_filter_matrix[p_col],pressure_bins)
 
-        # Define output array
+        # Define binned output array
         binned_matrix = np.empty(shape=(len(pressure_bins),), dtype=inMat.dtype)
 
+        # Iterate over input data by column, sort bins and find mean of binned data. 
         for col in binned_matrix.dtype.names:
             if col == p_col:
                 binned_matrix[col] = pressure_bins
             elif binned_matrix[col].dtype is np.dtype(np.float64):
-                #for i in range(0,len(pressure_bins)):
-                #    binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean()]
-                binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean() for i in range(0,len(pressure_bins))]
-
-    #print(binned_matrix.dtype.names)
+                binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean() for i in range(1,len(pressure_bins)+1)]
+                # Interpolate over NaN or missing data
+                if np.isnan(binned_matrix[col]).any(): 
+                    binned_matrix[col] = data_interpolater(binned_matrix[col])
 
     return binned_matrix
 
@@ -581,4 +603,4 @@ def treat_surface_data(p_col,sample_rate,inMat):
         surface_vals[p_col][i] = surface_vals[p_col][i] - (sp - i*dp)
 
     inMat = np.concatenate((surface_vals, inMat), axis=0)
-    return
+    return inMat
