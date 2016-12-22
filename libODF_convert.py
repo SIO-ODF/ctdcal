@@ -13,6 +13,7 @@ short_lookup = {
     '45':{'short_name': 'CTDPRS', 'long_name':'SBE 9+ Pressure', 'units': 'DBAR', 'type': 'float64'},
     '3':{'short_name': 'CTDCOND', 'long_name':'SBE 4 Conductivity', 'units': 'MSPCM', 'type':'float64'},
     '38':{'short_name': 'CTDOXY', 'long_name':'SBE 43 Oxygen', 'units': 'MLPL', 'type':'float64'},
+    '38':{'short_name': 'CTDOXYVOLTS', 'long_name':'SBE 43 Oxygen Volts', 'units': '0-5VDC', 'type':'float64'},
     '11':{'short_name': 'FLUOR', 'long_name':'Seapoint Fluorometer', 'units': 'UGPL', 'type':'float64'},
     '27':{'short_name': 'FREE', 'long_name':'empty', 'units':'NA', 'type':'NA'},
     '0':{'short_name': 'ALT', 'long_name':'Altitude', 'units':'M', 'type':'float64'},
@@ -203,6 +204,7 @@ def convertFromSBEReader(sbeReader, debug=False):
         elif temp_meta['sensor_id'] == '38':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
+            converted_df['SBE 43 Oxygen Volts'] = temp_meta['column']
             #processed_data.append(temp_meta)
 
         ### Fluorometer Seapoint block
