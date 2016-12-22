@@ -138,6 +138,7 @@ def main(argv):
 
     #Initialise Configuration Parameters
     expocode = config['cruise']['expocode']
+    sectionID = config['cruise']['sectionid']
     time_directory = config['ctd_processing']['time_data_directory']
     pressure_directory = config['ctd_processing']['pressure_data_directory']
     log_directory = config['ctd_processing']['log_directory']
@@ -150,9 +151,11 @@ def main(argv):
     H1 = config['ctd_processing']['hysteresis_1']
     H2 = config['ctd_processing']['hysteresis_2']
     H3 = config['ctd_processing']['hysteresis_3']
+    ctd = config['ctd_processing']['ctd_serial']
 
     lat_col = config['inputs']['lat']
     lon_col = config['inputs']['lon']
+    alt_col = config['inputs']['alt']
     input_parameters = config['analytical_inputs']['input_array'].split("\n")
     p_col = config['analytical_inputs']['p']
     t1_col = config['analytical_inputs']['t1']
@@ -177,7 +180,8 @@ def main(argv):
     p_column_names = config['pressure_series_output']['column_name'].split(',')
     p_column_units = config['pressure_series_output']['column_units'].split(',')
     p_column_format = config['pressure_series_output']['format']
-    p_column_qual = config['pressure_series_output']['qual_columns']
+    p_column_qual = config['pressure_series_output']['qual_columns'].split(',')
+    p_column_one = list(config['pressure_series_output']['q1_columns'].split(','))
 
     if nmea_time_col in converted_df.columns:
         time_col = nmea_time_col
@@ -208,16 +212,20 @@ def main(argv):
     filter_data = process_ctd.raw_ctd_filter(raw_data, 'triangle', 24, input_parameters)
 
     # Cast Details
-    stime, etime, btime, startP, maxP, cast_data = process_ctd.cast_details(filename_base, log_directory+'cast_details.csv', p_col, time_col, filter_data)
-    
+    stime, etime, btime, startP, maxP, btm_lat, btm_lon, btm_alt, cast_data = process_ctd.cast_details(filename_base, log_directory+'cast_details.csv', p_col, time_col, lat_col, lon_col, alt_col, filter_data)
+
     # Write time data to file
-    report_ctd.report_time_series_data(time_directory, expocode, time_column_names, time_column_units, time_column_data, time_column_format, cast_data)
+    report_ctd.report_time_series_data(filename_base, time_directory, expocode, time_column_names, time_column_units, time_column_data, time_column_format, cast_data)
 
     # Pressure Sequence
     pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, time_col, 2.0, stime, startP, 'down', int(sample_rate), int(search_time), cast_data)
 
     # Add quality codes to data
-    # qual_pseq_data = process_ctd.ctd_quality_codes(p_range, qual_code, False, pressure_seq_data)
+    qual_pseq_data = process_ctd.ctd_quality_codes(None, None, None, False, p_column_qual, p_column_one, pressure_seq_data)
+
+    # Write time data to file
+    depth = -999
+    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, qual_pseq_data, pressure_seq_data)
 
     debugPrint('Done!')
 

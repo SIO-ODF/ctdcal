@@ -27,7 +27,7 @@ def report_pressure_details(stacast, log_file, start, end):
     outfile.write("stacast:%s, ondeck_start_p:%s, ondeck_end_p:%s\n" % (stacast, start, end))
     return
 
-def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p):
+def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p, b_alt, b_lat, b_lon):
     """report_cast_details function 
 
     Function takes cast details and writes them to a file in log 
@@ -40,7 +40,10 @@ def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p):
         param4 (str): end, cast end time when instrument leaves water 
         param5 (str): bottom, bottom of cast time when instrument reaches max depth 
         param6 (str): start_p, starting pressure at the time the cast begins 
-        param7 (str): max_p, maximum pressure for entire cast 
+        param7 (str): max_p, maximum pressure for entire cast. 
+        param8 (str): b_alt, altimeter value at bottom of cast. 
+        param9 (str): b_lat, latitude at bottom of cast. 
+        param10 (str): b_lon, longitude at bottom of cast. 
 
     Prints formatted csv file. 
 
@@ -49,7 +52,7 @@ def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p):
     """
     
     outfile = open(c_file, "w+")
-    outfile.write("stacast:%s, , begin:%s, , bottom:%s, end:%s, start_pressure:%s, max_pressure:%s\n" % (stacast, start, bottom, end, start_p, max_p))
+    outfile.write("stacast:%s, begin:%s, bottom:%s, end:%s, start_pressure:%s, max_pressure:%s, altimeter_bottom:%s, latitude:%s, longitude:%s\n" % (stacast, start, bottom, end, start_p, max_p, b_alt, b_lat, b_lon))
     outfile.close()
 
     return
@@ -98,23 +101,31 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
         # Other attemps to import formats from config file 
         # or use savetxt and csv have been buggy so far
         for i in range(0,len(inMat)-1):
-            outfile.write("%8.1f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%d,%10.5f,%10.5f\n" % (inMat['p_dbar'][i], inMat['t1_C'][i], inMat['t2_C'][i], inMat['c1_mScm'][i], inMat['c1_mScm'][i], inMat['sal_PSU'][i], inMat['o1_mll'][i], inMat['cstar_ugl'][i], inMat['fluoro_ugl'][i], inMat['scan_datetime'][i], inMat['lat_ddeg'][i], inMat['lon_ddeg'][i]))
-            #outfile.write(column_format % (column_data))
+            outfile.write('%8.1f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%12d,%10.5f,%10.5f\n' % (inMat['CTDPRS_DBAR'][i], inMat['CTDTMP1_ITS90'][i], inMat['CTDTMP2_ITS90'][i], inMat['CTDCOND1_MSPCM'][i], inMat['CTDCOND2_MSPCM'][i], inMat['CTDSAL_PSU'][i], inMat['CTDOXY1_MLPL'][i], inMat['CTDXMISS_UGPL'][i], inMat['FLUOR_UGPL'][i], inMat['scan_datetime'][i], inMat['LATITUDE'][i], inMat['LONGITUDE'][i]))
 
-        #print(out_col)
-        #np.savetxt(outfile, out_col, fmt=column_format, delimiter=',')
-        #np.savetxt(outfile, out_col, delimiter=',')
-  
     return
 
-def report_pressure_series_data(stacast, expocode, section_id, btm_lat, btm_lon, depth, btm_alt, ctd, inMat=None):
-    """report_time_series_data function 
+def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_lat=-999, btm_lon=-999, depth=-999, btm_alt=-999, ctd=-999, p_dir=None, p_column_names=None, p_column_units=None, qualMat=None, inMat=None):
+    """report_pressure_series_data function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
     and writes time series data with quality codes to csv file.   
 
     Args:
-        param1 (ndarray): inMat, input data ndarray  
+        param1 (str): stacast, actually file base name from hex data. 
+        param2 (str): expocode, vessel id and startd date cruise identification code 
+        param3 (str): section_id, US hydrographic section id 
+        param4 (str): btime, UTC date time stamp at bottom of cast 
+        param5 (str): btm_lat, latitude value at bottom of cast.
+        param6 (str): btm_lon, longitude value at bottom of cast.
+        param7 (str): depth, ctd depth value + altimeter value. 
+        param8 (str): btm_alt, altimeter value at bottom of cast.
+        param9 (str): ctd, serial number of ctd inst.
+        param10 (str): p_dir, directory to write file. 
+        param11 (str): p_column_names, header column names.
+        param12 (str): p_column_units, header column units.
+        param13 (dataframe): qualMat, input dataframe.
+        param14 (ndarray): inMat, input data ndarray.  
 
     Prints formatted csv file. 
 
@@ -122,9 +133,39 @@ def report_pressure_series_data(stacast, expocode, section_id, btm_lat, btm_lon,
         No return
     """
 
-    if input_array is None:
+    if inMat is None:
         print("In report_pressure_series_data: No data array.")
         return
-    #else:  
+    else:  
+        out_col = []
+        h_num = 11
+        now = datetime.datetime.now()
+        file_datetime = now.strftime("%Y%m%d %H:%M") 
+        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
+        b_date = bdt[0]
+        b_time = bdt[1]
+       
+        s_num = stacast[-5:-2] 
+        c_num = stacast[-2:] 
+
+        outfile = open(p_dir+stacast+'.csv', "w+")
+        outfile.write("CTD, %s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\n DATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nDEPTH = %s\nINSTRUMENT_ID = %s\n" % (file_datetime, h_num, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, depth, ctd))
+        cn = np.asarray(p_column_names)
+        cn.tofile(outfile,sep=',', format='%s')
+        outfile.write('\n')
+        cu = np.asarray(p_column_units)
+        cu.tofile(outfile,sep=',', format='%s')
+        outfile.write('\n')
+
+        # Need to rewrite to remove hardcoded column data. 
+        # No ideal method to print formatted output to csv in python ATM 
+        # Other attemps to import formats from config file 
+        # or use savetxt and csv have been buggy so far
+
+#'CTDTMP1_ITS90', 'CTDPRS_DBAR', 'CTDSAL_PSU', 'CTDOXY1_MLPL', 'CTDXMISS_UGPL', 'FLUOR_UGPL', 'LATITUDE', 'LONGITUDE', 'scan_datetime'
+#'CTDPRS_FLAG_W', ' CTDTMP_FLAG_W', ' CTDSAL_FLAG_W', ' CTDOXY_FLAG_W', ' TRANS_FLAG_W', ' FLUOR_FLAG_W'
+        #tmp = list(qualMat[])
+        for i in range(0,len(inMat)-1):
+            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f\n" % (inMat['CTDPRS_DBAR'][i], qualMat[i][0], inMat['CTDTMP1_ITS90'][i], qualMat[i][1], inMat['CTDSAL_PSU'][i], qualMat[i][2], inMat['CTDOXY1_MLPL'][i], qualMat[i][3], inMat['CTDXMISS_UGPL'][i], qualMat[i][4], inMat['FLUOR_UGPL'][i], qualMat[i][5], inMat['scan_datetime'][i]))
 
     return

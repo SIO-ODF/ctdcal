@@ -1,5 +1,7 @@
 #!/usr/bin/env python
+from scipy import interpolate
 import numpy as np
+from numpy.lib.recfunctions import append_fields
 import scipy.signal as sig
 import scipy.stats as st
 import time, os
@@ -7,7 +9,7 @@ import pandas as pd
 import math
 import libODF_report_ctd as report_ctd
 
-def cast_details(stacast, log_file, p_col, time_col, inMat=None):
+def cast_details(stacast, log_file, p_col, time_col, blat_col, blon_col, alt_col, inMat=None):
     """cast_details function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -64,6 +66,9 @@ def cast_details(stacast, log_file, p_col, time_col, inMat=None):
         mp = max(inMat[p_col])    
         tmp = np.argmax((inMat[p_col])) 
         b = inMat[time_col][tmp]
+        b_lat = inMat[blat_col][tmp]
+        b_lon = inMat[blon_col][tmp]
+        b_a = inMat[alt_col][tmp]
 
         tmp = len(inMat)
         # Find ending top of cast time
@@ -76,9 +81,9 @@ def cast_details(stacast, log_file, p_col, time_col, inMat=None):
         # Remove everything after cast end
         inMat = inMat[:tmp]
   
-    report_ctd.report_cast_details(stacast, log_file, s, e, b, sp, mp)
+    report_ctd.report_cast_details(stacast, log_file, s, e, b, sp, mp, b_a, b_lat, b_lon)
     
-    return s, e, b, sp, mp, inMat
+    return s, e, b, sp, mp, b_lat, b_lon, b_a, inMat
 
 def ctd_align(inMat=None, col=None, time=0.0):
     """ctd_align function 
@@ -110,7 +115,7 @@ def ctd_align(inMat=None, col=None, time=0.0):
 
     return inMat
 
-def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, inMat=None):
+def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, p_qual_col=None, qual_one=None, inMat=None):
     """ctd_quality_codes function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -124,20 +129,21 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
           specified. 
 
     """
-    # If p_range set apply qual codes to part of array and return
+    #print(p_qual_col)
+    #If p_range set apply qual codes to part of array and return
     if p_range is not None:
         print("Some algoirythm for formatting qual codes per pressure range")
+        return
     else: 
-        if oxy_fit:
-            oxy_tmp = np.array().fill(2)
-        else:
-            oxy_tmp = np.array().fill(1)
-            
-        tmp = np.array().fill(2)
-    # Else create new ndarray with quality codes 
-    # if oxyfit is false set qual array 1
+        q_df = pd.DataFrame(index=np.arange(len(inMat)), columns=p_qual_col)
+        for pq in p_qual_col:
+            if pq in list(qual_one):
+                q_df[pq] = q_df[pq].fillna(1)
+            else:
+                q_df[pq] = q_df[pq].fillna(2)
 
-    return inMat
+        q_nd = q_df.as_matrix(columns=q_df.columns)
+    return q_nd
 
 def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
     """formatTimeEpoc function 
@@ -267,7 +273,7 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
           the above listed header values.
 
     """
-    print(input_array.dtype.names)
+
     if input_array is None:
         print("In raw_ctd_filter: No data array.")
         return
@@ -470,10 +476,6 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
     Returns:
         Narray: The return value is a matrix of pressure sequenced data 
 
-    todo: implement the following as fail safe surface treatment, 
-          repeatPt: the point in the matrix that is repeated back to the surface.
-          repeatVal: the values in the matrix that is repeated back to the surface.
-          
     todo: deep data bin interpolation to manage empty slices
     """
 
@@ -491,31 +493,25 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
 
         # Initialise input parameters
         if ((startT > 0.0) and (startT > inMat[time_col][0])):
-            repeatPt = (np.abs(inMat[time_col] - startT)).argmin()
-            repeatVal = inMat[:][repeatPt]
-            lenP = np.arange(repeatPt,indBtm,1)
-            start = repeatPt
+            start = (np.abs(inMat[time_col] - startT)).argmin()
+            lenP = np.arange(start,indBtm,1)
             end = len(lenP)
-            prvPrs = inMat[p_col][repeatPt]
+            prvPrs = inMat[p_col][start]
             if btmTime <= startT:
                 print("-startT start time is greater than down cast time. Cast issue.")
                 return
         elif ((startP > 0.0) and (startP > pF[0])):
-            repeatPt = (np.abs(inMat[p_col] - startP)).argmin()
-            repeatVal = inMat[:][repeatPt]
-            lenP = np.arange(repeatPt,indBtm,1)
-            start = repeatPt
+            start = (np.abs(inMat[p_col] - startP)).argmin()
+            lenP = np.arange(start,indBtm,1)
             end = len(lenP) 
-            prvPrs = inMat[p_col][repeatPt]
+            prvPrs = inMat[p_col][start]
             if btm <= startP:
                 print("-startP start pressure is greater than bottom pressure. Cast issue.")
                 return
         elif up is 'up':
-            repeatPt = full_length
-            repeatVal = inMat[:][repeatPt]
-            lenP = np.arange(indBtm,repeatPt,1) 
             start = indBtm
             end = full_length 
+            lenP = np.arange(start,end,1) 
             prvPrs = btm
         else:
             lenP = np.arange(0,indBtm,1)
@@ -525,6 +521,9 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         
         # Roll Filter 
         roll_filter_matrix = roll_filter(p_col, inMat[:][start:end:sample_rate], up, sample_rate, search_time)
+
+        # Treat surface data.
+        roll_filter_matrix = treat_surface_data(p_col, sample_rate,roll_filter_matrix)
 
         # Frame Pressure Bins
         pressure_bins = np.arange(0,int(btm),2)
@@ -537,8 +536,49 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
             if col == p_col:
                 binned_matrix[col] = pressure_bins
             elif binned_matrix[col].dtype is np.dtype(np.float64):
+                #for i in range(0,len(pressure_bins)):
+                #    binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean()]
                 binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean() for i in range(0,len(pressure_bins))]
 
-    print(binned_matrix.dtype.names)
+    #print(binned_matrix.dtype.names)
 
     return binned_matrix
+
+
+def treat_surface_data(p_col,sample_rate,inMat):
+    """pressure_sequence function 
+
+    Function takes full NUMPY ndarray with predefined dtype array 
+    and several arguments to treat missing sirface bin data. It
+    basically takes the first valid data row and repeats that row 
+    with the sample rate defined used in roll filter and constructs 
+    an interval based on a normal surface decent rate back to the surface. 
+
+    implement the following as fail safe surface treatment, 
+    Args:
+        param1 (str): p_col,
+        param1 (int): sample_rate,
+        param2 (int): 
+        param3 (array): 
+        param4 (ndarray): 
+
+    Returns:
+        Narray: The return value is a matrix of pressure sequenced data 
+    """
+
+    fl = 24
+    fps = fl / sample_rate # Number of frames per second
+    dr = 2 # dbar/sec 
+    fpdb = fps / dr # Frames per dbar
+    sp = inMat[p_col][0] # Start p
+    fn = math.ceil(sp * fpdb)
+    dp = sp / fn  # Delta pressure
+    
+    surface_vals = np.empty(shape=(fn,), dtype=inMat.dtype)
+   
+    for i in range(0,fn):
+        surface_vals[i] = inMat[0] 
+        surface_vals[p_col][i] = surface_vals[p_col][i] - (sp - i*dp)
+
+    inMat = np.concatenate((surface_vals, inMat), axis=0)
+    return
