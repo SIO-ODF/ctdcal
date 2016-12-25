@@ -8,6 +8,8 @@ import time, os
 import pandas as pd
 import math
 import libODF_report_ctd as report_ctd
+import conversions as convert
+import density_enthalpy_48 as density
 import warnings
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
@@ -271,6 +273,38 @@ def data_interpolater(inArr):
     nans, tmp= np.isnan(inArr), lambda z: z.nonzero()[0]
     inArr[nans] = np.interp(tmp(nans), tmp(~nans), inArr[~nans])
     return inArr 
+
+def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat):
+    """o2pl2pkg convert ml/l dissolved oxygen to umol/kg
+
+    Input:
+        - t_col, temperature column header deg c. 
+        - sal_col, salinity column header psu.
+        - dopl_col, dissolved column header ml/l. 
+        - dopkg_col, dissolved column header umol/kg
+        - lat_col, latitude for entire cast deg.
+        - lon_col, longitude for entire cast deg.
+        - inMat, dtype ndarray processed ctd time data. 
+    Output:
+        - Converted Oxygen column umol/kg 
+    Example:
+        >>> # linear interpolation of NaNs
+        >>> outArray = o2pl2kg(inArr) 
+    """
+    pkg = np.ndarray(shape=len(inMat), dtype=[(dopkg_col, np.float)])
+
+    # Absolute sailinity from Practical salinity.
+    SA = convert.SA_from_SP(inMat[sal_col], inMat[p_col], inMat[lat_col], inMat[lon_col]) 
+
+    # Conservative temperature from insitu temperature.
+    CT = convert.CT_from_t(SA, inMat[t_col], inMat[p_col]) 
+    s0 = density.sigma0(SA, CT) # Potential density from Absolute Salinity g/Kg Conservative temperature deg C.
+
+    # Convert DO ml/l to umol/kg
+    for i in range(0,len(inMat[dopl_col])):
+        pkg[i] = inMat[dopl_col][i] * 44660 / (s0[i] + 1000)
+    print(pkg[dopkg_col])
+    return pkg
 
 def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
     """raw_ctd_filter function 

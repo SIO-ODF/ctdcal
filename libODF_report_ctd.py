@@ -105,7 +105,7 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
 
     return
 
-def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_lat=-999, btm_lon=-999, depth=-999, btm_alt=-999, ctd=-999, p_dir=None, p_column_names=None, p_column_units=None, qualMat=None, inMat=None):
+def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_lat=-999, btm_lon=-999, depth=-999, btm_alt=-999, ctd=-999, p_dir=None, p_column_names=None, p_column_units=None, qualMat=None, doArr=None, inMat=None):
     """report_pressure_series_data function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
@@ -125,6 +125,7 @@ def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_l
         param11 (str): p_column_names, header column names.
         param12 (str): p_column_units, header column units.
         param13 (dataframe): qualMat, input dataframe.
+        param13 (ndarray): doArr, input do data.
         param14 (ndarray): inMat, input data ndarray.  
 
     Prints formatted csv file. 
@@ -161,11 +162,10 @@ def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_l
         # No ideal method to print formatted output to csv in python ATM 
         # Other attemps to import formats from config file 
         # or use savetxt and csv have been buggy so far
+        #outfile.write('CTDPRS,CTDPRS_FLAG_W,CTDTMP,CTDTMP_FLAG_W,CTDSAL,CTDSAL_FLAG_W,CTDOXY,CTDOXY_FLAG_W,CTDXMISS,CTDXMISS_FLAG_W,CTDFLUOR,CTD_FLUOR_FLAG_W')
+        #outfile.write('DBAR,,ITS-90,,PSU,,UMOL/KG,,0-5VDC,,0-5VDC,')
 
-#'CTDTMP1_ITS90', 'CTDPRS_DBAR', 'CTDSAL_PSU', 'CTDOXY1_MLPL', 'CTDXMISS_UGPL', 'FLUOR_UGPL', 'LATITUDE', 'LONGITUDE', 'scan_datetime'
-#'CTDPRS_FLAG_W', ' CTDTMP_FLAG_W', ' CTDSAL_FLAG_W', ' CTDOXY_FLAG_W', ' TRANS_FLAG_W', ' FLUOR_FLAG_W'
-        #tmp = list(qualMat[])
         for i in range(0,len(inMat)-1):
-            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f\n" % (inMat['CTDPRS_DBAR'][i], qualMat[i][0], inMat['CTDTMP1_ITS90'][i], qualMat[i][1], inMat['CTDSAL_PSU'][i], qualMat[i][2], inMat['CTDOXY1_MLPL'][i], qualMat[i][3], inMat['CTDXMISS_UGPL'][i], qualMat[i][4], inMat['FLUOR_UGPL'][i], qualMat[i][5], inMat['scan_datetime'][i]))
+            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d\n" % (inMat['CTDPRS_DBAR'][i], qualMat[i][0], inMat['CTDTMP1_ITS90'][i], qualMat[i][1], inMat['CTDSAL_PSU'][i], qualMat[i][2], doArr['CTDOXY1_PKG'][i], qualMat[i][3], inMat['CTDXMISS_UGPL'][i], qualMat[i][4], inMat['FLUOR_UGPL'][i], qualMat[i][5]))
 
     return

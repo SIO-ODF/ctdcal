@@ -162,7 +162,9 @@ def main(argv):
     t2_col = config['analytical_inputs']['t2']
     c1_col = config['analytical_inputs']['c1']
     c2_col = config['analytical_inputs']['c2']
-    do_col = config['analytical_inputs']['do']
+    sal_col = config['analytical_inputs']['salt']
+    dopl_col = config['analytical_inputs']['dopl']
+    dopkg_col = config['analytical_inputs']['dopkg']
     xmis_col = config['analytical_inputs']['xmis']
     fluor_col = config['analytical_inputs']['fluor']
     time_zone = config['inputs']['time_zone']
@@ -202,10 +204,10 @@ def main(argv):
     else:
         raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
 
-    if not do_col in raw_data.dtype.names:
+    if not dopl_col in raw_data.dtype.names:
         errPrint('do_col data not found, skipping')
     else:
-        raw_data = process_ctd.ctd_align(raw_data, do_col, float(do_align))
+        raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
         #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
 
     # Filter data
@@ -220,12 +222,15 @@ def main(argv):
     # Pressure Sequence
     pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, time_col, 2.0, stime, startP, 'down', int(sample_rate), int(search_time), cast_data)
 
+    # Convert dissolved oxygen from ml/l to umol/kg
+    dopkg = process_ctd.o2pl2pkg(p_col, t1_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, pressure_seq_data)
+
     # Add quality codes to data
     qual_pseq_data = process_ctd.ctd_quality_codes(None, None, None, False, p_column_qual, p_column_one, pressure_seq_data)
 
     # Write time data to file
     depth = -999
-    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, qual_pseq_data, pressure_seq_data)
+    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, qual_pseq_data, dopkg, pressure_seq_data)
 
     debugPrint('Done!')
 
