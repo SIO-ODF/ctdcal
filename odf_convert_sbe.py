@@ -156,17 +156,17 @@ def main(argv):
     lat_col = config['inputs']['lat']
     lon_col = config['inputs']['lon']
     alt_col = config['inputs']['alt']
-    input_parameters = config['analytical_inputs']['input_array'].split("\n")
-    p_col = config['analytical_inputs']['p']
-    t1_col = config['analytical_inputs']['t1']
-    t2_col = config['analytical_inputs']['t2']
-    c1_col = config['analytical_inputs']['c1']
-    c2_col = config['analytical_inputs']['c2']
-    sal_col = config['analytical_inputs']['salt']
-    dopl_col = config['analytical_inputs']['dopl']
+    input_parameters = config['inputs']['input_array'].split("\n")
+    p_col = config['inputs']['p']
+    t1_col = config['inputs']['t1']
+    t2_col = config['inputs']['t2']
+    c1_col = config['inputs']['c1']
+    c2_col = config['inputs']['c2']
+    sal_col = config['inputs']['salt']
+    dopl_col = config['inputs']['dopl']
     dopkg_col = config['analytical_inputs']['dopkg']
-    xmis_col = config['analytical_inputs']['xmis']
-    fluor_col = config['analytical_inputs']['fluor']
+    xmis_col = config['inputs']['xmis']
+    fluor_col = config['inputs']['fluor']
     time_zone = config['inputs']['time_zone']
     nmea_time_col = config['inputs']['nmea_datetime']
     scan_time_col = config['inputs']['scan_datetime']
@@ -191,7 +191,7 @@ def main(argv):
         time_col = scan_time_col
 
     # Construct NDarray
-    raw_data = process_ctd.dataToNDarray(convertedfilePath,None,list(converted_df.columns.insert(0,'index')),',')
+    raw_data = process_ctd.dataToNDarray(convertedfilePath,None,list(converted_df.columns.insert(0,'index')),',',2)
     raw_data = process_ctd.ondeck_pressure(filename_base, p_col, c1_col, c2_col, time_col, raw_data, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
 
     if not c1_col in raw_data.dtype.names:
