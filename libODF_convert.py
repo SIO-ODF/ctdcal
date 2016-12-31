@@ -204,7 +204,7 @@ def convertFromSBEReader(sbeReader, debug=False):
         elif temp_meta['sensor_id'] == '38':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
-            converted_df['CTDOXYVOLTS'] = temp_meta['column']
+            converted_df['CTDOXYVOLTS'] = raw_df[temp_meta['column']]
             #processed_data.append(temp_meta)
 
         ### Fluorometer Seapoint block
