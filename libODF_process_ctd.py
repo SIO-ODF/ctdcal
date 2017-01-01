@@ -77,10 +77,10 @@ def cast_details(stacast, log_file, p_col, time_col, blat_col, blon_col, alt_col
 
         tmp = len(inMat)
         # Find ending top of cast time
-        for i in range(int(lm/2),lm):
+        for i in range(int(tmp/2),tmp):
             if sp > inMat[p_col][i]:
                 e = inMat[time_col][i]
-                tmp = i + 24
+                if i < tmp: tmp = i + 24
                 break
      
         # Remove everything after cast end
@@ -134,7 +134,6 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
           specified. 
 
     """
-    #print(p_qual_col)
     #If p_range set apply qual codes to part of array and return
     if p_range is not None:
         print("Some algoirythm for formatting qual codes per pressure range")
@@ -197,7 +196,7 @@ def dataToDataFrame(inFile):
     df = pd.read_csv(inFile)
     return df
 
-def dataToNDarray(inFile, dtype=None, names=None, separator=',', ):
+def dataToNDarray(inFile, dtype=None, names=None, separator=',', skip=None):
     """dataToNDarray function 
 
     Function takes full file path to csv type data file and returns NUMPY
@@ -217,8 +216,8 @@ def dataToNDarray(inFile, dtype=None, names=None, separator=',', ):
         https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
     """
 
-    arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=2)
-    
+    arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=skip)
+  
     return arr 
 
 def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
@@ -303,7 +302,6 @@ def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat
     # Convert DO ml/l to umol/kg
     for i in range(0,len(inMat[dopl_col])):
         pkg[i] = inMat[dopl_col][i] * 44660 / (s0[i] + 1000)
-    print(pkg[dopkg_col])
     return pkg
 
 def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
@@ -339,8 +337,6 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
             print("In raw_ctd_filter: Empty parameter list.")
         else:
             for p in parameters:
-                #indices = [i for i, s in input_array.dtype.names if p in s]
-                #print(indices)
                 if filter_type is 'boxcar':
                     win = sig.boxcar(win_size)
                     return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/len(win)
@@ -352,6 +348,7 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
                     win = sig.triang(win_size)
                     return_array[p] = 2*sig.convolve(input_array[p], win, mode='same')/len(win)
     return return_array 
+
 
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function 

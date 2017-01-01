@@ -23,7 +23,7 @@ def report_pressure_details(stacast, log_file, start, end):
     Returns:
         No return
     """
-    outfile = open(log_file, "w+")
+    outfile = open(log_file, 'a')
     outfile.write("stacast:%s, ondeck_start_p:%s, ondeck_end_p:%s\n" % (stacast, start, end))
     return
 
@@ -51,7 +51,7 @@ def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p, b_a
         No return
     """
     
-    outfile = open(c_file, "w+")
+    outfile = open(c_file, "a")
     outfile.write("stacast:%s, begin:%s, bottom:%s, end:%s, start_pressure:%s, max_pressure:%s, altimeter_bottom:%s, latitude:%s, longitude:%s\n" % (stacast, start, bottom, end, start_p, max_p, b_alt, b_lat, b_lon))
     outfile.close()
 
@@ -166,6 +166,6 @@ def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_l
         #outfile.write('DBAR,,ITS-90,,PSU,,UMOL/KG,,0-5VDC,,0-5VDC,')
 
         for i in range(0,len(inMat)-1):
-            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d\n" % (inMat['CTDPRS_DBAR'][i], qualMat[i][0], inMat['CTDTMP1_ITS90'][i], qualMat[i][1], inMat['CTDSAL_PSU'][i], qualMat[i][2], doArr['CTDOXY1_PKG'][i], qualMat[i][3], inMat['CTDXMISS_UGPL'][i], qualMat[i][4], inMat['FLUOR_UGPL'][i], qualMat[i][5]))
+            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d\n" % (inMat['CTDPRS_DBAR'][i], qualMat[i][0], inMat['CTDTMP1_ITS90'][i], qualMat[i][1], inMat['CTDSAL_PSU'][i], qualMat[i][2], doArr['CTDOXY'][i], qualMat[i][3], inMat['CTDXMISS_UGPL'][i], qualMat[i][4], inMat['FLUOR_UGPL'][i], qualMat[i][5]))
 
     return
