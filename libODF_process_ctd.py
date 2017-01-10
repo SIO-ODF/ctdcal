@@ -143,6 +143,8 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
         for pq in p_qual_col:
             if pq in list(qual_one):
                 q_df[pq] = q_df[pq].fillna(1)
+            elif oxy_fit and pq is column:
+                q_df[pq] = q_df[pq].fillna(2)
             else:
                 q_df[pq] = q_df[pq].fillna(2)
 
@@ -216,7 +218,10 @@ def dataToNDarray(inFile, dtype=None, names=None, separator=',', skip=None):
         https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
     """
 
-    arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=skip)
+    if skip is None:
+        arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names)
+    else: 
+        arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=skip)
   
     return arr 
 
@@ -548,7 +553,7 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         if ((startT > 0.0) and (startT > inMat[time_col][0])):
             start = (np.abs(inMat[time_col] - startT)).argmin()
             lenP = np.arange(start,indBtm,1)
-            end = len(lenP)
+            end = indBtm 
             prvPrs = inMat[p_col][start]
             if btmTime <= startT:
                 print("-startT start time is greater than down cast time. Cast issue.")
@@ -556,7 +561,7 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         elif ((startP > 0.0) and (startP > pF[0])):
             start = (np.abs(inMat[p_col] - startP)).argmin()
             lenP = np.arange(start,indBtm,1)
-            end = len(lenP) 
+            end = indBtm 
             prvPrs = inMat[p_col][start]
             if btm <= startP:
                 print("-startP start pressure is greater than bottom pressure. Cast issue.")
@@ -569,7 +574,7 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         else:
             lenP = np.arange(0,indBtm,1)
             start = 0
-            end = len(lenP)
+            end = indBtm 
             prvPrs = 0.0
         
         # Roll Filter 
@@ -599,7 +604,7 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
 
 
 def treat_surface_data(p_col,sample_rate,inMat):
-    """pressure_sequence function 
+    """treat surface data function 
 
     Function takes full NUMPY ndarray with predefined dtype array 
     and several arguments to treat missing sirface bin data. It

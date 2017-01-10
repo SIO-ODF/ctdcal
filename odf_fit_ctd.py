@@ -2,20 +2,26 @@
 import sys
 import os
 import argparse
-import libODF_sbe_reader as sbe_reader
 import numpy as np
 import pandas as pd
-import libODF_convert as cnv
+import json
 import libODF_process_ctd as process_ctd
 import libODF_report_ctd as report_ctd
 import libODF_fit_ctd as fit_ctd
 import configparser
 import matplotlib.pyplot as plt
+from scipy.optimize import leastsq
 
 DEBUG = False
 
 #File extension to use for output files (csv-formatted)
 FILE_EXT = 'csv'
+
+#File extension to use for output files (csv-formatted)
+XML_EXT = 'XMLCON'
+
+#File extension to use for output files (csv-formatted)
+HEX_EXT = 'hex'
 
 #File extension to use for raw output
 BTL_SUFFIX = '_btl'
@@ -45,19 +51,13 @@ def errPrint(*args, **kwargs):
 def main(argv):
 
     parser = argparse.ArgumentParser(description='Convert SBE raw data to a converted, csv-formatted text file')
-    #parser.add_argument('hexFile', metavar='hex_file', help='the .hex data file to process')
     parser.add_argument('timeFile', metavar='time_file', help='the .csv data file to fit by bottle data')
-    #parser.add_argument('xmlconFile', metavar='XMLCON_file', help='the .XMLCON data file to process')
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
 
     # raw output
-    #parser.add_argument('-r', '--raw', action='store_true', help='return the raw data values')
     parser.add_argument('-oxy', '--oxygen', type=argparse.FileType('r'), help='return the oxygen data file')
-
-    # output directory
-    #parser.add_argument('-o', metavar='dest_dir', dest='outDir', help='location to save output files')
 
     # Process Command-line args
     args = parser.parse_args()
@@ -71,11 +71,6 @@ def main(argv):
         errPrint('ERROR: Input time dependent .csv file:', args.timeFile, 'not found\n')
         sys.exit(1)
 
-    # Verify xmlcon file exists
-    #if not os.path.isfile(args.xmlconFile):
-    #    errPrint('ERROR: Input xmlcon file:', args.xmlconFile, 'not found\n')
-    #    sys.exit(1)
-
     # Used later for building output file names
     filename_ext = os.path.basename(args.timeFile) # original filename with ext
     filename_base = os.path.splitext(filename_ext)[0] # original filename w/o ext
@@ -83,65 +78,6 @@ def main(argv):
     if '_' in filename_base:
         filename_base = filename_base.split('_')[0]
 
-    # Parse the input files
-    #debugPrint("Parsing", args.timeFile, "and", args.xmlconFile + '... ', end='')
-    #sbeReader = sbe_reader.SBEReader.from_paths(args.timeFile, args.xmlconFile)
-    #debugPrint("Success!")
-
-    # Build Output Directory exists
-    #if args.outDir:
-    #    if os.path.isdir(args.outDir):
-    #        outputDir = args.outDir
-    #    else:
-    #        debugPrint("Creating output directory...", end='')
-    #        try:
-    #            os.mkdir(args.outDir)
-    #        except:
-    #            errPrint('ERROR: Could not create output directory:', args.outDir)
-    #            sys.exit(1)
-    #        else:
-    #            outputDir = args.outDir
-    #            debugPrint('Success!')
-
-    # Save the raw scans as csv
-    #if args.raw:
-
-    #    debugPrint('Building raw dataset... ', end='')
-
-        # Retrieve parsed scans
-    #    rawData = sbeReader.parsed_scans()
-        # Retrieve parsed scans
-
-        # Convert raw data to dataframe
-    #    raw_df = pd.DataFrame(rawData)
-    #    raw_df.index.name = 'index'
-    #    raw_df = raw_df.apply(pd.to_numeric, errors="ignore")
-
-    #    debugPrint('Success!')
-
-    #    rawfileName = str(filename_base + FIT_SUFFIX + '.' + FILE_EXT)
-    #    rawfilePath = os.path.join(outputDir, rawfileName)
-
-    #    debugPrint('Saving raw data to:', rawfilePath + '... ', end='')
-    #    try:
-    #        raw_df.to_csv(rawfilePath)
-    #    except:
-    #        errPrint('ERROR: Could not save raw data to file')
-    #    else:
-    #        debugPrint('Success!')
-
-    #debugPrint("Converting raw scans to scientific units... ")
-    #converted_df = cnv.convertFromSBEReader(sbeReader, False)
-   
-    #convertedfileName  = filename_base + CONVERTED_SUFFIX + '.' + FILE_EXT
-    #convertedfilePath = os.path.join(outputDir, convertedfileName)
-
-    #debugPrint('Saving converted data to:', convertedfilePath + '... ', end='')
-    #if cnv.saveConvertedDataToFile(converted_df, convertedfilePath, False):
-    #    debugPrint('Success!')
-    #else:
-    #    errPrint('ERROR: Could not save converted data to file')
-    
     #Import Cruise Configuration File 
     iniFile = 'data/ini-files/configuration.ini' 
     config = configparser.RawConfigParser()
@@ -150,6 +86,7 @@ def main(argv):
     #Initialise Configuration Parameters
     expocode = config['cruise']['expocode']
     sectionID = config['cruise']['sectionid']
+    raw_directory = config['ctd_processing']['raw_data_directory']
     time_directory = config['ctd_processing']['time_data_directory']
     pressure_directory = config['ctd_processing']['pressure_data_directory']
     oxygen_directory = config['ctd_processing']['oxygen_directory']
@@ -160,23 +97,31 @@ def main(argv):
     search_time = config['ctd_processing']['roll_filter_time']
     ctd = config['ctd_processing']['ctd_serial']
 
-    #alt_col = config['inputs']['alt']
-    #input_parameters = config['analytical_inputs']['input_array'].split("\n")
     time_zone = config['inputs']['time_zone']
     p_col = config['analytical_inputs']['p']
+    p_btl_col = config['inputs']['p']
+    t_col = config['analytical_inputs']['t']
+    t_btl_col = config['inputs']['t']
     t1_col = config['analytical_inputs']['t1']
     t2_col = config['analytical_inputs']['t2']
+    reft_col = config['analytical_inputs']['reft']
+    c_col = config['analytical_inputs']['c']
     c1_col = config['analytical_inputs']['c1']
     c2_col = config['analytical_inputs']['c2']
-    sal_btl_col = config['inputs']['salt']
     sal_col = config['analytical_inputs']['salt']
+    sal_btl_col = config['inputs']['salt']
+    btl_sal_col = config['analytical_inputs']['btl_salt']
+    dov_col = config['analytical_inputs']['dov']
+    dov_btl_col = config['inputs']['dov']
     dopl_col = config['analytical_inputs']['dopl']
     dopkg_col = config['analytical_inputs']['dopkg']
+    btl_oxy_col = config['analytical_inputs']['btl_oxy']
     xmis_col = config['analytical_inputs']['xmis']
     fluor_col = config['analytical_inputs']['fluor']
     timedate = config['analytical_inputs']['datetime']
     lat_col = config['analytical_inputs']['lat']
     lon_col = config['analytical_inputs']['lon']
+    btl_num_col = config['inputs']['btl_num']
     
     #time_column_data = config['time_series_output']['data_names'].split(',')
     time_column_data = config['time_series_output']['data_output']
@@ -185,12 +130,20 @@ def main(argv):
     time_column_format = config['time_series_output']['format']
 
     #pressure_column_data = config['time_series_output']['data_names'].split(',')
-    p_column_data = config['pressure_series_output']['data_output']
+    p_column_data = config['pressure_series_output']['data'].split(',')
     p_column_names = config['pressure_series_output']['column_name'].split(',')
     p_column_units = config['pressure_series_output']['column_units'].split(',')
     p_column_format = config['pressure_series_output']['format']
     p_column_qual = config['pressure_series_output']['qual_columns'].split(',')
     p_column_one = list(config['pressure_series_output']['q1_columns'].split(','))
+
+    xmlfileName = str(filename_base + '.' + XML_EXT)
+    xmlfilePath = os.path.join(raw_directory, xmlfileName)
+
+    hexfileName = str(filename_base + '.' + HEX_EXT)
+    hexfilePath = os.path.join(raw_directory, hexfileName)
+
+    xmlfilePath = os.path.join(raw_directory, xmlfileName)
 
     timefileName = str(filename_base + TIME_SUFFIX + '.' + FILE_EXT)
     timefilePath = os.path.join(time_directory, timefileName)
@@ -204,38 +157,78 @@ def main(argv):
     btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
     btlfilePath = os.path.join(btl_directory, btlfileName)
 
-    if args.oxygen:
-        o2pkg_btl, o2pl_btl = fit_ctd.o2_calc(o2flask_file,args.oxygen.name,sal_btl_col,btlfilePath)
+    logfileName = str('cast_details' + '.' + FILE_EXT)
+    logfilePath = os.path.join(log_directory, logfileName)
 
-    # Construct NDarray
-    time_data = process_ctd.dataToNDarray(timefilePath,None,True,',',1)
-    print(time_data.dtype.names)
+    # Get bottle data
+    btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',0)
+    btl_data = btl_data[:][1:]
 
-    # Get analytical Oxygen data
-     
+    # Get Analytical Oxygen data
+    o2pkg_btl, o2pl_btl = fit_ctd.o2_calc(o2flask_file,args.oxygen.name,btl_data[btl_num_col],btl_data[sal_btl_col])
+    
+    # Get procesed time data 
+    time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
+    #end = np.argmax(time_data[p_col])
+    time_data = time_data[:][1:]
+
+    # Non Linear Fit Routine 
+    oxy_coef = fit_ctd.find_oxy_coef(o2pl_btl['OXYGEN'], btl_data[p_btl_col], btl_data[t_btl_col], btl_data[sal_btl_col], btl_data[dov_btl_col], hexfilePath, xmlfilePath)
+
+    kelvin = []
+    for i in range(0,len(time_data[t_col])):
+        kelvin.append(time_data[t_col][i] + 273.15)
+
+    # Find Isopycnal Down Trace Bottle Trip Equivalent
+    end = np.argmax(time_data[p_col])
+    down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, btl_data, time_data[p_col], time_data[t_col], time_data[sal_col], time_data[dov_col])
+
+    # Fit Oxygen Data
+    oxy_coef = fit_ctd.find_oxy_coef(o2pl_btl['OXYGEN'], down_trace_btl[p_btl_col], down_trace_btl[t_btl_col], down_trace_btl[sal_btl_col], down_trace_btl[dov_btl_col], hexfilePath, xmlfilePath)
+
+    # Convert CTD Oxygen Voltage Data with New DO Coef
+    time_data[dopl_col] = fit_ctd.oxy_dict(oxy_coef, time_data[p_col], kelvin, time_data[t_col], time_data[sal_col], time_data[dov_col])
 
     # Write time data to file
-    #report_ctd.report_time_series_data(filename_base, time_directory, expocode, time_column_names, time_column_units, time_column_data, time_column_format, time_data)
+    report_ctd.report_time_series_data(filename_base + FIT_SUFFIX, time_directory, expocode, time_column_names, time_column_units, time_column_names, time_column_format, time_data)
 
     # Pressure Sequence
-    #pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, time_col, 2.0, stime, startP, 'down', int(sample_rate), int(search_time), cast_data)
+    pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, timedate, 2.0, -1.0, 0.0, 'down', int(sample_rate), int(search_time), time_data)
+
+    #kelvin = []
+    #for i in range(0,len(pressure_seq_data[t_col])):
+    #    kelvin.append(pressure_seq_data[t_col][i] + 273.15)
+
+    #pressure_seq_data[dopl_col] = fit_ctd.oxy_dict(oxy_coef, pressure_seq_data[p_col], kelvin, pressure_seq_data[t_col], pressure_seq_data[sal_col], pressure_seq_data[dov_col])
 
     # Convert dissolved oxygen from ml/l to umol/kg
-    #dopkg = process_ctd.o2pl2pkg(p_col, t1_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, pressure_seq_data)
+    dopkg = process_ctd.o2pl2pkg(p_col, t1_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, pressure_seq_data)
 
     # Add quality codes to data
-    #qual_pseq_data = process_ctd.ctd_quality_codes(None, None, None, False, p_column_qual, p_column_one, pressure_seq_data)
+    qual_pseq_data = process_ctd.ctd_quality_codes(dopkg_col, None, None, True, p_column_qual, p_column_one, pressure_seq_data)
+
+    # Collect Cast Details from Log
+    cast_details = process_ctd.dataToNDarray(logfilePath,str,None,',',0)
+    for line in cast_details:
+        if filename_base in line[0]:
+            for val in line:
+                if 'at_depth' in val: btime = str.split(val, ':')
+                if 'latitude' in val: btm_lat = str.split(val, ':')
+                if 'longitude' in val: btm_lon = str.split(val, ':')
+                if 'altimeter_bottom' in val: btm_alt = str.split(val, ':')
+            break
 
     # Write time data to file
-    #depth = -999
-    #report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, qual_pseq_data, dopkg, pressure_seq_data)
+    depth = -999
+    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, float(btime[1]), float(btm_lat[1]), float(btm_lon[1]), depth, float(btm_alt[1]), ctd, pressure_directory, p_column_names, p_column_units, p_column_data, qual_pseq_data, dopkg, pressure_seq_data)
 
-    #plt.plot(pressure_seq_data[t1_col], pressure_seq_data[p_col], color='r', label='raw')
-    #plt.plot(pressure_seq_data[c1_col], pressure_seq_data[p_col], color='g', label='raw')
+    #plt.plot(time_data[dopl_col], time_data[p_col], color='b', label='raw')
+    plt.plot(pressure_seq_data[dopl_col], pressure_seq_data[p_col], color='r', label='raw')
+    plt.plot(o2pl_btl['OXYGEN'], btl_data[p_btl_col], color='g', marker='o', label='raw')
     #plt.plot(pressure_seq_data[do_col], pressure_seq_data[p_col], color='b', label='raw')
-    #plt.gca().invert_yaxis()
-    #plt.axis()
-    #plt.show()
+    plt.gca().invert_yaxis()
+    plt.axis()
+    plt.show()
 
     debugPrint('Done!')
 

@@ -143,6 +143,7 @@ def oxy_dict(calib, P, K, T, S, V):
     try:
         oxygen = []
         for P_x, K_x, T_x, S_x, V_x in zip(P, K, T, S, V):
+            #print(T_x)
             temp = (calib['Soc'] * (V_x + calib['offset'])
                     * (1.0 + calib['A'] * T_x + calib['B'] * math.pow(T_x,2) + calib['C'] * math.pow(T_x,3) )
                     * OxSol(T_x,S_x)
@@ -362,33 +363,3 @@ def fluoro_seapoint_dict(calib, signal):
     except:
         fluoro = round(signal,6)
     return fluoro
-
-def CR_to_C(cr):
-    """
-    Convert a given conductivity ratio to conductivity using constant from gsw library.
-
-    Given CR = C(S, t, p) / C(35, 15, 0) in (UNESCO, 1983) we adjust the equation to give
-    C(S, t, p) = CR / C(35, 15, 0). This gives us a conductivity that should be equivalent
-    to what we originally sampled - CHECK THIS?
-
-
-    Note that strictly speaking PSS-78 (Unesco, 1983) defines Practical
-    Salinity in terms of the conductivity ratio, R, without actually
-    specifying the value of C(35,15,0) (which we currently take to be
-    42.9140 mS/cm).
-
-    Input:
-    cr: conductivity ratio, either a single values or a list
-
-    Output:
-    output: a list or single value representing the measured conductivity
-    """
-
-    try:
-        output = []
-        for x in cr:
-            temp = x/42.9140
-            output.append(temp)
-    except:
-        output = cr/42.9140
-    return output

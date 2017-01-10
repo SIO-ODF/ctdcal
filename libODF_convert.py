@@ -14,10 +14,10 @@ short_lookup = {
     '3':{'short_name': 'CTDCOND', 'long_name':'SBE 4 Conductivity', 'units': 'MSPCM', 'type':'float64'},
     '38':{'short_name': 'CTDOXY', 'long_name':'SBE 43 Oxygen', 'units': 'MLPL', 'type':'float64'},
     #'38':{'short_name': 'CTDOXYVOLTS', 'long_name':'SBE 43 Oxygen Volts', 'units': '0-5VDC', 'type':'float64'},
-    '11':{'short_name': 'FLUOR', 'long_name':'Seapoint Fluorometer', 'units': 'UGPL', 'type':'float64'},
+    '11':{'short_name': 'FLUOR', 'long_name':'Seapoint Fluorometer', 'units': '0-5VDC', 'type':'float64'},
     '27':{'short_name': 'FREE', 'long_name':'empty', 'units':'NA', 'type':'NA'},
     '0':{'short_name': 'ALT', 'long_name':'Altitude', 'units':'M', 'type':'float64'},
-    '71':{'short_name': 'CTDXMISS', 'long_name':'CStar', 'units': 'UGPL', 'type':'float64'},
+    '71':{'short_name': 'CTDXMISS', 'long_name':'CStar', 'units': '0-5VDC', 'type':'float64'},
     '61':{'short_name': 'U_DEF', 'long_name':'user defined', 'units':'0-5VDC', 'type':'float64'},
     '1000':{'short_name': 'CTDSAL', 'long_name':'Salinity (C1 T1)', 'units':'PSU', 'type':'float64'}
 }

@@ -1,9 +1,13 @@
 #!/usr/bin/env python
-from math import sqrt
+import math
+import scipy
 import numpy as np
 import conversions as convert
 import density_enthalpy_48 as density
 import libODF_process_ctd as process_ctd
+import libODF_sbe_reader as sbe_rd
+import libODF_sbe_equations_dict as sbe_eq
+from scipy.optimize import leastsq
 import gsw
 import csv
 import requests
@@ -14,7 +18,7 @@ M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
 D = 1.42905481 #  /* density O2 g/l @ 0 C */
 
-def offset(offset, col, inMat):
+def offset(offset, inArr):
     """offset column of data 
 
     Input:
@@ -24,10 +28,10 @@ def offset(offset, col, inMat):
     Example:
         >>> outArray = offset(offset, col, inMat) 
     """
-    for i in range(0, len(inMat)):
-        inMat[col][i] = inMat[col][i] + offset
+    for i in range(0, len(inArr)):
+        inArr[i] = float(inArr[i]) + offset
 
-    return inMat
+    return inArr
 
 def IESRho(s, t, p):
     bars  = p * 0.1
@@ -48,7 +52,7 @@ def IESRho(s, t, p):
        t*  5.3875e-9))))+
        0.824493)*s)
     #/* pure water secant bulk modulus */
-    termc = s * sqrt(s);
+    termc = s * math.sqrt(s);
     kst0  = ((-0.00572466 +
        t*( 1.0227e-4  +
        t*(-1.6546e-6))) * termc)
@@ -159,7 +163,125 @@ def mll_to_umolkg(o2ml, s, t, rho_func=IESRho):
     o2kg = o2ml / ((M/D * 0.001) * rho_func(s, t, 0)/1000)
     return o2kg
 
-#
+
+# Find nearest value to argument in array 
+# Return the index of that value
+def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, btl_data, time_p, time_t, time_s, time_dov):
+    """find_iscopycnals 
+        
+    """
+    # Argument for Isopycnal values to be better collected here
+    # This function is built on the model that SBE aligns arrays 
+    # by offset to P response time
+    for i in range(0,len(btl_data[p_btl_col])): 
+        ind_p = find_nearest(time_p, btl_data[p_btl_col][i])
+        btl_data[t_btl_col][i] = time_t[ind_p]
+        btl_data[sal_btl_col][i] = time_s[ind_p]
+        btl_data[dov_btl_col][i] = time_dov[ind_p]
+    
+    return btl_data
+
+
+# Find nearest value to argument in array 
+# Return the index of that value 
+def find_nearest(yarr, val):    
+    """find_nearest 
+        
+    """
+    indx = (np.abs(yarr-val)).argmin()
+    #minarray = []
+    #for arg in yarr:
+    #    minarray.append(np.abs(arg - val)) # assumed float
+    #    value = min(minarray)
+    #    indx = minarray.index(value)
+    return indx
+
+
+# Residual calculation 
+def find_oxy_coef(o2pl, p, t, salt, dov, hexfilePath, xmlfilePath):    
+    """fit_oxy fits CTD dissolved oxygen  
+        
+    """
+    kelvin = []
+    for i in range(0,len(t)):
+        kelvin.append(t[i] + 273.15)
+
+    # Retrieve Config data
+    sbeReader = sbe_rd.SBEReader.from_paths(hexfilePath, xmlfilePath)
+    rawConfig = sbeReader.parsed_config()
+    for i, x in enumerate(rawConfig['Sensors']):
+       sensor_id = rawConfig['Sensors'][i]['SensorID']
+       if str(sensor_id) == '38':
+           oxy_meta = {'sensor_id': '38', 'list_id': 0, 'channel_pos': 1, 'ranking': 5, 'column': 'CTDOXYVOLTS', 'sensor_info': rawConfig['Sensors'][i]}
+           
+
+    coef0 = [oxy_meta['sensor_info']['Soc'], oxy_meta['sensor_info']['offset'], oxy_meta['sensor_info']['A'], oxy_meta['sensor_info']['B'], oxy_meta['sensor_info']['C'], oxy_meta['sensor_info']['E']]
+    oxy_data = oxy_dict(coef0, p, kelvin, t, salt, dov)
+    # Non Linear fit routine 
+    coefs, flag = leastsq(residual, coef0, args=(o2pl.astype(float),p,kelvin,t,salt,dov)) 
+
+    return coefs
+
+def oxy_dict(calib, P, K, T, S, V): 
+    """SBE equation for converting engineering units to oxygen (ml/l).
+    SensorID: 38
+
+    calib is a dict holding Soc, Voffset, Tau20, A, B, C, E
+    The following are single or list/tuple:
+    P is pressure in decibars
+    K is temperature in Kelvin
+    T is temperature in Celcius
+    S is Practical Salinity Units
+    V is Voltage from instrument
+
+    Original equation from calib sheet dated 2014:
+    Oxygen (ml/l) = Soc * (V + Voffset) * (1.0 + A * T + B * T + C * T ) * OxSol(T,S) * exp(E * P / K)
+
+    """
+    #array mode
+    try:
+        oxygen = []
+        for P_x, K_x, T_x, S_x, V_x in zip(P, K, T, S, V): 
+            #print(T_x)
+            temp = (calib[0] * (V_x + calib[1])
+                    * (1.0 + calib[2] * T_x + calib[3] * math.pow(T_x,2) + calib[4] * math.pow(T_x,3) )
+                    * sbe_eq.OxSol(T_x,S_x)
+                    * math.exp(calib[5] * P_x / K_x)) #foo
+            temp = round(temp,4)
+            oxygen.append(temp)
+    #Single mode.
+    except:
+        oxygen = (calib[0] * (V + calib[1])
+                  * (1.0 + calib[2] * T + calib[3] * math.pow(T,2) + calib[4] * math.pow(T,3) )
+                  * sbe_eq.OxSol(T,S) 
+                  * math.exp(calib[5] * P / K))
+    return oxygen   
+
+
+# Residual calculation 
+def residual(calib, o2pl, P, K, T, S, V):    
+    """residual weighted difference of dissolved oxygen bottle data
+       vs dissolved oxygen CTD data. 
+  
+    This conversion is included for least squares fitting routine.
+        
+    calib is a dict holding Soc, Voffset, Tau20, A, B, C, E
+    The following are single or list/tuple:
+    calib is a list of oxy_dict coefficients to be optimized
+    o2pl is dissolved oxygen winkler titrated data
+    P is pressure in decibars
+    K is temperature in Kelvin
+    T is temperature in Celcius
+    S is Practical Salinity Units
+    V is Voltage from instrument
+    """
+    weight = []
+    sig = 0.829
+    for i in range(0, len(o2pl)):
+        if o2pl[i] > 0:
+            weight.append(scipy.sqrt((o2pl[i] - oxy_dict(calib, P[i], K[i], T[i], S[i], V[i]))**2/sig**2))
+    return weight
+
 #def H2odVdT(v1, t1):
 #    return (v1*rho_t(t1)/rho_t(20))
 #
@@ -185,17 +307,13 @@ def mll_to_umolkg(o2ml, s, t, rho_func=IESRho):
 #
 #salts = requests.get("http://go-ship.rrevelle.sio.ucsd.edu/api/salt").json()
 #def o2_calc(path, o2_payload, thio_ns):
-def o2_calc(o2flasks, o2path, sal_col, btlpath):
-#    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
-    btl_data = process_ctd.dataToNDarray(btlpath,None,True,',',0)
-    btls = btl_data['btl_fire_num'][1:]
-    btls = btls.astype(float)
-    sal = (btl_data[sal_col][1:]) 
-    sal = sal.astype(float)
-    print(len(sal))
 
-    o2ml = np.ndarray(shape=len(sal), dtype=np.float)
-    o2kg = np.ndarray(shape=len(sal), dtype=np.float)
+def o2_calc(o2flasks, o2path, btl_num, salt):
+#    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
+
+    btl_num.astype(int)
+    o2ml = np.zeros(shape=(len(btl_num),), dtype=[('BTLNUM', np.int),('OXYGEN',np.float)])
+    o2kg = np.zeros(shape=(len(btl_num),), dtype=[('BTLNUM', np.int),('OXYGEN',np.float)])
 
     with open(o2path, 'r') as f:
         rho = IESRho
@@ -211,6 +329,7 @@ def o2_calc(o2flasks, o2path, sal_col, btlpath):
         thio_n = thio_n_calc(titr, blank, kio3_n, kio3_v, kio3_t, thio_t)
         rho_stp = rho_t(20)
 
+        btl_counter = 0
         for l in f:
             row = l.split()
             if "ABORT" in row[-1]:
@@ -225,15 +344,21 @@ def o2_calc(o2flasks, o2path, sal_col, btlpath):
             titr_temp = float(row[5])
             draw_temp = float(row[6])
             flask_vol = get_flask_vol(flask, o2flasks, draw_temp)
-
             titr_20c = titr_20_calc(titr, titr_temp)
-            if float(bottle) in btls:
-                btl_index = np.where(btls == bottle)[0]
-                print(btl_index)
-                print(sal[btl_index])
-                o2ml[btl_index] = (((titr_20c - blank) * thio_n * 5.598 - 0.0017)/((flask_vol - 2.0) * 0.001))
-                o2kg[btl_index] = mll_to_umolkg(o2ml[btl_index], float(sal[btl_index]), draw_temp,rho)
-            else: o2kg[btl_index] = '-999'
+
+            if bottle in btl_num:
+                #print(btl_num[bottle])
+                btl_counter += 1
+                o2ml['BTLNUM'][bottle-1] = int(bottle)
+                o2ml['OXYGEN'][bottle-1] = (((titr_20c - blank) * thio_n * 5.598 - 0.0017)/((flask_vol - 2.0) * 0.001))
+                o2kg['BTLNUM'][bottle-1] = int(bottle)
+                o2kg['OXYGEN'][bottle-1] = mll_to_umolkg(o2ml['OXYGEN'][bottle-1], salt[bottle-1], draw_temp,rho)
+            else: 
+                btl_counter += 1
+                o2ml['BTLNUM'][bottle-1] = btl_counter 
+                o2ml['OXYGEN'][bottle-1] = '-999'
+                o2kg['OXYGEN'][bottle-1] = '-999'
+                o2kg['BTLNUM'][bottle-1] = btl_counter 
 #           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
     return o2kg, o2ml
 #

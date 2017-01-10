@@ -172,13 +172,13 @@ def main(argv):
     scan_time_col = config['inputs']['scan_datetime']
     
     #time_column_data = config['time_series_output']['data_names'].split(',')
-    time_column_data = config['time_series_output']['data_output']
+    time_column_data = config['time_series_output']['data_output'].split(',')
     time_column_names = config['time_series_output']['column_name'].split(',')
     time_column_units = config['time_series_output']['column_units'].split(',')
     time_column_format = config['time_series_output']['format']
 
     #pressure_column_data = config['time_series_output']['data_names'].split(',')
-    p_column_data = config['pressure_series_output']['data_output']
+    p_column_data = config['pressure_series_output']['data_output'].split(',')
     p_column_names = config['pressure_series_output']['column_name'].split(',')
     p_column_units = config['pressure_series_output']['column_units'].split(',')
     p_column_format = config['pressure_series_output']['format']
@@ -230,7 +230,7 @@ def main(argv):
 
     # Write time data to file
     depth = -999
-    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, qual_pseq_data, dopkg, pressure_seq_data)
+    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, p_column_data, qual_pseq_data, dopkg, pressure_seq_data)
 
     debugPrint('Done!')
 
