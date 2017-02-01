@@ -167,18 +167,44 @@ def mll_to_umolkg(o2ml, s, t, rho_func=IESRho):
 
 # Find nearest value to argument in array 
 # Return the index of that value
-def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, btl_data, time_p, time_t, time_s, time_dov):
+def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t_col, sal_col, dov_col, lat_col, lon_col, time_data):
     """find_iscopycnals 
         
+    p_btl_col:   Pressure column for bottle data 
+    t_btl_col:   Temperature column for bottle data 
+    sal_btl_col: Salinity column for bottle data 
+    dov_btl_col: Oxygen voltage column for bottle data 
+    lat_btl_col: Latitude bottle column for bottle data 
+    lon_btl_col: Longitude bottle column for bottle data 
+    btl_data:    Bottle data ndarray 
+    p_col:       Pressure column for bottle data 
+    t_col:       Temperature column for bottle data 
+    sal_col:     Salinity column for bottle data 
+    dov_col:     Oxygen voltage column for bottle data 
+    lat_col:     Latitude column for bottle data 
+    lon_col:     Longitude column for bottle data 
+    time_data:   Time data ndarray 
+
     """
-    # Argument for Isopycnal values to be better collected here
-    # This function is built on the model that SBE aligns arrays 
-    # by offset to P response time
+
+    time_sigma = []
+    #for i in range(0,len(time_data[p_col])): 
+   #CT = convert.CT_from_t(time_data[sal_col][i],time_data[t_col][i],time_data[p_col][i])
+   #SA = convert.SA_from_SP(time_data[sal_col][i],time_data[p_col][i],time_data[lon_col][i],time_data[lat_col][i])
+   #time_sigma.append(density.sigma0(SA,CT))
+    CT = convert.CT_from_t(time_data[sal_col],time_data[t_col],time_data[p_col])
+    SA = convert.SA_from_SP(time_data[sal_col],time_data[p_col],time_data[lon_col],time_data[lat_col])
+    time_sigma = density.sigma0(SA,CT)
+    print(time_sigma)
+
     for i in range(0,len(btl_data[p_btl_col])): 
-        ind_p = find_nearest(time_p, btl_data[p_btl_col][i])
-        btl_data[t_btl_col][i] = time_t[ind_p]
-        btl_data[sal_btl_col][i] = time_s[ind_p]
-        btl_data[dov_btl_col][i] = time_dov[ind_p]
+        CT = convert.CT_from_t(btl_data[sal_btl_col][i],btl_data[t_btl_col][i],btl_data[p_btl_col][i])
+        SA = convert.SA_from_SP(btl_data[sal_btl_col][i],btl_data[p_btl_col][i],btl_data[lon_btl_col][i],btl_data[lat_btl_col][i])
+        btl_sigma = density.sigma0(SA,CT)
+        indx = find_nearest(time_sigma, btl_sigma)
+        btl_data[t_btl_col][i] = time_data[t_col][indx]
+        btl_data[sal_btl_col][i] = time_data[sal_col][indx]
+        btl_data[dov_btl_col][i] = time_data[dov_col][indx]
     
     return btl_data
 
@@ -223,7 +249,7 @@ def find_temp_coef(refT, p, t):
     return coefs
 
 
-# Residual calculation 
+# Residual cgswalculation 
 def find_oxy_coef(o2pl, p, t, salt, dov, hexfilePath, xmlfilePath):    
     """fit_oxy fits CTD dissolved oxygen  
         

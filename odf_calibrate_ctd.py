@@ -105,10 +105,13 @@ def main(argv):
     sal_col = config['analytical_inputs']['salt']
     sal_btl_col = config['inputs']['salt']
     dov_col = config['inputs']['dov']
+    dov_btl_col = config['inputs']['dov']
     btl_sal_col = config['analytical_inputs']['btl_salt']
     timedate = config['analytical_inputs']['datetime']
     lat_col = config['analytical_inputs']['lat']
+    lat_btl_col = config['inputs']['lat']
     lon_col = config['analytical_inputs']['lon']
+    lon_btl_col = config['inputs']['lon']
     reft_col = config['inputs']['reft']
     btl_num_col = config['inputs']['btl_num']
     
@@ -202,7 +205,7 @@ def main(argv):
                 # Find Isopycnal Down Trace Bottle Trip Equivalent
                 # Need to add density (sigma_theta) driven component to this search
                 end = np.argmax(time_data[p_col])
-                down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_col, btl_data, time_data[p_col], time_data[t1_col], time_data[sal_col], time_data[dov_col])
+                down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t1_col, sal_col, dov_col, lat_col, lon_col, time_data)
 
                 for i in range(0,len(reft_btl[btl_num_col])):
                     j = reft_btl[btl_num_col][i] 
@@ -337,7 +340,7 @@ def main(argv):
                 # Find Isopycnal Down Trace Bottle Trip Equivalent
                 # Need to add density (sigma_theta) driven component to this search
                 end = np.argmax(time_data[p_col])
-                down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_col, btl_data, time_data[p_col], time_data[t1_col], time_data[sal_col], time_data[dov_col])
+                down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t1_col, sal_col, dov_col, lat_col, lon_col, time_data)
 
                 for i in range(0,len(cond_btl[btl_num_col])):
                     j = cond_btl[btl_num_col][i] 
