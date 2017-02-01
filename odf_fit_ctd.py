@@ -113,7 +113,9 @@ def main(argv):
     t_col = config['analytical_inputs']['t']
     t_btl_col = config['inputs']['t']
     t1_col = config['analytical_inputs']['t1']
+    t1_btl_col = config['inputs']['t1']
     t2_col = config['analytical_inputs']['t2']
+    t2_btl_col = config['inputs']['t2']
     c_col = config['analytical_inputs']['c']
     c1_col = config['analytical_inputs']['c1']
     c2_col = config['analytical_inputs']['c2']
@@ -130,7 +132,9 @@ def main(argv):
     fluor_col = config['analytical_inputs']['fluor']
     timedate = config['analytical_inputs']['datetime']
     lat_col = config['analytical_inputs']['lat']
+    lat_btl_col = config['inputs']['lat']
     lon_col = config['analytical_inputs']['lon']
+    lon_btl_col = config['inputs']['lon']
     reft_col = config['inputs']['reft']
     btl_num_col = config['inputs']['btl_num']
     
@@ -175,7 +179,7 @@ def main(argv):
     # Find Isopycnal Down Trace Bottle Trip Equivalent
     # Need to add density (sigma_theta) driven component to this search
     #end = np.argmax(time_data[p_col])
-    down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, btl_data, time_data[p_col], time_data[t_col], time_data[sal_col], time_data[dov_col])
+    down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t1_col, sal_col, dov_col, lat_col, lon_col, time_data) 
 
     if args.pressure:
         print('In -pres flag fit condition')
