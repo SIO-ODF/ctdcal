@@ -151,6 +151,7 @@ class SBEReader():
         #breaks down line according to columns specified by unpack_str and converts from hex to decimal MSB first
         #needs to be adjusted for LSB fields (NMEA time, scan time), break into two lines? move int(x,16) outside
         measurements = [line for line in struct.iter_unpack(unpack_str, the_bytes)]
+        print(string_order)
         measurements_2 = np.array([self._breakdown(line, string_order) for line in measurements])
 
         return measurements_2
