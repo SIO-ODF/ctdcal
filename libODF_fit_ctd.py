@@ -18,6 +18,7 @@ M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
 D = 1.42905481 #  /* density O2 g/l @ 0 C */
 
+
 def offset(offset, inArr):
     """offset column of data 
 
@@ -166,18 +167,44 @@ def mll_to_umolkg(o2ml, s, t, rho_func=IESRho):
 
 # Find nearest value to argument in array 
 # Return the index of that value
-def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, btl_data, time_p, time_t, time_s, time_dov):
+def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t_col, sal_col, dov_col, lat_col, lon_col, time_data):
     """find_iscopycnals 
         
+    p_btl_col:   Pressure column for bottle data 
+    t_btl_col:   Temperature column for bottle data 
+    sal_btl_col: Salinity column for bottle data 
+    dov_btl_col: Oxygen voltage column for bottle data 
+    lat_btl_col: Latitude bottle column for bottle data 
+    lon_btl_col: Longitude bottle column for bottle data 
+    btl_data:    Bottle data ndarray 
+    p_col:       Pressure column for bottle data 
+    t_col:       Temperature column for bottle data 
+    sal_col:     Salinity column for bottle data 
+    dov_col:     Oxygen voltage column for bottle data 
+    lat_col:     Latitude column for bottle data 
+    lon_col:     Longitude column for bottle data 
+    time_data:   Time data ndarray 
+
     """
-    # Argument for Isopycnal values to be better collected here
-    # This function is built on the model that SBE aligns arrays 
-    # by offset to P response time
+
+    time_sigma = []
+    #for i in range(0,len(time_data[p_col])): 
+   #CT = convert.CT_from_t(time_data[sal_col][i],time_data[t_col][i],time_data[p_col][i])
+   #SA = convert.SA_from_SP(time_data[sal_col][i],time_data[p_col][i],time_data[lon_col][i],time_data[lat_col][i])
+   #time_sigma.append(density.sigma0(SA,CT))
+    CT = convert.CT_from_t(time_data[sal_col],time_data[t_col],time_data[p_col])
+    SA = convert.SA_from_SP(time_data[sal_col],time_data[p_col],time_data[lon_col],time_data[lat_col])
+    time_sigma = density.sigma0(SA,CT)
+    print(time_sigma)
+
     for i in range(0,len(btl_data[p_btl_col])): 
-        ind_p = find_nearest(time_p, btl_data[p_btl_col][i])
-        btl_data[t_btl_col][i] = time_t[ind_p]
-        btl_data[sal_btl_col][i] = time_s[ind_p]
-        btl_data[dov_btl_col][i] = time_dov[ind_p]
+        CT = convert.CT_from_t(btl_data[sal_btl_col][i],btl_data[t_btl_col][i],btl_data[p_btl_col][i])
+        SA = convert.SA_from_SP(btl_data[sal_btl_col][i],btl_data[p_btl_col][i],btl_data[lon_btl_col][i],btl_data[lat_btl_col][i])
+        btl_sigma = density.sigma0(SA,CT)
+        indx = find_nearest(time_sigma, btl_sigma)
+        btl_data[t_btl_col][i] = time_data[t_col][indx]
+        btl_data[sal_btl_col][i] = time_data[sal_col][indx]
+        btl_data[dov_btl_col][i] = time_data[dov_col][indx]
     
     return btl_data
 
@@ -189,15 +216,40 @@ def find_nearest(yarr, val):
         
     """
     indx = (np.abs(yarr-val)).argmin()
-    #minarray = []
-    #for arg in yarr:
-    #    minarray.append(np.abs(arg - val)) # assumed float
-    #    value = min(minarray)
-    #    indx = minarray.index(value)
     return indx
 
 
 # Residual calculation 
+def find_cond_coef(cond_btl, p, t, cond):    
+    """find_temp_coef finds fitted temperature coefs 
+        
+    """
+
+    #C = [1, 1, 1, 1, 1] 
+    C = [0, 0, 0, 0, 0, 0, 0] 
+     
+    # Linear fit routine 
+    coefs, flag = leastsq(residual_Cond, C, args=(cond_btl,p,t,cond)) 
+
+    return coefs
+
+
+# Residual calculation 
+def find_temp_coef(refT, p, t):    
+    """find_temp_coef finds fitted temperature coefs 
+        
+    """
+
+    #C = [1, 1, 1, 1, 1] 
+    C = [0, 0, 0, 0, 0] 
+     
+    # Linear fit routine 
+    coefs, flag = leastsq(residual_Temp, C, args=(refT,p,t)) 
+
+    return coefs
+
+
+# Residual cgswalculation 
 def find_oxy_coef(o2pl, p, t, salt, dov, hexfilePath, xmlfilePath):    
     """fit_oxy fits CTD dissolved oxygen  
         
@@ -218,7 +270,7 @@ def find_oxy_coef(o2pl, p, t, salt, dov, hexfilePath, xmlfilePath):
     coef0 = [oxy_meta['sensor_info']['Soc'], oxy_meta['sensor_info']['offset'], oxy_meta['sensor_info']['A'], oxy_meta['sensor_info']['B'], oxy_meta['sensor_info']['C'], oxy_meta['sensor_info']['E']]
     oxy_data = oxy_dict(coef0, p, kelvin, t, salt, dov)
     # Non Linear fit routine 
-    coefs, flag = leastsq(residual, coef0, args=(o2pl.astype(float),p,kelvin,t,salt,dov)) 
+    coefs, flag = leastsq(residualO2, coef0, args=(o2pl.astype(float),p,kelvin,t,salt,dov)) 
 
     return coefs
 
@@ -259,7 +311,7 @@ def oxy_dict(calib, P, K, T, S, V):
 
 
 # Residual calculation 
-def residual(calib, o2pl, P, K, T, S, V):    
+def residualO2(calib, o2pl, P, K, T, S, V):    
     """residual weighted difference of dissolved oxygen bottle data
        vs dissolved oxygen CTD data. 
   
@@ -276,11 +328,112 @@ def residual(calib, o2pl, P, K, T, S, V):
     V is Voltage from instrument
     """
     weight = []
-    sig = 0.829
+    ctd_o2pl = oxy_dict(calib, P, K, T, S, V) 
+    sig = np.std(ctd_o2pl) 
+
+    # Least sq residual 
     for i in range(0, len(o2pl)):
         if o2pl[i] > 0:
             weight.append(scipy.sqrt((o2pl[i] - oxy_dict(calib, P[i], K[i], T[i], S[i], V[i]))**2/sig**2))
     return weight
+
+
+def residual_Cond(C, cond_btl, P, T, cond):    
+    """residual weighted difference of bottle salinity back calculated to 
+       conductivity with CTD conductivity
+  
+    This conversion is included for least squares fitting routine.
+        
+    The following are single or list/tuple:
+    C is coefficient array
+    cond is bottle salt back calculated 
+    P is pressure in decibars
+    T is temperature in Celcius
+    """
+    weight = []
+    sig = np.std(cond) 
+    for i in range(0, len(cond)):
+        weight.append(scipy.sqrt((cond_btl[i] - conductivity_pressure_polyfit(C, P[i], T[i], cond[i]))**2/sig**2))
+    return weight
+
+
+def residual_Temp(C, refT, P, T):    
+    """residual weighted difference of sbe35 reference temperature 
+       vs sbe3+ temperature data
+  
+    This conversion is included for least squares fitting routine.
+        
+    The following are single or list/tuple:
+    C is coefficient array
+    refT is dissolved oxygen winkler titrated data
+    P is pressure in decibars
+    T is temperature in Celcius
+    """
+    weight = []
+    sig = np.std(T) 
+    for i in range(0, len(refT)):
+        weight.append(scipy.sqrt((refT[i] - temperature_pressure_polyfit(C, P[i], T[i]))**2/sig**2))
+    return weight
+
+
+def conductivity_pressure_polyfit(C, P, T, cond): 
+    """Polynomial used to fit conductivity data with pressure effect.
+
+    The following are single or list/tuple:
+    C is starting estimate for coefficients 
+    P is pressure in decibars
+    T is temperature in Celcius
+    cond is conductivity in mS/cm
+
+    Original equation from ... 
+    Conductivity mS/cm = cond + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4 * cond^2 + C5 * cond + C6 
+
+    Another time based fit must be run at the end of cruise to account for time dependent drift.
+
+    """
+    #array mode
+    c_arr = []
+    try:
+        for P_x, T_x, cond_x in zip(P, T, cond): 
+            #print(T_x)
+            tmp = cond_x + C[0] * math.pow(P_x,2) + C[1] * P_x + C[2] * math.pow(T_x,2) + C[3] * T_x + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
+            tmp = round(tmp,4)
+            c_arr.append(tmp)
+    #Single mode.
+    except:
+        tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond,2) + C[5] * cond + C[6]
+        c_arr = round(tmp,4)
+    return c_arr   
+
+
+def temperature_pressure_polyfit(C, P, T): 
+    """Polynomial used to fit temperature data with pressure effect.
+
+    The following are single or list/tuple:
+    C is starting estimate for coefficients 
+    P is pressure in decibars
+    T is temperature in Celcius
+
+    Original equation from ... 
+    Temperature degC ITS-90 = T + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4 
+
+    Another time based fit must be run at the end of cruise to account for time dependent drift.
+
+    """
+    #array mode
+    t_arr = []
+    try:
+        for P_x, T_x in zip(P, T): 
+            #print(T_x)
+            tmp = T_x + C[0] * math.pow(P_x,2) + C[1] * P_x + C[2] * math.pow(T_x,2) + C[3] * T_x + C[4]
+            tmp = round(tmp,4)
+            t_arr.append(tmp)
+    #Single mode.
+    except:
+        tmp = T + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4]
+        t_arr = round(tmp,4)
+    return t_arr   
+
 
 #def H2odVdT(v1, t1):
 #    return (v1*rho_t(t1)/rho_t(20))
@@ -361,6 +514,54 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
                 o2kg['BTLNUM'][bottle-1] = btl_counter 
 #           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
     return o2kg, o2ml
+
+
+def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
+#    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
+
+    salt_file_name = os.path.basename(saltpath)
+    salt_sta = int(salt_file_name[0:3])
+    salt_cst = int(salt_file_name[3:5])
+
+    btl_num = btl_data[btl_num_col].astype(int) 
+    
+    psu = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('SALNTY',np.float)])
+    mspcm = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('BTLCOND',np.float)])
+    tmp_tmp = np.zeros(len(btl_num), dtype=np.float)
+    tmp_p = np.zeros(len(btl_num), dtype=np.float)
+
+    with open(saltpath, 'r') as f:
+        params = next(f).strip().split()
+        #std   = float(params[8])
+
+        params = next(f).strip().split()
+        worm1   = float(params[4])
+
+        #btl_counter = 0
+        for l in f:
+            row = l.split()
+            station = int(row[0])
+            cast = int(row[1])
+            if (station == salt_sta) and (cast == salt_cst):
+                if (row[5] == 'worm'):
+                    worm2 = float(row[4])
+                else: 
+                   bottle = int(row[5])
+                   cond = float(row[4])
+
+                if bottle in btl_num:
+                    i = int(np.where(btl_num == bottle)[0][0])
+                    j = int(np.where(btl_data[btl_num_col] == bottle)[0][0])
+                    tmp_tmp[j] = btl_data[btl_tmp_col][j]
+                    tmp_p[j] = btl_data[btl_p_col][j]
+                    psu[btl_num_col][i] = int(bottle)
+                    mspcm[btl_num_col][i] = int(bottle)
+                    psu['SALNTY'][i] = cond / 2.0 
+
+        psu['SALNTY'] = gsw.SP_salinometer(psu['SALNTY'], tmp_tmp)
+        mspcm['BTLCOND'] = gsw.C_from_SP(psu['SALNTY'], tmp_tmp, tmp_p)
+#           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
+    return mspcm, psu
 #
 #            key = (station, cast, bottle, "o2")
 #            if key in qual:

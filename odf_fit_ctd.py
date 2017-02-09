@@ -9,8 +9,9 @@ import libODF_process_ctd as process_ctd
 import libODF_report_ctd as report_ctd
 import libODF_fit_ctd as fit_ctd
 import configparser
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from scipy.optimize import leastsq
+import gsw
 
 DEBUG = False
 
@@ -55,6 +56,15 @@ def main(argv):
 
     # debug messages
     parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
+
+    # raw output
+    parser.add_argument('-pres', '--pressure', action='store_true', help='Fit pressure data')
+
+    # raw output
+    parser.add_argument('-temp', '--temperature', action='store_true', help='Fit temperture data')
+
+    # raw output
+    parser.add_argument('-cond', '--conductivity', action='store_true', help='Fit conductivity data')
 
     # raw output
     parser.add_argument('-oxy', '--oxygen', type=argparse.FileType('r'), help='return the oxygen data file')
@@ -103,8 +113,9 @@ def main(argv):
     t_col = config['analytical_inputs']['t']
     t_btl_col = config['inputs']['t']
     t1_col = config['analytical_inputs']['t1']
+    t1_btl_col = config['inputs']['t1']
     t2_col = config['analytical_inputs']['t2']
-    reft_col = config['analytical_inputs']['reft']
+    t2_btl_col = config['inputs']['t2']
     c_col = config['analytical_inputs']['c']
     c1_col = config['analytical_inputs']['c1']
     c2_col = config['analytical_inputs']['c2']
@@ -114,13 +125,17 @@ def main(argv):
     dov_col = config['analytical_inputs']['dov']
     dov_btl_col = config['inputs']['dov']
     dopl_col = config['analytical_inputs']['dopl']
+    dopl_btl_col = config['inputs']['dopl']
     dopkg_col = config['analytical_inputs']['dopkg']
     btl_oxy_col = config['analytical_inputs']['btl_oxy']
     xmis_col = config['analytical_inputs']['xmis']
     fluor_col = config['analytical_inputs']['fluor']
     timedate = config['analytical_inputs']['datetime']
     lat_col = config['analytical_inputs']['lat']
+    lat_btl_col = config['inputs']['lat']
     lon_col = config['analytical_inputs']['lon']
+    lon_btl_col = config['inputs']['lon']
+    reft_col = config['inputs']['reft']
     btl_num_col = config['inputs']['btl_num']
     
     #time_column_data = config['time_series_output']['data_names'].split(',')
@@ -137,18 +152,13 @@ def main(argv):
     p_column_qual = config['pressure_series_output']['qual_columns'].split(',')
     p_column_one = list(config['pressure_series_output']['q1_columns'].split(','))
 
-    xmlfileName = str(filename_base + '.' + XML_EXT)
-    xmlfilePath = os.path.join(raw_directory, xmlfileName)
-
     hexfileName = str(filename_base + '.' + HEX_EXT)
     hexfilePath = os.path.join(raw_directory, hexfileName)
 
+    xmlfileName = str(filename_base + '.' + XML_EXT)
     xmlfilePath = os.path.join(raw_directory, xmlfileName)
 
-    timefileName = str(filename_base + TIME_SUFFIX + '.' + FILE_EXT)
-    timefilePath = os.path.join(time_directory, timefileName)
-
-    outtimefileName = str(filename_base + FIT_SUFFIX + '.' + FILE_EXT)
+    outtimefileName = str(filename_base + TIME_SUFFIX + '.' + FILE_EXT)
     outtimefilePath = os.path.join(time_directory, outtimefileName)
 
     pressfileName = str(filename_base + FIT_SUFFIX + '.' + FILE_EXT)
@@ -157,49 +167,139 @@ def main(argv):
     btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
     btlfilePath = os.path.join(btl_directory, btlfileName)
 
-    logfileName = str('cast_details' + '.' + FILE_EXT)
-    logfilePath = os.path.join(log_directory, logfileName)
-
     # Get bottle data
     btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',0)
     btl_data = btl_data[:][1:]
 
-    # Get Analytical Oxygen data
-    o2pkg_btl, o2pl_btl = fit_ctd.o2_calc(o2flask_file,args.oxygen.name,btl_data[btl_num_col],btl_data[sal_btl_col])
-    
     # Get procesed time data 
-    time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
-    #end = np.argmax(time_data[p_col])
-    time_data = time_data[:][1:]
-
-    # Non Linear Fit Routine 
-    oxy_coef = fit_ctd.find_oxy_coef(o2pl_btl['OXYGEN'], btl_data[p_btl_col], btl_data[t_btl_col], btl_data[sal_btl_col], btl_data[dov_btl_col], hexfilePath, xmlfilePath)
-
-    kelvin = []
-    for i in range(0,len(time_data[t_col])):
-        kelvin.append(time_data[t_col][i] + 273.15)
+    time_data = process_ctd.dataToNDarray(args.timeFile,float,True,',',1)
+    end = np.argmax(time_data[p_col][1:])
+    time_data = time_data[:][1:end]
 
     # Find Isopycnal Down Trace Bottle Trip Equivalent
-    end = np.argmax(time_data[p_col])
-    down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, btl_data, time_data[p_col], time_data[t_col], time_data[sal_col], time_data[dov_col])
+    # Need to add density (sigma_theta) driven component to this search
+    #end = np.argmax(time_data[p_col])
+    down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t1_col, sal_col, dov_col, lat_col, lon_col, time_data) 
 
-    # Fit Oxygen Data
-    oxy_coef = fit_ctd.find_oxy_coef(o2pl_btl['OXYGEN'], down_trace_btl[p_btl_col], down_trace_btl[t_btl_col], down_trace_btl[sal_btl_col], down_trace_btl[dov_btl_col], hexfilePath, xmlfilePath)
+    if args.pressure:
+        print('In -pres flag fit condition')
+        print(filename_base)
+        pfileName = str('poffset' + '.' + FILE_EXT)
+        pfilePath = os.path.join(log_directory, pfileName)
+        poff_data = process_ctd.dataToNDarray(pfilePath,str,None,',',None)
 
-    # Convert CTD Oxygen Voltage Data with New DO Coef
-    time_data[dopl_col] = fit_ctd.oxy_dict(oxy_coef, time_data[p_col], kelvin, time_data[t_col], time_data[sal_col], time_data[dov_col])
+        for line in poff_data:
+            if filename_base in line[0]:
+                for val in line:
+                    if 'offset' in val:
+                        offset = float(str.split(val, ':')[1])
+            continue
+
+        # Pressure offset  
+        time_data[p_col] = fit_ctd.offset(offset, time_data[p_col])
+        # End pressure if condition 
+
+    if args.temperature:
+        print('In -temp flag fit condition')
+        print(filename_base)
+        coef1 = []
+        coef2 = []
+        # Get descrete ref temp data 
+        t1fileName = str('fitting_t1' + '.' + FILE_EXT)
+        t1filePath = os.path.join(log_directory, t1fileName)
+        t1_coef = process_ctd.dataToNDarray(t1filePath,str,None,',',None)
+
+        for line in t1_coef:
+            if filename_base in line[0]:
+                val = line[1:]
+                for i in range(0,len(val)):
+                    if 'coef' in val[i]:
+                        coef1.append(float(str.split(val[i], ':')[1]))
+                    else:
+                        coef1.append(float(val[i]))
+            continue
+        time_data[t1_col] = fit_ctd.temperature_pressure_polyfit(coef1, time_data[p_col], time_data[t1_col])
+
+        t2fileName = str('fitting_t2' + '.' + FILE_EXT)
+        t2filePath = os.path.join(log_directory, t2fileName)
+        t2_coef = process_ctd.dataToNDarray(t2filePath,str,None,',',None)
+
+        for line in t2_coef:
+            if filename_base in line[0]:
+                val = line[1:]
+                for i in range(0,len(val)):
+                    if 'coef' in val[i]:
+                        coef2.append(float(str.split(val[i], ':')[1]))
+                    else:
+                        coef2.append(float(val[i]))
+            continue
+        time_data[t2_col] = fit_ctd.temperature_pressure_polyfit(coef2, time_data[p_col], time_data[t2_col])
+
+    if args.conductivity:
+        print('In -cond flag fit condition')
+        print(filename_base)
+        coef1 = []
+        coef2 = []
+        # Get descrete ref temp data 
+        c1fileName = str('fitting_c1' + '.' + FILE_EXT)
+        c1filePath = os.path.join(log_directory, c1fileName)
+        c1_coef = process_ctd.dataToNDarray(c1filePath,str,None,',',None)
+
+        for line in c1_coef:
+            if filename_base in line[0]:
+                val = line[1:]
+                for i in range(0,len(val)):
+                    if 'coef' in val[i]:
+                        coef1.append(float(str.split(val[i], ':')[1]))
+                    else:
+                        coef1.append(float(val[i]))
+            continue
+        time_data[c1_col] = fit_ctd.temperature_pressure_polyfit(coef1, time_data[p_col], time_data[c1_col])
+
+        c2fileName = str('fitting_c2' + '.' + FILE_EXT)
+        c2filePath = os.path.join(log_directory, c2fileName)
+        c2_coef = process_ctd.dataToNDarray(c2filePath,str,None,',',None)
+
+        for line in c2_coef:
+            if filename_base in line[0]:
+                val = line[1:]
+                for i in range(0,len(val)):
+                    if 'coef' in val[i]:
+                        coef2.append(float(str.split(val[i], ':')[1]))
+                    else:
+                        coef2.append(float(val[i]))
+            continue
+        time_data[c2_col] = fit_ctd.temperature_pressure_polyfit(coef2, time_data[p_col], time_data[c2_col])
+        
+        time_data[sal_col] = gsw.SP_from_C(time_data[c_col],time_data[t_col],time_data[p_col])
+
+    if args.oxygen:
+        print('In -oxy flag fit condition')
+        print(filename_base)
+        # Get Analytical Oxygen data
+        o2pkg_btl, o2pl_btl = fit_ctd.o2_calc(o2flask_file,args.oxygen.name,btl_data[btl_num_col],btl_data[sal_btl_col])
+    
+        kelvin = []
+        for i in range(0,len(time_data[t_col])):
+            kelvin.append(time_data[t_col][i] + 273.15)
+
+        # Find New Oxygen Coef
+        oxy_coef = fit_ctd.find_oxy_coef(o2pl_btl['OXYGEN'], down_trace_btl[p_btl_col], down_trace_btl[t_btl_col], down_trace_btl[sal_btl_col], down_trace_btl[dov_btl_col], hexfilePath, xmlfilePath)
+
+        # Find weight for reporting
+        weights = fit_ctd.residualO2(oxy_coef, o2pl_btl['OXYGEN'], down_trace_btl[p_btl_col], kelvin, time_data[t_col], time_data[sal_col], time_data[dov_col])
+        print(weights)
+         
+        # Convert CTD Oxygen Voltage Data with New DO Coef
+        time_data[dopl_col] = fit_ctd.oxy_dict(oxy_coef, time_data[p_col], kelvin, time_data[t_col], time_data[sal_col], time_data[dov_col])
+        # End oxygen flag fitting if condition
+
 
     # Write time data to file
-    report_ctd.report_time_series_data(filename_base + FIT_SUFFIX, time_directory, expocode, time_column_names, time_column_units, time_column_names, time_column_format, time_data)
+    report_ctd.report_time_series_data(filename_base, time_directory, expocode, time_column_names, time_column_units, time_column_names, time_column_format, time_data)
 
     # Pressure Sequence
     pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, timedate, 2.0, -1.0, 0.0, 'down', int(sample_rate), int(search_time), time_data)
-
-    #kelvin = []
-    #for i in range(0,len(pressure_seq_data[t_col])):
-    #    kelvin.append(pressure_seq_data[t_col][i] + 273.15)
-
-    #pressure_seq_data[dopl_col] = fit_ctd.oxy_dict(oxy_coef, pressure_seq_data[p_col], kelvin, pressure_seq_data[t_col], pressure_seq_data[sal_col], pressure_seq_data[dov_col])
 
     # Convert dissolved oxygen from ml/l to umol/kg
     dopkg = process_ctd.o2pl2pkg(p_col, t1_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, pressure_seq_data)
@@ -208,27 +308,34 @@ def main(argv):
     qual_pseq_data = process_ctd.ctd_quality_codes(dopkg_col, None, None, True, p_column_qual, p_column_one, pressure_seq_data)
 
     # Collect Cast Details from Log
+    logfileName = str('cast_details' + '.' + FILE_EXT)
+    logfilePath = os.path.join(log_directory, logfileName)
+
     cast_details = process_ctd.dataToNDarray(logfilePath,str,None,',',0)
     for line in cast_details:
         if filename_base in line[0]:
             for val in line:
-                if 'at_depth' in val: btime = str.split(val, ':')
-                if 'latitude' in val: btm_lat = str.split(val, ':')
-                if 'longitude' in val: btm_lon = str.split(val, ':')
-                if 'altimeter_bottom' in val: btm_alt = str.split(val, ':')
+                if 'at_depth' in val: btime = float(str.split(val, ':')[1])
+                if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
+                if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
+                if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
             break
 
     # Write time data to file
     depth = -999
-    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, float(btime[1]), float(btm_lat[1]), float(btm_lon[1]), depth, float(btm_alt[1]), ctd, pressure_directory, p_column_names, p_column_units, p_column_data, qual_pseq_data, dopkg, pressure_seq_data)
+    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, p_column_data, qual_pseq_data, dopkg, pressure_seq_data)
 
+    #plt.plot(o2pl_btl['OXYGEN'], btl_data[p_btl_col], color='b', marker='o')
+    #plt.plot(tmpo2, time_data[p_col], color='g', label='raw')
     #plt.plot(time_data[dopl_col], time_data[p_col], color='b', label='raw')
-    plt.plot(pressure_seq_data[dopl_col], pressure_seq_data[p_col], color='r', label='raw')
-    plt.plot(o2pl_btl['OXYGEN'], btl_data[p_btl_col], color='g', marker='o', label='raw')
+    #plt.plot(pressure_seq_data[dopl_col], pressure_seq_data[p_col], color='r', label='raw')
+    #plt.plot(pressure_seq_data[t2_col], pressure_seq_data[p_col], color='r', label='raw')
+    #plt.plot(btl_data[t_btl_col], time_data[p_col], color='r', label='raw')
+    #plt.plot(o2pl_btl['OXYGEN'], btl_data[p_btl_col], color='g', marker='o', label='raw')
     #plt.plot(pressure_seq_data[do_col], pressure_seq_data[p_col], color='b', label='raw')
-    plt.gca().invert_yaxis()
-    plt.axis()
-    plt.show()
+    #plt.gca().invert_yaxis()
+    #plt.axis()
+    #plt.show()
 
     debugPrint('Done!')
 

@@ -13,7 +13,6 @@ Edit the following sections of the configuration file
 - [time_series_output] Should not need to edit this section; maintains time series column headers.
 - [pressure_series_output] Should not need to edit this section; maintains pressure series column headers.
 
-
 # Process CTD Data
 For preliminary processing run the following command on each raw data file. The file base name should be ssscc.{hex,XMLCON} (s Ð station, c - cast).
 
@@ -24,9 +23,36 @@ For preliminary processing run the following command on each raw data file. The 
 
 ./odf_process_bottle.py data/converted/ssscc_cnv.csv -o data/bottle/
 
+# Fit Pressure data
+./odf_calibrate_ctd.py data/bottle/ctd.py ssscc-ssscc -press
+
+This averages the ondeck pressure reading for the selected group of station casts and outputs the resulting suggested offset to a log file.
+
+./odf_fit_ctd.py data/time/ssscc_time.py ¿press
+
+This reads the log file and applies appropriate offset to selected file.
+
+# Fit Temperature data
+./odf_calibrate_ctd.py data/bottle/ctd.py ssscc-ssscc -temp
+
+This process reads sbe35 data for selected station casts and compares with ctd bottle data. The residual differences are optimized through a polyfit routine and an optimal set of coefficients are recorded in a log file for each station cast.
+
+./odf_fit_ctd.py data/time/ssscc_time.py -temp
+
+This reads the log file and applies appropriate coefficients to selected file.
+
+# Fit Conductivity data:
+./odf_calibrate_ctd.py data/bottle/ctd.py ssscc-ssscc -cond
+
+This process reads bottle salinity data for selected station casts and compares with ctd bottle data. The residual differences are optimized through a polyfit routine and an optimal set of coefficients are recorded in a log file for each station cast.
+
+./odf_fit_ctd.py data/time/ssscc_time.py ¿cond
+
+This reads the log file and applies appropriate coefficients to selected file.
+
 # Fit Oxygen Data
 Dissolved oxygen analytical data files need to be accessible command line and the path defined in the data/ini-files/configuration.ini file. The o2flask file needs to be in the same directory.
 
-Same file base name pattern. '-oxy' flag fits DO data from the path file following the flag.    
+Same file base name pattern. '-oxy' flag fits DO data from the path file following the flag.
 
 ./odf_fit_ctd.py data/time/ssscc_time.csv -oxy data/oxygen/ssscc

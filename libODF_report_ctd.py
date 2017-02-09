@@ -27,6 +27,55 @@ def report_pressure_details(stacast, log_file, start, end):
     outfile.write("stacast:%s, ondeck_start_p:%s, ondeck_end_p:%s\n" % (stacast, start, end))
     return
 
+
+def report_polyfit(coef, stacast_list, fitfile):
+    """report_polyfit
+
+    Function takes deck pressure offset and stores them for later fitting 
+
+    Args:
+        p_off_file (str): path to file 
+
+    Prints formatted csv file. 
+
+    Returns:
+        No return
+    """
+    outfile = open(fitfile, 'a')
+    coefTostr = ', '.join(map(str, coef))
+
+    try: 
+        for stacast in stacast_list:
+            outfile.write("stacast:%s, coef:%s\n" % (stacast, coefTostr))
+    except: 
+        outfile.write("stacast:%s, coef:%s\n" % (stacast_list, coefTostr))
+    return
+
+
+def report_pressure_offset(p_off_file, p_offset, stacast_list):
+    """report_pressure_offset function 
+
+    Function takes deck pressure offset and stores them for later fitting 
+
+    Args:
+        p_off_file (str): path to file 
+        p_offset (float): offset to apply to specific station cast 
+        stacast (str): station cast for later file reference 
+
+    Prints formatted csv file. 
+
+    Returns:
+        No return
+    """
+    outfile = open(p_off_file, 'a')
+    try: 
+        for stacast in stacast_list:
+            outfile.write("stacast:%s, offset:%9.4f\n" % (stacast, p_offset))
+    except: 
+        outfile.write("stacast:%s, offset:%9.4f\n" % (stacast_list, p_offset))
+    return
+
+
 def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p, b_alt, b_lat, b_lon):
     """report_cast_details function 
 
