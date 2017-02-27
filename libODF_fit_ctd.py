@@ -164,7 +164,6 @@ def mll_to_umolkg(o2ml, s, t, rho_func=IESRho):
     o2kg = o2ml / ((M/D * 0.001) * rho_func(s, t, 0)/1000)
     return o2kg
 
-
 # Find nearest value to argument in array 
 # Return the index of that value
 def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t_col, sal_col, dov_col, lat_col, lon_col, time_data):
@@ -188,23 +187,38 @@ def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, lat_btl_col,
     """
 
     time_sigma = []
-    #for i in range(0,len(time_data[p_col])): 
-   #CT = convert.CT_from_t(time_data[sal_col][i],time_data[t_col][i],time_data[p_col][i])
-   #SA = convert.SA_from_SP(time_data[sal_col][i],time_data[p_col][i],time_data[lon_col][i],time_data[lat_col][i])
-   #time_sigma.append(density.sigma0(SA,CT))
     CT = convert.CT_from_t(time_data[sal_col],time_data[t_col],time_data[p_col])
     SA = convert.SA_from_SP(time_data[sal_col],time_data[p_col],time_data[lon_col],time_data[lat_col])
     time_sigma = density.sigma0(SA,CT)
-    print(time_sigma)
 
+    # Pressure-bounded isopycnal search. 
+    # Based on maximum decent rate and package size.
     for i in range(0,len(btl_data[p_btl_col])): 
         CT = convert.CT_from_t(btl_data[sal_btl_col][i],btl_data[t_btl_col][i],btl_data[p_btl_col][i])
         SA = convert.SA_from_SP(btl_data[sal_btl_col][i],btl_data[p_btl_col][i],btl_data[lon_btl_col][i],btl_data[lat_btl_col][i])
         btl_sigma = density.sigma0(SA,CT)
-        indx = find_nearest(time_sigma, btl_sigma)
-        btl_data[t_btl_col][i] = time_data[t_col][indx]
-        btl_data[sal_btl_col][i] = time_data[sal_col][indx]
-        btl_data[dov_btl_col][i] = time_data[dov_col][indx]
+        p_indx = find_nearest(time_data[p_col], btl_data[p_btl_col][i])
+        indx = find_nearest(time_sigma[p_indx-int(24*1.5):p_indx+int(24*1.5)], btl_sigma)
+
+        #print('Bottle:')
+        #print('Sigma: '+str(btl_sigma))
+        #print('Pres: '+str(btl_data[p_btl_col][i]))
+        #print('Temp: '+str(btl_data[t_btl_col][i]))
+        #print('Salt: '+str(btl_data[sal_btl_col][i]))
+        #print('Pressure: '+str(p_indx)+' '+str(indx+p_indx))
+        #print('Sigma: '+str(time_sigma[indx+p_indx]))
+        #print('Pres: '+str(time_data[p_col][indx+p_indx]))
+        #print('Temp: '+str(time_data[t_col][indx+p_indx]))
+        #print('Salt: '+str(time_data[sal_col][indx+p_indx]))
+
+        if indx+p_indx > len(time_sigma):
+            btl_data[t_btl_col][i] = time_data[t_col][len(time_data)-1]
+            btl_data[sal_btl_col][i] = time_data[sal_col][len(time_data)-1]
+            btl_data[dov_btl_col][i] = time_data[dov_col][len(time_data)-1]
+        else:
+            btl_data[t_btl_col][i] = time_data[t_col][indx+p_indx]
+            btl_data[sal_btl_col][i] = time_data[sal_col][indx+p_indx]
+            btl_data[dov_btl_col][i] = time_data[dov_col][indx+p_indx]
     
     return btl_data
 
@@ -220,36 +234,14 @@ def find_nearest(yarr, val):
 
 
 # Residual calculation 
-def find_cond_coef(cond_btl, p, t, cond):    
-    """find_temp_coef finds fitted temperature coefs 
+def calibration(independent_arr, dependent_diff_arr, order):    
+    """calibration
         
     """
-
-    #C = [1, 1, 1, 1, 1] 
-    C = [0, 0, 0, 0, 0, 0, 0] 
-     
-    # Linear fit routine 
-    coefs, flag = leastsq(residual_Cond, C, args=(cond_btl,p,t,cond)) 
-
-    return coefs
+    return np.polyfit(independent_arr, dependent_diff_arr, order)
 
 
-# Residual calculation 
-def find_temp_coef(refT, p, t):    
-    """find_temp_coef finds fitted temperature coefs 
-        
-    """
-
-    #C = [1, 1, 1, 1, 1] 
-    C = [0, 0, 0, 0, 0] 
-     
-    # Linear fit routine 
-    coefs, flag = leastsq(residual_Temp, C, args=(refT,p,t)) 
-
-    return coefs
-
-
-# Residual cgswalculation 
+# Oxygen Coef 
 def find_oxy_coef(o2pl, p, t, salt, dov, hexfilePath, xmlfilePath):    
     """fit_oxy fits CTD dissolved oxygen  
         
@@ -338,47 +330,8 @@ def residualO2(calib, o2pl, P, K, T, S, V):
     return weight
 
 
-def residual_Cond(C, cond_btl, P, T, cond):    
-    """residual weighted difference of bottle salinity back calculated to 
-       conductivity with CTD conductivity
-  
-    This conversion is included for least squares fitting routine.
-        
-    The following are single or list/tuple:
-    C is coefficient array
-    cond is bottle salt back calculated 
-    P is pressure in decibars
-    T is temperature in Celcius
-    """
-    weight = []
-    sig = np.std(cond) 
-    for i in range(0, len(cond)):
-        weight.append(scipy.sqrt((cond_btl[i] - conductivity_pressure_polyfit(C, P[i], T[i], cond[i]))**2/sig**2))
-    return weight
-
-
-def residual_Temp(C, refT, P, T):    
-    """residual weighted difference of sbe35 reference temperature 
-       vs sbe3+ temperature data
-  
-    This conversion is included for least squares fitting routine.
-        
-    The following are single or list/tuple:
-    C is coefficient array
-    refT is dissolved oxygen winkler titrated data
-    P is pressure in decibars
-    T is temperature in Celcius
-    """
-    weight = []
-    sig = np.std(T) 
-    for i in range(0, len(refT)):
-        weight.append(scipy.sqrt((refT[i] - temperature_pressure_polyfit(C, P[i], T[i]))**2/sig**2))
-    return weight
-
-
-def conductivity_pressure_polyfit(C, P, T, cond): 
+def conductivity_polyfit(C, P, T, cond): 
     """Polynomial used to fit conductivity data with pressure effect.
-
     The following are single or list/tuple:
     C is starting estimate for coefficients 
     P is pressure in decibars
@@ -391,25 +344,24 @@ def conductivity_pressure_polyfit(C, P, T, cond):
     Another time based fit must be run at the end of cruise to account for time dependent drift.
 
     """
-    #array mode
-    c_arr = []
     try:
+        c_arr = []
         for P_x, T_x, cond_x in zip(P, T, cond): 
-            #print(T_x)
             tmp = cond_x + C[0] * math.pow(P_x,2) + C[1] * P_x + C[2] * math.pow(T_x,2) + C[3] * T_x + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
-            tmp = round(tmp,4)
-            c_arr.append(tmp)
+            c_arr.append(round(tmp,4))
     #Single mode.
     except:
-        tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond,2) + C[5] * cond + C[6]
+        tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
         c_arr = round(tmp,4)
+
     return c_arr   
 
 
-def temperature_pressure_polyfit(C, P, T): 
-    """Polynomial used to fit temperature data with pressure effect.
+def temperature_polyfit(C, P, T): 
+    """Polynomial used to fit data with pressure effect.
 
     The following are single or list/tuple:
+    fit declares fit type 
     C is starting estimate for coefficients 
     P is pressure in decibars
     T is temperature in Celcius
@@ -420,24 +372,19 @@ def temperature_pressure_polyfit(C, P, T):
     Another time based fit must be run at the end of cruise to account for time dependent drift.
 
     """
-    #array mode
-    t_arr = []
     try:
+        t_arr = []
         for P_x, T_x in zip(P, T): 
-            #print(T_x)
             tmp = T_x + C[0] * math.pow(P_x,2) + C[1] * P_x + C[2] * math.pow(T_x,2) + C[3] * T_x + C[4]
-            tmp = round(tmp,4)
-            t_arr.append(tmp)
-    #Single mode.
+            t_arr.append(round(tmp,4))
+       #Single mode.
     except:
         tmp = T + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4]
         t_arr = round(tmp,4)
+
     return t_arr   
 
 
-#def H2odVdT(v1, t1):
-#    return (v1*rho_t(t1)/rho_t(20))
-#
 #def load_qual(path):
 #    comment_dict = {}
 #    with open(path) as f:

@@ -41,7 +41,7 @@ def report_polyfit(coef, stacast_list, fitfile):
     Returns:
         No return
     """
-    outfile = open(fitfile, 'a')
+    outfile = open(fitfile, 'w+')
     coefTostr = ', '.join(map(str, coef))
 
     try: 
@@ -106,6 +106,60 @@ def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p, b_a
 
     return
 
+
+def report_quality_flags(qual_file, stacast, btl, pres, param, d1, d2, d12):
+    """report_quality flags
+
+    Prints formatted csv file. 
+
+    Returns:
+        No return
+    """
+    #print(stacast+' '+str(btl)+' '+param+' '+str(pres)+' '+str(d1)+' '+str(d2)+' '+str(d12))
+    outfile = open(qual_file, "a")
+    outfile.write("stacast: %s, bottle: %s, parameter: %s, pressure: %8.3f, flag: 3, Primary Diff: %f, Secondary Diff: %f, P-S: %f\n" % (stacast, str(btl), param, pres, d1, d2, d12))
+    outfile.close()
+
+    return
+
+
+def report_btl_data(btl_file, btl_dtype, btl_data):
+    """report_btl_data function 
+
+    Args:
+        btl_file (str): file path 
+        btl_dtype (dtype): list  
+        btl_data (ndarray):input data ndarray.  
+
+    Prints formatted csv file. 
+
+    Returns:
+        No return
+    """
+    dtype_list = btl_data.dtype.names
+
+    if btl_data is None:
+        print("In report_btl_data: No data array.")
+        return
+    else:  
+        outfile = open(btl_file, "w+")
+
+        # Print out headers
+        outfile.write("%s" % (dtype_list[0]))
+        for i in range(1, len(dtype_list)):
+            outfile.write(",%s" % (dtype_list[i]))
+        outfile.write('\n'+btl_dtype+'\n')
+
+        # Print out data
+        for i in range(0,len(btl_data)):
+            outfile.write("%s" % (btl_data[dtype_list[0]][i]))
+            for j in range(1, len(dtype_list)):
+                outfile.write(",%s" % (btl_data[dtype_list[j]][i]))
+            outfile.write('\n')
+
+    return
+
+
 def report_time_series_data(stacast, printdir, expocode, column_names, column_units, column_data, column_format, inMat=None):
     """report_time_series_data function 
 
@@ -150,7 +204,7 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
         # Other attemps to import formats from config file 
         # or use savetxt and csv have been buggy so far
         for i in range(0,len(inMat)-1):
-            outfile.write('%8.1f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%12d,%10.5f,%10.5f\n' % (inMat[column_data[0]][i], inMat[column_data[1]][i], inMat[column_data[2]][i], inMat[column_data[3]][i], inMat[column_data[4]][i], inMat[column_data[5]][i], inMat[column_data[6]][i], inMat[column_data[7]][i], inMat[column_data[8]][i], inMat[column_data[9]][i], inMat[column_data[10]][i], inMat[column_data[11]][i], inMat[column_data[12]][i]))
+            outfile.write('%9.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%12d,%10.5f,%10.5f\n' % (inMat[column_data[0]][i], inMat[column_data[1]][i], inMat[column_data[2]][i], inMat[column_data[3]][i], inMat[column_data[4]][i], inMat[column_data[5]][i], inMat[column_data[6]][i], inMat[column_data[7]][i], inMat[column_data[8]][i], inMat[column_data[9]][i], inMat[column_data[10]][i], inMat[column_data[11]][i], inMat[column_data[12]][i]))
 
     return
 

@@ -24,7 +24,7 @@ For preliminary processing run the following command on each raw data file. The 
 ./odf_process_bottle.py data/converted/ssscc_cnv.csv -o data/bottle/
 
 # Fit Pressure data
-./odf_calibrate_ctd.py data/bottle/ctd.py ssscc-ssscc -press
+./odf_calibrate_ctd.py ssscc-ssscc -press
 
 This averages the ondeck pressure reading for the selected group of station casts and outputs the resulting suggested offset to a log file.
 
@@ -33,20 +33,40 @@ This averages the ondeck pressure reading for the selected group of station cast
 This reads the log file and applies appropriate offset to selected file.
 
 # Fit Temperature data
-./odf_calibrate_ctd.py data/bottle/ctd.py ssscc-ssscc -temp
+./odf_calibrate_ctd.py ssscc-ssscc -temp [-primary:-secondary] -calib P -order [0,1,2] -xRange [min:max]
+example:
+./odf_calibrate_ctd.py 03001-03901 -temp -calib P -primary -order 2 -xRange 1000:6000
 
 This process reads sbe35 data for selected station casts and compares with ctd bottle data. The residual differences are optimized through a polyfit routine and an optimal set of coefficients are recorded in a log file for each station cast.
+
+Flags:
+-temp 
+-primary
+-secondary
+-calib, select only P (calibrate to pressure) for now
+-order, polynomial order of calibration
+-xRange, range for calibration parameter 
 
 ./odf_fit_ctd.py data/time/ssscc_time.py -temp
 
 This reads the log file and applies appropriate coefficients to selected file.
 
 # Fit Conductivity data:
-./odf_calibrate_ctd.py data/bottle/ctd.py ssscc-ssscc -cond
+./odf_calibrate_ctd.py ssscc-ssscc -cond
+example:
+./odf_calibrate_ctd.py 03001-03901 -cond -calib P -secondary -order 0 -xRange 200:6000
 
 This process reads bottle salinity data for selected station casts and compares with ctd bottle data. The residual differences are optimized through a polyfit routine and an optimal set of coefficients are recorded in a log file for each station cast.
 
-./odf_fit_ctd.py data/time/ssscc_time.py ¿cond
+Flags:
+-temp 
+-primary
+-secondary
+-calib, select only P (calibrate to pressure) for now
+-order, polynomial order of calibration
+-xRange, range for calibration parameter 
+
+./odf_fit_ctd.py data/time/ssscc_time.py -cond
 
 This reads the log file and applies appropriate coefficients to selected file.
 

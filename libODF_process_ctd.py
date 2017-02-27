@@ -581,7 +581,7 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         roll_filter_matrix = roll_filter(p_col, inMat[:][start:end:sample_rate], up, sample_rate, search_time)
 
         # Treat surface data.
-        roll_filter_matrix = treat_surface_data(p_col, sample_rate,roll_filter_matrix)
+        roll_filter_matrix = treat_surface_data(p_col, sample_rate, roll_filter_matrix)
 
         # Frame Pressure Bins
         pressure_bins = np.arange(0,int(btm),intP)
