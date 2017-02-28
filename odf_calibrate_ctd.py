@@ -4,14 +4,16 @@ import os
 import math
 import argparse
 import fnmatch
+import pylab
 import numpy as np
 import pandas as pd
+import scipy as sp
 import json
 import libODF_process_ctd as process_ctd
 import libODF_report_ctd as report_ctd
 import libODF_fit_ctd as fit_ctd
 import configparser
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from scipy.optimize import leastsq
 
 DEBUG = False
@@ -50,19 +52,37 @@ def errPrint(*args, **kwargs):
 def main(argv):
 
     parser = argparse.ArgumentParser(description='Convert SBE raw data to a converted, csv-formatted text file')
-    parser.add_argument('castRange', metavar='cast_range', help='range of cast values for shipboard calibration.')
+    parser.add_argument('castRange', metavar='cast_range', help='Range of cast values for shipboard calibration.')
 
     # debug messages
-    parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
+    parser.add_argument('-d', '--debug', action='store_true', help='Display debug messages')
 
-    # raw output
-    parser.add_argument('-press', '--pressure', action='store_true', help='Calibration pressure for fitting.')
+    # update bottle data with down trace profile data 
+    parser.add_argument('-btl', '--bottle_data', action='store_true', help='Update bottle data with downtrace profile.')
 
-    # raw output
-    parser.add_argument('-temp', '--temperature', action='store_true', help='')
+    # Calibrate pressure
+    parser.add_argument('-press', '--pressure', action='store_true', help='Calibrate pressure.')
 
-    # raw output
-    parser.add_argument('-cond', '--conductivity', action='store_true', help='')
+    # Calibrate temperature
+    parser.add_argument('-temp', '--temperature', action='store_true', help='Calibrate temperature.')
+
+    # Calibrate conductivity
+    parser.add_argument('-cond', '--conductivity', action='store_true', help='Calibrate conductivity.')
+
+    # Calibrate primary side
+    parser.add_argument('-primary', '--primary', action='store_true', help='Calibrate primary.')
+
+    # Calibrate sensondary side
+    parser.add_argument('-secondary', '--secondary', action='store_true', help='Calibrate secondary.')
+
+    # Independent parameter to calibrate with 
+    parser.add_argument('-calib', metavar='calibrate', dest='calib', help='Independent parameter to calabrate with (P, T or C).')
+
+    # Independent parameter range 
+    parser.add_argument('-xRange', metavar='xRange', dest='xRange', help='Independent parameter range.')
+
+    # Order of fit 
+    parser.add_argument('-order', metavar='order', dest='order', help='Calibration order.')
 
     # Process Command-line args
     args = parser.parse_args()
@@ -98,6 +118,7 @@ def main(argv):
     t2_col = config['analytical_inputs']['t2']
     t2_btl_col = config['inputs']['t2']
     c_col = config['analytical_inputs']['c']
+    c_btl_col = config['inputs']['c']
     c1_col = config['analytical_inputs']['c1']
     c1_btl_col = config['inputs']['c1']
     c2_col = config['analytical_inputs']['c2']
@@ -114,6 +135,7 @@ def main(argv):
     lon_btl_col = config['inputs']['lon']
     reft_col = config['inputs']['reft']
     btl_num_col = config['inputs']['btl_num']
+    btl_dtype = config['bottle_series_output']['dtype']
     
     file_base_arr = []
 
@@ -137,7 +159,41 @@ def main(argv):
             filename_base = str.split(f,'_')[0] # original filename w/o ext
             file_base_arr.append(filename_base)
 
-        # If Pressure fit selected
+        # Update bottle file with isopycnal equivalnt from downtrace
+        if args.bottle_data:
+            for sc in file_base_arr:
+                # Collect bottle data
+                btlfileName = str(sc + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
+                btlfilePath = os.path.join(btl_directory, btlfileName)
+                if os.path.isfile(btlfilePath):
+                    btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
+                    btl_data = btl_data[:][1:]
+                else:
+                    print("Missing file: "+btlfilePath)
+                    break
+ 
+                timefileName = str(sc + TIME_SUFFIX + '.' + FILE_EXT)
+                timefilePath = os.path.join(time_directory, timefileName)
+                if os.path.isfile(timefilePath):
+                    time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
+                    time_data = time_data[:][1:]
+                else:
+                    print("Missing file: "+timefilePath)
+                    break
+
+                # Find Isopycnal Down Trace Bottle Trip Equivalent
+                end = np.argmax(time_data[p_col])
+                down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t1_col, sal_col, dov_col, lat_col, lon_col, time_data)
+
+                # Write bottle data to file
+                report_ctd.report_btl_data(btlfilePath, btl_dtype, down_trace_btl)
+
+            # Exit Bottle Data Update
+            sys.exit()
+
+
+        # Get Pressure Calibration Offset for castrange.
+        # And save in Log Files
         if args.pressure:
             for sc in file_base_arr:
                 for line in log_data:
@@ -159,293 +215,401 @@ def main(argv):
 
             # Record pressure offset for cast set list in log file for later fit
             report_ctd.report_pressure_offset(log_directory + 'poffset.' + FILE_EXT, p_off, file_base_arr)
+           
+            # Exit Pressure Offset 
+            sys.exit()
  
-        # If Temperature fit selected
-        if args.temperature:
+        if args.order:
+            order = int(args.order)
+        else: print('Set polyfit calibration order. Ex: ./odf_calibrate_ctd.py 03001-03901 -cond -secondary -param P -order 2 -prange 0:6000')
 
-            btl_num = []
-            P1 = []
-            P2 = []
-            P12 = []
-            reft1 = []
-            reft2 = []
-            reft12 = []
-            ctd_btl_t1 = [] 
-            ctd_btl_t2 = [] 
-            ctd_btl_dt1 = [] 
-            ctd_btl_dt2 = [] 
-            ctd_btl_dt1t2 = [] 
-            for filename_base in file_base_arr:
+        btl_num = []
+        P1 = []
+        P2 = []
+        P12 = []
+        T1 = []
+        T2 = []
+        T12 = []
+        C1 = []
+        C2 = []
+        C12 = []
+        ref_data1 = []
+        ref_data2 = []
+        ref_data12 = []
+        ctd_1 = [] 
+        ctd_2 = [] 
+        ctd_12 = [] 
+        ctd_d1 = [] 
+        ctd_d2 = [] 
+        ctd_d12 = [] 
+        calib1 = []
+        calib2 = []
+        calib12 = []
+        qual = []
+        indx = []
+
+        #Determine parameter condition
+        if 'P' in args.calib: 
+            calib1_btl_col = p_btl_col
+            calib2_btl_col = p_btl_col
+            calib12_btl_col = p_btl_col
+        elif 'T' in args.calib: 
+            calib1_btl_col = t1_btl_col
+            calib2_btl_col = t2_btl_col
+            calib12_btl_col = t_btl_col
+        elif 'C' in args.calib:
+            calib1_btl_col = c1_btl_col
+            calib2_btl_col = c2_btl_col
+            calib12_btl_col = c_btl_col
+
+        if args.temperature:
+            param = 'T'
+            qualfileName = str('quality_flag_temp.' + FILE_EXT)
+            qualfilePath = os.path.join(log_directory, qualfileName)
+            coef = np.zeros(shape=5)
+            ref_col = reft_col
+            ctd1_btl_col = t1_btl_col
+            ctd2_btl_col = t2_btl_col
+        elif args.conductivity:
+            param = 'C'
+            qualfileName = str('quality_flag_temp.' + FILE_EXT)
+            qualfilePath = os.path.join(log_directory, qualfileName)
+            coef = np.zeros(shape=7)
+            ref_col = 'BTLCOND'
+            ctd1_btl_col = c1_btl_col
+            ctd2_btl_col = c2_btl_col
+
+        if os.path.exists(qualfilePath): os.remove(qualfilePath)
+
+        for filename_base in file_base_arr:
+            btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
+            btlfilePath = os.path.join(btl_directory, btlfileName)
+            if os.path.isfile(btlfilePath):
+                btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
+                btl_data = btl_data[:][1:]
+            else:
+                print("Missing file: "+btlfilePath)
+                sys.exit()
+
+            timefileName = str(filename_base + TIME_SUFFIX + '.' + FILE_EXT)
+            timefilePath = os.path.join(time_directory, timefileName)
+            if os.path.isfile(timefilePath):
+                time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
+                time_data = time_data[:][1:]
+            else:
+                print("Missing file: "+timefilePath)
+                sys.exit()
+
+            if args.temperature:
                 reftfileName = (filename_base + REFT_SUFFIX + '.' + FILE_EXT) 
                 reftfilePath = os.path.join(reft_directory, reftfileName)
                 if os.path.isfile(reftfilePath):
                     print("Processing "+ filename_base)
-                    reft_btl = process_ctd.dataToNDarray(reftfilePath,float,True,',',None)
+                    ref_btl = process_ctd.dataToNDarray(reftfilePath,float,True,',',None)
                 else: 
+                    print("Missing Reference temperature data for "+ filename_base)
                     continue
-
-                btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
-                btlfilePath = os.path.join(btl_directory, btlfileName)
-                if os.path.isfile(btlfilePath):
-                    btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
-                    btl_data = btl_data[:][1:]
-                else:
-                    print("Missing file: "+btlfilePath)
-                    break
-
-                timefileName = str(filename_base + TIME_SUFFIX + '.' + FILE_EXT)
-                timefilePath = os.path.join(time_directory, timefileName)
-                if os.path.isfile(timefilePath):
-                    time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
-                    time_data = time_data[:][1:]
-                else:
-                    print("Missing file: "+timefilePath)
-                    break
-
-                # Find Isopycnal Down Trace Bottle Trip Equivalent
-                # Need to add density (sigma_theta) driven component to this search
-                end = np.argmax(time_data[p_col])
-                down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t1_col, sal_col, dov_col, lat_col, lon_col, time_data)
-
-                for i in range(0,len(reft_btl[btl_num_col])):
-                    j = reft_btl[btl_num_col][i] 
-                    k = int(np.where(btl_data[btl_num_col] == j)[0][0])
-                    dt1 = reft_btl[reft_col][i] - down_trace_btl[t1_btl_col][k]
-                    dt2 = reft_btl[reft_col][i] - down_trace_btl[t2_btl_col][k]
-                    dt1t2 = down_trace_btl[t1_btl_col][k] - down_trace_btl[t2_btl_col][k]
-                    if down_trace_btl[p_btl_col][k] > 2000:
-                        if abs(dt1) < 0.002:
-                            reft1.append(reft_btl[reft_col][i])
-                            P1.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_t1.append(down_trace_btl[t1_btl_col][k])
-                            ctd_btl_dt1.append(dt1)
-                        if abs(dt2) < 0.002:
-                            reft2.append(reft_btl[reft_col][i])
-                            P2.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_t2.append(down_trace_btl[t2_btl_col][k])
-                            ctd_btl_dt2.append(dt2)
-                        if abs(dt1t2) < 0.002:
-                            reft12.append(reft_btl[reft_col][i])
-                            P12.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_dt1t2.append(dt1t2)
-                    elif (down_trace_btl[p_btl_col][k] < 2000) and (down_trace_btl[p_btl_col][k] > 1000):
-                        if abs(dt1) < 0.005:
-                            reft1.append(reft_btl[reft_col][i])
-                            P1.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_t1.append(down_trace_btl[t1_btl_col][k])
-                            ctd_btl_dt1.append(dt1)
-                        if abs(dt2) < 0.005:
-                            reft2.append(reft_btl[reft_col][i])
-                            P2.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_t2.append(down_trace_btl[t2_btl_col][k])
-                            ctd_btl_dt2.append(dt2)
-                        if abs(dt1t2) < 0.005:
-                            reft12.append(reft_btl[reft_col][i])
-                            P12.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_dt1t2.append(dt1t2)
-                    elif (down_trace_btl[p_btl_col][k] < 1000) and (down_trace_btl[p_btl_col][k] > 500):
-                        if abs(dt1) < 0.010:
-                            reft1.append(reft_btl[reft_col][i])
-                            P1.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_t1.append(down_trace_btl[t1_btl_col][k])
-                            ctd_btl_dt1.append(dt1)
-                        if abs(dt2) < 0.010:
-                            reft2.append(reft_btl[reft_col][i])
-                            P2.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_t2.append(down_trace_btl[t2_btl_col][k])
-                            ctd_btl_dt2.append(dt2)
-                        if abs(dt1t2) < 0.010:
-                            reft12.append(reft_btl[reft_col][i])
-                            P12.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_dt1t2.append(dt1t2)
-                    elif btl_data[p_btl_col][k] < 500:
-                        if abs(dt1) < 0.020:
-                            reft1.append(reft_btl[reft_col][i])
-                            P1.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_t1.append(down_trace_btl[t1_btl_col][k])
-                            ctd_btl_dt1.append(dt1)
-                        if abs(dt2) < 0.020:
-                            reft2.append(reft_btl[reft_col][i])
-                            P2.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_t2.append(down_trace_btl[t2_btl_col][k])
-                            ctd_btl_dt2.append(dt2)
-                        if abs(dt1t2) < 0.020:
-                            reft12.append(reft_btl[reft_col][i])
-                            P12.append(down_trace_btl[p_btl_col][k])
-                            ctd_btl_dt1t2.append(dt1t2)
-
-
-            # Get descrete ref temp data 
-            coef1 = fit_ctd.find_temp_coef(reft1, P1, ctd_btl_t1)
-            coef2 = fit_ctd.find_temp_coef(reft2, P2, ctd_btl_t2)
-
-            fitfileT1 = str('fitting_t1.' + FILE_EXT)
-            fitfileT1Path = os.path.join(log_directory, fitfileT1)
-            fitfileT2 = str('fitting_t2.' + FILE_EXT)
-            fitfileT2Path = os.path.join(log_directory, fitfileT2)
-
-            report_ctd.report_polyfit(coef1, file_base_arr, fitfileT1Path)
-            report_ctd.report_polyfit(coef2, file_base_arr, fitfileT2Path)
-
- 
-        # If Temperature fit selected
-        if args.conductivity:
-
-            btl_num = []
-            P1 = []
-            P2 = []
-            P12 = []
-            T1 = []
-            T2 = []
-            T12 = []
-            cond_btl_col = 'BTLCOND'
-            cond1 = []
-            cond2 = []
-            cond12 = []
-            salt1 = []
-            salt2 = []
-            salt12 = []
-            ctd_btl_c1 = [] 
-            ctd_btl_c2 = [] 
-            ctd_btl_dc1 = [] 
-            ctd_btl_dc2 = [] 
-            ctd_btl_dc1c2 = [] 
-            for filename_base in file_base_arr:
-                btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
-                btlfilePath = os.path.join(btl_directory, btlfileName)
-                if os.path.isfile(btlfilePath):
-                    btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
-                    btl_data = btl_data[:][1:]
-                else:
-                    print("Missing file: "+btlfilePath)
-                    continue
-
+            elif args.conductivity:
                 saltfileName = filename_base
                 saltfilePath = os.path.join(salt_directory, saltfileName)
                 if os.path.isfile(saltfilePath):
                     print("Processing "+ filename_base)
-                    cond_btl, salt_btl = fit_ctd.salt_calc(saltfilePath,btl_num_col,t1_btl_col,p_btl_col,btl_data)
+                    #cond_btl, salt_btl = fit_ctd.salt_calc(saltfilePath,btl_num_col,t1_btl_col,p_btl_col,btl_data)
+                    ref_btl, salt_btl = fit_ctd.salt_calc(saltfilePath,btl_num_col,t1_btl_col,p_btl_col,btl_data)
                 else: 
+                    print("Missing reference salinity data for "+ filename_base)
                     continue
 
-                timefileName = str(filename_base + TIME_SUFFIX + '.' + FILE_EXT)
-                timefilePath = os.path.join(time_directory, timefileName)
-                if os.path.isfile(timefilePath):
-                    time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
-                    time_data = time_data[:][1:]
-                else:
-                    print("Missing file: "+timefilePath)
-                    break
+            for i in range(0,len(ref_btl[btl_num_col])):
+            # Search bottle number
+                j = ref_btl[btl_num_col][i] 
+                if j != 0:
+                    k = int(np.where(btl_data[btl_num_col] == j)[0][0])
+                    d1 = ref_btl[ref_col][i] - btl_data[ctd1_btl_col][k]
+                    d2 = ref_btl[ref_col][i] - btl_data[ctd2_btl_col][k]
+                    d12 = btl_data[ctd1_btl_col][k] - btl_data[ctd2_btl_col][k]
+                    if btl_data[p_btl_col][k] > 2000:
+                        if abs(d1) < 0.002:
+                            ref_data1.append(ref_btl[ref_col][i])
+                            P1.append(btl_data[p_btl_col][k])
+                            T1.append(btl_data[t1_btl_col][k])
+                            C1.append(btl_data[c1_btl_col][k])
+                            calib1.append(btl_data[calib1_btl_col][k])
+                            ctd_1.append(btl_data[ctd1_btl_col][k])
+                            ctd_d1.append(d1)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param+'1', 
+                                                        d1, d2, d12)
+                        if abs(d2) < 0.002:
+                            ref_data2.append(ref_btl[ref_col][i])
+                            P2.append(btl_data[p_btl_col][k])
+                            T2.append(btl_data[t2_btl_col][k])
+                            C2.append(btl_data[c2_btl_col][k])
+                            calib2.append(btl_data[calib2_btl_col][k])
+                            ctd_2.append(btl_data[ctd2_btl_col][k])
+                            ctd_d2.append(d2)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param+'2', 
+                                                        d1, d2, d12)
+                        if abs(d12) < 0.002:
+                            ref_data12.append(ref_btl[ref_col][i])
+                            P12.append(btl_data[p_btl_col][k])
+                            T12.append(btl_data[t_btl_col][k])
+                            C12.append(btl_data[c_btl_col][k])
+                            calib12.append(btl_data[calib12_btl_col][k])
+                            ctd_d12.append(d12)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param, 
+                                                        d1, d2, d12)
+                    elif (btl_data[p_btl_col][k] < 2000) and (btl_data[p_btl_col][k] > 1000):
+                        if abs(d1) < 0.005:
+                            ref_data1.append(ref_btl[ref_col][i])
+                            P1.append(btl_data[p_btl_col][k])
+                            T1.append(btl_data[t1_btl_col][k])
+                            C1.append(btl_data[c1_btl_col][k])
+                            calib1.append(btl_data[calib1_btl_col][k])
+                            ctd_1.append(btl_data[ctd1_btl_col][k])
+                            ctd_d1.append(d1)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param+'1', 
+                                                        d1, d2, d12)
+                        if abs(d2) < 0.005:
+                            ref_data2.append(ref_btl[ref_col][i])
+                            P2.append(btl_data[p_btl_col][k])
+                            T2.append(btl_data[t2_btl_col][k])
+                            C2.append(btl_data[c2_btl_col][k])
+                            calib2.append(btl_data[calib2_btl_col][k])
+                            ctd_2.append(btl_data[ctd2_btl_col][k])
+                            ctd_d2.append(d2)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param+'2', 
+                                                        d1, d2, d12)
+                        if abs(d12) < 0.005:
+                            ref_data12.append(ref_btl[ref_col][i])
+                            P12.append(btl_data[p_btl_col][k])
+                            T12.append(btl_data[t_btl_col][k])
+                            C12.append(btl_data[c_btl_col][k])
+                            calib12.append(btl_data[calib12_btl_col][k])
+                            ctd_d12.append(d12)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param, 
+                                                        d1, d2, d12)
+                    elif (btl_data[p_btl_col][k] < 1000) and (btl_data[p_btl_col][k] > 500):
+                        if abs(d1) < 0.010:
+                            ref_data1.append(ref_btl[ref_col][i])
+                            P1.append(btl_data[p_btl_col][k])
+                            T1.append(btl_data[t1_btl_col][k])
+                            C1.append(btl_data[c1_btl_col][k])
+                            calib1.append(btl_data[calib1_btl_col][k])
+                            ctd_1.append(btl_data[ctd1_btl_col][k])
+                            ctd_d1.append(d1)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param+'1', 
+                                                        d1, d2, d12)
+                        if abs(d2) < 0.010:
+                            ref_data2.append(ref_btl[ref_col][i])
+                            P2.append(btl_data[p_btl_col][k])
+                            T2.append(btl_data[t2_btl_col][k])
+                            C2.append(btl_data[c2_btl_col][k])
+                            calib2.append(btl_data[calib2_btl_col][k])
+                            ctd_2.append(btl_data[ctd2_btl_col][k])
+                            ctd_d2.append(d2)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param+'2', 
+                                                        d1, d2, d12)
+                        if abs(d12) < 0.010:
+                            ref_data12.append(ref_btl[ref_col][i])
+                            P12.append(btl_data[p_btl_col][k])
+                            T12.append(btl_data[t_btl_col][k])
+                            C12.append(btl_data[c_btl_col][k])
+                            calib12.append(btl_data[calib12_btl_col][k])
+                            ctd_d12.append(d12)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param, 
+                                                        d1, d2, d12)
+                    elif btl_data[p_btl_col][k] < 500:
+                        if abs(d1) < 0.020:
+                            ref_data1.append(ref_btl[ref_col][i])
+                            P1.append(btl_data[p_btl_col][k])
+                            T1.append(btl_data[t1_btl_col][k])
+                            C1.append(btl_data[c1_btl_col][k])
+                            calib1.append(btl_data[calib1_btl_col][k])
+                            ctd_1.append(btl_data[ctd1_btl_col][k])
+                            ctd_d1.append(d1)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param+'1', 
+                                                        d1, d2, d12)
+                        if abs(d2) < 0.020:
+                            ref_data2.append(ref_btl[ref_col][i])
+                            P2.append(btl_data[p_btl_col][k])
+                            T2.append(btl_data[t2_btl_col][k])
+                            C2.append(btl_data[c2_btl_col][k])
+                            calib2.append(btl_data[calib2_btl_col][k])
+                            ctd_2.append(btl_data[ctd2_btl_col][k])
+                            ctd_d2.append(d2)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param+'2', 
+                                                        d1, d2, d12)
+                        if abs(d12) < 0.020:
+                            ref_data12.append(ref_btl[ref_col][i])
+                            P12.append(btl_data[p_btl_col][k])
+                            T12.append(btl_data[t_btl_col][k])
+                            C12.append(btl_data[c_btl_col][k])
+                            calib12.append(btl_data[calib12_btl_col][k])
+                            ctd_d12.append(d12)
+                        else: 
+                            report_ctd.report_quality_flags(qualfilePath, 
+                                                        filename_base, ref_btl[btl_num_col][i], 
+                                                        btl_data[p_btl_col][k], param, 
+                                                        d1, d2, d12)
 
-                # Find Isopycnal Down Trace Bottle Trip Equivalent
-                # Need to add density (sigma_theta) driven component to this search
-                end = np.argmax(time_data[p_col])
-                down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t1_col, sal_col, dov_col, lat_col, lon_col, time_data)
+        # Get Range
+        if args.xRange: 
+            x0 = int(args.xRange.split(":")[0])
+            x1 = int(args.xRange.split(":")[1])
+        else: 
+            if args.primary: 
+                x0 = min(calib1)
+                x1 = max(calib1)
+            elif args.secondary: 
+                x0 = min(calib2)
+                x1 = max(calib2)
 
-                for i in range(0,len(cond_btl[btl_num_col])):
-                    j = cond_btl[btl_num_col][i] 
-                    if j != 0:
-                        k = int(np.where(btl_data[btl_num_col] == j)[0][0])
-                        dc1 = cond_btl[cond_btl_col][i] - down_trace_btl[c1_btl_col][k]
-                        dc2 = cond_btl[cond_btl_col][i] - down_trace_btl[c2_btl_col][k]
-                        dc1c2 = down_trace_btl[c1_btl_col][k] - down_trace_btl[c2_btl_col][k]
-                        if down_trace_btl[p_btl_col][k] > 2000:
-                            if abs(dc1) < 0.002:
-                                cond1.append(cond_btl[cond_btl_col][i])
-                                P1.append(down_trace_btl[p_btl_col][k])
-                                T1.append(down_trace_btl[t1_btl_col][k])
-                                ctd_btl_c1.append(down_trace_btl[c1_btl_col][k])
-                                ctd_btl_dc1.append(dc1)
-                            if abs(dc2) < 0.002:
-                                cond2.append(cond_btl[cond_btl_col][i])
-                                P2.append(down_trace_btl[p_btl_col][k])
-                                T2.append(down_trace_btl[t2_btl_col][k])
-                                ctd_btl_c2.append(down_trace_btl[c2_btl_col][k])
-                                ctd_btl_dc2.append(dc2)
-                            if abs(dc1c2) < 0.002:
-                                cond12.append(cond_btl[cond_btl_col][i])
-                                P12.append(down_trace_btl[p_btl_col][k])
-                                T12.append(down_trace_btl[t_btl_col][k])
-                                ctd_btl_dc1c2.append(dc1c2)
-                        elif (down_trace_btl[p_btl_col][k] < 2000) and (down_trace_btl[p_btl_col][k] > 1000):
-                            if abs(dc1) < 0.005:
-                                cond1.append(cond_btl[cond_btl_col][i])
-                                P1.append(down_trace_btl[p_btl_col][k])
-                                T1.append(down_trace_btl[t1_btl_col][k])
-                                ctd_btl_c1.append(down_trace_btl[c1_btl_col][k])
-                                ctd_btl_dc1.append(dc1)
-                            if abs(dc2) < 0.005:
-                                cond2.append(cond_btl[cond_btl_col][i])
-                                P2.append(down_trace_btl[p_btl_col][k])
-                                T2.append(down_trace_btl[t2_btl_col][k])
-                                ctd_btl_c2.append(down_trace_btl[c2_btl_col][k])
-                                ctd_btl_dc2.append(dc2)
-                            if abs(dc1c2) < 0.005:
-                                cond12.append(cond_btl[cond_btl_col][i])
-                                P12.append(down_trace_btl[p_btl_col][k])
-                                T12.append(down_trace_btl[t_btl_col][k])
-                                ctd_btl_dc1c2.append(dc1c2)
-                        elif (down_trace_btl[p_btl_col][k] < 1000) and (down_trace_btl[p_btl_col][k] > 500):
-                            if abs(dc1) < 0.010:
-                                cond1.append(cond_btl[cond_btl_col][i])
-                                P1.append(down_trace_btl[p_btl_col][k])
-                                T1.append(down_trace_btl[t1_btl_col][k])
-                                ctd_btl_c1.append(down_trace_btl[c1_btl_col][k])
-                                ctd_btl_dc1.append(dc1)
-                            if abs(dc2) < 0.010:
-                                cond2.append(cond_btl[cond_btl_col][i])
-                                P2.append(down_trace_btl[p_btl_col][k])
-                                T2.append(down_trace_btl[t2_btl_col][k])
-                                ctd_btl_c2.append(down_trace_btl[c2_btl_col][k])
-                                ctd_btl_dc2.append(dc2)
-                            if abs(dc1c2) < 0.010:
-                                cond12.append(cond_btl[cond_btl_col][i])
-                                P12.append(down_trace_btl[p_btl_col][k])
-                                T12.append(down_trace_btl[t_btl_col][k])
-                                ctd_btl_dc1c2.append(dc1c2)
-                        elif btl_data[p_btl_col][k] < 500:
-                            if abs(dc1) < 0.020:
-                                cond1.append(cond_btl[cond_btl_col][i])
-                                P1.append(down_trace_btl[p_btl_col][k])
-                                T1.append(down_trace_btl[t1_btl_col][k])
-                                ctd_btl_c1.append(down_trace_btl[c1_btl_col][k])
-                                ctd_btl_dc1.append(dc1)
-                            if abs(dc2) < 0.020:
-                                cond2.append(cond_btl[cond_btl_col][i])
-                                P2.append(down_trace_btl[p_btl_col][k])
-                                T2.append(down_trace_btl[t2_btl_col][k])
-                                ctd_btl_c2.append(down_trace_btl[c2_btl_col][k])
-                                ctd_btl_dc2.append(dc2)
-                            if abs(dc1c2) < 0.020:
-                                cond12.append(cond_btl[cond_btl_col][i])
-                                P12.append(down_trace_btl[p_btl_col][k])
-                                T12.append(down_trace_btl[t_btl_col][k])
-                                ctd_btl_dc1c2.append(dc1c2)
+        if args.primary: 
+            sensor = 1
+            ctd_d = ctd_d1
+            calib = calib1
+            P = P1
+        elif args.secondary: 
+            sensor = 2
+            ctd_d = ctd_d2
+            calib = calib2
+            P = P2 
+
+        calib_indx = np.argsort(calib)
+        for i in calib_indx:
+            if (calib[i] >= x0) and (calib[i] <= x1):
+                indx.append(i)
+        calib = [calib[i] for i in indx]
+        fit = np.arange(x0,x1,(x1-x0)/50)
+        P = [P[i] for i in indx]
+        ctd_d = [ctd_d[i] for i in indx]
+
+        mean = np.mean(ctd_d)
+        std = np.std(ctd_d) 
+        lstd = mean - std 
+        hstd = mean + std 
+        cf = np.polyfit(calib, ctd_d, order)
+
+        indx12 = [index for index, value in enumerate(calib12) 
+                  if (value >= x0) and (value <= x1)]
+        calib12 = [calib12[i] for i in indx12]
+        P12 = [P12[i] for i in indx12]
+        T12 = [T12[i] for i in indx12]
+        C12 = [C12[i] for i in indx12]
+        ref_data12 = [ref_data12[i] for i in indx12]
+        ctd_d12 = [ctd_d12[i] for i in indx12]
+
+        mean12 = np.mean(ctd_d12)
+        std12 = np.std(ctd_d12) 
+        lstd12 = mean12 - std12
+        hstd12 = mean12 + std12
+
+        if args.temperature: 
+            sensor = '_t'+str(sensor)
+            if order is 0: 
+                coef[4] = cf[0]
+            elif (order is 1) and ('P' in args.calib):
+                coef[1] = cf[0]
+                coef[4] = cf[1]
+            elif (order is 2) and ('P' in args.calib): 
+                coef[0] = cf[0]
+                coef[1] = cf[1]
+                coef[4] = cf[2]
+            elif (order is 1) and ('T' in args.calib):
+                coef[3] = cf[0]
+                coef[4] = cf[1]
+            elif (order is 2) and ('T' in args.calib): 
+                coef[2] = cf[0]
+                coef[3] = cf[1]
+                coef[4] = cf[2]
+
+            Y = fit_ctd.temperature_polyfit(coef, fit, np.full(len(fit), 0.0))
+
+        elif args.conductivity:
+            sensor = '_c'+str(sensor)
+            if order is 0: 
+                coef[6] = cf[0]
+            elif (order is 1) and ('P' in args.calib):
+                coef[1] = cf[0]
+                coef[6] = cf[1]
+            elif (order is 2) and ('P' in args.calib): 
+                coef[0] = cf[0]
+                coef[1] = cf[1]
+                coef[6] = cf[2]
+            elif (order is 1) and ('T' in args.calib):
+                coef[3] = cf[0]
+                coef[6] = cf[1]
+            elif (order is 2) and ('T' in args.calib): 
+                coef[2] = cf[0]
+                coef[3] = cf[1]
+                coef[6] = cf[2]
+            elif (order is 1) and ('C' in args.calib):
+                coef[5] = cf[0]
+                coef[6] = cf[1]
+            elif (order is 2) and ('C' in args.calib): 
+                coef[4] = cf[0]
+                coef[5] = cf[1]
+                coef[6] = cf[2]
+
+            Y = fit_ctd.conductivity_polyfit(coef, fit, fit, np.full(len(fit), 0.0))
 
 
-            # Get descrete ref temp data 
-            coef1 = fit_ctd.find_cond_coef(cond1, P1, T1, ctd_btl_c1)
-            coef2 = fit_ctd.find_cond_coef(cond2, P2, T2, ctd_btl_c2)
+        fitfile = str('fitting'+sensor+'.' + FILE_EXT)
+        fitfilePath = os.path.join(log_directory, fitfile)
+        report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
 
-            fitfileC1 = str('fitting_c1.' + FILE_EXT)
-            fitfileC1Path = os.path.join(log_directory, fitfileC1)
-            fitfileC2 = str('fitting_c2.' + FILE_EXT)
-            fitfileC2Path = os.path.join(log_directory, fitfileC2)
+        plt.scatter(calib, ctd_d, c=P, cmap=plt.cm.gist_rainbow)
+        plt.plot(fit, Y, color='red')
+        pylab.axhline( mean, color="black", label='mean') 
+        pylab.axhline( lstd, color="black", linestyle="--", label='std') 
+        pylab.axhline( hstd, color="black", linestyle="--") 
+        plt.axis()
+        plt.show()
+                
+        plt.scatter(calib12, ctd_d12, c=P12, cmap=plt.cm.gist_rainbow)
+        pylab.axhline( mean12, color="black", label='mean') 
+        pylab.axhline( lstd12, color="black", linestyle="--", label='std') 
+        pylab.axhline( hstd12, color="black", linestyle="--") 
+        plt.axis()
+        plt.show()
 
-            report_ctd.report_polyfit(coef1, file_base_arr, fitfileC1Path)
-            report_ctd.report_polyfit(coef2, file_base_arr, fitfileC2Path)
     else:
         errPrint('ERROR: Input cast range:', args.castRange, 'not found\n')
         sys.exit(1)
 
-    #plt.scatter(P1, ctd_btl_dc1, c=P1, cmap=plt.cm.gist_rainbow, label='SBE35 - T1')
-    #plt.plot(P1, time_data[p_col], color='b', label='raw')
-    #plt.plot(pressure_seq_data[dopl_col], pressure_seq_data[p_col], color='r', label='raw')
-    #plt.plot(o2pl_btl['OXYGEN'], btl_data[p_btl_col], color='g', marker='o', label='raw')
-    #plt.plot(pressure_seq_data[do_col], pressure_seq_data[p_col], color='b', label='raw')
-    #plt.gca().invert_yaxis()
-    #plt.axis()
-    #plt.show()
 
     debugPrint('Done!')
 

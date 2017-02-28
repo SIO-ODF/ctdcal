@@ -36,6 +36,9 @@ MEAN_SUFFIX = '_mean'
 #File extension to use for raw output
 TIME_SUFFIX = '_time'
  
+#File extension to use for output files (csv-formatted)
+UPDT_SUFFIX = '_updt'
+
 #File extension to use for converted output
 CONVERTED_SUFFIX = '_cnv'
 
@@ -118,7 +121,9 @@ def main(argv):
     t2_btl_col = config['inputs']['t2']
     c_col = config['analytical_inputs']['c']
     c1_col = config['analytical_inputs']['c1']
+    c1_btl_col = config['inputs']['c1']
     c2_col = config['analytical_inputs']['c2']
+    c2_btl_col = config['inputs']['c2']
     sal_col = config['analytical_inputs']['salt']
     sal_btl_col = config['inputs']['salt']
     btl_sal_col = config['analytical_inputs']['btl_salt']
@@ -152,6 +157,9 @@ def main(argv):
     p_column_qual = config['pressure_series_output']['qual_columns'].split(',')
     p_column_one = list(config['pressure_series_output']['q1_columns'].split(','))
 
+    #bottle_data outputs
+    btl_dtype = config['bottle_series_output']['dtype']
+
     hexfileName = str(filename_base + '.' + HEX_EXT)
     hexfilePath = os.path.join(raw_directory, hexfileName)
 
@@ -173,13 +181,8 @@ def main(argv):
 
     # Get procesed time data 
     time_data = process_ctd.dataToNDarray(args.timeFile,float,True,',',1)
-    end = np.argmax(time_data[p_col][1:])
-    time_data = time_data[:][1:end]
-
-    # Find Isopycnal Down Trace Bottle Trip Equivalent
-    # Need to add density (sigma_theta) driven component to this search
-    #end = np.argmax(time_data[p_col])
-    down_trace_btl = fit_ctd.find_isopycnals(p_btl_col, t1_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t1_col, sal_col, dov_col, lat_col, lon_col, time_data) 
+    btm = np.argmax(time_data[p_col][1:])
+    time_data = time_data[:][1:btm]
 
     if args.pressure:
         print('In -pres flag fit condition')
@@ -196,6 +199,7 @@ def main(argv):
             continue
 
         # Pressure offset  
+        btl_data[p_btl_col] = fit_ctd.offset(offset, btl_data[p_btl_col])
         time_data[p_col] = fit_ctd.offset(offset, time_data[p_col])
         # End pressure if condition 
 
@@ -218,7 +222,8 @@ def main(argv):
                     else:
                         coef1.append(float(val[i]))
             continue
-        time_data[t1_col] = fit_ctd.temperature_pressure_polyfit(coef1, time_data[p_col], time_data[t1_col])
+        btl_data[t1_btl_col] = fit_ctd.temperature_polyfit(coef1, btl_data[p_btl_col], btl_data[t1_btl_col], 'all')
+        time_data[t1_col] = fit_ctd.temperature_polyfit(coef1, time_data[p_col], time_data[t1_col], 'all')
 
         t2fileName = str('fitting_t2' + '.' + FILE_EXT)
         t2filePath = os.path.join(log_directory, t2fileName)
@@ -233,13 +238,15 @@ def main(argv):
                     else:
                         coef2.append(float(val[i]))
             continue
-        time_data[t2_col] = fit_ctd.temperature_pressure_polyfit(coef2, time_data[p_col], time_data[t2_col])
+        btl_data[t2_btl_col] = fit_ctd.temperature_polyfit(coef2, btl_data[p_btl_col], btl_data[t2_btl_col], 'all')
+        time_data[t2_col] = fit_ctd.temperature_polyfit(coef2, time_data[p_col], time_data[t2_col], 'all')
 
     if args.conductivity:
         print('In -cond flag fit condition')
         print(filename_base)
         coef1 = []
         coef2 = []
+
         # Get descrete ref temp data 
         c1fileName = str('fitting_c1' + '.' + FILE_EXT)
         c1filePath = os.path.join(log_directory, c1fileName)
@@ -254,7 +261,8 @@ def main(argv):
                     else:
                         coef1.append(float(val[i]))
             continue
-        time_data[c1_col] = fit_ctd.temperature_pressure_polyfit(coef1, time_data[p_col], time_data[c1_col])
+        btl_data[c1_btl_col] = fit_ctd.conductivity_polyfit(coef1, btl_data[p_btl_col], btl_data[t1_btl_col], btl_data[c1_btl_col])
+        time_data[c1_col] = fit_ctd.conductivity_polyfit(coef1, time_data[p_col], time_data[c1_col], time_data[c1_col])
 
         c2fileName = str('fitting_c2' + '.' + FILE_EXT)
         c2filePath = os.path.join(log_directory, c2fileName)
@@ -269,7 +277,8 @@ def main(argv):
                     else:
                         coef2.append(float(val[i]))
             continue
-        time_data[c2_col] = fit_ctd.temperature_pressure_polyfit(coef2, time_data[p_col], time_data[c2_col])
+        btl_data[c2_btl_col] = fit_ctd.conductivity_polyfit(coef2, btl_data[p_btl_col], btl_data[t2_btl_col], btl_data[c2_btl_col])
+        time_data[c2_col] = fit_ctd.conductivity_polyfit(coef2, time_data[p_col], time_data[c2_col], time_data[c2_col])
         
         time_data[sal_col] = gsw.SP_from_C(time_data[c_col],time_data[t_col],time_data[p_col])
 
@@ -284,16 +293,15 @@ def main(argv):
             kelvin.append(time_data[t_col][i] + 273.15)
 
         # Find New Oxygen Coef
-        oxy_coef = fit_ctd.find_oxy_coef(o2pl_btl['OXYGEN'], down_trace_btl[p_btl_col], down_trace_btl[t_btl_col], down_trace_btl[sal_btl_col], down_trace_btl[dov_btl_col], hexfilePath, xmlfilePath)
+        oxy_coef = fit_ctd.find_oxy_coef(o2pl_btl['OXYGEN'], btl_data[p_btl_col], btl_data[t_btl_col], btl_data[sal_btl_col], btl_data[dov_btl_col], hexfilePath, xmlfilePath)
 
-        # Find weight for reporting
-        weights = fit_ctd.residualO2(oxy_coef, o2pl_btl['OXYGEN'], down_trace_btl[p_btl_col], kelvin, time_data[t_col], time_data[sal_col], time_data[dov_col])
-        print(weights)
-         
         # Convert CTD Oxygen Voltage Data with New DO Coef
         time_data[dopl_col] = fit_ctd.oxy_dict(oxy_coef, time_data[p_col], kelvin, time_data[t_col], time_data[sal_col], time_data[dov_col])
         # End oxygen flag fitting if condition
 
+    # Find Isopycnal Down Trace Bottle Trip Equivalent
+    # Write bottle data to file
+    report_ctd.report_btl_data(btlfilePath, btl_dtype, btl_data)
 
     # Write time data to file
     report_ctd.report_time_series_data(filename_base, time_directory, expocode, time_column_names, time_column_units, time_column_names, time_column_format, time_data)
