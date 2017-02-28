@@ -5,16 +5,16 @@ data/ini-files/configuration.ini
 
 Edit the following sections of the configuration file
 - [cruise] change all values specific to the cruise
-- [ctd_processing] 
+- [ctd_processing]
       ctd_serial: sss
-- [ctd_processing] 
+- [ctd_processing]
       TC_side: 1->2 for secondary input
-- [inputs] Might need to edit this section depending on the converted file header. This section sets up column call input to data/converted directory. 
+- [inputs] Might need to edit this section depending on the converted file header. This section sets up column call input to data/converted directory.
 - [time_series_output] Should not need to edit this section; maintains time series column headers.
 - [pressure_series_output] Should not need to edit this section; maintains pressure series column headers.
 
 # Process CTD Data
-For preliminary processing run the following command on each raw data file. The file base name should be ssscc.{hex,XMLCON} (s Ð station, c - cast).
+For preliminary processing run the following command on each raw data file. The file base name should be ssscc.{hex,XMLCON} (s ï¿½ station, c - cast).
 
 ./odf_convert_sbe.py data/raw/ssscc.hex data/raw/ssscc.XMLCON -o data/converted/
 
@@ -28,7 +28,7 @@ For preliminary processing run the following command on each raw data file. The 
 
 This averages the ondeck pressure reading for the selected group of station casts and outputs the resulting suggested offset to a log file.
 
-./odf_fit_ctd.py data/time/ssscc_time.py ¿press
+./odf_fit_ctd.py data/time/ssscc_time.py -pres
 
 This reads the log file and applies appropriate offset to selected file.
 
@@ -36,8 +36,9 @@ This reads the log file and applies appropriate offset to selected file.
 ./odf_calibrate_ctd.py data/bottle/ctd.py ssscc-ssscc -temp
 
 This process reads sbe35 data for selected station casts and compares with ctd bottle data. The residual differences are optimized through a polyfit routine and an optimal set of coefficients are recorded in a log file for each station cast.
+need to specify reft_directory in config file and in directory structure for it to work
 
-./odf_fit_ctd.py data/time/ssscc_time.py -temp
+./odf_fit_ctd.py data/time/ssscc_time.csv -temp
 
 This reads the log file and applies appropriate coefficients to selected file.
 
@@ -46,7 +47,7 @@ This reads the log file and applies appropriate coefficients to selected file.
 
 This process reads bottle salinity data for selected station casts and compares with ctd bottle data. The residual differences are optimized through a polyfit routine and an optimal set of coefficients are recorded in a log file for each station cast.
 
-./odf_fit_ctd.py data/time/ssscc_time.py ¿cond
+./odf_fit_ctd.py data/time/ssscc_time.py ï¿½cond
 
 This reads the log file and applies appropriate coefficients to selected file.
 
