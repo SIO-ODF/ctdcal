@@ -1,0 +1,35 @@
+courtney:
+add testing.py to run.py
+
+joseph:
+build out config file to make output values not HARDCODED
+bottle.py
+rename run.py to converter.py
+polyfit
+read DPO
+
+Things left to do:
+polyfit
+bottle quality coding
+non-linear least squares fitting
+reporting
+quality coding
+
+infrastructure need to track with sets of sensors
+overlay filter for quality codes for
+sensor profiles for bad sensors/pumps/degassing/etc
+run.py = background daemon
+manual.py = run manually
+
+need some way to keep qc codes for bottle data and ctd data - need to tie it in from the bottle db
+
+Roadmap:
+pandas or numpy arrays?
+constraint of this stage of software to analysis only - no visualization? how to integrate visualization for fitting?
+unit testing/automated testing
+database for holding end fits
+how to track intermediary fits
+truncation to level of signal from ctd
+if we use other than sbe ctd - do we create additional libraries for other conversion equations?
+log sheet value entering - start pressure, end pressure, bottom depth, time, etc AND comparison against computer generated values
+do we need to append/alter "Notes on CTD/O2 Data Acquisition and Processing Using Seabird Hardware and Software" for GO-SHIP?
