@@ -9,7 +9,7 @@
  - pandas (>= v0.18.1)
 
 ###Overview of available scripts
-#### Utility for converting Seabird Electronics .hex/.XMLCON raw data into csv-formatted text files 
+#### Utility for converting Seabird Electronics .hex/.XMLCON raw data into csv-formatted text files
 ```
 usage: odf_convert_sbe.py [-h] [-d] [-r] [-o destDir] hex_file XMLCON_file
 
@@ -95,8 +95,9 @@ optional arguments:
 ```
 
 ### Additional information
- - Please take a look at [INSTALL.md](./INSTALL.md) for instructions on how to install the ORD-CTD-PROC Utilites.
+ - Please take a look at [INSTALL.md](./INSTALL.md) for instructions on how to install the ODF-CTD-PROC Utilites.
  - Please take a look at [SETUP.md](./SETUP.md) for recommendation on how to setup the SBE CTD Hardware and SBE Data Acquisition software.
- - Please take a look at [COOKBOOK.md](./COOKBOOK.md) for suggestions on how to leverage the ORD-CTD-PROC Utilites in a real-world, at-sea scenario.
+ - Please take a look at [COOKBOOK.md](./COOKBOOK.md) for suggestions on how to leverage the ODF-CTD-PROC Utilites in a real-world, at-sea scenario.
 
- 
+### LICENSING
+Coming soon 

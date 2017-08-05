@@ -28,9 +28,12 @@ For preliminary processing run the following command on each raw data file. The 
 
 This averages the ondeck pressure reading for the selected group of station casts and outputs the resulting suggested offset to a log file.
 
-./odf_fit_ctd.py data/time/ssscc_time.py -pres
+./odf_fit_ctd.py data/time/ssscc_time.cnv -pres
 
 This reads the log file and applies appropriate offset to selected file.
+
+------------xRange only applies to pressure, otherwise allow to run without arguments
+------------odf_fit_ctd.py automatically applies coefficients to both sensors if CT
 
 # Fit Temperature data
 ./odf_calibrate_ctd.py ssscc-ssscc -temp [-primary:-secondary] -calib P -order [0,1,2] -xRange [min:max]
@@ -41,14 +44,14 @@ This process reads sbe35 data for selected station casts and compares with ctd b
 need to specify reft_directory in config file and in directory structure for it to work
 
 Flags:
--temp 
+-temp
 -primary
 -secondary
 -calib, select only P (calibrate to pressure) for now
 -order, polynomial order of calibration
--xRange, range for calibration parameter 
+-xRange, range for calibration parameter
 
-./odf_fit_ctd.py data/time/ssscc_time.py -temp
+./odf_fit_ctd.py data/time/ssscc_time.csv -temp
 
 This reads the log file and applies appropriate coefficients to selected file.
 
@@ -60,14 +63,14 @@ example:
 This process reads bottle salinity data for selected station casts and compares with ctd bottle data. The residual differences are optimized through a polyfit routine and an optimal set of coefficients are recorded in a log file for each station cast.
 
 Flags:
--temp 
+-temp
 -primary
 -secondary
 -calib, select only P (calibrate to pressure) for now
 -order, polynomial order of calibration
--xRange, range for calibration parameter 
+-xRange, range for calibration parameter
 
-./odf_fit_ctd.py data/time/ssscc_time.py -cond
+./odf_fit_ctd.py data/time/ssscc_time.csv -cond
 
 This reads the log file and applies appropriate coefficients to selected file.
 
