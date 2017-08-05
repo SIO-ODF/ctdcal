@@ -71,6 +71,10 @@ def bottle_median(btl_df):
         i += 1
     return output
 
+
+#old code
+
+
 def handler(converted_file, config_file=False, debug=False):
     """Wrapper for the whole thing.
     Take in the file, then call other methods on it to process.

@@ -26,16 +26,16 @@ HEX_EXT = 'hex'
 
 #File extension to use for raw output
 BTL_SUFFIX = '_btl'
- 
+
 #File extension to use for raw output
 FIT_SUFFIX = '_fit'
- 
+
 #File extension to use for raw output
 MEAN_SUFFIX = '_mean'
- 
+
 #File extension to use for raw output
 TIME_SUFFIX = '_time'
- 
+
 #File extension to use for output files (csv-formatted)
 UPDT_SUFFIX = '_updt'
 
@@ -87,12 +87,12 @@ def main(argv):
     # Used later for building output file names
     filename_ext = os.path.basename(args.timeFile) # original filename with ext
     filename_base = os.path.splitext(filename_ext)[0] # original filename w/o ext
-   
+
     if '_' in filename_base:
         filename_base = filename_base.split('_')[0]
 
-    #Import Cruise Configuration File 
-    iniFile = 'data/ini-files/configuration.ini' 
+    #Import Cruise Configuration File
+    iniFile = 'data/ini-files/configuration.ini'
     config = configparser.RawConfigParser()
     config.read(iniFile)
 
@@ -142,7 +142,7 @@ def main(argv):
     lon_btl_col = config['inputs']['lon']
     reft_col = config['inputs']['reft']
     btl_num_col = config['inputs']['btl_num']
-    
+
     #time_column_data = config['time_series_output']['data_names'].split(',')
     time_column_data = config['time_series_output']['data_output']
     time_column_names = config['time_series_output']['column_name'].split(',')
@@ -179,7 +179,7 @@ def main(argv):
     btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',0)
     btl_data = btl_data[:][1:]
 
-    # Get procesed time data 
+    # Get procesed time data
     time_data = process_ctd.dataToNDarray(args.timeFile,float,True,',',1)
     btm = np.argmax(time_data[p_col][1:])
     time_data = time_data[:][1:btm]
@@ -198,17 +198,17 @@ def main(argv):
                         offset = float(str.split(val, ':')[1])
             continue
 
-        # Pressure offset  
+        # Pressure offset
         btl_data[p_btl_col] = fit_ctd.offset(offset, btl_data[p_btl_col])
         time_data[p_col] = fit_ctd.offset(offset, time_data[p_col])
-        # End pressure if condition 
+        # End pressure if condition
 
     if args.temperature:
         print('In -temp flag fit condition')
         print(filename_base)
         coef1 = []
         coef2 = []
-        # Get descrete ref temp data 
+        # Get descrete ref temp data
         t1fileName = str('fitting_t1' + '.' + FILE_EXT)
         t1filePath = os.path.join(log_directory, t1fileName)
         t1_coef = process_ctd.dataToNDarray(t1filePath,str,None,',',None)
@@ -222,8 +222,8 @@ def main(argv):
                     else:
                         coef1.append(float(val[i]))
             continue
-        btl_data[t1_btl_col] = fit_ctd.temperature_polyfit(coef1, btl_data[p_btl_col], btl_data[t1_btl_col], 'all')
-        time_data[t1_col] = fit_ctd.temperature_polyfit(coef1, time_data[p_col], time_data[t1_col], 'all')
+        btl_data[t1_btl_col] = fit_ctd.temperature_polyfit(coef1, btl_data[p_btl_col], btl_data[t1_btl_col])
+        time_data[t1_col] = fit_ctd.temperature_polyfit(coef1, time_data[p_col], time_data[t1_col])
 
         t2fileName = str('fitting_t2' + '.' + FILE_EXT)
         t2filePath = os.path.join(log_directory, t2fileName)
@@ -238,8 +238,8 @@ def main(argv):
                     else:
                         coef2.append(float(val[i]))
             continue
-        btl_data[t2_btl_col] = fit_ctd.temperature_polyfit(coef2, btl_data[p_btl_col], btl_data[t2_btl_col], 'all')
-        time_data[t2_col] = fit_ctd.temperature_polyfit(coef2, time_data[p_col], time_data[t2_col], 'all')
+        btl_data[t2_btl_col] = fit_ctd.temperature_polyfit(coef2, btl_data[p_btl_col], btl_data[t2_btl_col])
+        time_data[t2_col] = fit_ctd.temperature_polyfit(coef2, time_data[p_col], time_data[t2_col])
 
     if args.conductivity:
         print('In -cond flag fit condition')
@@ -247,39 +247,42 @@ def main(argv):
         coef1 = []
         coef2 = []
 
-        # Get descrete ref temp data 
+        # Get descrete cond data
+
         c1fileName = str('fitting_c1' + '.' + FILE_EXT)
         c1filePath = os.path.join(log_directory, c1fileName)
-        c1_coef = process_ctd.dataToNDarray(c1filePath,str,None,',',None)
+        if os.path.exists(c1filePath):
+            c1_coef = process_ctd.dataToNDarray(c1filePath,str,None,',',None)
 
-        for line in c1_coef:
-            if filename_base in line[0]:
-                val = line[1:]
-                for i in range(0,len(val)):
-                    if 'coef' in val[i]:
-                        coef1.append(float(str.split(val[i], ':')[1]))
-                    else:
-                        coef1.append(float(val[i]))
-            continue
-        btl_data[c1_btl_col] = fit_ctd.conductivity_polyfit(coef1, btl_data[p_btl_col], btl_data[t1_btl_col], btl_data[c1_btl_col])
-        time_data[c1_col] = fit_ctd.conductivity_polyfit(coef1, time_data[p_col], time_data[c1_col], time_data[c1_col])
+            for line in c1_coef:
+                if filename_base in line[0]:
+                    val = line[1:]
+                    for i in range(0,len(val)):
+                        if 'coef' in val[i]:
+                            coef1.append(float(str.split(val[i], ':')[1]))
+                        else:
+                            coef1.append(float(val[i]))
+                continue
+            btl_data[c1_btl_col] = fit_ctd.conductivity_polyfit(coef1, btl_data[p_btl_col], btl_data[t1_btl_col], btl_data[c1_btl_col])
+            time_data[c1_col] = fit_ctd.conductivity_polyfit(coef1, time_data[p_col], time_data[c1_col], time_data[c1_col])
 
         c2fileName = str('fitting_c2' + '.' + FILE_EXT)
         c2filePath = os.path.join(log_directory, c2fileName)
-        c2_coef = process_ctd.dataToNDarray(c2filePath,str,None,',',None)
+        if os.path.exists(c2filePath):
+            c2_coef = process_ctd.dataToNDarray(c2filePath,str,None,',',None)
 
-        for line in c2_coef:
-            if filename_base in line[0]:
-                val = line[1:]
-                for i in range(0,len(val)):
-                    if 'coef' in val[i]:
-                        coef2.append(float(str.split(val[i], ':')[1]))
-                    else:
-                        coef2.append(float(val[i]))
-            continue
-        btl_data[c2_btl_col] = fit_ctd.conductivity_polyfit(coef2, btl_data[p_btl_col], btl_data[t2_btl_col], btl_data[c2_btl_col])
-        time_data[c2_col] = fit_ctd.conductivity_polyfit(coef2, time_data[p_col], time_data[c2_col], time_data[c2_col])
-        
+            for line in c2_coef:
+                if filename_base in line[0]:
+                    val = line[1:]
+                    for i in range(0,len(val)):
+                        if 'coef' in val[i]:
+                            coef2.append(float(str.split(val[i], ':')[1]))
+                        else:
+                            coef2.append(float(val[i]))
+                continue
+            btl_data[c2_btl_col] = fit_ctd.conductivity_polyfit(coef2, btl_data[p_btl_col], btl_data[t2_btl_col], btl_data[c2_btl_col])
+            time_data[c2_col] = fit_ctd.conductivity_polyfit(coef2, time_data[p_col], time_data[c2_col], time_data[c2_col])
+
         time_data[sal_col] = gsw.SP_from_C(time_data[c_col],time_data[t_col],time_data[p_col])
 
     if args.oxygen:
@@ -287,7 +290,7 @@ def main(argv):
         print(filename_base)
         # Get Analytical Oxygen data
         o2pkg_btl, o2pl_btl = fit_ctd.o2_calc(o2flask_file,args.oxygen.name,btl_data[btl_num_col],btl_data[sal_btl_col])
-    
+
         kelvin = []
         for i in range(0,len(time_data[t_col])):
             kelvin.append(time_data[t_col][i] + 273.15)
@@ -331,6 +334,7 @@ def main(argv):
 
     # Write time data to file
     depth = -999
+    #import pdb; pdb.set_trace()
     report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, p_column_data, qual_pseq_data, dopkg, pressure_seq_data)
 
     #plt.plot(o2pl_btl['OXYGEN'], btl_data[p_btl_col], color='b', marker='o')

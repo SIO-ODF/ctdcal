@@ -1,4 +1,5 @@
 .DS_Store
+__pycache__/
 data/raw/*
 data/converted/*
 data/GS*

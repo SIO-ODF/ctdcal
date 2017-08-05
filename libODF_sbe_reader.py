@@ -36,7 +36,8 @@ class SBEReader():
     def _load_hex(self):
         split_lines = self.raw_hex.splitlines()
         self.raw_bytes = [l.strip().encode("utf-8") for l in split_lines if not l.startswith("*")]
-
+        #next few lines are to grab start_scan_time
+        self.raw_comments = [l.strip().split() for l in split_lines if l.startswith("*")]
 
     def _check_scan_lengths(self):
         if not all([len(scan) == self.scan_length for scan in self.raw_bytes]):
@@ -113,11 +114,11 @@ class SBEReader():
         flag_spar = 0
         #put in to make code readable later on
         flag_pressure_temp = 1
-        flag_status = 1
+        flag_ctd_status = 1
         flag_modulo = 1
         if self.config["SurfaceParVoltageAdded"]:
             flag_spar = 1
-            string_order.append('spar')
+            #string_order.append('spar') #already added into mass line, does not need additional flag
         if self.config["NmeaPositionDataAdded"]:
             flag_nmea_pos = 1
             string_order.append('nmea_pos')
@@ -130,7 +131,7 @@ class SBEReader():
             flag_nmea_time = 1
             string_order.append('nmea_time')
         string_order.append('pressure_temp')
-        string_order.append('btl_status')
+        string_order.append('flag_ctd_status')
         string_order.append('modulo')
         if self.config["ScanTimeAdded"]:
             flag_scan_time = 1
@@ -145,16 +146,23 @@ class SBEReader():
             "6s" * flag_nmea_depth +
             "8s" * flag_nmea_time +
             "3s" * flag_pressure_temp +
-            "1s" * flag_status +
+            "1s" * flag_ctd_status +
             "2s" * flag_modulo +
             "8s" * flag_scan_time)
         #breaks down line according to columns specified by unpack_str and converts from hex to decimal MSB first
         #needs to be adjusted for LSB fields (NMEA time, scan time), break into two lines? move int(x,16) outside
         measurements = [line for line in struct.iter_unpack(unpack_str, the_bytes)]
-        print(string_order)
-        measurements_2 = np.array([self._breakdown(line, string_order) for line in measurements])
-
-        return measurements_2
+        #print(unpack_str)
+        #measurements_2 = np.array([self._breakdown(line, string_order) for line in measurements])
+        measurements_2 = [self._breakdown(line, string_order) for line in measurements]
+        #if no time is enabled, fake the scan timestamp from info in the .hex file
+        if flag_scan_time == 0:
+            measurements_3 = self._sbe_time_seq(measurements_2)
+#            print(True)
+            measurements_3 = np.array(measurements_3)
+            return measurements_3
+        #print(measurements_3)
+        return np.array(measurements_2)
 
 
     def _breakdown(self, line, ordering):
@@ -177,10 +185,11 @@ class SBEReader():
         Lat, Lon, pressure temp, bottle fire status, NMEA time, Scan time
         '''
         output = ''
-
+        #print(ordering, line)
         for x, y in zip(ordering, line):
             if x == 'nmea_pos':
                 tokens = []
+                #print(y)
                 for t in struct.iter_unpack("2s2s2s2s2s2s2s", y):
                     for tt in t:
                         tokens.append(tt)
@@ -189,8 +198,8 @@ class SBEReader():
                 output = output + str(self._sbe_time(self._reverse_bytes(y), 'nmea')) + ','
             elif x == 'scan_time':
                 output = output + str(self._sbe_time(self._reverse_bytes(y), 'scan'))
-            elif x == 'btl_status':
-                output = output + str(self._bottle_fire(y)) + ','
+            elif x == 'flag_ctd_status':
+                output = output + str(self._pump_status(y)) + ',' + str(self._bottle_fire(y)) + ',' #need to make final comma dynamic later so less errors down the line
             elif x == 'pressure_temp':
                 output = output + str(int(y, 16)) + ','
 
@@ -213,11 +222,15 @@ class SBEReader():
             output[1].append('float64')
         output[0].append('pressure_temp_int')
         output[1].append('int_')
+        output[0].append('pump_on')
+        output[1].append('bool_')
         output[0].append('btl_fire')
         output[1].append('bool_')
-        if self.config["ScanTimeAdded"]:
-            output[0].append('scan_datetime')
-            output[1].append('float64')
+        #if self.config["ScanTimeAdded"]: #need to fix flagging part
+            #output[0].append('scan_datetime')
+            #output[1].append('float64')
+        output[0].append('scan_datetime')
+        output[1].append('float64')
 
         return output
 
@@ -272,10 +285,8 @@ class SBEReader():
         The final output is guaranteed to have '0x' at the beginning.
         """
         time = hex_time.decode("utf-8")
-        #print(time)
         if re.match('0x', time):
             time = time[2:]
-        #print(time)
         if (len(time) % 2) == 1:
             time = '0' + time
 
@@ -288,6 +299,7 @@ class SBEReader():
             reverse_hex = reverse_hex + list_1[y]
         """Add prefix to make python hex compatible"""
         reverse_hex = '0x' + reverse_hex
+        #print('Output of reverse_hex: ' + reverse_hex)
         return reverse_hex
 
 
@@ -317,7 +329,6 @@ class SBEReader():
             raise Exception('Hex string too short to be SBE formatted time: ' + hex_time)
 
         seconds = datetime.timedelta(seconds = int(hex_time, 16))
-
         #changed to epoch time at request of analysts
         #epoch time assumes it is UTC all way through
         if sbe_type == "scan":
@@ -332,6 +343,57 @@ class SBEReader():
             return time.replace(tzinfo=timezone('UTC')).timestamp()
         else:
             raise Exception('Please choose "nmea" or "scan" for second input to _sbe_time()')
+
+    def _sbe_time_create(self, utc_time, sbe_type = 'scan'):
+        '''Reverse of _sbe_time, create a sbe timestamp in hex to append to file.
+        Useful when SBE acquisition software does not have NMEA time or scan time activated.
+
+        The inverse of _sbe_time
+
+        Input:
+        utc_time: datetime
+        '''
+
+        #values as state by SBE in manual
+        scan_start = datetime.datetime(1970, 1, 1, 0, 0, 0, tzinfo=timezone('UTC'))
+        nmea_start = datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=timezone('UTC'))
+        utc_time = utc_time.replace(tzinfo=timezone('UTC'))
+        if sbe_type == 'scan':
+            time = utc_time - scan_start
+        elif sbe_type == 'nmea':
+            time = utc_time - nmea_start
+
+        #timedelta method to return seconds from any timedelta format
+        hex_time = hex(int(time.total_seconds()))
+
+        output = self._reverse_bytes(bytearray(hex_time,'utf-8'))
+        return output
+
+    def _sbe_time_seq(self, data_list):
+        '''Recreates the scan timestamp if the option was not enabled in SBE acq.
+        Accurate to 1 second/24hz, as it uses the start time in the second to last line of the .hex file.
+
+        Sequencer will run over a processed file/list? and append the scan time at the end.
+        '''
+        #Pull out the second to last line of the comments in .hex,
+        #then pull out the datetime info at the end of the line, then format
+        start_month = self.raw_comments[-2][-4]
+        start_day = self.raw_comments[-2][-3]
+        start_year = self.raw_comments[-2][-2]
+        start_time = self.raw_comments[-2][-1]
+
+        start_scan_time = datetime.datetime.strptime(start_month + start_day + start_year + start_time, '%b%d%Y%H:%M:%S')
+        current_scan_time = start_scan_time
+        hz_counter = 0
+        output = []
+        for l in data_list:
+            if hz_counter >= 24:
+                hz_counter = 0
+                current_scan_time = current_scan_time + datetime.timedelta(seconds=1)
+            l = l + str(current_scan_time.replace(tzinfo=timezone('UTC')).timestamp())
+            output.append(l)
+            hz_counter += 1
+        return output
 
 
     def _flag_status(self, flag_char, scan_number):
@@ -376,6 +438,17 @@ class SBEReader():
 
         return output
 
+    def _pump_status(self, flag_char):
+        '''Decode SBE flag bit, as referenced on SBE 11pV2, pg 66.
+        CTD status:
+            Bit 0 Pump status- 1=pump on, 0=pump off.
+        '''
+        mask_pump = 1
+
+        if int(flag_char) & mask_pump:
+            return True
+        else:
+            return False
 
     def _bottle_fire(self, flag_char):
         """Determine if a scan is around a bottle firing as marked by SBE.
