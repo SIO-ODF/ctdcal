@@ -246,7 +246,7 @@ def importConvertedFile(file_name, debug=False):
     """
     try:
         output_df = pd.read_pickle(file_name)
-    except:
+    except FileNotFoundError:
         global DEBUG
         DEBUG = debug
 

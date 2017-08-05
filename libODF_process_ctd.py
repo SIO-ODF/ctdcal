@@ -67,7 +67,7 @@ def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_c
                                    bottom_cast_time, start_pressure, max_pressure, b_alti,
                                    b_lat, b_lon)
     #reconvert to ndarray - might need to be altered to remove second index
-    inMat = df_cast2.to_records(index=False)
+    inMat = df_cast2.loc[:df_cast2['CTDPRS_DBAR'].idxmax()].to_records(index=False)
 
     return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
 #Move next four functions to a library or class(?) Clean up module
@@ -300,13 +300,13 @@ def dataToNDarray(inFile, dtype=None, names=None, separator=',', skip=None):
     Reference Page:
         https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
     """
-    #try:
-        
-    #except:
-    if skip is None:
-        arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names)
-    else:
-        arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=skip)
+    try:
+        return pd.read_pickle(inFile).to_records()
+    except:
+        if skip is None:
+            arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names)
+        else:
+            arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=skip)
 
     return arr
 
