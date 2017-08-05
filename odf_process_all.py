@@ -9,7 +9,7 @@ import time
 import sys
 
 def process_all():
-    prefix = 'nbp1701_'
+    prefix = 'nbp1706_'
     btl = '.btl'
     ros = '.ros'
     cnv = '.cnv'
@@ -27,7 +27,7 @@ def process_all():
     cnv_dir_list = os.listdir('data/converted/')
 
     for x in ssscc:
-        if '{}_cnv.csv'.format(x) in cnv_dir_list:
+        if '{}_cnv.pkl'.format(x) in cnv_dir_list:
             continue
         #convert hex to ctd
         subprocess.run(['python3', './odf_convert_sbe.py', 'data/raw/' + x + '.hex', 'data/raw/' + x + '.XMLCON', '-o', 'data/converted'], stdout=subprocess.PIPE)
@@ -37,10 +37,10 @@ def process_all():
 
     btl_dir_list = os.listdir('data/bottle/')
     for x in ssscc:
-        if '{}_btl.csv'.format(x) in btl_dir_list:
+        if '{}_btl.pkl'.format(x) in btl_dir_list:
             continue
         #process bottle file
-        subprocess.run(['python3', './odf_process_bottle.py', 'data/converted/' + x + '_cnv.csv', '-o', 'data/bottle/'], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_process_bottle.py', 'data/converted/' + x + '_cnv.pkl', '-o', 'data/bottle/'], stdout=subprocess.PIPE)
         print('odf_process_bottle.py SSSCC: ' + x + ' done')
     time_bottle = time.perf_counter()
 

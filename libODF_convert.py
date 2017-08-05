@@ -240,41 +240,44 @@ def convertFromSBEReader(sbeReader, debug=False):
     return converted_df
 
 
-def importConvertedFile(fileName, debug=False):
+def importConvertedFile(file_name, debug=False):
 
     """Handler to import converted data from a csv-formatted file created by run.py
     """
-    global DEBUG
-    DEBUG = debug
+    try:
+        output_df = pd.read_pickle(file_name)
+    except:
+        global DEBUG
+        DEBUG = debug
 
-    debugPrint("Importing data from:", fileName + '... ', end='')
-    output_df = pd.read_csv(fileName, index_col=0, skiprows=[1], parse_dates=False)
-    #debugPrint(output_df.head())
-    header_raw = output_df.columns.values.tolist()
-    header_type = []
+        debugPrint("Importing data from:", file_name + '... ', end='')
+        output_df = pd.read_csv(file_name, index_col=0, skiprows=[1], parse_dates=False)
+        #debugPrint(output_df.head())
+        header_raw = output_df.columns.values.tolist()
+        header_type = []
 
-    with open(fileName) as csvfile:
-        dtypeReader = csv.reader(csvfile, delimiter=',')
-        dtypeReader.__next__() # skip first row
-        dtype_header = dtypeReader.__next__() #second row
-        dtype_header.pop(0) #remove 'index' from left of dtype list
-        #debugPrint(dtype_header)
+        with open(file_name) as csvfile:
+            dtypeReader = csv.reader(csvfile, delimiter=',')
+            dtypeReader.__next__() # skip first row
+            dtype_header = dtypeReader.__next__() #second row
+            dtype_header.pop(0) #remove 'index' from left of dtype list
+            #debugPrint(dtype_header)
 
-    for i, x in enumerate(dtype_header):
-        #debugPrint('Set', header_raw[i], 'to', dtype_header[i])
-        if dtype_header[i] == 'bool_':
-            d = {'True': True, 'False': False}
-            output_df[header_raw[i]].map(d)
-        elif dtype_header[i] == 'datetime_':
-            output_df[header_raw[i]] = output_df[header_raw[i]].astype('datetime64')
-        elif dtype_header[i] == 'int_':
-            output_df[header_raw[i]] = output_df[header_raw[i]].astype('int64')
-        elif dtype_header[i] == 'float_':
-            output_df[header_raw[i]] = output_df[header_raw[i]].astype('float64')
+        for i, x in enumerate(dtype_header):
+            #debugPrint('Set', header_raw[i], 'to', dtype_header[i])
+            if dtype_header[i] == 'bool_':
+                d = {'True': True, 'False': False}
+                output_df[header_raw[i]].map(d)
+            elif dtype_header[i] == 'datetime_':
+                output_df[header_raw[i]] = output_df[header_raw[i]].astype('datetime64')
+            elif dtype_header[i] == 'int_':
+                output_df[header_raw[i]] = output_df[header_raw[i]].astype('int64')
+            elif dtype_header[i] == 'float_':
+                output_df[header_raw[i]] = output_df[header_raw[i]].astype('float64')
 
-    debugPrint("Done!")
+        debugPrint("Done!")
 
-    # return the imported data as a dataframe
+        # return the imported data as a dataframe
     return output_df
 
 
