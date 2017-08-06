@@ -27,7 +27,7 @@ def process_all():
     cnv_dir_list = os.listdir('data/converted/')
 
     for x in ssscc:
-        if '{}_cnv.pkl'.format(x) in cnv_dir_list:
+        if '{}.pkl'.format(x) in cnv_dir_list:
             continue
         #convert hex to ctd
         subprocess.run(['python3', './odf_convert_sbe.py', 'data/raw/' + x + '.hex', 'data/raw/' + x + '.XMLCON', '-o', 'data/converted'], stdout=subprocess.PIPE)
@@ -35,12 +35,18 @@ def process_all():
 
     time_convert = time.perf_counter()
 
+    for x in ssscc:
+        # if '{}.pkl'.format(x) in cnv_dir_list:
+        #     continue
+        subprocess.run(['python3', './odf_sbe_metadata.py', 'data/converted/' + x + '.pkl'], stdout=subprocess.PIPE)
+        print('odf_sbe_metadata.py SSSCC: ' + x + ' done')
+
     btl_dir_list = os.listdir('data/bottle/')
     for x in ssscc:
-        if '{}_btl.pkl'.format(x) in btl_dir_list:
+        if '{}_btl_mean.pkl'.format(x) in btl_dir_list:
             continue
         #process bottle file
-        subprocess.run(['python3', './odf_process_bottle.py', 'data/converted/' + x + '_cnv.pkl', '-o', 'data/bottle/'], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_process_bottle.py', 'data/converted/' + x + '.pkl', '-o', 'data/bottle/'], stdout=subprocess.PIPE)
         print('odf_process_bottle.py SSSCC: ' + x + ' done')
     time_bottle = time.perf_counter()
 
