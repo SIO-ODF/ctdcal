@@ -54,20 +54,21 @@ def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_c
     df_cast2 = trim_soak_period_from_df(df_cast)
 
     start_cast_time = float(df_cast2['scan_datetime'].head(1))
-    start_pressure = float(df_cast2['CTDPRS_DBAR'].head(1))
+    start_pressure = float(df_cast2['CTDPRS'].head(1))
     end_cast_time = float(df_cast2['scan_datetime'].tail(1))
-    max_pressure = float(df_cast2['CTDPRS_DBAR'].max())
-    bottom_cast_time = float(df_cast2.loc[df_cast2['CTDPRS_DBAR'].idxmax()]['scan_datetime'])
-    b_lat = float(df_cast2.loc[df_cast2['CTDPRS_DBAR'].idxmax()]['LATITUDE'])
-    b_lon = float(df_cast2.loc[df_cast2['CTDPRS_DBAR'].idxmax()]['LONGITUDE'])
-    b_alti = float(df_cast2.loc[df_cast2['CTDPRS_DBAR'].idxmax()]['ALT_M'])
+    max_pressure = float(df_cast2['CTDPRS'].max())
+    bottom_cast_time = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['scan_datetime'])
+    b_lat = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['LATITUDE'])
+    b_lon = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['LONGITUDE'])
+    b_alti = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['ALT'])
 
     #last two lines must be in to return the same as old - change to slices of df later
     report_ctd.report_cast_details(stacast, log_file, start_cast_time, end_cast_time,
                                    bottom_cast_time, start_pressure, max_pressure, b_alti,
                                    b_lat, b_lon)
     #reconvert to ndarray - might need to be altered to remove second index
-    inMat = df_cast2.loc[:df_cast2['CTDPRS_DBAR'].idxmax()].to_records(index=False)
+    # inMat = df_cast2.loc[:df_cast2['CTDPRS'].idxmax()].to_records(index=False)
+    inMat = df_cast2.loc[:df_cast2['CTDPRS'].idxmax()]
 
     return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
 #Move next four functions to a library or class(?) Clean up module
@@ -80,9 +81,9 @@ def find_max_pressure_df(dfs):
     '''Giving a list of data frames, return a reference to the frame with which contians the highest pressure value
     '''
     max_pressure_df = dfs[0]
-    max_pressure = max_pressure_df['CTDPRS_DBAR'].max() #TODO make into config var
+    max_pressure = max_pressure_df['CTDPRS'].max() #TODO make into config var
     for df in dfs:
-        if df['CTDPRS_DBAR'].max() > max_pressure:
+        if df['CTDPRS'].max() > max_pressure:
             max_pressure_df = df
     return max_pressure_df
 
@@ -94,7 +95,7 @@ def find_pumps_on_dfs(dfs):
 def trim_soak_period_from_df(df):
     '''Look for minimum pressure in dataframe, then return everything after minimum pressure/top of cast.
     '''
-    test = int(df.loc[1:(len(df)/4),['CTDPRS_DBAR']].idxmin())
+    test = int(df.loc[1:(len(df)/4),['CTDPRS']].idxmin())
     return df.loc[test:]
 #End move four functions
 # def cast_details_old(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
@@ -519,7 +520,7 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
     return outMat
 
-def _roll_filter(df, pressure_column="CTDPRS_DBAR", direction="down"):
+def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
     #fix/remove try/except once serialization is fixed
     try:
         if direction == 'down':

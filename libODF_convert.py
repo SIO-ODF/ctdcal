@@ -174,7 +174,7 @@ def convertFromSBEReader(sbeReader, debug=False):
 
     for temp_meta in queue_metadata:
 
-        column_name = '{0}{1}_{2}'.format(short_lookup[temp_meta['sensor_id']]['short_name'], temp_meta['channel_pos'], short_lookup[temp_meta['sensor_id']]['units'])
+        column_name = '{0}{1}'.format(short_lookup[temp_meta['sensor_id']]['short_name'], temp_meta['channel_pos'])
 
         ###Temperature block
         if temp_meta['sensor_id'] == '55':
