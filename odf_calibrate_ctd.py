@@ -22,6 +22,7 @@ DEBUG = False
 
 #File extension to use for output files (csv-formatted)
 FILE_EXT = 'csv'
+PKL_EXT = 'pkl'
 
 #File extension to use for raw output
 REFT_SUFFIX = '_reft'
@@ -171,7 +172,7 @@ def main(argv):
         if args.bottle_data:
             for sc in file_base_arr:
                 # Collect bottle data
-                btlfileName = str(sc + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
+                btlfileName = str(sc + BTL_SUFFIX + MEAN_SUFFIX + '.' + PKL_EXT)
                 btlfilePath = os.path.join(btl_directory, btlfileName)
                 if os.path.isfile(btlfilePath):
                     btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
@@ -180,7 +181,7 @@ def main(argv):
                     print("Missing file: "+btlfilePath)
                     break
 
-                timefileName = str(sc + TIME_SUFFIX + '.' + FILE_EXT)
+                timefileName = str(sc + TIME_SUFFIX + '.' + PKL_EXT)
                 timefilePath = os.path.join(time_directory, timefileName)
                 if os.path.isfile(timefilePath):
                     time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
@@ -290,7 +291,7 @@ def main(argv):
         if os.path.exists(qualfilePath): os.remove(qualfilePath)
 
         for filename_base in file_base_arr:
-            btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
+            btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + PKL_EXT)
             btlfilePath = os.path.join(btl_directory, btlfileName)
             if os.path.isfile(btlfilePath):
                 btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
@@ -299,7 +300,7 @@ def main(argv):
                 print("Missing file: "+btlfilePath)
                 sys.exit()
 
-            timefileName = str(filename_base + TIME_SUFFIX + '.' + FILE_EXT)
+            timefileName = str(filename_base + TIME_SUFFIX + '.' + PKL_EXT)
             timefilePath = os.path.join(time_directory, timefileName)
             if os.path.isfile(timefilePath):
                 time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
@@ -322,7 +323,6 @@ def main(argv):
                 saltfilePath = os.path.join(salt_directory, saltfileName)
                 if os.path.isfile(saltfilePath):
                     print("Processing "+ filename_base)
-                    #cond_btl, salt_btl = fit_ctd.salt_calc(saltfilePath,btl_num_col,t1_btl_col,p_btl_col,btl_data)
                     ref_btl, salt_btl = fit_ctd.salt_calc(saltfilePath,btl_num_col,t1_btl_col,p_btl_col,btl_data)
                 else:
                     print("Missing reference salinity data for "+ filename_base + " in " + salt_directory)
@@ -332,7 +332,6 @@ def main(argv):
             # Search bottle number
                 j = ref_btl[btl_num_col][i]
                 if j != 0:
-                    #import pdb; pdb.set_trace()
                     k = int(np.where(btl_data[btl_num_col] == j)[0][0])
                     d1 = ref_btl[ref_col][i] - btl_data[ctd1_btl_col][k]
                     d2 = ref_btl[ref_col][i] - btl_data[ctd2_btl_col][k]

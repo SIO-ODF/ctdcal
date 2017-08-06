@@ -181,30 +181,32 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
     Returns:
         No return
     """
+    try:
+        inMat.to_pickle(printdir)
+    except:
+        if inMat is None:
+           print("In report_time_series_data: No data")
+           return
+        else:
+            out_col = []
+            now = datetime.datetime.now()
+            file_datetime = now.strftime("%Y%m%d %H:%M")
 
-    if inMat is None:
-       print("In report_time_series_data: No data")
-       return
-    else:
-        out_col = []
-        now = datetime.datetime.now()
-        file_datetime = now.strftime("%Y%m%d %H:%M")
+            outfile = open(printdir+stacast+'_time.csv', "w+")
+            outfile.write('expocode: '+expocode+', station cast: '+stacast+', printed: '+file_datetime+'\n')
+            cn = np.asarray(column_names)
+            cn.tofile(outfile,sep=',', format='%s')
+            outfile.write('\n')
+            cu = np.asarray(column_units)
+            cu.tofile(outfile,sep=',', format='%s')
+            outfile.write('\n')
 
-        outfile = open(printdir+stacast+'_time.csv', "w+")
-        outfile.write('expocode: '+expocode+', station cast: '+stacast+', printed: '+file_datetime+'\n')
-        cn = np.asarray(column_names)
-        cn.tofile(outfile,sep=',', format='%s')
-        outfile.write('\n')
-        cu = np.asarray(column_units)
-        cu.tofile(outfile,sep=',', format='%s')
-        outfile.write('\n')
-
-        # Need to rewrite to remove hardcoded column data.
-        # No ideal method to print formatted output to csv in python ATM
-        # Other attemps to import formats from config file
-        # or use savetxt and csv have been buggy so far
-        for i in range(0,len(inMat)-1):
-            outfile.write('%9.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%12d,%10.5f,%10.5f\n' % (inMat[column_data[0]][i], inMat[column_data[1]][i], inMat[column_data[2]][i], inMat[column_data[3]][i], inMat[column_data[4]][i], inMat[column_data[5]][i], inMat[column_data[6]][i], inMat[column_data[7]][i], inMat[column_data[8]][i], inMat[column_data[9]][i], inMat[column_data[10]][i], inMat[column_data[11]][i], inMat[column_data[12]][i]))
+            # Need to rewrite to remove hardcoded column data.
+            # No ideal method to print formatted output to csv in python ATM
+            # Other attemps to import formats from config file
+            # or use savetxt and csv have been buggy so far
+            for i in range(0,len(inMat)-1):
+                outfile.write('%9.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%10.4f,%12d,%10.5f,%10.5f\n' % (inMat[column_data[0]][i], inMat[column_data[1]][i], inMat[column_data[2]][i], inMat[column_data[3]][i], inMat[column_data[4]][i], inMat[column_data[5]][i], inMat[column_data[6]][i], inMat[column_data[7]][i], inMat[column_data[8]][i], inMat[column_data[9]][i], inMat[column_data[10]][i], inMat[column_data[11]][i], inMat[column_data[12]][i]))
 
     return
 

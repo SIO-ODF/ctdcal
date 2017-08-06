@@ -17,6 +17,7 @@ DEBUG = False
 
 #File extension to use for output files (csv-formatted)
 FILE_EXT = 'csv'
+PKL_EXT = 'pkl'
 
 #File extension to use for output files (csv-formatted)
 XML_EXT = 'XMLCON'
@@ -166,13 +167,13 @@ def main(argv):
     xmlfileName = str(filename_base + '.' + XML_EXT)
     xmlfilePath = os.path.join(raw_directory, xmlfileName)
 
-    outtimefileName = str(filename_base + TIME_SUFFIX + '.' + FILE_EXT)
+    outtimefileName = str(filename_base + TIME_SUFFIX + '.' + PKL_EXT)
     outtimefilePath = os.path.join(time_directory, outtimefileName)
 
-    pressfileName = str(filename_base + FIT_SUFFIX + '.' + FILE_EXT)
-    pressfilePath = os.path.join(pressure_directory, pressfileName)
+    # pressfileName = str(filename_base + FIT_SUFFIX + '.' + FILE_EXT)
+    # pressfilePath = os.path.join(pressure_directory, pressfileName)
 
-    btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT)
+    btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + PKL_EXT)
     btlfilePath = os.path.join(btl_directory, btlfileName)
 
     # Get bottle data
