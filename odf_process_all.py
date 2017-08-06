@@ -25,6 +25,7 @@ def process_all():
     #check for already converted files to skip later
     time_start = time.perf_counter()
     cnv_dir_list = os.listdir('data/converted/')
+    time_dir_list = os.listdir('data/time/')
 
     for x in ssscc:
         if '{}.pkl'.format(x) in cnv_dir_list:
@@ -36,8 +37,8 @@ def process_all():
     time_convert = time.perf_counter()
 
     for x in ssscc:
-        # if '{}.pkl'.format(x) in cnv_dir_list:
-        #     continue
+        if '{}_time.pkl'.format(x) in time_dir_list:
+            continue
         subprocess.run(['python3', './odf_sbe_metadata.py', 'data/converted/' + x + '.pkl'], stdout=subprocess.PIPE)
         print('odf_sbe_metadata.py SSSCC: ' + x + ' done')
 
@@ -59,7 +60,7 @@ def process_all():
 
     for x in ssscc:
         #apply pressure offset to selected files
-        subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.csv', '-pres'], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.pkl', '-pres'], stdout=subprocess.PIPE)
         print('odf_fit_ctd.py pressure fit SSSCC: ' + x + ' done')
     time_pressure_fit = time.perf_counter()
 
@@ -81,7 +82,7 @@ def process_all():
 
         #apply temperature fits to cast data (time)
         for x in ssscc:
-            subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.csv', '-temp'], stdout=subprocess.PIPE)
+            subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.pkl', '-temp'], stdout=subprocess.PIPE)
             print('odf_fit_ctd.py temp coefficients appplied to SSSCC: ' + x + ' done')
 
         subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'T', '-primary', '-order', '1'], stdout=subprocess.PIPE)
@@ -91,7 +92,7 @@ def process_all():
 
         time_temperature_calibrate = time.perf_counter()
         for x in ssscc:
-            subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.csv', '-temp'], stdout=subprocess.PIPE)
+            subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.pkl', '-temp'], stdout=subprocess.PIPE)
             print('odf_fit_ctd.py temp coefficients appplied to SSSCC: ' + x + ' done')
         time_temperature_fit = time.perf_counter()
 
@@ -111,7 +112,7 @@ def process_all():
 
         #apply conductivity fits to cast data (time)
         for x in ssscc:
-            subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.csv', '-cond'], stdout=subprocess.PIPE)
+            subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.pkl', '-cond'], stdout=subprocess.PIPE)
             print('odf_fit_ctd.py cond coefficients appplied to SSSCC: ' + x + ' done')
         time_conductivity_fit = time.perf_counter()
 
@@ -122,7 +123,7 @@ def process_all():
 
         #apply conductivity fits to cast data (time)
         for x in ssscc:
-            subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.csv', '-cond'], stdout=subprocess.PIPE)
+            subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.pkl', '-cond'], stdout=subprocess.PIPE)
             print('odf_fit_ctd.py cond coefficients appplied to SSSCC: ' + x + ' done')
         time_conductivity_fit = time.perf_counter()
 
@@ -130,7 +131,7 @@ def process_all():
 
     #apply oxygen fits to cast data (time)
     for x in ssscc:
-        subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.csv', '-oxy', 'data/oxygen/' + x], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_fit_ctd.py', 'data/time/' + x + '_time.pkl', '-oxy', 'data/oxygen/' + x], stdout=subprocess.PIPE)
         print('odf_fit_ctd.py oxy coefficients appplied to SSSCC: ' + x + ' done')
     time_oxygen_fit = time.perf_counter()
 
