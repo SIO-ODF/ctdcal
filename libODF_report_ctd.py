@@ -182,7 +182,9 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
         No return
     """
     try:
-        inMat.to_pickle(printdir)
+        inMat = pd.DataFrame.from_records(inMat)
+        inMat = inMat.iloc[:, 1:]
+        inMat.to_pickle(printdir+stacast+'_time.pkl')
     except:
         if inMat is None:
            print("In report_time_series_data: No data")
@@ -266,6 +268,10 @@ def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_l
         # Need to rewrite to remove hardcoded column data.
         # No ideal method to print formatted output to csv in python ATM
         for i in range(0,len(inMat)):
-            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d\n" % (inMat[p_column_data[0]][i], qualMat[i][0], inMat[p_column_data[1]][i], qualMat[i][1], inMat[p_column_data[2]][i], qualMat[i][2], doArr['CTDOXY'][i], qualMat[i][3], inMat[p_column_data[3]][i], qualMat[i][4], inMat[p_column_data[4]][i], qualMat[i][5]))
+            #import pdb; pdb.set_trace()
+            ### Alter configuration.ini in pressure_series in order to change output
+            ### Will need to be altered in order to put out RINKO in UMOL/KG
+            ### CTDOXY is slipped in and piggybacks on CTDXMISS qual code
+            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d\n" % (inMat[p_column_data[0]][i], qualMat[i][0], inMat[p_column_data[1]][i], qualMat[i][1], inMat[p_column_data[2]][i], qualMat[i][2], doArr['CTDOXY'][i], qualMat[i][3], inMat[p_column_data[3]][i], qualMat[i][3], inMat[p_column_data[4]][i], qualMat[i][4],inMat[p_column_data[5]][i], qualMat[i][5], inMat[p_column_data[6]][i], qualMat[i][6]))
         outfile.write('END_DATA')
     return
