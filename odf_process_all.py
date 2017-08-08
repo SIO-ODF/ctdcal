@@ -135,6 +135,9 @@ def process_all():
         print('odf_fit_ctd.py oxy coefficients appplied to SSSCC: ' + x + ' done')
     time_oxygen_fit = time.perf_counter()
 
+    subprocess.run(['python3', './ctd_to_bottle.py'], stdout=subprocess.PIPE)
+    time_bottle_file = time.perf_counter()
+
     time_end = time.perf_counter()
     print(str(time_end - time_start) + ' total seconds elapsed via perf_counter(), ' + str((time_end - time_start)/60) + ' minutes elapsed')
     print(str(time_convert - time_start) + ' seconds elapsed converting raw files')
@@ -146,6 +149,7 @@ def process_all():
     print(str(time_conductivity_calibrate - time_temperature_fit) + ' seconds elapsed conductivity calib')
     print(str(time_conductivity_fit - time_conductivity_calibrate) + ' seconds elapsed conductivity fit')
     print(str(time_oxygen_fit - time_conductivity_fit) + ' seconds elapsed oxygen fit')
+    print(str(time_bottle_file - time_oxygen_fit) + ' seconds elapsed bottle file creation')
 
 def main(argv):
     '''Run everything.
