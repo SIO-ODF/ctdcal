@@ -9,8 +9,8 @@ def main(argv):
     Needs to be cleaned up from script form to other form, hopefully
     '''
     #general fileloading area
-    output_file = '/Users/jgum/work_code/cruises/P06_2017/ctd_proc_rewrite/data/scratch_folder/ctd_to_bottle.csv'
-    file_ssscc = '/Users/jgum/work_code/cruises/P06_2017/ssscc.csv'
+    output_file = './data/scratch_folder/ctd_to_bottle.csv'
+    file_ssscc = '../ssscc.csv'
     df_all = pd.DataFrame()
 
     all_casts = []
@@ -21,17 +21,21 @@ def main(argv):
         station = int(ssscc[0:3])
         cast = int(ssscc[3:5])
         #bottle handling section
-        dir_bottle = '/Users/jgum/work_code/cruises/P06_2017/ctd_proc_rewrite/data/bottle/'
-        bottle_postfix = '_btl_mean.csv'
+        dir_bottle = './data/bottle/'
+        bottle_postfix = '_btl_mean.pkl'
         btl_skiprows = [0,1]
         btl_names = ['SAMPNO','CTDPRS']
         btl_usecols = [0,3]
 
-        df_bottle = pd.read_csv(dir_bottle + ssscc + bottle_postfix, skiprows=btl_skiprows, names=btl_names, usecols = btl_usecols)
+        #df_bottle = pd.read_csv(dir_bottle + ssscc + bottle_postfix, skiprows=btl_skiprows, names=btl_names, usecols = btl_usecols)
+        df_bottle = pd.read_pickle(f"{dir_bottle}{ssscc}{bottle_postfix}")
+        df_bottle.rename(index=str, columns={'FREE1':'CTDFLUOR', 'FREE2':'CTDBACKSCATTER', 'FREE3':'CTDRINKO', 'btl_fire_num':'SAMPNO', 'CTDTMP1':'CTDTMP', 'CTDOXY1':'CTDOXY'}, inplace=True)
+        df_bottle = df_bottle.loc[:,['CTDPRS', 'SAMPNO']]
         df_bottle['bins'] = pd.cut(df_bottle['CTDPRS'], range(0,int(np.ceil(df_bottle['CTDPRS'].max()))+5,2), right=False, include_lowest=True)
+        #import pdb; pdb.set_trace()
 
         #ctd handling section
-        dir_ctd = '/Users/jgum/work_code/cruises/P06_2017/ctd_proc_rewrite/data/pressure/'
+        dir_ctd = './data/pressure/'
         ctd_postfix = '_ct1.csv'
         ctd_skiprows = [0,1,2,3,4,5,6,7,8,9,10,11,13]
 
@@ -45,7 +49,7 @@ def main(argv):
 
         #reference temperature section
         #there should not be any 9 values, unless the reftemp dies? then we have a PROBLEM
-        dir_reft = '/Users/jgum/work_code/cruises/P06_2017/ctd_proc_rewrite/data/reft/'
+        dir_reft = './data/reft/'
         reft_postfix = '_reft.csv'
         try:
             df_reft = pd.read_csv(dir_reft + ssscc + reft_postfix, names =['SAMPNO', 'REFTMP'], skiprows = 1, usecols = [2, 5])
@@ -69,10 +73,19 @@ def main(argv):
     #d_end = {'blah' : ['END_DATA']}
     #df_start = pd.DataFrame(d_start)
     #df_end = pd.DataFrame(d_end)
-    stringy = 'CASTNO,CTDOXY,CTDOXY_FLAG_W,CTDPRS,CTDPRS_FLAG_W,CTDSAL,CTDSAL_FLAG_W,CTDTMP,CTDTMP_FLAG_W,CTDFLUOR,CTDFLUOR_FLAG_W,REFTMP,REFTMP_FLAG_W,SAMPNO,STNNBR,CTDXMISS,CTDXMISS_FLAG_W\n,UMOL/KG,,DBAR,,PSS-78,,ITS-90,,VOLTS,,ITS-90,,,,VOLTS,\n'
+    stringy = 'CASTNO,CTDBACKSCATTER,CTDBACKSCATTER_FLAG_W,CTDFLUOR,CTDFLUOR_FLAG_W,'
+    stringy += 'CTDOXY,CTDOXY_FLAG_W,CTDPRS,CTDPRS_FLAG_W,CTDRINKO,CTDRINKO_FLAG_W,CTDSAL,'
+    stringy += 'CTDSAL_FLAG_W,CTDTMP,CTDTMP_FLAG_W,CTDXMISS,CTDXMISS_FLAG_W,REFTMP,REFTMP_FLAG_W,'
+    stringy += 'SAMPNO,STNNBR\n,VOLTS,,VOLTS,,UMOL/KG,,DBAR,,VOLTS,,PSS-78,,ITS-90,,VOLTS,,ITS-90,,,\n'
     #stringy = df_start.to_string(header=False, index=False) + '\n'
     #the next line is incredibly stupid. find a better way to create
-    stringy += df_all.iloc[:,0:-1].to_string(header=False, index=False, formatters=[lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)])
+    #import pdb; pdb.set_trace()
+    stringy += df_all.iloc[:,0:-1].to_string(header=False, index=False, formatters=[lambda x: str(x)+',',
+    lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',
+    lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',
+    lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',
+    lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',
+    lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)])
     #stringy += df_end.to_string(header=False, index=False)
     stringy += '\nEND_DATA\n'
 
