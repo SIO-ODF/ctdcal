@@ -2,9 +2,4 @@
 __pycache__/
 data/raw/*
 data/converted/*
-data/GS*
-.ipynb_checkpoints/
-2016_07_28.ipynb
-Converter.ipynb.orig
-Converter_2.ipynb
 data/*
