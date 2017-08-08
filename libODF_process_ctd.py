@@ -58,8 +58,8 @@ def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_c
     end_cast_time = float(df_cast2['scan_datetime'].tail(1))
     max_pressure = float(df_cast2['CTDPRS'].max())
     bottom_cast_time = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['scan_datetime'])
-    b_lat = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['LATITUDE'])
-    b_lon = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['LONGITUDE'])
+    b_lat = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['GPSLAT'])
+    b_lon = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['GPSLON'])
     b_alti = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['ALT'])
 
     #last two lines must be in to return the same as old - change to slices of df later
@@ -383,6 +383,7 @@ def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat
     """
     pkg = np.ndarray(shape=len(inMat), dtype=[(dopkg_col, np.float)])
     # Absolute sailinity from Practical salinity.
+    #import pdb; pdb.set_trace()
     SA = gsw.SA_from_SP(inMat[sal_col], inMat[p_col], inMat[lat_col], inMat[lon_col])
 
     # Conservative temperature from insitu temperature.

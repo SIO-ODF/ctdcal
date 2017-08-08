@@ -176,7 +176,8 @@ def main(argv):
                 btlfilePath = os.path.join(btl_directory, btlfileName)
                 if os.path.isfile(btlfilePath):
                     btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
-                    btl_data = btl_data[:][1:]
+                    #import pdb; pdb.set_trace()
+                    #btl_data = btl_data[:][1:]
                 else:
                     print("Missing file: "+btlfilePath)
                     break
@@ -185,7 +186,9 @@ def main(argv):
                 timefilePath = os.path.join(time_directory, timefileName)
                 if os.path.isfile(timefilePath):
                     time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
-                    time_data = time_data[:][1:]
+                    time_data = pd.DataFrame.from_records(time_data)
+                    time_data = time_data.loc[:time_data['CTDPRS'].idxmax()]
+                    time_data = time_data.to_records(index=False)
                 else:
                     print("Missing file: "+timefilePath)
                     break
@@ -295,7 +298,7 @@ def main(argv):
             btlfilePath = os.path.join(btl_directory, btlfileName)
             if os.path.isfile(btlfilePath):
                 btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
-                btl_data = btl_data[:][1:]
+                #btl_data = btl_data[:][1:]
             else:
                 print("Missing file: "+btlfilePath)
                 sys.exit()
@@ -304,7 +307,9 @@ def main(argv):
             timefilePath = os.path.join(time_directory, timefileName)
             if os.path.isfile(timefilePath):
                 time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
-                time_data = time_data[:][1:]
+                time_data = pd.DataFrame.from_records(time_data)
+                time_data = time_data.loc[:time_data['CTDPRS'].idxmax()]
+                time_data = time_data.to_records(index=False)
             else:
                 print("Missing file: "+timefilePath)
                 sys.exit()
@@ -332,6 +337,7 @@ def main(argv):
             # Search bottle number
                 j = ref_btl[btl_num_col][i]
                 if j != 0:
+                    #import pdb; pdb.set_trace()
                     k = int(np.where(btl_data[btl_num_col] == j)[0][0])
                     d1 = ref_btl[ref_col][i] - btl_data[ctd1_btl_col][k]
                     d2 = ref_btl[ref_col][i] - btl_data[ctd2_btl_col][k]

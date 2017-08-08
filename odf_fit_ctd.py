@@ -178,12 +178,16 @@ def main(argv):
 
     # Get bottle data
     btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',0)
-    btl_data = btl_data[:][1:]
+    #import pdb; pdb.set_trace()
+    #btl_data = btl_data[:][1:]
 
     # Get procesed time data
     time_data = process_ctd.dataToNDarray(args.timeFile,float,True,',',1)
-    btm = np.argmax(time_data[p_col][1:])
-    time_data = time_data[:][1:btm]
+    #btm = np.argmax(time_data[p_col][1:])
+    #time_data = time_data[:][1:btm]
+    time_data = pd.DataFrame.from_records(time_data)
+    time_data = time_data.loc[:time_data['CTDPRS'].idxmax()]
+    time_data = time_data.to_records(index=False)
 
     if args.pressure:
         print('In -pres flag fit condition')

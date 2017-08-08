@@ -209,13 +209,13 @@ class SBEReader():
     def _breakdown_header(self):
         '''Creates header for metadata. Arrays below are what is expected.
 
-        ['LATITUDE', 'LONGITUDE', 'new_fix', 'nmea_datetime', 'pressure_temp_int', 'btl_fire', 'scan_datetime'],
+        ['GPSLAT', 'GPSLON', 'new_fix', 'nmea_datetime', 'pressure_temp_int', 'btl_fire', 'scan_datetime'],
         ['float64', 'float64', 'bool_', 'datetime64', 'int_', 'bool_', 'datetime64']
         '''
         #temp fix, need to adjust to take in file to adjust as wanted?
         output = [[],[]]
         if self.config["NmeaPositionDataAdded"]:
-            output[0] = ['LATITUDE', 'LONGITUDE', 'new_fix']
+            output[0] = ['GPSLAT', 'GPSLON', 'new_fix']
             output[1] = ['float64', 'float64', 'bool_']
         if self.config["NmeaTimeAdded"]:
             output[0].append('nmea_datetime')

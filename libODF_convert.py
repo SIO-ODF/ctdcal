@@ -282,45 +282,47 @@ def importConvertedFile(file_name, debug=False):
 
 
 def saveConvertedDataToFile(converted_df, filename, debug=False):
+    try:
+        converted_df.to_pickle(filename)
+    except:
+        # Save the bottle fire dataframe to file.
+        column_names = ['index']
+        column_names += converted_df.columns.tolist()
+        #debugPrint("Column Names:", ','.join(column_names))
 
-    # Save the bottle fire dataframe to file.
-    column_names = ['index']
-    column_names += converted_df.columns.tolist()
-    #debugPrint("Column Names:", ','.join(column_names))
+        datatype_names = ['index']
+        for column in converted_df.columns:
 
-    datatype_names = ['index']
-    for column in converted_df.columns:
+            if converted_df[column].dtype.name == 'float64':
+                datatype_names.append('float_')
+            elif converted_df[column].dtype.name == 'datetime64[ns]':
+                datatype_names.append('datetime_')
+            elif converted_df[column].dtype.name == 'bool':
+                datatype_names.append('bool_')
+            elif converted_df[column].dtype.name == 'int64':
+                datatype_names.append('int_')
+            else:
+                datatype_names.append(converted_df[column].dtype.name)
+        #debugPrint("Datatypes Names:", ','.join(datatype_names))
 
-        if converted_df[column].dtype.name == 'float64':
-            datatype_names.append('float_')
-        elif converted_df[column].dtype.name == 'datetime64[ns]':
-            datatype_names.append('datetime_')
-        elif converted_df[column].dtype.name == 'bool':
-            datatype_names.append('bool_')
-        elif converted_df[column].dtype.name == 'int64':
-            datatype_names.append('int_')
+        # write the header and dtype rows to file
+        try:
+            with open(filename, 'w') as f:
+                f.write(','.join(column_names) + '\n')
+                f.write(','.join(datatype_names) + '\n')
+        except:
+            errPrint('ERROR: Could not save bottle fire data header to file')
+            return False
         else:
-            datatype_names.append(converted_df[column].dtype.name)
-    #debugPrint("Datatypes Names:", ','.join(datatype_names))
+            debugPrint('Success!')
 
-    # write the header and dtype rows to file
-    try:
-        with open(filename, 'w') as f:
-            f.write(','.join(column_names) + '\n')
-            f.write(','.join(datatype_names) + '\n')
-    except:
-        errPrint('ERROR: Could not save bottle fire data header to file')
-        return False
-    else:
-        debugPrint('Success!')
-
-    # write the contents of the dataframe to file
-    try:
-        converted_df.to_csv(filename, mode='a', header=False)
-    except:
-        errPrint('ERROR: Could not save bottle fire data to file')
-        return False
-    else:
-        debugPrint('Success!')
+        # write the contents of the dataframe to file
+        try:
+            converted_df.to_csv(filename, mode='a', header=False)
+        except:
+            errPrint('ERROR: Could not save bottle fire data to file')
+            return False
+        else:
+            debugPrint('Success!')
 
     return True

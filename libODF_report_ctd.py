@@ -136,26 +136,32 @@ def report_btl_data(btl_file, btl_dtype, btl_data):
     Returns:
         No return
     """
-    dtype_list = btl_data.dtype.names
+    try:
+        btl_data = pd.DataFrame.from_records(btl_data)
+        #cut index from btl_data, i hope. Not guaranteed to work correctly...
+        btl_data = btl_data.iloc[:, 1:]
+        btl_data.to_pickle(btl_file)
+    except:
+        dtype_list = btl_data.dtype.names
 
-    if btl_data is None:
-        print("In report_btl_data: No data array.")
-        return
-    else:
-        outfile = open(btl_file, "w+")
+        if btl_data is None:
+            print("In report_btl_data: No data array.")
+            return
+        else:
+            outfile = open(btl_file, "w+")
 
-        # Print out headers
-        outfile.write("%s" % (dtype_list[0]))
-        for i in range(1, len(dtype_list)):
-            outfile.write(",%s" % (dtype_list[i]))
-        outfile.write('\n'+btl_dtype+'\n')
+            # Print out headers
+            outfile.write("%s" % (dtype_list[0]))
+            for i in range(1, len(dtype_list)):
+                outfile.write(",%s" % (dtype_list[i]))
+            outfile.write('\n'+btl_dtype+'\n')
 
-        # Print out data
-        for i in range(0,len(btl_data)):
-            outfile.write("%s" % (btl_data[dtype_list[0]][i]))
-            for j in range(1, len(dtype_list)):
-                outfile.write(",%s" % (btl_data[dtype_list[j]][i]))
-            outfile.write('\n')
+            # Print out data
+            for i in range(0,len(btl_data)):
+                outfile.write("%s" % (btl_data[dtype_list[0]][i]))
+                for j in range(1, len(dtype_list)):
+                    outfile.write(",%s" % (btl_data[dtype_list[j]][i]))
+                outfile.write('\n')
 
     return
 
@@ -268,10 +274,9 @@ def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_l
         # Need to rewrite to remove hardcoded column data.
         # No ideal method to print formatted output to csv in python ATM
         for i in range(0,len(inMat)):
-            #import pdb; pdb.set_trace()
             ### Alter configuration.ini in pressure_series in order to change output
             ### Will need to be altered in order to put out RINKO in UMOL/KG
             ### CTDOXY is slipped in and piggybacks on CTDXMISS qual code
-            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d\n" % (inMat[p_column_data[0]][i], qualMat[i][0], inMat[p_column_data[1]][i], qualMat[i][1], inMat[p_column_data[2]][i], qualMat[i][2], doArr['CTDOXY'][i], qualMat[i][3], inMat[p_column_data[3]][i], qualMat[i][3], inMat[p_column_data[4]][i], qualMat[i][4],inMat[p_column_data[5]][i], qualMat[i][5], inMat[p_column_data[6]][i], qualMat[i][6]))
+            outfile.write("%8.1f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d,%10.4f,%d\n" % (inMat[p_column_data[0]][i], qualMat[i][0], inMat[p_column_data[1]][i], qualMat[i][1], inMat[p_column_data[2]][i], qualMat[i][2], doArr['CTDOXY1'][i], qualMat[i][3], inMat[p_column_data[3]][i], qualMat[i][3], inMat[p_column_data[4]][i], qualMat[i][4],inMat[p_column_data[5]][i], qualMat[i][5], inMat[p_column_data[6]][i], qualMat[i][6]))
         outfile.write('END_DATA')
     return
