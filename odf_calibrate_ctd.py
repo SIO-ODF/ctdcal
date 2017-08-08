@@ -275,6 +275,8 @@ def main(argv):
             calib12_btl_col = c_btl_col
 
         if args.temperature:
+            ### Need to fix hard codedness later
+            # if args.primary:
             param = 'T'
             qualfileName = str('quality_flag_temp.' + FILE_EXT)
             qualfilePath = os.path.join(log_directory, qualfileName)
@@ -282,7 +284,17 @@ def main(argv):
             ref_col = reft_col
             ctd1_btl_col = t1_btl_col
             ctd2_btl_col = t2_btl_col
+            # if args.secondary:
+            #     param = 'T'
+            #     qualfileName = str('quality_flag_temp_secondary.' + FILE_EXT)
+            #     qualfilePath = os.path.join(log_directory, qualfileName)
+            #     coef = np.zeros(shape=5)
+            #     ref_col = reft_col
+            #     ctd1_btl_col = t1_btl_col
+            #     ctd2_btl_col = t2_btl_col
         elif args.conductivity:
+            ### Need to fix hard codedness later
+            # if args.primary:
             param = 'C'
             qualfileName = str('quality_flag_cond.' + FILE_EXT)
             qualfilePath = os.path.join(log_directory, qualfileName)
@@ -290,6 +302,14 @@ def main(argv):
             ref_col = 'BTLCOND'
             ctd1_btl_col = c1_btl_col
             ctd2_btl_col = c2_btl_col
+            # if args.secondary:
+            #     param = 'C'
+            #     qualfileName = str('quality_flag_cond_secondary.' + FILE_EXT)
+            #     qualfilePath = os.path.join(log_directory, qualfileName)
+            #     coef = np.zeros(shape=7)
+            #     ref_col = 'BTLCOND'
+            #     ctd1_btl_col = c1_btl_col
+            #     ctd2_btl_col = c2_btl_col
 
         if os.path.exists(qualfilePath): os.remove(qualfilePath)
 

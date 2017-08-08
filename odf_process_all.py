@@ -15,12 +15,27 @@ def process_all():
     cnv = '.cnv'
     ext_hex = '.hex'
     xmlcon = '.XMLCON'
+    csv = '.csv'
+    #directories and index files
     ssscc_file = '../ssscc.csv'
+    dir_logs = 'data/logs/'
+    qual_dir_temp_primary = 'quality_code/temp_primary/'
+    qual_dir_temp_secondary = 'quality_code/temp_secondary/'
+    qual_dir_cond_primary = 'quality_code/cond_primary/'
+    qual_dir_cond_secondary = 'quality_code/cond_secondary/'
+    qual_flag_temp = 'qual_flag_temp'
+    qual_flag_cond = 'qual_flag_cond'
+    #remove below later
+    ssscc_cond1 = '../ssscc_cond1.csv'
+    ssscc_cond2 = '../ssscc_cond2.csv'
+
 
     #load ssscc from file
     ssscc = []
     with open(ssscc_file, 'r') as filename:
         ssscc = [line.strip() for line in filename]
+
+    ### TODO ADD IN REFT PROCESSOR AND MOVE FILES TO CORRECT DIRECTORY
 
     #check for already converted files to skip later
     time_start = time.perf_counter()
@@ -68,16 +83,18 @@ def process_all():
 
     for x in range(2):
         #temperature fit against reftemp data
-        #using 5000 because no casts went past 5000
+        #using 6000 because nominal bottom depth - change if not to not bias data
         subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'P', '-primary', '-order', '2', '-xRange', '1000:6000'], stdout=subprocess.PIPE)
         time_temperature_calibrate = time.perf_counter()
+        subprocess.run(['cp', f'{dir_logs}quality_flag_temp.csv', f'{dir_logs}{qual_dir_temp_primary}{qual_flag_temp}_pressure{csv}'], stdout=subprocess.PIPE)
         print('Primary temperature wrt P calibrated')
 
+
         #one pass on secondary sensors
-        #using 5000 because no casts went past 5000
+        #using 6000 because nominal bottom depth - change if not to not bias data
         subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'P', '-secondary', '-order', '2', '-xRange', '1000:6000'], stdout=subprocess.PIPE)
         time_temperature_calibrate = time.perf_counter()
-
+        subprocess.run(['cp', f'{dir_logs}quality_flag_temp.csv', f'{dir_logs}{qual_dir_temp_secondary}{qual_flag_temp}_pressure{csv}'], stdout=subprocess.PIPE)
         print('Secondary temperature wrt P calibrated')
 
         #apply temperature fits to cast data (time)
@@ -86,9 +103,12 @@ def process_all():
             print('odf_fit_ctd.py temp coefficients appplied to SSSCC: ' + x + ' done')
 
         subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'T', '-primary', '-order', '1'], stdout=subprocess.PIPE)
+        subprocess.run(['cp', f'{dir_logs}quality_flag_temp.csv', f'{dir_logs}{qual_dir_temp_primary}{qual_flag_temp}_temperature{csv}'], stdout=subprocess.PIPE)
         print('Primary temperature wrt T calibrated')
         subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'T', '-secondary', '-order', '1'], stdout=subprocess.PIPE)
+        subprocess.run(['cp', f'{dir_logs}quality_flag_temp.csv', f'{dir_logs}{qual_dir_temp_secondary}{qual_flag_temp}_temperature{csv}'], stdout=subprocess.PIPE)
         print('Secondary temperature wrt T calibrated')
+        time_temperature_calibrate = time.perf_counter()
 
         time_temperature_calibrate = time.perf_counter()
         for x in ssscc:
@@ -100,15 +120,23 @@ def process_all():
 
     for x in range(2):
         #conductivity fit against salt data
-        #using 5000 because no casts went past 5000
-        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'P', '-primary', '-order', '2', '-xRange', '200:6000'], stdout=subprocess.PIPE)
+        #using 6000 because nominal bottom depth - change if not to not bias data
+        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_cond1, '-cond', '-calib', 'P', '-primary', '-order', '2', '-xRange', '200:6000'], stdout=subprocess.PIPE)
+        subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_primary}{qual_flag_cond}_pressure_1{csv}'], stdout=subprocess.PIPE)
         time_conductivity_calibrate = time.perf_counter()
         print('Primary conductivity wrt P calibrated')
 
-        #using 5000 because no casts went past 5000
+        #using 6000 because nominal bottom depth - change if not to not bias data
         subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'P', '-secondary', '-order', '2', '-xRange', '200:6000'], stdout=subprocess.PIPE)
+        subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_secondary}{qual_flag_cond}_pressure{csv}'], stdout=subprocess.PIPE)
         time_conductivity_calibrate = time.perf_counter()
         print('Secondary conductivity wrt P calibrated')
+
+        #using 6000 because nominal bottom depth - change if not to not bias data
+        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_cond2, '-cond', '-calib', 'P', '-primary', '-order', '2', '-xRange', '200:6000'], stdout=subprocess.PIPE)
+        subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_primary}{qual_flag_cond}_pressure_2{csv}'], stdout=subprocess.PIPE)
+        time_conductivity_calibrate = time.perf_counter()
+        print('Primary conductivity wrt P calibrated')
 
         #apply conductivity fits to cast data (time)
         for x in ssscc:
@@ -116,10 +144,16 @@ def process_all():
             print('odf_fit_ctd.py cond coefficients appplied to SSSCC: ' + x + ' done')
         time_conductivity_fit = time.perf_counter()
 
-        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'T', '-primary', '-order', '2'], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_cond1, '-cond', '-calib', 'T', '-primary', '-order', '2'], stdout=subprocess.PIPE)
+        subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_primary}{qual_flag_cond}_temperature_1{csv}'], stdout=subprocess.PIPE)
         print('Primary conductivity wrt T calibrated')
         subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'T', '-secondary', '-order', '2'], stdout=subprocess.PIPE)
+        subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_secondary}{qual_flag_cond}_temperature{csv}'], stdout=subprocess.PIPE)
         print('Secondary conductivity wrt T calibrated')
+        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_cond2, '-cond', '-calib', 'T', '-primary', '-order', '2'], stdout=subprocess.PIPE)
+        subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_primary}{qual_flag_cond}_temperature_2{csv}'], stdout=subprocess.PIPE)
+        print('Primary conductivity wrt T calibrated')
+        time_conductivity_calibrate = time.perf_counter()
 
         #apply conductivity fits to cast data (time)
         for x in ssscc:
