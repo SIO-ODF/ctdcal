@@ -31,7 +31,7 @@ def main(argv):
         #next line not strictly necessaryas we don't move every column, but left just in case
         df_bottle.rename(index=str, columns={'FREE1':'CTDFLUOR', 'FREE2':'CTDBACKSCATTER', 'FREE3':'CTDRINKO', 'btl_fire_num':'SAMPNO', 'CTDTMP1':'CTDTMP', 'CTDOXY1':'CTDOXY'}, inplace=True)
         df_bottle = df_bottle.loc[:,['CTDPRS', 'SAMPNO']]
-        df_bottle['bins'] = pd.cut(df_bottle['CTDPRS'], range(0,int(np.ceil(df_bottle['CTDPRS'].max()))+2,2), right=False, include_lowest=True)
+        df_bottle['bins'] = pd.cut(df_bottle['CTDPRS'], range(0,int(np.ceil(df_bottle['CTDPRS'].max()))+5,2), right=False, include_lowest=True)
 
         #ctd handling section
         dir_ctd = './data/pressure/'
@@ -39,7 +39,7 @@ def main(argv):
         ctd_skiprows = [0,1,2,3,4,5,6,7,8,9,10,11,13]
 
         df_c = pd.read_csv(dir_ctd + ssscc + ctd_postfix, skiprows=ctd_skiprows, skipfooter=1, engine='python')
-        df_c['bins'] = pd.cut(df_c['CTDPRS'],range(0,int(np.floor(df_c['CTDPRS'].max()))+2,2), right=False, include_lowest=True)
+        df_c['bins'] = pd.cut(df_c['CTDPRS'],range(0,int(np.floor(df_c['CTDPRS'].max()))+5,2), right=False, include_lowest=True)
 
         df_merged_btl_ctd_4 = pd.merge(df_c, df_bottle[['bins']], on='bins', how='outer')
 
