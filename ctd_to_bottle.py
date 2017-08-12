@@ -27,12 +27,11 @@ def main(argv):
         btl_names = ['SAMPNO','CTDPRS']
         btl_usecols = [0,3]
 
-        #df_bottle = pd.read_csv(dir_bottle + ssscc + bottle_postfix, skiprows=btl_skiprows, names=btl_names, usecols = btl_usecols)
         df_bottle = pd.read_pickle(f"{dir_bottle}{ssscc}{bottle_postfix}")
+        #next line not strictly necessaryas we don't move every column, but left just in case
         df_bottle.rename(index=str, columns={'FREE1':'CTDFLUOR', 'FREE2':'CTDBACKSCATTER', 'FREE3':'CTDRINKO', 'btl_fire_num':'SAMPNO', 'CTDTMP1':'CTDTMP', 'CTDOXY1':'CTDOXY'}, inplace=True)
         df_bottle = df_bottle.loc[:,['CTDPRS', 'SAMPNO']]
-        df_bottle['bins'] = pd.cut(df_bottle['CTDPRS'], range(0,int(np.ceil(df_bottle['CTDPRS'].max()))+5,2), right=False, include_lowest=True)
-        #import pdb; pdb.set_trace()
+        df_bottle['bins'] = pd.cut(df_bottle['CTDPRS'], range(0,int(np.ceil(df_bottle['CTDPRS'].max()))+2,2), right=False, include_lowest=True)
 
         #ctd handling section
         dir_ctd = './data/pressure/'
@@ -40,7 +39,7 @@ def main(argv):
         ctd_skiprows = [0,1,2,3,4,5,6,7,8,9,10,11,13]
 
         df_c = pd.read_csv(dir_ctd + ssscc + ctd_postfix, skiprows=ctd_skiprows, skipfooter=1, engine='python')
-        df_c['bins'] = pd.cut(df_c['CTDPRS'],range(0,int(np.floor(df_c['CTDPRS'].max()))+5,2), right=False, include_lowest=True) #heisenbug here at bin padding
+        df_c['bins'] = pd.cut(df_c['CTDPRS'],range(0,int(np.floor(df_c['CTDPRS'].max()))+2,2), right=False, include_lowest=True)
 
         df_merged_btl_ctd_4 = pd.merge(df_c, df_bottle[['bins']], on='bins', how='outer')
 
@@ -57,6 +56,7 @@ def main(argv):
             df_incomplete_reft = pd.merge(df_reft, df_merged_btl_ctd_6, on='SAMPNO', how='outer')
             df_incomplete_reft.groupby('SAMPNO').fillna(inplace=True, method = 'pad')
             df_complete_reft = df_incomplete_reft.fillna(value={'REFTMP':-999, 'REFTMP_FLAG_W':5})
+        #if there are no SBE35 files for the cast, flag as 5
         except FileNotFoundError:
             df_merged_btl_ctd_6['REFTMP'] = -999
             df_merged_btl_ctd_6['REFTMP_FLAG_W'] = 5
@@ -69,24 +69,17 @@ def main(argv):
         df_all = df_all.append(df_complete_reft)
 
     #create the stupid string
-    #d_start = {'0':['CASTNO,CTDOXY,CTDOXY_FLAG_W,CTDPRS,CTDPRS_FLAG_W,CTDSAL,CTDSAL_FLAG_W,CTDTMP,CTDTMP_FLAG_W,CTDFLUOR,CTDFLUOR_FLAG_W,REFTMP,REFTMP_FLAG_W,SAMPNO,STNNBR,CTDXMISS,CTDXMISS_FLAG_W',',UMOL/KG,,DBAR,,PSS-78,,ITS-90,,VOLTS,,ITS-90,,,,VOLTS,']}
-    #d_end = {'blah' : ['END_DATA']}
-    #df_start = pd.DataFrame(d_start)
-    #df_end = pd.DataFrame(d_end)
     stringy = 'CASTNO,CTDBACKSCATTER,CTDBACKSCATTER_FLAG_W,CTDFLUOR,CTDFLUOR_FLAG_W,'
     stringy += 'CTDOXY,CTDOXY_FLAG_W,CTDPRS,CTDPRS_FLAG_W,CTDRINKO,CTDRINKO_FLAG_W,CTDSAL,'
     stringy += 'CTDSAL_FLAG_W,CTDTMP,CTDTMP_FLAG_W,CTDXMISS,CTDXMISS_FLAG_W,REFTMP,REFTMP_FLAG_W,'
     stringy += 'SAMPNO,STNNBR\n,VOLTS,,VOLTS,,UMOL/KG,,DBAR,,VOLTS,,PSS-78,,ITS-90,,VOLTS,,ITS-90,,,\n'
-    #stringy = df_start.to_string(header=False, index=False) + '\n'
     #the next line is incredibly stupid. find a better way to create
-    #import pdb; pdb.set_trace()
     stringy += df_all.iloc[:,0:-1].to_string(header=False, index=False, formatters=[lambda x: str(x)+',',
     lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',
     lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',
     lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',
     lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',
     lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)+',',lambda x: str(x)])
-    #stringy += df_end.to_string(header=False, index=False)
     stringy += '\nEND_DATA\n'
 
     with open(output_file, 'w') as f_handle:
