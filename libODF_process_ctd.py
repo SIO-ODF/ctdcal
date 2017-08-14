@@ -383,7 +383,6 @@ def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat
     """
     pkg = np.ndarray(shape=len(inMat), dtype=[(dopkg_col, np.float)])
     # Absolute sailinity from Practical salinity.
-    #import pdb; pdb.set_trace()
     SA = gsw.SA_from_SP(inMat[sal_col], inMat[p_col], inMat[lat_col], inMat[lon_col])
 
     # Conservative temperature from insitu temperature.
@@ -394,6 +393,18 @@ def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat
     for i in range(0,len(inMat[dopl_col])):
         pkg[i] = inMat[dopl_col][i] * 44660 / (s0[i] + 1000)
     return pkg
+
+def oxy_to_umolkg(df_sal, df_pressure, df_lat, df_lon, df_temp, df_oxy):
+    '''Rewritten from Courtney's method to use array-likes (aka use dataframes and ndarrays).
+    '''
+    # Absolute salinity from Practical salinity.
+    SA = gsw.SA_from_SP(df_sal, df_pressure, df_lat, df_lon)
+
+    # Conservative temperature from insitu temperature.
+    CT = gsw.CT_from_t(SA, df_temp, df_pressure)
+    s0 = gsw.sigma0(SA, CT) # Potential density from Absolute Salinity g/Kg Conservative temperature deg C.
+    series = df_oxy * 44660 / (s0 + 1000)
+    return series
 
 def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
     """raw_ctd_filter function
@@ -565,7 +576,6 @@ def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15,
     tmp_df = pd.DataFrame.from_records(full_matrix[start:end])
     tmp_df = _roll_filter(tmp_df)
     #return tmp_df.to_records(index=False)
-    #import pdb; pdb.set_trace()
     return tmp_df
 
     remove = []
@@ -723,15 +733,12 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
     # Roll Filter
 
     roll_filter_matrix = roll_filter(p_col, inMat[:][start:end:sample_rate], up, sample_rate, search_time, start=start, end=end, full_matrix=inMat)
-    #import pdb; pdb.set_trace()
     ### Needs to be removed and replaced with pd.fillna()
     # Treat surface data.
     #roll_filter_matrix = treat_surface_data(p_col, sample_rate, roll_filter_matrix)
     df_roll_surface = fill_surface_data(roll_filter_matrix, bin_size=2)
-    #import pdb; pdb.set_trace()
     #bin_size should be moved into config
     binned_df = binning_df(df_roll_surface, bin_size=2)
-    #import pdb; pdb.set_trace()
     ### OLD code - bin data and find mean of each bin
     # # Frame Pressure Bins
     # pressure_bins = np.arange(0,int(btm),intP)
