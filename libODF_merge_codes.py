@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import gsw
 
 def string_converter(value):
     '''To deal with Courtney CTD codes'''
@@ -11,7 +12,7 @@ def float_converter(value):
     '''To deal with Courtney CTD codes'''
     return float(value.split(":")[-1])
 
-def merge_courtney_ctd_codes(bottle_file, qc_file):
+def merge_courtney_ctd_codes(bottle_df, qc_df):
     '''Take in ctd bottle file to be given to database, qc logs, and combine together.
     For use with Courtney style codes (P06W 2017).
     Input:
@@ -38,8 +39,8 @@ def merge_courtney_ctd_codes(bottle_file, qc_file):
     ]
 
     ### too lazy to fix it all in jupyter, do later
-    a = qc_file
-    b = bottle_file
+    a = qc_df
+    b = bottle_df
 
     ### setup indicies for writing to
     a["CASTNO"] = a["stacast"] % 100
@@ -144,29 +145,25 @@ def write_to_odf_db_bottle_file(df_bottle, output_file):
         f_handle.write(stringy)
     return None
 
-def merge_ctd_codes(log_folder, bottle_file, output_file):
-    '''Merge codes into bottle file.
-    Setup for file to be given to odf_db maintainer, not file from odf_db.
+def merge_ctd_codes(log_folder, df_bottle):
+    '''
+    Chopped version of old merge_ctd_codes to deal with dfs
     Input:
     log_folder - file path
-    bottle_file - file path
-    output_file - file path
+    bottle_file - df
 
-    Output: (Could be None at some point in the future)
+    Output:
     btl -  dataframe
     '''
-    btl = load_to_odf_db_bottle_file(bottle_file)
-
     ### Expecting all codes to be in one directory for now. Must change later
     log_files = os.listdir(log_folder)
 
     ### Merge quality codes, and store a copy in-memory in btl
-    for file in log_files:
-        x = load_courtney_ctd_codes(f'{log_folder}{file}')
-        btl = merge_courtney_ctd_codes(btl, x)
+    for f in log_files:
+        x = load_courtney_ctd_codes(f'{log_folder}{f}')
+        df_bottle = merge_courtney_ctd_codes(df_bottle, x)
 
-    write_to_odf_db_bottle_file(btl, output_file)
-    return btl
+    return df_bottle
 
 def merge_bottle_trip_dfs(file_ssscc):
     '''Merge the bottle trip dataframes, and add flag columns.
@@ -189,11 +186,7 @@ def merge_bottle_trip_dfs(file_ssscc):
         ### rewrite this line to be more portable
         df = pd.read_pickle(f'../../ctd_proc_rewrite/data/bottle/{ssscc}_btl_mean.pkl')
 
-        ### add in oxygen umol/kg
-        #df['CTDOXY'] = oxy_to_umolkg(df['CTDSAL'], df['CTDPRS'], df['GPSLAT'], df['GPSLON'], df['CTDTMP1'], df['CTDOXY1'])
-
         ### chop dataframe shorter for ease of use
-        #df = df[['CTDPRS','CTDTMP1','CTDTMP2','CTDCOND1','CTDCOND2','CTDOXY','btl_fire_num']] ### might not need oxy here
         df = df[['CTDPRS','CTDTMP1','CTDTMP2','CTDCOND1','CTDCOND2','btl_fire_num']]
         df.rename(index=str, columns={'btl_fire_num':'SAMPNO'}, inplace=True)
 
@@ -218,7 +211,8 @@ def prelim_ctd_bottle_df(file_ssscc, file_whp_bottle):
     df_bottle_trip = merge_bottle_trip_dfs(file_ssscc)
     ### load whp_bottle file from odf_db
     df_whp_bottle = load_exchange_bottle_file(file_whp_bottle)
-    df_whp_bottle = df_whp_bottle[['STNNBR','CASTNO','SAMPNO','SALNTY','SALNTY_FLAG_W','REFTMP','REFTMP_FLAG_W','CTDOXY','CTDOXY_FLAG_W','OXYGEN','OXYGEN_FLAG_W']]
+    df_whp_bottle = df_whp_bottle[['STNNBR','CASTNO','SAMPNO','SALNTY','SALNTY_FLAG_W',
+    'CTDSAL','CTDSAL_FLAG_W','REFTMP','REFTMP_FLAG_W','CTDOXY','CTDOXY_FLAG_W','OXYGEN','OXYGEN_FLAG_W']]
 
     ### merge both dataframes together
     df_merged = df_bottle_trip.merge(df_whp_bottle, on=['STNNBR','CASTNO','SAMPNO'])
@@ -228,6 +222,7 @@ def ctd_residuals_df(df_bottle):
     '''Compute residuals and add to dataframe.
     Operate in place.
     '''
+    #Salinity should really be grabbed straight from the files, but 
     df_bottle['BTLCOND'] = gsw.C_from_SP(df_bottle['SALNTY'], df_bottle['CTDTMP1'], df_bottle['CTDPRS'])
     df_bottle['BTL_O'] = df_bottle['OXYGEN'] - df_bottle['CTDOXY']
 
@@ -238,6 +233,8 @@ def ctd_residuals_df(df_bottle):
     df_bottle['BTL_T1'] = df_bottle['REFTMP'] - df_bottle['CTDTMP1']
     df_bottle['BTL_T2'] = df_bottle['REFTMP'] - df_bottle['CTDTMP2']
     df_bottle['T1_T2'] = df_bottle['CTDTMP1'] - df_bottle['CTDTMP2']
+
+    df_bottle['BTL_SAL'] = df_bottle['SALNTY'] - df_bottle['CTDSAL']
     return None
 
 def main(argv):
@@ -252,6 +249,8 @@ def main(argv):
     df_bottle = prelim_ctd_bottle_df(file_ssscc, bottle_file)
     ### compute residuals for plotting
     ctd_residuals_df(df_bottle)
+    load_courtney_ctd_codes()
+    df_bottle = merge_ctd_codes(log_dir, df_bottle)
 
     ### write file out
     df_bottle.to_pickle(f'{qual_codes_filepath}merged_ctd_codes.pkl')
