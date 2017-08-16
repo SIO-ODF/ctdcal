@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('nbagg')
+matplotlib.use('agg')
 
 import pandas as pd
 import numpy as np
@@ -9,6 +9,41 @@ import matplotlib.pyplot as plt
 # The following section is a little brittle due to hardcoded names, but we'll fix
 # that later. Code copy pasted from jupyter notebook.
 #####
+
+def all_plots(df):
+    '''Create and output all plots'''
+    btl_t1_residuals_pressure_plot(df)
+    btl_t2_residuals_pressure_plot(df)
+    t1_t2_residuals_pressure_plot(df)
+    btl_t1_residuals_station_plot(df)
+    btl_t2_residuals_station_plot(df)
+    t1_t2_residuals_station_plot(df)
+    btl_t1_residuals_station_deep_plot(df)
+    btl_t2_residuals_station_deep_plot(df)
+    t1_t2_residuals_station_deep_plot(df)
+    btl_c1_residuals_pressure_plot(df)
+    btl_c2_residuals_pressure_plot(df)
+    c1_c2_residuals_pressure_plot(df)
+    btl_c1_residuals_station_plot(df)
+    btl_c2_residuals_station_plot(df)
+    c1_c2_residuals_station_plot(df)
+    btl_c1_residuals_station_deep_plot(df)
+    btl_c2_residuals_station_deep_plot(df)
+    c1_c2_residuals_station_deep_plot(df)
+    c_t_coherence_plot(df)
+    btl_c1_residuals_compare_plot(df)
+    btl_c2_residuals_compare_plot(df)
+    c1_c2_residuals_compare_plot(df)
+    btl_c1_residuals_station_uncorrected_plot(df)
+    btl_c2_residuals_station_uncorrected_plot(df)
+    c1_c2_residuals_station_uncorrected_plot(df)
+    btl_sal_pressure_plot(df)
+    btl_sal_station_plot(df)
+    btl_sal_station_deep_plot(df)
+    btl_oxy_residuals_pressure_plot(df)
+    btl_oxy_residuals_station_plot(df)
+    btl_oxy_residuals_station_deep_plot(df)
+    return None
 
      #################################################################
      ##### Here lies the temperature plots, long may they rest.  #####
@@ -20,12 +55,13 @@ def btl_t1_residuals_pressure_plot(df):
     cm = ax.scatter(df['BTL_T1'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
     ax.set_xlim(-0.02,0.02)
     ax.set_title('REFTMP-CTDTMP1 vs CTDPRS')
-    ax.set_xlabel('T1 Residual (T90 milliDegrees C)')
+    ax.set_xlabel('T1 Residual (T90 C)')
     ax.set_ylabel('Pressure (dbar)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
-    fig.savefig('./reftmp_t1_p.ps', format='ps')
+    fig.savefig('./images/reftmp_t1_p.ps', format='ps')
+    fig.savefig('./images/reftmp_t1_p.png', format='png')
     plt.close()
     return None
 
@@ -35,11 +71,13 @@ def btl_t2_residuals_pressure_plot(df):
     cm = ax.scatter(df['BTL_T2'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
     ax.set_xlim(-0.02,0.02)
     ax.set_title('REFTMP-CTDTMP2 vs CTDPRS')
-    ax.set_xlabel('T2 Residual (T90 milliDegrees C)')
+    ax.set_xlabel('T2 Residual (T90 C)')
     ax.set_ylabel('Pressure (dbar)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
-    fig.savefig('./reftmp_t2_p.ps', format='ps')
+
+    fig.savefig('./images/reftmp_t2_p.ps', format='ps')
+    fig.savefig('./images/reftmp_t2_p.png', format='png')
     plt.close()
     return None
 
@@ -49,11 +87,13 @@ def t1_t2_residuals_pressure_plot(df):
     cm = ax.scatter(df['T1_T2'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
     ax.set_xlim(-0.02,0.02)
     ax.set_title('CTDTMP1-CTDTMP2 vs CTDPRS')
-    ax.set_xlabel('T1-T2 Residual (T90 milliDegrees C)')
+    ax.set_xlabel('T1-T2 Residual (T90 C)')
     ax.set_ylabel('Pressure (dbar)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
-    fig.savefig('./t1_t2_p.ps', format='ps')
+
+    fig.savefig('./images/t1_t2_p.ps', format='ps')
+    ig.savefig('./images/t1_t2_p.png', format='png')
     plt.close()
     return None
 
@@ -64,10 +104,12 @@ def btl_t1_residuals_station_plot(df):
     ax.set_ylim(-0.01,0.01)
     ax.set_title('REFTMP-CTDTMP1 vs STNNBR')
     ax.set_xlabel('Station Number')
-    ax.set_ylabel('T1 Residual (T90 milliDegrees C)')
+    ax.set_ylabel('T1 Residual (T90 C)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./reftmp_t1_stn.ps', format='ps')
+
+    fig.savefig('./images/reftmp_t1_stn.ps', format='ps')
+    fig.savefig('./images/reftmp_t1_stn.png', format='png')
     plt.close()
     return None
 
@@ -78,10 +120,12 @@ def btl_t2_residuals_station_plot(df):
     ax.set_ylim(-0.01,0.01)
     ax.set_title('REFTMP-CTDTMP2 vs STNNBR')
     ax.set_xlabel('Station Number')
-    ax.set_ylabel('T2 Residual (T90 milliDegrees C)')
+    ax.set_ylabel('T2 Residual (T90 C)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./reftmp_t2_stn.ps', format='ps')
+
+    fig.savefig('./images/reftmp_t2_stn.ps', format='ps')
+    fig.savefig('./images/reftmp_t2_stn.png', format='png')
     plt.close()
     return None
 
@@ -92,10 +136,12 @@ def t1_t2_residuals_station_plot(df):
     ax.set_ylim(-0.01,0.01)
     ax.set_title('CTDTMP1-CTDTMP2 vs STNNBR')
     ax.set_xlabel('Station Number')
-    ax.set_ylabel('T1-T2 Residual (T90 milliDegrees C)')
+    ax.set_ylabel('T1-T2 Residual (T90 C)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./t1_t2_stn.ps', format='ps')
+
+    fig.savefig('./images/t1_t2_stn.ps', format='ps')
+    fig.savefig('./images/t1_t2_stn.png', format='png')
     plt.close()
     return None
 
@@ -112,10 +158,12 @@ def btl_t1_residuals_station_deep_plot(df):
     ax.set_ylim(-0.01,0.01)
     ax.set_title('REFTMP-CTDTMP1 (>2000 db) vs STNNBR')
     ax.set_xlabel('Station Number')
-    ax.set_ylabel('T1 Residual (T90 milliDegrees C)')
+    ax.set_ylabel('T1 Residual (T90 C)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./reftmp_t1_stn_deep.ps', format='ps')
+
+    fig.savefig('./images/reftmp_t1_stn_deep.ps', format='ps')
+    fig.savefig('./images/reftmp_t1_stn_deep.png', format='png')
     plt.close()
     return None
 
@@ -127,10 +175,12 @@ def btl_t2_residuals_station_deep_plot(df):
     ax.set_ylim(-0.01,0.01)
     ax.set_title('REFTMP-CTDTMP2 (>2000 db) vs STNNBR')
     ax.set_xlabel('Station Number')
-    ax.set_ylabel('T2 Residual (T90 milliDegrees C)')
+    ax.set_ylabel('T2 Residual (T90 C)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./reftmp_t2_stn_deep.ps', format='ps')
+
+    fig.savefig('./images/reftmp_t2_stn_deep.ps', format='ps')
+    fig.savefig('./images/reftmp_t2_stn_deep.png', format='png')
     plt.close()
     return None
 
@@ -142,10 +192,12 @@ def t1_t2_residuals_station_deep_plot(df):
     ax.set_ylim(-0.01,0.01)
     ax.set_title('CTDTMP1-CTDTMP2 (>2000 db) vs STNNBR')
     ax.set_xlabel('Station Number')
-    ax.set_ylabel('T1-T2 Residual (T90 milliDegrees C)')
+    ax.set_ylabel('T1-T2 Residual (T90 C)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./t1_t2_stn_deep.ps', format='ps')
+
+    fig.savefig('./images/t1_t2_stn_deep.ps', format='ps')
+    fig.savefig('./images/t1_t2_stn_deep.png', format='png')
     plt.close()
     return None
 
@@ -158,12 +210,14 @@ def btl_c1_residuals_pressure_plot(df):
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(df['BTL_C1'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
     ax.set_xlim(-0.02,0.02)
-    ax.set_title('SALNTY-CTDCOND1 vs CTDPRS')
+    ax.set_title('BTLCOND-CTDCOND1 vs CTDPRS')
     ax.set_xlabel('C1 Residual (mS/cm)')
     ax.set_ylabel('Pressure (dbar)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
-    fig.savefig('./btlcond_c1_p.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c1_p.ps', format='ps')
+    fig.savefig('./images/btlcond_c1_p.png', format='png')
     plt.close()
     return None
 
@@ -172,12 +226,14 @@ def btl_c2_residuals_pressure_plot(df):
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(df['BTL_C2'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
     ax.set_xlim(-0.02,0.02)
-    ax.set_title('SALNTY-CTDCOND2 vs CTDPRS')
+    ax.set_title('BTLCOND-CTDCOND2 vs CTDPRS')
     ax.set_xlabel('C2 Residual (mS/cm)')
     ax.set_ylabel('Pressure (dbar)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
-    fig.savefig('./btlcond_c2_p.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c2_p.ps', format='ps')
+    fig.savefig('./images/btlcond_c2_p.png', format='png')
     plt.close()
     return None
 
@@ -191,7 +247,9 @@ def c1_c2_residuals_pressure_plot(df):
     ax.set_ylabel('Pressure (dbar)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
-    fig.savefig('./c1_c2_p.ps', format='ps')
+
+    fig.savefig('./images/c1_c2_p.ps', format='ps')
+    fig.savefig('./images/c1_c2_p.png', format='png')
     plt.close()
     return None
 
@@ -200,12 +258,14 @@ def btl_c1_residuals_station_plot(df):
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(df['STNNBR'], df['BTL_C1'], marker='+', c=df['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
-    ax.set_title('SALNTY-CTDCOND1 vs STNNBR')
+    ax.set_title('BTLCOND-CTDCOND1 vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('C1 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlcond_c1_stn.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c1_stn.ps', format='ps')
+    fig.savefig('./images/btlcond_c1_stn.png', format='png')
     plt.close()
     return None
 
@@ -214,12 +274,14 @@ def btl_c2_residuals_station_plot(df):
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(df['STNNBR'], df['BTL_C2'], marker='+', c=df['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
-    ax.set_title('SALNTY-CTDCOND2 vs STNNBR')
+    ax.set_title('BTLCOND-CTDCOND2 vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlcond_c2_stn.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c2_stn.ps', format='ps')
+    fig.savefig('./images/btlcond_c2_stn.png', format='png')
     plt.close()
     return None
 
@@ -233,7 +295,9 @@ def c1_c2_residuals_station_plot(df):
     ax.set_ylabel('C1-C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./c1_c2_stn.ps', format='ps')
+
+    fig.savefig('./images/c1_c2_stn.ps', format='ps')
+    fig.savefig('./images/c1_c2_stn.png', format='png')
     plt.close()
     return None
 
@@ -241,14 +305,16 @@ def btl_c1_residuals_station_deep_plot(df):
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    cm = ax.scatter(df['STNNBR'], df['BTL_C1'], marker='+', c=df['CTDPRS'], cmap='rainbow')
+    cm = ax.scatter(df_deep['STNNBR'], df_deep['BTL_C1'], marker='+', c=df_deep['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
-    ax.set_title('SALNTY-CTDCOND1 (>2000 db) vs STNNBR')
+    ax.set_title('BTLCOND-CTDCOND1 (>2000 db) vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('C1 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlcond_c1_stn_deep.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c1_stn_deep.ps', format='ps')
+    fig.savefig('./images/btlcond_c1_stn_deep.png', format='png')
     plt.close()
     return None
 
@@ -256,14 +322,16 @@ def btl_c2_residuals_station_deep_plot(df):
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    cm = ax.scatter(df['STNNBR'], df['BTL_C2'], marker='+', c=df['CTDPRS'], cmap='rainbow')
+    cm = ax.scatter(df_deep['STNNBR'], df_deep['BTL_C2'], marker='+', c=df_deep['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
-    ax.set_title('SALNTY-CTDCOND2 (>2000 db) vs STNNBR')
+    ax.set_title('BTLCOND-CTDCOND2 (>2000 db) vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlcond_c2_stn_deep.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c2_stn_deep.ps', format='ps')
+    fig.savefig('./images/btlcond_c2_stn_deep.png', format='png')
     plt.close()
     return None
 
@@ -271,14 +339,16 @@ def c1_c2_residuals_station_deep_plot(df):
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    cm = ax.scatter(df['STNNBR'], df['C1_C2'], marker='+', c=df['CTDPRS'], cmap='rainbow')
+    cm = ax.scatter(df_deep['STNNBR'], df_deep['C1_C2'], marker='+', c=df_deep['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
     ax.set_title('CTDCOND1-CTDCOND2 (>2000 db) vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('C1-C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./c1_c2_stn_deep.ps', format='ps')
+
+    fig.savefig('./images/c1_c2_stn_deep.ps', format='ps')
+    fig.savefig('./images/c1_c2_stn_deep.png', format='png')
     plt.close()
     return None
 
@@ -288,11 +358,13 @@ def c_t_coherence_plot(df):
     cm = ax.scatter(df['T1_T2'],df['C1_C2'], marker='+', c=df['CTDPRS'], cmap='rainbow')
     ax.set_xlim(-0.02,0.02)
     ax.set_title('T1-T2 vs C1-C2')
-    ax.set_xlabel('T1-T2 Residual (T90 milliDegrees C)')
+    ax.set_xlabel('T1-T2 Residual (T90 C)')
     ax.set_ylabel('C1-C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./c_t_coherence_p.ps', format='ps')
+
+    fig.savefig('./images/c_t_coherence_p.ps', format='ps')
+    fig.savefig('./images/c_t_coherence_p.png', format='png')
     plt.close()
     return None
 
@@ -306,7 +378,9 @@ def btl_c1_residuals_compare_plot(df):
     ax.set_ylabel('C1 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlcond_c1_compare.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c1_compare.ps', format='ps')
+    fig.savefig('./images/btlcond_c1_compare.png', format='png')
     plt.close()
     return None
 
@@ -320,7 +394,9 @@ def btl_c2_residuals_compare_plot(df):
     ax.set_ylabel('C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlcond_c2_compare.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c2_compare.ps', format='ps')
+    fig.savefig('./images/btlcond_c2_compare.png', format='png')
     plt.close()
     return None
 
@@ -334,7 +410,9 @@ def c1_c2_residuals_compare_plot(df):
     ax.set_ylabel('C1-C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./c1_c2_compare.ps', format='ps')
+
+    fig.savefig('./images/c1_c2_compare.ps', format='ps')
+    fig.savefig('./images/c1_c2_compare.png', format='png')
     plt.close()
     return None
 
@@ -343,12 +421,14 @@ def btl_c1_residuals_station_uncorrected_plot(df):
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(df['STNNBR'], df['BTL_C1'], marker='+', c=df['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
-    ax.set_title('SALNTY-CTDCOND1 vs STNNBR')
+    ax.set_title('BTLCOND-CTDCOND1 (Uncorrected) vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('C1 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlcond_c1_stn_uncorrected.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c1_stn_uncorrected.ps', format='ps')
+    fig.savefig('./images/btlcond_c1_stn_uncorrected.png', format='png')
     plt.close()
     return None
 
@@ -357,12 +437,14 @@ def btl_c2_residuals_station_uncorrected_plot(df):
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(df['STNNBR'], df['BTL_C2'], marker='+', c=df['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
-    ax.set_title('SALNTY-CTDCOND2 vs STNNBR')
+    ax.set_title('BTLCOND-CTDCOND2 (Uncorrected) vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlcond_c2_stn_uncorrected.ps', format='ps')
+
+    fig.savefig('./images/btlcond_c2_stn_uncorrected.ps', format='ps')
+    fig.savefig('./images/btlcond_c2_stn_uncorrected.png', format='png')
     plt.close()
     return None
 
@@ -371,12 +453,14 @@ def c1_c2_residuals_station_uncorrected_plot(df):
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(df['STNNBR'], df['C1_C2'], marker='+', c=df['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
-    ax.set_title('CTDCOND1-CTDCOND2 vs STNNBR')
+    ax.set_title('CTDCOND1-CTDCOND2 (Uncorrected) vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('C1-C2 Residual (mS/cm)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./c1_c2_stn_uncorrected.ps', format='ps')
+
+    fig.savefig('./images/c1_c2_stn_uncorrected.ps', format='ps')
+    fig.savefig('./images/c1_c2_stn_uncorrected.png', format='png')
     plt.close()
     return None
 
@@ -390,7 +474,9 @@ def btl_sal_pressure_plot(df):
     ax.set_ylabel('Pressure (dbar)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
-    fig.savefig('./btlsal_sal_p.ps', format='ps')
+
+    fig.savefig('./images/btlsal_sal_p.ps', format='ps')
+    fig.savefig('./images/btlsal_sal_p.png', format='png')
     plt.close()
     return None
 
@@ -404,7 +490,9 @@ def btl_sal_station_plot(df):
     ax.set_ylabel('CTDSAL Residual (mPSU)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlsal_sal_stn.ps', format='ps')
+
+    fig.savefig('./images/btlsal_sal_stn.ps', format='ps')
+    fig.savefig('./images/btlsal_sal_stn.png', format='png')
     plt.close()
     return None
 
@@ -412,14 +500,16 @@ def btl_sal_station_deep_plot(df):
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    cm = ax.scatter(df['STNNBR'], df['BTL_SAL'], marker='+', c=df['CTDPRS'], cmap='rainbow')
+    cm = ax.scatter(df_deep['STNNBR'], df_deep['BTL_SAL'], marker='+', c=df_deep['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
     ax.set_title('SALNTY-CTDSAL (>2000 db) vs STNNBR')
     ax.set_xlabel('Station Number')
     ax.set_ylabel('CTDSAL Residual (mPSU)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btlsal_sal_stn_deep.ps', format='ps')
+
+    fig.savefig('./images/btlsal_sal_stn_deep.ps', format='ps')
+    fig.savefig('./images/btlsal_sal_stn_deep.png', format='png')
     plt.close()
     return None
 
@@ -437,7 +527,9 @@ def btl_oxy_residuals_pressure_plot(df):
     ax.set_ylabel('Pressure (dbar)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
-    fig.savefig('./btl_oxy_p.ps', format='ps')
+
+    fig.savefig('./images/btl_oxy_p.ps', format='ps')
+    fig.savefig('./images/btl_oxy_p.png', format='png')
     plt.close()
     return None
 
@@ -451,7 +543,9 @@ def btl_oxy_residuals_station_plot(df):
     ax.set_ylabel('CTDOXY Residual (umol/kg)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btl_oxy_stn.ps', format='ps')
+
+    fig.savefig('./images/btl_oxy_stn.ps', format='ps')
+    fig.savefig('./images/btl_oxy_stn.png', format='png')
     plt.close()
     return None
 
@@ -466,6 +560,8 @@ def btl_oxy_residuals_station_deep_plot(df):
     ax.set_ylabel('CTDOXY Residual (umol/kg)')
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
-    fig.savefig('./btl_oxy_stn_deep.ps', format='ps')
+
+    fig.savefig('./images/btl_oxy_stn_deep.ps', format='ps')
+    fig.savefig('./images/btl_oxy_stn_deep.png', format='png')
     plt.close()
     return None

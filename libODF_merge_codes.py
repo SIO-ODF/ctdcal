@@ -222,7 +222,7 @@ def ctd_residuals_df(df_bottle):
     '''Compute residuals and add to dataframe.
     Operate in place.
     '''
-    #Salinity should really be grabbed straight from the files, but 
+    #Salinity should really be grabbed straight from the files, but...
     df_bottle['BTLCOND'] = gsw.C_from_SP(df_bottle['SALNTY'], df_bottle['CTDTMP1'], df_bottle['CTDPRS'])
     df_bottle['BTL_O'] = df_bottle['OXYGEN'] - df_bottle['CTDOXY']
 
@@ -236,6 +236,68 @@ def ctd_residuals_df(df_bottle):
 
     df_bottle['BTL_SAL'] = df_bottle['SALNTY'] - df_bottle['CTDSAL']
     return None
+
+def get_qc_t_from_df(df):
+    '''Limit data to only good data (WOCE discrete sample code 2)
+    Returns a new copy of a dataframe.
+    Input:
+    df - dataframe of all data
+    Output:
+    df limited to only good temperature data
+    '''
+    df = df.groupby(['REFTMP_FLAG_W','CTDTMP1_FLAG_W','CTDTMP2_FLAG_W']).get_group((2,2,2)).copy()
+    return df
+
+def get_qc_c_from_df(df):
+    '''Limit data to only good data (WOCE discrete sample code 2)
+    Returns a new copy of a dataframe.
+    Input:
+    df - dataframe of all data
+    Output:
+    df limited to only good conductivity data
+    '''
+    df = df.groupby(['SALNTY_FLAG_W','CTDCOND1_FLAG_W','CTDCOND2_FLAG_W']).get_group((2,2,2)).copy()
+    return df
+
+def get_qc_s_from_df(df):
+    '''Limit data to only good data (WOCE discrete sample code 2)
+    Returns a new copy of a dataframe.
+    Input:
+    df - dataframe of all data
+    Output:
+    df limited to only good salinity data
+    '''
+    df = df.groupby(['SALNTY_FLAG_W','CTDSAL_FLAG_W']).get_group((2,2)).copy()
+    return df
+
+def get_qc_o_from_df(df):
+    '''Limit data to only good data (WOCE discrete sample code 2)
+    Returns a new copy of a dataframe.
+    Input:
+    df - dataframe of all data
+    Output:
+    df limited to only good oxygen data
+    '''
+    df = df.groupby(['OXYGEN_FLAG_W','CTDOXY_FLAG_W']).get_group((2,2)).copy()
+    return df
+
+def get_qc_all_from_df(df):
+    '''Limit data to only good data (WOCE discrete sample code 2)
+    Returns a new copy of a dataframe.
+    Input:
+    df - dataframe of all data
+    Output:
+    df limited to only good ctdo data
+    '''
+    try:
+        df = df.groupby(['REFTMP_FLAG_W','CTDTMP1_FLAG_W','CTDTMP2_FLAG_W','CTDCOND1_FLAG_W',
+        'CTDCOND2_FLAG_W','SALNTY_FLAG_W','CTDSAL_FLAG_W','OXYGEN_FLAG_W',
+        'CTDOXY_FLAG_W']).get_group((2,2,2,2,2,2,2,2,2)).copy()
+    except KeyError:
+        df = df.groupby(['REFTMP_FLAG_W','CTDTMP1_FLAG_W','CTDTMP2_FLAG_W','CTDCOND1_FLAG_W',
+        'CTDCOND2_FLAG_W','SALNTY_FLAG_W','CTDSAL_FLAG_W','OXYGEN_FLAG_W',
+        'CTDOXY_FLAG_W']).get_group((2,2,2,2,2,2,2,2,1)).copy()
+    return df
 
 def main(argv):
     '''Example run'''
@@ -251,9 +313,10 @@ def main(argv):
     ctd_residuals_df(df_bottle)
     load_courtney_ctd_codes()
     df_bottle = merge_ctd_codes(log_dir, df_bottle)
-
-    ### write file out
     df_bottle.to_pickle(f'{qual_codes_filepath}merged_ctd_codes.pkl')
+
+    df_coded = get_qc_all_from_df(df_bottle)
+    ### write file out
     return None
 
 if __name__ == '__main__':
