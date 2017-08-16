@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 import gsw
 
 def string_converter(value):
@@ -184,7 +185,7 @@ def merge_bottle_trip_dfs(file_ssscc):
         cast = int(ssscc[3:5])
 
         ### rewrite this line to be more portable
-        df = pd.read_pickle(f'../../ctd_proc_rewrite/data/bottle/{ssscc}_btl_mean.pkl')
+        df = pd.read_pickle(f'/Users/jgum/work_code/cruises/P06_2017/ctd_proc_rewrite/data/bottle/{ssscc}_btl_mean.pkl')
 
         ### chop dataframe shorter for ease of use
         df = df[['CTDPRS','CTDTMP1','CTDTMP2','CTDCOND1','CTDCOND2','btl_fire_num']]
@@ -223,7 +224,13 @@ def ctd_residuals_df(df_bottle):
     Operate in place.
     '''
     #Salinity should really be grabbed straight from the files, but...
-    df_bottle['BTLCOND'] = gsw.C_from_SP(df_bottle['SALNTY'], df_bottle['CTDTMP1'], df_bottle['CTDPRS'])
+    try:
+        df_bottle['BTLCOND'] = gsw.C_from_SP(df_bottle['SALNTY'], df_bottle['CTDTMP1'], df_bottle['CTDPRS'])
+    except ValueError:
+        print(f'WHOOPS SOMETHING WENT WRONG')
+        df_bottle['SALNTY'] = df_bottle['SALNTY'].replace(to_replace = -999, value = np.nan)
+        df_bottle['BTLCOND'] = gsw.C_from_SP(df_bottle['SALNTY'], df_bottle['CTDTMP1'], df_bottle['CTDPRS'])
+
     df_bottle['BTL_O'] = df_bottle['OXYGEN'] - df_bottle['CTDOXY']
 
     df_bottle['BTL_C1'] = df_bottle['BTLCOND'] - df_bottle['CTDCOND1']

@@ -93,7 +93,7 @@ def t1_t2_residuals_pressure_plot(df):
     cbar.set_label('Station Number')
 
     fig.savefig('./images/t1_t2_p.ps', format='ps')
-    ig.savefig('./images/t1_t2_p.png', format='png')
+    fig.savefig('./images/t1_t2_p.png', format='png')
     plt.close()
     return None
 
