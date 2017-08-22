@@ -306,6 +306,20 @@ def get_qc_all_from_df(df):
         'CTDOXY_FLAG_W']).get_group((2,2,2,2,2,2,2,2,1)).copy()
     return df
 
+def residual_stddev(df, param):
+    '''Calculate standard deviations of parameters or residuals.
+    Input:
+    df - dataframe containing all data from casts
+    param - list of parameter names
+    Output:
+    output - dictionary, key = is parameter name or parameter deep, value is 2 stddevs
+    '''
+    output = {}
+    output[f'{param}'] = df[f'{param}'].std()*2
+    df = df[df['CTDPRS'] > 2000]
+    output[f'{param}_DEEP'] = df[f'{param}'].std()*2
+    return output
+
 def main(argv):
     '''Example run'''
     qual_codes_filepath = f'/Users/jgum/work_code/cruises/P06_2017/quality_codes/'
