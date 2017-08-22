@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('agg')
+#matplotlib.use('agg')
 
 import pandas as pd
 import numpy as np
@@ -43,6 +43,11 @@ def all_plots(df):
     btl_oxy_residuals_pressure_plot(df)
     btl_oxy_residuals_station_plot(df)
     btl_oxy_residuals_station_deep_plot(df)
+    btl_oxy_residuals_temperature_plot(df)
+    btl_oxy_residuals_station_temperature_plot(df)
+    btl_oxy_residuals_station_deep_temperature_plot(df)
+    btl_oxy_residuals_pressure_concentration_plot(df)
+    btl_oxy_residuals_station_concentration_plot(df)
     return None
 
      #################################################################
@@ -563,5 +568,86 @@ def btl_oxy_residuals_station_deep_plot(df):
 
     fig.savefig('./images/btl_oxy_stn_deep.ps', format='ps')
     fig.savefig('./images/btl_oxy_stn_deep.png', format='png')
+    plt.close()
+    return None
+
+def btl_oxy_residuals_temperature_plot(df):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cm = ax.scatter(df['BTL_O'], df['CTDTMP1'], marker='+', c=df['STNNBR'], cmap='rainbow')
+    ax.set_xlim(-10,10)
+    ax.set_title('OXYGEN-CTDOXY vs CTDPRS')
+    ax.set_xlabel('CTDOXY Residual (umol/kg)')
+    ax.set_ylabel('Temperature (degrees C)')
+    cbar = fig.colorbar(cm)
+    cbar.set_label('Station Number')
+
+    fig.savefig('./images/btl_oxy_t.ps', format='ps')
+    fig.savefig('./images/btl_oxy_t.png', format='png')
+    plt.close()
+    return None
+
+def btl_oxy_residuals_station_temperature_plot(df):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cm = ax.scatter(df['STNNBR'],df['BTL_O'], marker='+', c=df['CTDTMP1'], cmap='rainbow')
+    ax.set_ylim(-10,10)
+    ax.set_title('OXYGEN-CTDOXY vs STNNBR')
+    ax.set_xlabel('Station Number')
+    ax.set_ylabel('CTDOXY Residual (umol/kg)')
+    cbar = fig.colorbar(cm)
+    cbar.set_label('Temperature (degrees C)')
+
+    fig.savefig('./images/btl_oxy_stn_t.ps', format='ps')
+    fig.savefig('./images/btl_oxy_stn_t.png', format='png')
+    plt.close()
+    return None
+
+def btl_oxy_residuals_station_deep_temperature_plot(df):
+    df_deep = df[df['CTDPRS'] > 2000]
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cm = ax.scatter(df_deep['STNNBR'],df_deep['BTL_O'], marker='+', c=df_deep['CTDTMP1'], cmap='rainbow')
+    ax.set_ylim(-10,10)
+    ax.set_title('OXYGEN-CTDOXY (> 2000 db) vs STNNBR')
+    ax.set_xlabel('Station Number')
+    ax.set_ylabel('CTDOXY Residual (umol/kg)')
+    cbar = fig.colorbar(cm)
+    cbar.set_label('Temperature (degrees C)')
+
+    fig.savefig('./images/btl_oxy_stn_deep_t.ps', format='ps')
+    fig.savefig('./images/btl_oxy_stn_deep_t.png', format='png')
+    plt.close()
+    return None
+
+def btl_oxy_residuals_pressure_concentration_plot(df):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cm = ax.scatter(df['BTL_O'],df['OXYGEN'], marker='+', c=df['STNNBR'], cmap='rainbow')
+    ax.set_xlim(-10,10)
+    ax.set_title('OXYGEN-CTDOXY vs OXYGEN')
+    ax.set_xlabel('CTDOXY Residual (umol/kg)')
+    ax.set_ylabel('Dissolved Oxygen (umol/kg)')
+    cbar = fig.colorbar(cm)
+    cbar.set_label('Station Number')
+
+    fig.savefig('./images/btl_oxy_p_concentration.ps', format='ps')
+    fig.savefig('./images/btl_oxy_p_concentration.png', format='png')
+    plt.close()
+    return None
+
+def btl_oxy_residuals_station_concentration_plot(df):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cm = ax.scatter(df['BTL_O'],df['OXYGEN'], marker='+', c=df['CTDPRS'], cmap='rainbow')
+    ax.set_xlim(-10,10)
+    ax.set_title('OXYGEN-CTDOXY vs OXYGEN')
+    ax.set_xlabel('CTDOXY Residual (umol/kg)')
+    ax.set_ylabel('Dissolved Oxygen (umol/kg)')
+    cbar = fig.colorbar(cm)
+    cbar.set_label('Pressure (dbar)')
+
+    fig.savefig('./images/btl_oxy_stn_concentration.ps', format='ps')
+    fig.savefig('./images/btl_oxy_stn_concentration.png', format='png')
     plt.close()
     return None
