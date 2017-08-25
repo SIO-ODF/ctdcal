@@ -6,8 +6,6 @@ import libODF_sbe_reader as sbe_reader
 import numpy as np
 import pandas as pd
 import libODF_convert as cnv
-import libODF_process_ctd as process_ctd
-import libODF_report_ctd as report_ctd
 
 import pickle
 
