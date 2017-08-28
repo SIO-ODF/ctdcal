@@ -29,7 +29,7 @@ def main(argv):
 
         df_bottle = pd.read_pickle(f"{dir_bottle}{ssscc}{bottle_postfix}")
         #next line not strictly necessaryas we don't move every column, but left just in case
-        df_bottle.rename(index=str, columns={'FREE1':'CTDFLUOR', 'FREE2':'CTDBACKSCATTER', 'FREE3':'CTDRINKO', 'btl_fire_num':'SAMPNO', 'CTDTMP1':'CTDTMP', 'CTDOXY1':'CTDOXY'}, inplace=True)
+        df_bottle.rename(index=str, columns={'FREE1':'CTDRINKO', 'btl_fire_num':'SAMPNO', 'CTDTMP1':'CTDTMP', 'CTDOXY1':'CTDOXY'}, inplace=True)
         df_bottle = df_bottle.loc[:,['CTDPRS', 'SAMPNO']]
         df_bottle['bins'] = pd.cut(df_bottle['CTDPRS'], range(0,int(np.ceil(df_bottle['CTDPRS'].max()))+5,2), right=False, include_lowest=True)
 
@@ -68,6 +68,7 @@ def main(argv):
         df_complete_reft.reset_index(inplace=True)
         df_all = df_all.append(df_complete_reft)
 
+    df_all = df_all.sort_index(axis=1)
     #create the stupid string
     stringy = 'CASTNO,CTDBACKSCATTER,CTDBACKSCATTER_FLAG_W,CTDFLUOR,CTDFLUOR_FLAG_W,'
     stringy += 'CTDOXY,CTDOXY_FLAG_W,CTDPRS,CTDPRS_FLAG_W,CTDRINKO,CTDRINKO_FLAG_W,CTDSAL,'

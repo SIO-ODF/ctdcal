@@ -185,7 +185,7 @@ def merge_bottle_trip_dfs(file_ssscc):
         cast = int(ssscc[3:5])
 
         ### rewrite this line to be more portable
-        df = pd.read_pickle(f'/Users/jgum/work_code/cruises/P06_2017/ctd_proc_rewrite/data/bottle/{ssscc}_btl_mean.pkl')
+        df = pd.read_pickle(f'/Users/jgum/work_code/cruises/NBP1707/ctd_proc_rewrite/data/bottle/{ssscc}_btl_mean.pkl')
 
         ### chop dataframe shorter for ease of use
         df = df[['CTDPRS','CTDTMP1','CTDTMP2','CTDCOND1','CTDCOND2','btl_fire_num']]
