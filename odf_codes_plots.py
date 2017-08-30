@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 std_dir = f'/Users/jgum/work_code/cruises/'
 whp_btl_name = f'320620170820_hy1.csv'
 
-cruise_dir = f'../'
+cruise_dir = f'{std_dir}NBP1707/'
 qual_codes_filepath = f'{cruise_dir}quality_codes/'
 log_dir = f'{cruise_dir}ctd_proc_rewrite/data/logs/quality_code/all/'
 
