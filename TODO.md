@@ -18,6 +18,8 @@ generate (based on configuration.ini?):
 standardize flag names with directory names (oxy vs oxygen, cond vs conductivity, etc)
 (standardize on WOCE parameter names/relationships where possible, but in a long form)
 
+config and/or constants file
+
 integrate following libraries:
 - Software:
   - logging
@@ -28,3 +30,12 @@ integrate following libraries:
   - gsw (full integration across all modules)
 
 Rereckon all module names to something better
+
+Setup sphinx documentation
+
+Separate all conversions (salts, oxygen) from merging/calibration routines
+
+Binary search algorithm when fitting T/C - start looking for 2nd degree fit at 1000 db,
+then try upwards with min=500 to start. minimum 50 db bins. Optimize based on residuals on all points
+and on residuals against y=0 (differences are 0) for pressure range (1000:6000)
+possibly fold in some of the data above the pressure range, just to make sure it's not overly throwing out the top
