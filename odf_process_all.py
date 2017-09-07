@@ -8,6 +8,9 @@ import subprocess
 import time
 import sys
 
+import odf_bottle_combine as btl_combine
+import odf_codes_plots as plots
+
 def merge_files(file1, file2, file_out_path):
     with open(file_out_path, 'w') as file_out:
         with open(file1, 'r') as f1:
@@ -80,6 +83,7 @@ def process_all():
         print('odf_process_bottle.py SSSCC: ' + x + ' done')
     time_bottle = time.perf_counter()
 
+    btl_combine.main(None)
     ################################################################################
 
         #process pressure offset
@@ -98,7 +102,7 @@ def process_all():
     for x in range(2):
         #temperature fit against reftemp data
         #using 6000 because nominal bottom depth - change if not to not bias data
-        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'P', '-primary', '-order', '2', '-xRange', '1000:6000'], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'P', '-primary', '-order', '2', '-xRange', '800:6000'], stdout=subprocess.PIPE)
         time_temperature_calibrate = time.perf_counter()
         subprocess.run(['cp', f'{dir_logs}{qual_flag_temp}.csv', f'{dir_logs}{qual_dir_temp_primary}{qual_flag_temp}1_pressure{csv}'], stdout=subprocess.PIPE)
         subprocess.run(['cp', f'{dir_logs}{fit_t1}.csv', f'{dir_logs}{qual_dir_temp_primary}{fit_t1}_pressure{csv}'], stdout=subprocess.PIPE)
@@ -107,7 +111,7 @@ def process_all():
 
         #one pass on secondary sensors
         #using 6000 because nominal bottom depth - change if not to not bias data
-        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'P', '-secondary', '-order', '2', '-xRange', '1000:6000'], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-temp', '-calib', 'P', '-secondary', '-order', '2', '-xRange', '1500:6000'], stdout=subprocess.PIPE)
         time_temperature_calibrate = time.perf_counter()
         subprocess.run(['cp', f'{dir_logs}quality_flag_temp.csv', f'{dir_logs}{qual_dir_temp_secondary}{qual_flag_temp}2_pressure{csv}'], stdout=subprocess.PIPE)
         subprocess.run(['cp', f'{dir_logs}{fit_t2}.csv', f'{dir_logs}{qual_dir_temp_secondary}{fit_t2}_pressure{csv}'], stdout=subprocess.PIPE)
@@ -139,14 +143,14 @@ def process_all():
     for x in range(2):
         #conductivity fit against salt data
         #using 6000 because nominal bottom depth - change if not to not bias data
-        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'P', '-primary', '-order', '0', '-xRange', '1000:6000'], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'P', '-primary', '-order', '0', '-xRange', '800:6000'], stdout=subprocess.PIPE)
         subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_primary}{qual_flag_cond}_pressure_1{csv}'], stdout=subprocess.PIPE)
         subprocess.run(['cp', f'{dir_logs}{fit_c1}.csv', f'{dir_logs}{qual_dir_cond_primary}{fit_c1}_pressure_1{csv}'], stdout=subprocess.PIPE)
         time_conductivity_calibrate = time.perf_counter()
         print('Primary conductivity wrt P calibrated')
 
         #using 6000 because nominal bottom depth - change if not to not bias data
-        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'P', '-secondary', '-order', '0', '-xRange', '1000:6000'], stdout=subprocess.PIPE)
+        subprocess.run(['python3', './odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'P', '-secondary', '-order', '0', '-xRange', '500:6000'], stdout=subprocess.PIPE)
         subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_secondary}{qual_flag_cond}_pressure{csv}'], stdout=subprocess.PIPE)
         subprocess.run(['cp', f'{dir_logs}{fit_c2}.csv', f'{dir_logs}{qual_dir_cond_secondary}{fit_c2}_pressure{csv}'], stdout=subprocess.PIPE)
         time_conductivity_calibrate = time.perf_counter()
@@ -297,6 +301,8 @@ def process_all():
 
     subprocess.run(['python3', './ctd_to_bottle.py'], stdout=subprocess.PIPE)
     time_bottle_file = time.perf_counter()
+
+    plots.main(None)
 
     time_end = time.perf_counter()
     print(str(time_end - time_start) + ' total seconds elapsed via perf_counter(), ' + str((time_end - time_start)/60) + ' minutes elapsed')
