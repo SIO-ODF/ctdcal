@@ -188,7 +188,7 @@ def merge_bottle_trip_dfs(file_ssscc):
         df = pd.read_pickle(f'/Users/jgum/work_code/cruises/NBP1707/ctd_proc_rewrite/data/bottle/{ssscc}_btl_mean.pkl')
 
         ### chop dataframe shorter for ease of use
-        df = df[['CTDPRS','CTDTMP1','CTDTMP2','CTDCOND1','CTDCOND2','btl_fire_num']]
+        df = df[['CTDPRS','CTDTMP1','CTDTMP2','CTDCOND1','CTDCOND2','CTDSAL','btl_fire_num']]
         df.rename(index=str, columns={'btl_fire_num':'SAMPNO'}, inplace=True)
 
         ### add columns
@@ -213,7 +213,7 @@ def prelim_ctd_bottle_df(file_ssscc, file_whp_bottle):
     ### load whp_bottle file from odf_db
     df_whp_bottle = load_exchange_bottle_file(file_whp_bottle)
     df_whp_bottle = df_whp_bottle[['STNNBR','CASTNO','SAMPNO','SALNTY','SALNTY_FLAG_W',
-    'CTDSAL','CTDSAL_FLAG_W','REFTMP','REFTMP_FLAG_W','CTDOXY','CTDOXY_FLAG_W','OXYGEN','OXYGEN_FLAG_W']]
+    'CTDSAL_FLAG_W','REFTMP','REFTMP_FLAG_W','CTDOXY','CTDOXY_FLAG_W','OXYGEN','OXYGEN_FLAG_W']]
 
     ### merge both dataframes together
     df_merged = df_bottle_trip.merge(df_whp_bottle, on=['STNNBR','CASTNO','SAMPNO'])
@@ -319,6 +319,21 @@ def residual_stddev(df, param):
     df = df[df['CTDPRS'] > 2000]
     output[f'{param}_DEEP'] = df[f'{param}'].std()*2
     return output
+
+def discount_test_stations(df, **kwargs):
+    '''Remove ODF/WOCE? style test stations.
+    Test stations always start above 900 except in unusual circumstances.
+    Cut everything above 900 from dataframe.
+    Does not currently handle alpha characters in station naming
+    Input:
+    df - dataframe
+    test_stations - numeric type, the non-test greatest numbered station done
+    Output:
+    dataframe with all 'STNNBR'
+    '''
+    test_stations = kwargs.get("test_stations", 899)
+    #this will break if non-numeric station name, fix later
+    return df = df[df['STNNBR'] <= int(test_stations)]
 
 def main(argv):
     '''Example run'''
