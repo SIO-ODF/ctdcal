@@ -176,8 +176,6 @@ def main(argv):
                 btlfilePath = os.path.join(btl_directory, btlfileName)
                 if os.path.isfile(btlfilePath):
                     btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
-                    #import pdb; pdb.set_trace()
-                    #btl_data = btl_data[:][1:]
                 else:
                     print("Missing file: "+btlfilePath)
                     break
@@ -333,7 +331,7 @@ def main(argv):
             else:
                 print("Missing file: "+timefilePath)
                 sys.exit()
-
+            ### Load in bottle data (push off into a df)
             if args.temperature:
                 reftfileName = (filename_base + REFT_SUFFIX + '.' + FILE_EXT)
                 reftfilePath = os.path.join(reft_directory, reftfileName)
@@ -352,7 +350,9 @@ def main(argv):
                 else:
                     print("Missing reference salinity data for "+ filename_base + " in " + salt_directory)
                     continue
+            ### end load bottle data
 
+            ### start comparison
             for i in range(0,len(ref_btl[btl_num_col])):
             # Search bottle number
                 j = ref_btl[btl_num_col][i]
@@ -551,10 +551,10 @@ def main(argv):
         P = [P[i] for i in indx]
         ctd_d = [ctd_d[i] for i in indx]
 
-        mean = np.mean(ctd_d)
-        std = np.std(ctd_d)
-        lstd = mean - std
-        hstd = mean + std
+        # mean = np.mean(ctd_d)
+        # std = np.std(ctd_d)
+        # lstd = mean - std
+        # hstd = mean + std
         cf = np.polyfit(calib, ctd_d, order)
 
         indx12 = [index for index, value in enumerate(calib12)
@@ -566,10 +566,10 @@ def main(argv):
         ref_data12 = [ref_data12[i] for i in indx12]
         ctd_d12 = [ctd_d12[i] for i in indx12]
 
-        mean12 = np.mean(ctd_d12)
-        std12 = np.std(ctd_d12)
-        lstd12 = mean12 - std12
-        hstd12 = mean12 + std12
+        # mean12 = np.mean(ctd_d12)
+        # std12 = np.std(ctd_d12)
+        # lstd12 = mean12 - std12
+        # hstd12 = mean12 + std12
 
         if args.temperature:
             sensor = '_t'+str(sensor)
