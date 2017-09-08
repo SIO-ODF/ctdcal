@@ -333,7 +333,7 @@ def discount_test_stations(df, **kwargs):
     '''
     test_stations = kwargs.get("test_stations", 899)
     #this will break if non-numeric station name, fix later
-    return df = df[df['STNNBR'] <= int(test_stations)]
+    return df[df['STNNBR'] <= int(test_stations)]
 
 def main(argv):
     '''Example run'''
