@@ -3,12 +3,12 @@ import libODF_merge_codes as merge
 import numpy as np
 import io
 
-qual_codes_filepath = f'/Users/jgum/work_code/cruises/P06_2017/quality_codes/'
-cruise_dir = f'/Users/jgum/work_code/cruises/P06_2017/'
+qual_codes_filepath = f'/Users/jgum/work_code/cruises/NBP1707/quality_codes/'
+cruise_dir = f'/Users/jgum/work_code/cruises/NBP1707/'
 log_dir = f'{cruise_dir}ctd_proc_rewrite/data/logs/quality_code/all/'
 
 file_ssscc = f'{cruise_dir}ssscc.csv'
-bottle_file= f'{qual_codes_filepath}320620170703_hy1.csv'
+bottle_file= f'{qual_codes_filepath}320620170820_hy1.csv'
 
 ### compile bottle trips into one file, then merge with odf_db bottle file
 #df_bottle = merge.prelim_ctd_bottle_df(file_ssscc, bottle_file)
