@@ -1,0 +1,2 @@
+include versioneer.py
+include ctdcal/_version.py
