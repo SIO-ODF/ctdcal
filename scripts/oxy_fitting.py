@@ -19,7 +19,7 @@ import libODF_sbe_reader as sbe_rd
 import libODF_sbe_equations_dict as sbe_eq
 import gsw
 import pandas as pd
-import oxy_fitting_ver3
+import oxy_fitting
 
 #Line 342 module isopycnals
 
@@ -340,7 +340,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     time_data_matched['weights'] = wgt(time_data_matched['CTDPRS_y'])
     
 #   Least Squares fitting to determine new coefficients   
-    coef,flag=scipy.optimize.leastsq(oxy_fitting_ver3.oxygen_cal_ml,coef0,
+    coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef0,
                                      args=(time_data_matched,btl_data_clean,
                                            method))
 
@@ -418,7 +418,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
                 / (time_data_matched['TEMPERATURE_CTD'] + 273.15))   
                 
 #       Recalculate coeficients 
-        coef,flag=scipy.optimize.leastsq(oxy_fitting_ver3.oxygen_cal_ml,coef,
+        coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef,
                                          args=(time_data_matched,btl_data_clean,
                                                method))
         
