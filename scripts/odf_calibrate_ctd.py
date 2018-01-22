@@ -18,6 +18,8 @@ import configparser
 import matplotlib.pyplot as plt
 from scipy.optimize import leastsq
 
+#Test CAlibrate CTD
+
 DEBUG = False
 
 #File extension to use for output files (csv-formatted)
