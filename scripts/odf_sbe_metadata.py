@@ -2,12 +2,12 @@
 import sys
 import os
 
-import libODF_sbe_reader as sbe_reader
+import ctdcal.sbe_reader as sbe_reader
 import numpy as np
 import pandas as pd
-import libODF_convert as cnv
-import libODF_process_ctd as process_ctd
-import libODF_report_ctd as report_ctd
+import ctdcal.convert as cnv
+import ctdcal.process_ctd as process_ctd
+import ctdcal.report_ctd as report_ctd
 
 import pickle
 

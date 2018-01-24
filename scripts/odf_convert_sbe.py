@@ -2,10 +2,10 @@
 import sys
 import os
 
-import libODF_sbe_reader as sbe_reader
+import ctdcal.sbe_reader as sbe_reader
 import numpy as np
 import pandas as pd
-import libODF_convert as cnv
+import ctdcal.convert as cnv
 
 import pickle
 

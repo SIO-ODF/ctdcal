@@ -11,7 +11,7 @@ sys.path.append('/Users/k3jackson/Kennycode/')
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-import libODF_process_ctd as process_ctd
+import ctdcal.process_ctd as process_ctd
 import pandas as pd
 import oxy_fitting_ver2
 #Make this key argument
@@ -67,9 +67,9 @@ for cast in range(len(ssscc)):
     stn_nbr = int(ssscc[cast][0:3])
     cst_nbr = int(ssscc[cast][-2:])
     stn_cst = str(ssscc[cast])
-    
+
 #    stn_cst = str(ssscc[-3:]+'01')
-    
+
     hexfile = raw_dir+stn_cst+'.hex'
     xmlfile = raw_dir+stn_cst+'.XMLCON'
     time_file = time_dir+stn_cst+'_time.pkl'
@@ -88,10 +88,10 @@ for cast in range(len(ssscc)):
     btl_data_write, btl_data_fit = oxy_fitting_ver2.oxy_fit(time_data,btl_data,stn_cst,hexfile,xmlfile)
     print('COMPLETED SSSCC:',stn_cst)
     dataframe_concat = pd.concat([dataframe_concat,btl_data_fit])
-    
+
 df=dataframe_concat
 df['BTL_O'] = df['OXYGEN']-df['CTDOXY']
-    
+
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 cm = ax.scatter(df['BTL_O'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')

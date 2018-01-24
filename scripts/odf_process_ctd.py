@@ -5,9 +5,9 @@ import argparse
 import numpy as np
 import pandas as pd
 import configparser
-import libODF_process_ctd as process_ctd
-import libODF_sbe_reader as sbe_reader
-import libODF_convert as cnv
+import ctdcal.process_ctd as process_ctd
+import ctdcal.sbe_reader as sbe_reader
+import ctdcal.convert as cnv
 
 DEBUG = False
 
@@ -54,7 +54,7 @@ def main(argv):
         errPrint('ERROR: INI file:', args.iniFile, 'not found\n')
         sys.exit(1)
     else:
-        #Import Cruise Configuration File 
+        #Import Cruise Configuration File
         config = configparser.ConfigParser()
         config.read(args.iniFile)
 
@@ -121,7 +121,7 @@ def main(argv):
     # CTD Processing
     debugPrint('Processing data')
 
-    #Import Cruise Configuration File 
+    #Import Cruise Configuration File
     config = configparser.ConfigParser()
     config.read(args.iniFile)
 
@@ -140,7 +140,7 @@ def main(argv):
 
     raw_matrix = process_ctd.dataToMatrix(inputFile,None,list(imported_df.columns.insert(0,'index')),',')
     debugPrint("Martix DTypes:",raw_matrix.dtype)
-    
+
     data_matrix = process_ctd.ondeck_pressure(raw_matrix, float(config['ctd_processing']['conductivity_start']))
 
     if not 'c1_Sm' in raw_matrix.dtype.names:
@@ -156,10 +156,10 @@ def main(argv):
     if not 'o1_mll' in raw_matrix.dtype.names:
         errPrint('o1_mll data not found, skipping')
     else:
-        hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix) 
+        hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix)
         align_matrix = process_ctd.ctd_align(hysteresis_matrix,'o1_mll', float(do_align))
 
-    
+
     debugPrint('Done!')
 
 # -------------------------------------------------------------------------------------

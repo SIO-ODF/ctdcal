@@ -7,7 +7,7 @@ import scipy.stats as st
 import time, os
 import pandas as pd
 import math
-import libODF_report_ctd as report_ctd
+import ctdcal.report_ctd as report_ctd
 import warnings
 
 import gsw

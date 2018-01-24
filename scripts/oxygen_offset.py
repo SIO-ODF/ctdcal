@@ -1,5 +1,5 @@
 import pandas as pd
-import libODF_merge_codes as merge
+import ctdcal.merge_codes as merge
 import numpy as np
 import io
 

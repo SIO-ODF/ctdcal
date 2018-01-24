@@ -3,8 +3,8 @@ import sys
 import os
 import argparse
 import pandas as pd
-import libODF_convert as cnv
-import libODF_process_bottle as btl
+import ctdcal.convert as cnv
+import ctdcal.process_bottle as btl
 
 #File extension to use for output files (csv-formatted)
 FILE_EXT = 'csv'

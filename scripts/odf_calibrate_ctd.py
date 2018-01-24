@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 import json
-import libODF_process_ctd as process_ctd
-import libODF_report_ctd as report_ctd
-import libODF_fit_ctd as fit_ctd
+import ctdcal.process_ctd as process_ctd
+import ctdcal.report_ctd as report_ctd
+import ctdcal.fit_ctd as fit_ctd
 import configparser
 import matplotlib.pyplot as plt
 from scipy.optimize import leastsq

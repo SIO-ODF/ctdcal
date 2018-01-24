@@ -1,8 +1,8 @@
 import matplotlib
 matplotlib.use('ps')
 
-import libODF_merge_codes as merge
-import libODF_ctd_plots as ctd_plots
+import ctdcal.merge_codes as merge
+import ctdcal.ctd_plots as ctd_plots
 
 import pandas as pd
 #import numpy as np
