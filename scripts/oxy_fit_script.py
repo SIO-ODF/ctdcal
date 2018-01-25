@@ -6,8 +6,8 @@ Created on Tue Dec  5 11:36:32 2017
 @author: k3jackson
 """
 import sys
-sys.path.append('/Users/k3jackson/p06e/ctd_proc')
-sys.path.append('/Users/k3jackson/odf-ctd-proc/ctdcal/')
+sys.path.append('/ctd_proc')
+sys.path.append('/odf-ctd-proc/ctdcal/')
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -21,38 +21,12 @@ method = 3
 
 
 # These can be input automatically from configurationn file
-##################1701 Analysis##############
 
-#raw_dir = '/Users/k3jackson/NBP1701/data/ctd_raw/'
-#ssscc_file = '/Users/k3jackson/NBP1701/data/ssscc3.csv'
-#time_dir = '/Users/k3jackson/NBP1701/data/time/'
-#btl_dir = '/Users/k3jackson/NBP1701/data/bottle/'
+raw_dir = '/data/raw/'
+ssscc_file = '/data/ssscc.csv'
+time_dir = '/data/time/'
+btl_dir = '/data/bottle/'
 
-##################1707 Analysis################
-raw_dir = '/Users/k3jackson/NPD1707/data/raw/'
-ssscc_file = '/Users/k3jackson/NPD1707/data/ssscc.csv'
-time_dir = '/Users/k3jackson/NPD1707/data/time/'
-btl_dir = '/Users/k3jackson/NPD1707/data/bottle/'
-
-##################1706 Analysis################
-#raw_dir = '/Users/k3jackson/p06e/data/raw/'
-#ssscc_file = '/Users/k3jackson/p06e/data/ssscc.csv'
-#time_dir = '/Users/k3jackson/p06e/data/time/'
-#btl_dir = '/Users/k3jackson/p06e/data/bottle/'
-
-#sal_col='CTDSAL'
-#t_col='CTDTMP1'
-#p_col='CTDPRS'
-#lon_col='GPSLON'
-#lat_col='GPSLAT'
-#sal_btl_col='CTDSAL'
-#t_btl_col='CTDTMP1'
-#p_btl_col='CTDPRS'
-#dov_col = 'CTDOXYVOLTS'
-#lat_btl_col='GPSLAT'
-#lon_btl_col='GPSLON'
-#oxy_btl_col='CTDOXY1'
-#dov_btl_col='CTDOXYVOLTS'
 
 
 with open(ssscc_file, 'r') as filename:

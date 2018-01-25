@@ -7,8 +7,8 @@ Created on Mon Jan  8 10:04:19 2018
 """
 
 import sys
-sys.path.append('/Users/k3jackson/p06e/ctd_proc')
-sys.path.append('/Users/k3jackson/odf-ctd-proc/ctdcal/')
+sys.path.append('/ctd_proc')
+sys.path.append('/ctdcal/')
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
