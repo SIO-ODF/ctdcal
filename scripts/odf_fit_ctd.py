@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import json
-import ctdcal.process_ctd as process_ctd
+from .ctdcal import process_ctd
 import ctdcal.report_ctd as report_ctd
 import ctdcal.fit_ctd as fit_ctd
 import configparser
