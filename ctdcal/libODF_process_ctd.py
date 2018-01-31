@@ -576,6 +576,10 @@ def roll_filter(df, p_col='CTDPRS', up='down', frames_per_sec=24, search_time=15
     """
     #When the "pressure sequence" code is fixed, uncomment and use this instead
     #start = kwargs.get("start", 0)
+    if df is None:
+        print("Roll filter function: No input data.")
+        return
+    
     end = df[p_col].idxmax()
     full_matrix = df
     tmp_df = df[start:end]
@@ -583,69 +587,67 @@ def roll_filter(df, p_col='CTDPRS', up='down', frames_per_sec=24, search_time=15
 
     return tmp_df
 
-    remove = []
-    frequency = 24 # Hz of package
+#    remove = []
+#    frequency = 24 # Hz of package
+#
+#    if (frames_per_sec > 0) & (frames_per_sec <= 24):
+#        sample = int(frequency/frames_per_sec) # establish subsample rate to time ratio
+#    else: sample = frequency
+#
+#    # Adjusted search time with subsample rate
+#    search_time = int(sample*frequency*int(search_time))
 
-    if (frames_per_sec > 0) & (frames_per_sec <= 24):
-        sample = int(frequency/frames_per_sec) # establish subsample rate to time ratio
-    else: sample = frequency
+#    else:
+#        P = df[p_col]
+#        dP = P.diff()
+#        
+#        if up is 'down':
+#            #index_to_remove = np.where(dP < 0)[0] # Differential filter Use DIff command
+#            #subMat = np.delete(df, index_to_remove, axis=0)# use dataframe boolean
+#            
+#            P = P[(dP>0) | (dP.isna()==True)]#Remove pressure value increases and recover first element with or
+#            P = P.reset_index(drop=True)
+#            dP2 = P.diff()
+#            P2 = P[(dP2<0)]# Questionable data points
+#            indicies = P2.index
+#
+#            tmp = np.array([])
+#            for i in range(0,len(P)-1):#Lose If Statement
+#               if P[i] > P[i+1]:# Use another diff command to find indicies
+#                   deltaP = P[i+1] + abs(P[i] - P[i+1])
+#                   # Remove aliasing
+#                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
+#                   tmp = np.arange(i+1,k[0]+1,1)
+#               remove = np.append(remove,tmp)
+#               deltaP = 0
+#        elif up is 'up':
+#            index_to_remove = np.where(dP > 0)[0] # Differential filter
+#            subMat = np.delete(inMat, index_to_remove, axis=0)
+#
+#            P = subMat[p_col]
+#            tmp = np.array([])
+#            for i in range(0,len(P)-1):
+#               if P[i] < P[i+1]:
+#                   deltaP = P[i+1] - abs(P[i] - P[i+1])
+#                   # Remove aliasing
+#                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
+#                   tmp = np.arange(i+1,k[0]+1,1)
+#               remove = np.append(remove,tmp)
+#               deltaP = 0
+#
+#        subMat = np.delete(subMat,remove,axis=0)
+#
+#    return subMat
 
-    # Adjusted search time with subsample rate
-    search_time = int(sample*frequency*int(search_time))
-
-    if df is None:
-        print("Roll filter function: No input data.")
-        return
-    else:
-        P = df[p_col]
-        dP = P.diff()
-
-        if up is 'down':
-            #index_to_remove = np.where(dP < 0)[0] # Differential filter Use DIff command
-            #subMat = np.delete(df, index_to_remove, axis=0)# use dataframe boolean
-            
-            P = P[(dP>0) | (dP.isna()==True)]#Remove pressure value increases and recover first element with or
-            dP2 = P.diff()
-            P2 = P[(dP2<0)]# Questionable data points
-            indicies = P2.index
-
-            tmp = np.array([])
-            for i in range(0,len(P)-1):#Lose If Statement
-               if P[i] > P[i+1]:# Use another diff command to find indicies
-                   deltaP = P[i+1] + abs(P[i] - P[i+1])
-                   # Remove aliasing
-                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
-                   tmp = np.arange(i+1,k[0]+1,1)
-               remove = np.append(remove,tmp)
-               deltaP = 0
-        elif up is 'up':
-            index_to_remove = np.where(dP > 0)[0] # Differential filter
-            subMat = np.delete(inMat, index_to_remove, axis=0)
-
-            P = subMat[p_col]
-            tmp = np.array([])
-            for i in range(0,len(P)-1):
-               if P[i] < P[i+1]:
-                   deltaP = P[i+1] - abs(P[i] - P[i+1])
-                   # Remove aliasing
-                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
-                   tmp = np.arange(i+1,k[0]+1,1)
-               remove = np.append(remove,tmp)
-               deltaP = 0
-
-        subMat = np.delete(subMat,remove,axis=0)
-
-    return subMat
-
-def pressure_sequence(df, p_col='CTDPRS', time_col, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15):
+def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15):
     """pressure_sequence function
 
-    Function takes full NUMPY ndarray with predefined dtype array
-    and several arguments to return a pressure sequenced data ndarray.
+    Function takes a dataframe and several arguments to return a pressure 
+    sequenced data ndarray.
 
     Pressure sequencing includes rollfilter.
 
-    Necissary inputs are input Matrix (inMat) and pressure interval (intP).
+    Necessary inputs are input Matrix (inMat) and pressure interval (intP).
     The other inputs have default settings. The program will figure out
     specifics for those settings if left blank.
     Start time (startT), start pressure (startP) and up are mutually exclusive.
@@ -656,10 +658,9 @@ def pressure_sequence(df, p_col='CTDPRS', time_col, intP=2.0, startT=-1.0, start
     are void.
 
     Args:
-        param1 (str): stacast, station cast input
+        param1 (Dataframe: Dataframe containing measurement data
         param2 (str): p_col, pressure column name
-        param3 (str): time_col, time column name
-        param4 (float): starting pressure interval
+        param3 (float): starting pressure interval
         param5 (float): start time (startT) for pressure sequence
         param6 (float): start pressure (startP) for pressure sequence
         param7 (str): pressure sequence direction (down/up)
@@ -690,18 +691,14 @@ def pressure_sequence(df, p_col='CTDPRS', time_col, intP=2.0, startT=-1.0, start
 
     start = 0
 
-    end = df[p_col].idxmax()
-    btm = df[p_col].max()
-    
     # Roll Filter
-    roll_filter_matrix = roll_filter(p_col, df[:][start:end:sample_rate], up, sample_rate, search_time, start=start, end=end, full_matrix=df)
+    roll_filter_matrix = roll_filter(df, p_col, up, sample_rate, search_time, start=start)
 
     df_roll_surface = fill_surface_data(roll_filter_matrix, bin_size=2)
     #bin_size should be moved into config
     binned_df = binning_df(df_roll_surface, bin_size=2)
-
-    binned_matrix = binned_df.to_records(index=False)
-    return binned_matrix
+    binned_df = binning_df.reset_index(drop=True)
+    return binned_df
 ### Once serialization has been fixed, fix try/except to compact code
 
 def binning_df(df, **kwargs):
