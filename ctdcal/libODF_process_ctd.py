@@ -736,6 +736,26 @@ def fill_surface_data(df, **kwargs):
 
     return df_merged.fillna(method='bfill')
 
+def load_reft_data(reft_file,index_name = 'index_memory'):
+    """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
+    
+    reft_data = pd.read_csv(reft_file)
+    reft_data.set_index(index_name)
+    
+    return reft_data
+
+#def calibrate_temperature(df,order,ref_temp,calib_param,sensor,xrange,t_col = 'CTDTMP1', reft_col = 'T90'):
+#    
+#    
+#    
+#    # Calculate differences between sensors and reference thermom
+#    
+#    df['d_t1'] = 
+#    
+#    return df
+    
+    
+
 ###End try/except fix
 
 ### OLD UNUSED
