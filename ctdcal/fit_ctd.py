@@ -8,7 +8,7 @@ import ctdcal.sbe_equations_dict as sbe_eq
 from scipy.optimize import leastsq
 import gsw
 import csv
-import requests
+#import requests
 import os
 import json
 

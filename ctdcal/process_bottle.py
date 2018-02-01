@@ -13,7 +13,7 @@ import sys
 import csv
 import datetime
 import statistics
-import libODF_convert as cnv
+import ctdcal.convert as cnv
 import pandas as pd
 import time
 
