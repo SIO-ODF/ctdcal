@@ -744,18 +744,67 @@ def load_reft_data(reft_file,index_name = 'index_memory'):
     
     return reft_data
 
-#def calibrate_temperature(df,order,ref_temp,calib_param,sensor,xrange,t_col = 'CTDTMP1', reft_col = 'T90'):
-#    
-#    
-#    
-#    # Calculate differences between sensors and reference thermom
-#    
-#    df['d_t1'] = 
-#    
-#    return df
+def calibrate_temperature(df,order,reft_data,calib_param,sensor,xrange,
+                          t_col_1 = 'CTDTMP1', t_col_2 = 'CTDTMP2', reft_col = 'T90',
+                          p_col = 'CTDPRS'):
     
+    
+    
+    # Calculate absolute differences between sensors and reference thermom
+    
+    df['d_t1'] = reft_data[reft_col] - df[t_col_1]
+    #df['d_t1'] = df['d_t1'].abs()
+    df['d_t2'] = reft_data[reft_col] - df[t_col_2]
+    #df['d_t2'] = df['d_t2'].abs()
+    df['d_t1_t2'] = df[t_col_1] - df[t_col_2]
+    #df['d_t1_t2'] = df['d_t1_t2'].abs()
+    
+    #split dataframes by pressure ranges
+    
+#    df_deep = df[df[p_col]>2000]
+#    df_deep_t1_3 = df_deep[df_deep['d_t1'] < 0.002]
+#    df_deep_t2_3 = df_deep[df_deep['d_t2'] < 0.002]
+#    df_deep_t12_3 = df_deep[df_deep['d_t1_t2'] < 0.002]
+#    
+#    df_m1 = df[(df[p_col]>1000) & (df[p_col]<=2000)]
+    
+    
+    return df
+    
+def quality_check(df,col_name = 'CTDPRS',d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good'):
+    
+    #Choose Data range to compare with
+    df_range = df[(df[col_name] > lower_lim) & (df[col_name] <= upper_lim)]
+    
+    
+    if find == 'good':
+    # Find data values for each sensor that are below the threshold (good)
+        df_range_comp_1 = df_range[df_range[d_1].abs() < threshold]
+        df_range_comp_2 = df_range[df_range[d_2].abs() < threshold]
+        df_range_comp_3 = df_range[df_range[d_12].abs() < threshold]
+    
+    elif find == 'quest':
+    # Find data values for each sensor that are above the threshold (questionable)
+        df_range_comp_1 = df_range[df_range[d_1].abs() > threshold]
+        df_range_comp_2 = df_range[df_range[d_2].abs() > threshold]
+        df_range_comp_3 = df_range[df_range[d_12].abs() > threshold]
+   
+    else:
+        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
+    
+    #concatenate dataframe to merge all values together
+    df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
+        
+    # Remove duplicate values
+    df_concat = df_concat_good.drop_duplicates(subset=[col_name],keep='first')
+    
+    return df_concat
     
 
+    #Combine these three into a dataframe and write out to a csv 
+    #Sort by sta/cast, bottle number, rev. press
+    
+    
 ###End try/except fix
 
 ### OLD UNUSED
