@@ -9,8 +9,8 @@ def main(argv):
     Needs to be cleaned up from script form to other form, hopefully
     '''
     #general fileloading area
-    output_file = './data/scratch_folder/ctd_to_bottle.csv'
-    file_ssscc = '../ssscc.csv'
+    output_file = 'data/scratch_folder/ctd_to_bottle.csv'
+    file_ssscc = 'data/ssscc.csv'
     df_all = pd.DataFrame()
 
     all_casts = []
@@ -21,7 +21,7 @@ def main(argv):
         station = int(ssscc[0:3])
         cast = int(ssscc[3:5])
         #bottle handling section
-        dir_bottle = './data/bottle/'
+        dir_bottle = 'data/bottle/'
         bottle_postfix = '_btl_mean.pkl'
         btl_skiprows = [0,1]
         btl_names = ['SAMPNO','CTDPRS']
@@ -34,7 +34,7 @@ def main(argv):
         df_bottle['bins'] = pd.cut(df_bottle['CTDPRS'], range(0,int(np.ceil(df_bottle['CTDPRS'].max()))+5,2), right=False, include_lowest=True)
 
         #ctd handling section
-        dir_ctd = './data/pressure/'
+        dir_ctd = 'data/pressure/'
         ctd_postfix = '_ct1.csv'
         ctd_skiprows = [0,1,2,3,4,5,6,7,8,9,10,11,13]
 
@@ -48,7 +48,7 @@ def main(argv):
 
         #reference temperature section
         #there should not be any 9 values, unless the reftemp dies? then we have a PROBLEM
-        dir_reft = './data/reft/'
+        dir_reft = 'data/reft/'
         reft_postfix = '_reft.csv'
         try:
             df_reft = pd.read_csv(dir_reft + ssscc + reft_postfix, names =['SAMPNO', 'REFTMP'], skiprows = 1, usecols = [2, 5])
