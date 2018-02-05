@@ -6,14 +6,14 @@ Created on Tue Dec  5 11:36:32 2017
 @author: k3jackson
 """
 import sys
-sys.path.append('/Users/k3jackson/p06e/ctd_proc')
-sys.path.append('/Users/k3jackson/Kennycode/')
+sys.path.append('/ctd_proc')
+sys.path.append('/odf-ctd-proc/ctdcal/')
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import ctdcal.process_ctd as process_ctd
 import pandas as pd
-import oxy_fitting_ver2
+import oxy_fitting
 #Make this key argument
 method = 3
 
@@ -21,38 +21,12 @@ method = 3
 
 
 # These can be input automatically from configurationn file
-##################1701 Analysis##############
 
-#raw_dir = '/Users/k3jackson/NBP1701/data/ctd_raw/'
-#ssscc_file = '/Users/k3jackson/NBP1701/data/ssscc3.csv'
-#time_dir = '/Users/k3jackson/NBP1701/data/time/'
-#btl_dir = '/Users/k3jackson/NBP1701/data/bottle/'
+raw_dir = '/data/raw/'
+ssscc_file = '/data/ssscc.csv'
+time_dir = '/data/time/'
+btl_dir = '/data/bottle/'
 
-##################1707 Analysis################
-#raw_dir = '/Users/k3jackson/NPD1707/raw/'
-#ssscc_file = '/Users/k3jackson/NPD1707/ssscc.csv'
-#time_dir = '/Users/k3jackson/NPD1707/time/'
-#btl_dir = '/Users/k3jackson/NPD1707/bottle/'
-
-##################1706 Analysis################
-raw_dir = '/Users/k3jackson/p06e/data/raw/'
-ssscc_file = '/Users/k3jackson/p06e/data/ssscc.csv'
-time_dir = '/Users/k3jackson/p06e/data/time/'
-btl_dir = '/Users/k3jackson/p06e/data/bottle/'
-
-#sal_col='CTDSAL'
-#t_col='CTDTMP1'
-#p_col='CTDPRS'
-#lon_col='GPSLON'
-#lat_col='GPSLAT'
-#sal_btl_col='CTDSAL'
-#t_btl_col='CTDTMP1'
-#p_btl_col='CTDPRS'
-#dov_col = 'CTDOXYVOLTS'
-#lat_btl_col='GPSLAT'
-#lon_btl_col='GPSLON'
-#oxy_btl_col='CTDOXY1'
-#dov_btl_col='CTDOXYVOLTS'
 
 
 with open(ssscc_file, 'r') as filename:
@@ -60,7 +34,6 @@ with open(ssscc_file, 'r') as filename:
 
 dataframe_concat = pd.DataFrame()
 
-ssscc = ['02301']
 
 for cast in range(len(ssscc)):
 
@@ -85,7 +58,7 @@ for cast in range(len(ssscc)):
     btl_data = pd.DataFrame.from_records(btl_data)
 
 
-    btl_data_write, btl_data_fit = oxy_fitting_ver2.oxy_fit(time_data,btl_data,stn_cst,hexfile,xmlfile)
+    btl_data_write, btl_data_fit = oxy_fitting.oxy_fit(time_data,btl_data,stn_cst,hexfile,xmlfile,method=method)
     print('COMPLETED SSSCC:',stn_cst)
     dataframe_concat = pd.concat([dataframe_concat,btl_data_fit])
 
@@ -101,3 +74,13 @@ ax.set_xlabel('CTDOXY Residual (umol/kg)')
 ax.set_ylabel('Pressure (dbar)')
 cbar = fig.colorbar(cm)
 cbar.set_label('Station Number')
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+cm = ax.scatter(df['STNNBR'],df['BTL_O'], marker='+', c=df['CTDPRS'], cmap='rainbow')
+ax.set_ylim(-10,10)
+ax.set_title('OXYGEN-CTDOXY vs STNNBR')
+ax.set_xlabel('Station Number')
+ax.set_ylabel('CTDOXY Residual (umol/kg)')
+cbar = fig.colorbar(cm)
+cbar.set_label('Pressure (dbar)')
