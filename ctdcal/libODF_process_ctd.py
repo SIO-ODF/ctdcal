@@ -744,11 +744,24 @@ def load_reft_data(reft_file,index_name = 'index_memory'):
     
     return reft_data
 
+def load_btl_data(btl_file):
+    
+    """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.csv'"""
+    
+    btl_data = dataToNDarray(btl_file,float,True,',',0) 
+
+    btl_data = pd.DataFrame.from_records(btl_data)
+    
+    return btl_data
+
+
 def calibrate_temperature(df,order,reft_data,calib_param,sensor,xrange,
                           t_col_1 = 'CTDTMP1', t_col_2 = 'CTDTMP2', reft_col = 'T90',
                           p_col = 'CTDPRS'):
     
-    
+    d_1 = 'd_t1' #Difference between ref and prim sensor
+    d_2 = 'd_t2' #Difference between ref and second sensor
+    d_12 = 'd_t1_t2' #Difference between prim and sec sensor
     
     # Calculate absolute differences between sensors and reference thermom
     
@@ -761,17 +774,60 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xrange,
     
     #split dataframes by pressure ranges
     
-#    df_deep = df[df[p_col]>2000]
-#    df_deep_t1_3 = df_deep[df_deep['d_t1'] < 0.002]
-#    df_deep_t2_3 = df_deep[df_deep['d_t2'] < 0.002]
-#    df_deep_t12_3 = df_deep[df_deep['d_t1_t2'] < 0.002]
-#    
-#    df_m1 = df[(df[p_col]>1000) & (df[p_col]<=2000)]
+    #Greater than 2000 dBar
+    lower_lim = 2000
+    upper_lim = df[p_col].max()
+    threshold = 0.002
+    
+    df_deep_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+    df_deep_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    #Between 2000 and 1000
+    lower_lim = 1000
+    upper_lim = 2000
+    threshold = 0.005
+    
+    df_lmid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+    df_lmid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    #Between 1000 and 500
+    lower_lim = 500
+    upper_lim = 1000
+    threshold = 0.010
+    
+    df_umid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+    df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    #Less than 500
+    lower_lim = df[p_col].min()
+    upper_lim = 500
+    threshold = 0.020
+
+    df_shal_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+    df_shal_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    #concat dataframes into two main dfs
+    df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
+    df_quest = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
+    
+    x0 = int(xRange.split(":")[0])
+    x1 = int(xRange.split(":")[1])
+    
+    #report questionable data to a csv file
+    
+    #constrain dataframes to within limits of xRange
+    
+    
+    #df_good_cons = df_good[df_good]
+    
+    
+    
+    
     
     
     return df
     
-def quality_check(df,col_name = 'CTDPRS',d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good'):
+def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):
     
     #Choose Data range to compare with
     df_range = df[(df[col_name] > lower_lim) & (df[col_name] <= upper_lim)]
@@ -796,7 +852,7 @@ def quality_check(df,col_name = 'CTDPRS',d_1,d_2,d_12,lower_lim,upper_lim,thresh
     df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
         
     # Remove duplicate values
-    df_concat = df_concat_good.drop_duplicates(subset=[col_name],keep='first')
+    df_concat = df_concat.drop_duplicates(subset=[col_name],keep='first')
     
     return df_concat
     
