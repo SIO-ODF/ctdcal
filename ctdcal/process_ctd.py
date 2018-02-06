@@ -755,7 +755,7 @@ def load_btl_data(btl_file):
     return btl_data
 
 
-def calibrate_temperature(df,order,reft_data,calib_param,sensor,xrange,
+def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
                           t_col_1 = 'CTDTMP1', t_col_2 = 'CTDTMP2', reft_col = 'T90',
                           p_col = 'CTDPRS'):
     
@@ -808,7 +808,7 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xrange,
     
     #concat dataframes into two main dfs
     df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
-    df_quest = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
+    df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
     
     x0 = int(xRange.split(":")[0])
     x1 = int(xRange.split(":")[1])
@@ -817,14 +817,81 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xrange,
     
     #constrain dataframes to within limits of xRange
     
+    if xRange != None:
+        x0 = int(xRange.split(":")[0])
+        x1 = int(xRange.split(":")[1])
+        
+        df_good_cons = df_good[(df_good[p_col] >= x0) & (df_good[p_col] <= x1)]
+     
+        #Add here is planning on using for other calibrate code
+#    else: 
+#        if order == 1:
+#            
+#            x0 = 
+#            x1 = 
+#        
+#        elif:
+#            
+#            x0 = 
+#            x1 = 
+#            
+    else:
+        print('Invalid xRange')
     
-    #df_good_cons = df_good[df_good]
+    # Determine fitting ranges
     
+    fit = np.arange(x0,x1,(x1-x0)/50)
     
+    cf1 = np.polyfit(df_good_cons[p_col], df_good_cons[d_1], order)
+    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
     
+   
+    sensor = '_t'+str(sensor)
+    coef1 = np.zeros(shape=5)
+    coef2 = np.zeros(shape=5)
     
+    if order is 0:
+        coef1[4] = cf1[0]
+        
+        coef2[4] = cf2[0]
+        
+    elif (order is 1) and (calib_param == 'P'):
+        coef1[1] = cf1[0]
+        coef1[4] = cf1[1]
+        
+        coef2[1] = cf2[0]
+        coef2[4] = cf2[1]
+        
+    elif (order is 2) and (calib_param == 'P'):
+        coef1[0] = cf1[0]
+        coef1[1] = cf1[1]
+        coef1[4] = cf1[2]
+        
+        coef2[0] = cf2[0]
+        coef2[1] = cf2[1]
+        coef2[4] = cf2[2]
+    elif (order is 1) and (calib_param == 'T'):
+        coef1[3] = cf1[0]
+        coef1[4] = cf1[1]
+        
+        coef2[3] = cf2[0]
+        coef2[4] = cf2[1]
+    elif (order is 2) and (calib_param == 'T'):
+        coef1[2] = cf1[0]
+        coef1[3] = cf1[1]
+        coef1[4] = cf1[2]
     
-    
+        coef2[2] = cf2[0]
+        coef2[3] = cf2[1]
+        coef2[4] = cf2[2]
+        
+#    Y = fit_ctd.conductivity_polyfit(coef, fit, fit, np.full(len(fit), 0.0))
+#
+#
+#    fitfile = str('fitting'+sensor+'.' + FILE_EXT)
+#    fitfilePath = os.path.join(log_directory, fitfile)
+#    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
+        
     return df
     
 def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):
