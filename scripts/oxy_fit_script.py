@@ -6,8 +6,7 @@ Created on Tue Dec  5 11:36:32 2017
 @author: k3jackson
 """
 import sys
-sys.path.append('/ctd_proc')
-sys.path.append('/odf-ctd-proc/ctdcal/')
+sys.path.append('../ctdcal/')
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -20,12 +19,12 @@ method = 3
 
 
 
-# These can be input automatically from configurationn file
+# These can be input automatically from configuration file
 
-raw_dir = '/data/raw/'
-ssscc_file = '/data/ssscc.csv'
-time_dir = '/data/time/'
-btl_dir = '/data/bottle/'
+raw_dir = '../data/raw/'
+ssscc_file = '../data/ssscc.csv'
+time_dir = '../data/time/'
+btl_dir = '../data/bottle/'
 
 
 

@@ -6,17 +6,15 @@ Created on Mon Jan  8 10:04:19 2018
 @author: k3jackson
 """
 
-import sys
-sys.path.append('/ctd_proc')
-sys.path.append('/ctdcal/')
+
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import scipy
 import numpy as np
-import libODF_process_ctd as process_ctd
-import libODF_sbe_reader as sbe_rd
-import libODF_sbe_equations_dict as sbe_eq
+import process_ctd
+import sbe_reader as sbe_rd
+import sbe_equations_dict as sbe_eq
 import gsw
 import pandas as pd
 import oxy_fitting
@@ -121,6 +119,9 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     time_data_clean = process_ctd.binning_df(time_data)
     time_data_clean = time_data_clean.dropna(how='all')
     time_data_clean.index = pd.RangeIndex(len(time_data_clean.index))#reindex
+    
+    #Preserve dataframe for writing out
+    time_data_write = time_data_clean
     
 #   Rename Dataframe columns to avoid confusion later on
     time_data_clean['CTDOXYVOLTS_time'] = time_data_clean[dov_col] 
@@ -407,14 +408,14 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
                                                time_data_matched['SALINITY_CTD'])
         
 #       Recalculate Oxygen (ml/L)       
-        time_data_matched['NOAA_oxy_mlL'] = coef0[0] \
+        time_data_matched['NOAA_oxy_mlL'] = coef[0] \
                 * (time_data_matched['CTDOXYVOLTS_time'] \
-                + coef0[1]+Tau20 * np.exp(cc[0] \
+                + coef[1]+Tau20 * np.exp(cc[0] \
                 * time_data_matched['CTDPRS_y'] + cc[0] \
                 * time_data_matched['TEMPERATURE_CTD']) \
                 * time_data_matched['dv_dt_time']) * time_data_matched['OS'] \
                 * np.exp(Tcorr * time_data_matched['TEMPERATURE_CTD']) \
-                * np.exp((coef0[4] * time_data_matched['CTDPRS_y']) \
+                * np.exp((coef[4] * time_data_matched['CTDPRS_y']) \
                 / (time_data_matched['TEMPERATURE_CTD'] + 273.15))   
                 
 #       Recalculate coeficients 
@@ -552,8 +553,67 @@ def oxygen_cal_ml(coef0,time_data,btl_data,switch):
 
     return resid    
     
+def apply_oxy_coef(df,coef,oxyvo_col = 'CTDOXYVOLTS',p_col = 'CTDPRS',
+                   t_col = 'CTDTMP1',dvdt_col = 'dv_dt_time',sal_col = 'CTDSAL',
+                   date_time = 'scan_datetime',lon_col='GPSLON',lat_col='GPSLAT'):
+   """ Apply determined coefficients to time data """     
+   ###COEF[2] is TAU20
+   
+   Tau20 = coef[2]
+   Tcorr = coef[3]
+   cc=[1.92634e-4,-4.64803e-2]
+   
+   #calculate sigma0
+   df['CT'] = gsw.CT_from_t(df[sal_col],df[t_col],
+                                         df[p_col])
     
+   df['SA'] = gsw.SA_from_SP(df[sal_col],df[p_col],
+                                 df[lon_col],df[lat_col])
     
+   df['sigma0'] = gsw.sigma0(df['SA'], df['CT'])
+   
+   
+   
+   #calculate OS
+   df['OS'] = sbe_eq.OxSol(df[t_col], df[sal_col])
+   
+   #Calculate dv_dt and filter
+   doxyv = np.diff(df[oxyvo_col])
+   dt = np.diff(df[date_time])
+    
+   dv_dt = doxyv/dt
+   dv_dt_conv = np.convolve(dv_dt,[0.5,0.5])
+    
+   a = 1
+   windowsize = 5
+   b = (1/windowsize)*np.ones(windowsize)
+   filtfilt = scipy.signal.filtfilt(b,a,dv_dt_conv)
+    
+   df[dvdt_col] = filtfilt
+   
+   #calculate oxy in ml/L using new coef
+   df['NOAA_oxy_fitted'] = coef[0] * (df[oxyvo_col] \
+                + coef[1]+Tau20 * np.exp(cc[0] \
+                * df[p_col] + cc[0] \
+                * df[t_col]) \
+                * df[dvdt_col]) * df['OS'] \
+                * np.exp(Tcorr * df[t_col]) \
+                * np.exp((coef[4] * df[p_col]) \
+                / (df[t_col] + 273.15))  
+    
+    #convert to umol/kg
+   df['CTDOXY'] = df['NOAA_oxy_fitted'] * 44660 \
+                 / (df['sigma0'] + 1000)
+  
+   return df
+
+#def write_oxy_coef(coef,path):
+#    
+#    
+#    
+#    return df
+
+
     #####           GRAVEYARD             ##########
         
     #NOAA Calucaltion (unmodified):
