@@ -628,7 +628,7 @@ def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15,
 
     return subMat
 
-def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15, inMat=None,):
+def pressure_sequence(stacast, p_col, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15, inMat=None,):
     """pressure_sequence function
 
     Function takes full NUMPY ndarray with predefined dtype array
@@ -757,8 +757,8 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
     #         if np.isnan(binned_matrix[col]).any():
     #             binned_matrix[col] = data_interpolater(binned_matrix[col])
 
-    binned_matrix = binned_df.to_records(index=False)
-    return binned_matrix
+    #binned_matrix = binned_df.to_records(index=False)
+    return binned_df
 ### Once serialization has been fixed, fix try/except to compact code
 
 def binning_df(df, **kwargs):

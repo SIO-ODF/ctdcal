@@ -644,6 +644,21 @@ def get_oxy_coef(ssscc,log_file ='../data/logs/oxy_fit_coefs.csv',ind_col = 'SSS
     
     
     return coef
+
+def load_ct1_file(ssscc, dir_ctd = '../data/pressure/',ctd_postfix = '_ct1.csv',
+                  ctd_skiprows = [0,1,2,3,4,5,6,7,8,9,10,11,13]):
+    
+    
+    df = pd.read_csv(dir_ctd + ssscc + ctd_postfix, skiprows=ctd_skiprows, skipfooter=1, engine='python')
+    
+    
+    
+    return df
+
+#def oxyfit_to_ctd(ssscc,df):
+    
+    #Load time_data to df
+    
     #####           GRAVEYARD             ##########
         
     #NOAA Calucaltion (unmodified):
