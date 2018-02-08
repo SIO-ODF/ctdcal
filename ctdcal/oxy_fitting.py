@@ -375,7 +375,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     thrown_values = btl_data_output[btl_data_output['residual']>cutoff]
     bad_values = btl_data_output[btl_data_output['residual']>cutoff]
     btl_data_clean
-    print(thrown_values['BTLNBR'])
+#    print(thrown_values['BTLNBR'])
     
 #   Loop until there are no outliers
     
@@ -453,10 +453,10 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
         btl_data_clean=btl_data_clean[btl_data_output['residual']<=cutoff]
         bad_values2 = btl_data_output[btl_data_output['residual']>cutoff]
         thrown_values = btl_data_clean[btl_data_output['residual']>cutoff]
-        print(thrown_values['BTLNBR'])
-        print(btl_data_clean['BTLNBR'])
+#        print(thrown_values['BTLNBR'])
+#        print(btl_data_clean['BTLNBR'])
         bad_values = pd.concat([bad_values,bad_values2])
-        print('NEW STANDARD DEVIATION IS:',std_res)
+#        print('NEW STANDARD DEVIATION IS:',std_res)
         
 #      Add Station and Cast Numbers to DataFrame
     time_data_matched['STNNBR']=stn_nbr
@@ -465,11 +465,11 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     btl_data_clean['STNNBR']=stn_nbr
     btl_data_clean['CASTNO']=cst_nbr
         
-#   Sanity PLOT
-    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
-    plt.xlim(xmax=10)
-    plt.show()
-    #dataframe_concat = pd.concat([dataframe_concat,btl_data_clean])
+##   Sanity PLOT
+#    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
+#    plt.xlim(xmax=10)
+#    plt.show()
+#    #dataframe_concat = pd.concat([dataframe_concat,btl_data_clean])
         
 #   Flag data    
     bad_values['CTDOXY_FLAG_W'] = 4
@@ -486,10 +486,11 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     btl_data_write['CTDOXY'] = btl_data_clean['CTDOXY'].values
     btl_data_write['CTDOXY_FLAG_W'] = btl_data_clean['CTDOXY_FLAG_W'].values
     
+    print('Final coefficients: ',coef)
 #    btl_data_write.to_csv(filestring,index=False)
 #    btl_write_concat = pd.concat([btl_write_concat,btl_data_write])
     
-    return btl_data_write, btl_data_clean
+    return btl_data_write, btl_data_clean, coef
 
 def oxygen_cal_ml(coef0,time_data,btl_data,switch):
 
@@ -607,13 +608,42 @@ def apply_oxy_coef(df,coef,oxyvo_col = 'CTDOXYVOLTS',p_col = 'CTDPRS',
   
    return df
 
-#def write_oxy_coef(coef,path):
-#    
-#    
-#    
-#    return df
+def write_oxy_coef(coef,sta_cast):
+    """
+    
+    coefs:
+    coef[0] = Soc
+    coef[1] = Voffset
+    coef[2] = Tau20
+    coef[3] = Tcorr
+    coef[4] = E
 
+    cc[0] = D1
+    cc[1] = D2
+    
+    
+    """
+    
+    oxy_coef = [{'SSSCC': int(sta_cast), 'Soc': coef[0], 'Voffset': coef[1], 'Tau20': coef[2], 'Tcorr': coef[3], 'E': coef[4]}]
+    df = pd.DataFrame(oxy_coef)
+    df = df[['SSSCC', 'Soc', 'Voffset', 'Tau20','Tcorr','E']]
+    df.set_index('SSSCC',inplace=True)
+    
+    return df
 
+def get_oxy_coef(ssscc,log_file ='../data/logs/oxy_fit_coefs.csv',ind_col = 'SSSCC'):
+    
+    df = pd.read_csv(log_file,index_col='SSSCC')
+    ssscc = int(ssscc)
+    coef = np.zeros(5)
+    coef[0] = df.loc[ssscc]['Soc']
+    coef[1] = df.loc[ssscc]['Voffset']
+    coef[2] = df.loc[ssscc]['Tau20']
+    coef[3] = df.loc[ssscc]['Tcorr']
+    coef[4] = df.loc[ssscc]['E']
+    
+    
+    return coef
     #####           GRAVEYARD             ##########
         
     #NOAA Calucaltion (unmodified):
