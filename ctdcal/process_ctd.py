@@ -697,7 +697,7 @@ def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up=
     df_roll_surface = fill_surface_data(roll_filter_matrix, bin_size=2)
     #bin_size should be moved into config
     binned_df = binning_df(df_roll_surface, bin_size=2)
-    binned_df = binning_df.reset_index(drop=True)
+    binned_df = binned_df.reset_index(drop=True)
     return binned_df
 ### Once serialization has been fixed, fix try/except to compact code
 
