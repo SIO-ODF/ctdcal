@@ -466,10 +466,10 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     btl_data_clean['CASTNO']=cst_nbr
         
 ##   Sanity PLOT
-#    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
-#    plt.xlim(xmax=10)
-#    plt.show()
-#    #dataframe_concat = pd.concat([dataframe_concat,btl_data_clean])
+    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
+    plt.xlim(xmax=10)
+    plt.show()
+    #dataframe_concat = pd.concat([dataframe_concat,btl_data_clean])
         
 #   Flag data    
     bad_values['CTDOXY_FLAG_W'] = 4
@@ -542,11 +542,13 @@ def oxygen_cal_ml(coef0,time_data,btl_data,switch):
             - time_data['NOAA_oxy_mlL'])) / (np.sum(time_data['weights'])**2) 
         
     elif switch == 2:
-        #L2 Norm
-        resid = (btl_data['CTDOXY1'] - time_data['NOAA_oxy_mlL'])**2
+        
+        resid = np.sqrt(((btl_data['NOAA_oxy_mlL'] 
+                - time_data['NOAA_oxy_mlL'])**2) 
+                / (np.sqrt(np.std(time_data['NOAA_oxy_mlL'])**2)))
     
     elif switch == 3:
-        #ODF residuals      
+              
         
         resid = np.sqrt(((btl_data['NOAA_oxy_mlL'] 
                 - time_data['NOAA_oxy_mlL'])**2) 
@@ -583,6 +585,7 @@ def apply_oxy_coef(df,coef,oxyvo_col = 'CTDOXYVOLTS',p_col = 'CTDPRS',
    dt = np.diff(df[date_time])
     
    dv_dt = doxyv/dt
+   #df[dvdt_col] = dv_dt
    dv_dt_conv = np.convolve(dv_dt,[0.5,0.5])
     
    a = 1
@@ -655,8 +658,61 @@ def load_ct1_file(ssscc, dir_ctd = '../data/pressure/',ctd_postfix = '_ct1.csv',
     
     return df
 
+def load_time_data(time_file):
+    
+    time_data = process_ctd.dataToNDarray(time_file,float,True,',',1)
+    time_data = pd.DataFrame.from_records(time_data)  
+    #time_data = process_ctd.pressure_sequence(time_data)
+    
+    return time_data
+
+def apply_time_data(ssscc,p_col = 'CTDPRS',t_col = 'CTDTMP1',dvdt_col = 'dv_dt_time',
+                    sal_col = 'CTDSAL',date_time = 'scan_datetime',lon_col='GPSLON',
+                    lat_col='GPSLAT',oxyvo_col = 'CTDOXYVOLTS'):
+    
+    time_file = '../data/time/'+ssscc+'_time.pkl'
+    time_data = load_time_data(time_file)
+    coef = get_oxy_coef(ssscc)
+    
+    time_data['CT'] = gsw.CT_from_t(time_data[sal_col],time_data[t_col],time_data[p_col])
+    time_data['SA'] = gsw.SA_from_SP(time_data[sal_col],time_data[p_col],
+                              time_data[lon_col],time_data[lat_col])
+    time_data['sigma0'] = gsw.sigma0(time_data['SA'], time_data['CT'])
+    time_data['OS'] = sbe_eq.OxSol(time_data[t_col], time_data[sal_col])
+    
+    time_data = process_ctd.pressure_sequence(time_data)
+    
+    time_data = oxy_fitting.apply_oxy_coef(time_data,coef)
+    # Fill NA for dv_dt at beginning of the cast with mean
+    time_data['dv_dt_time'] = time_data['dv_dt_time'].replace([np.inf, -np.inf], np.nan)
+    time_data['dv_dt_time'] = time_data['dv_dt_time'].fillna(time_data['dv_dt_time'].mean())
+    
+    
+    Tau20 = coef[2]
+    Tcorr = coef[3]
+    cc=[1.92634e-4,-4.64803e-2]
+    
+    time_data['NOAA_oxy_fitted'] = coef[0] * (time_data[oxyvo_col] \
+             + coef[1]+Tau20 * np.exp(cc[0] \
+             * time_data[p_col] + cc[0] \
+             * time_data[t_col]) \
+             * time_data[dvdt_col]) * time_data['OS'] \
+             * np.exp(Tcorr * time_data[t_col]) \
+             * np.exp((coef[4] * time_data[p_col]) \
+             / (time_data[t_col] + 273.15))
+
+    time_data['CTDOXY'] = time_data['NOAA_oxy_fitted'] * 44660 \
+              / (time_data['sigma0'] + 1000)
+    
+    
+    
+    return time_data['CTDOXY']
 #def oxyfit_to_ctd(ssscc,df):
     
+#def write_ct1_file(ssscc, dir_ctd = '../data/pressure/',ctd_postfix = '_ct1.csv'):
+#    
+#    
+
     #Load time_data to df
     
     #####           GRAVEYARD             ##########

@@ -553,11 +553,16 @@ def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
     return df[df[pressure_column] == monotonic_sequence]
 
 
-def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15, **kwargs):
+def roll_filter(df, p_col='CTDPRS', up='down', frames_per_sec=24, search_time=15, start=0):
     """roll_filter function
 
     Function takes full NUMPY ndarray with predefined dtype array
     and subsample arguments to return a roll filtered ndarray.
+
+    
+    Jackson Notes: calculate sampling frequency 
+        Two types of filters: differential filter, alias filt
+        Get index of second diff function and do discrete analysis
 
     Args:
         param1 (str): stacast, station cast info
@@ -570,73 +575,77 @@ def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15,
         Narray: The return value ndarray of data with ship roll removed
     """
     #When the "pressure sequence" code is fixed, uncomment and use this instead
-    start = kwargs.get("start", 0)
-    end = kwargs.get("end", -1)
-    full_matrix = kwargs.get("full_matrix", inMat)
-    tmp_df = pd.DataFrame.from_records(full_matrix[start:end])
-    tmp_df = _roll_filter(tmp_df)
-    #return tmp_df.to_records(index=False)
-    return tmp_df
-
-    remove = []
-    frequency = 24 # Hz of package
-
-    if (frames_per_sec > 0) & (frames_per_sec <= 24):
-        sample = int(frequency/frames_per_sec) # establish subsample rate to time ratio
-    else: sample = frequency
-
-    # Adjusted search time with subsample rate
-    search_time = int(sample*frequency*int(search_time))
-
-    if inMat is None:
+    #start = kwargs.get("start", 0)
+    if df is None:
         print("Roll filter function: No input data.")
         return
-    else:
-        P = inMat[p_col]
-        dP = np.diff(P,1)
+    
+    end = df[p_col].idxmax()
+    full_matrix = df
+    tmp_df = df[start:end]
+    tmp_df = _roll_filter(tmp_df)
 
-        if up is 'down':
-            index_to_remove = np.where(dP < 0)[0] # Differential filter
-            subMat = np.delete(inMat, index_to_remove, axis=0)
+    return tmp_df
 
-            P = subMat[p_col]
-            tmp = np.array([])
-            for i in range(0,len(P)-1):
-               if P[i] > P[i+1]:
-                   deltaP = P[i+1] + abs(P[i] - P[i+1])
-                   # Remove aliasing
-                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
-                   tmp = np.arange(i+1,k[0]+1,1)
-               remove = np.append(remove,tmp)
-               deltaP = 0
-        elif up is 'up':
-            index_to_remove = np.where(dP > 0)[0] # Differential filter
-            subMat = np.delete(inMat, index_to_remove, axis=0)
+#    remove = []
+#    frequency = 24 # Hz of package
+#
+#    if (frames_per_sec > 0) & (frames_per_sec <= 24):
+#        sample = int(frequency/frames_per_sec) # establish subsample rate to time ratio
+#    else: sample = frequency
+#
+#    # Adjusted search time with subsample rate
+#    search_time = int(sample*frequency*int(search_time))
+#
+#    if inMat is None:
+#        print("Roll filter function: No input data.")
+#        return
+#    else:
+#        P = inMat[p_col]
+#        dP = np.diff(P,1)
+#
+#        if up is 'down':
+#            index_to_remove = np.where(dP < 0)[0] # Differential filter
+#            subMat = np.delete(inMat, index_to_remove, axis=0)
+#
+#            P = subMat[p_col]
+#            tmp = np.array([])
+#            for i in range(0,len(P)-1):
+#               if P[i] > P[i+1]:
+#                   deltaP = P[i+1] + abs(P[i] - P[i+1])
+#                   # Remove aliasing
+#                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
+#                   tmp = np.arange(i+1,k[0]+1,1)
+#               remove = np.append(remove,tmp)
+#               deltaP = 0
+#        elif up is 'up':
+#            index_to_remove = np.where(dP > 0)[0] # Differential filter
+#            subMat = np.delete(inMat, index_to_remove, axis=0)
+#
+#            P = subMat[p_col]
+#            tmp = np.array([])
+#            for i in range(0,len(P)-1):
+#               if P[i] < P[i+1]:
+#                   deltaP = P[i+1] - abs(P[i] - P[i+1])
+#                   # Remove aliasing
+#                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
+#                   tmp = np.arange(i+1,k[0]+1,1)
+#               remove = np.append(remove,tmp)
+#               deltaP = 0
+#
+#        subMat = np.delete(subMat,remove,axis=0)
+#
+#    return subMat
 
-            P = subMat[p_col]
-            tmp = np.array([])
-            for i in range(0,len(P)-1):
-               if P[i] < P[i+1]:
-                   deltaP = P[i+1] - abs(P[i] - P[i+1])
-                   # Remove aliasing
-                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
-                   tmp = np.arange(i+1,k[0]+1,1)
-               remove = np.append(remove,tmp)
-               deltaP = 0
-
-        subMat = np.delete(subMat,remove,axis=0)
-
-    return subMat
-
-def pressure_sequence(stacast, p_col, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15, inMat=None,):
+def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15):
     """pressure_sequence function
 
-    Function takes full NUMPY ndarray with predefined dtype array
-    and several arguments to return a pressure sequenced data ndarray.
+    Function takes a dataframe and several arguments to return a pressure 
+    sequenced data ndarray.
 
     Pressure sequencing includes rollfilter.
 
-    Necissary inputs are input Matrix (inMat) and pressure interval (intP).
+    Necessary inputs are input Matrix (inMat) and pressure interval (intP).
     The other inputs have default settings. The program will figure out
     specifics for those settings if left blank.
     Start time (startT), start pressure (startP) and up are mutually exclusive.
@@ -647,10 +656,9 @@ def pressure_sequence(stacast, p_col, intP=2.0, startT=-1.0, startP=0.0, up='dow
     are void.
 
     Args:
-        param1 (str): stacast, station cast input
+        param1 (Dataframe: Dataframe containing measurement data
         param2 (str): p_col, pressure column name
-        param3 (str): time_col, time column name
-        param4 (float): starting pressure interval
+        param3 (float): starting pressure interval
         param5 (float): start time (startT) for pressure sequence
         param6 (float): start pressure (startP) for pressure sequence
         param7 (str): pressure sequence direction (down/up)
@@ -679,85 +687,15 @@ def pressure_sequence(stacast, p_col, intP=2.0, startT=-1.0, startP=0.0, up='dow
     #lenP, prvPrs not used
     # Passed Time-Series, Create Pressure Series
 
-    ###forget the check, let it crash
-    # if inMat is None:
-    #     print("Pressure sequence function: No input data.")
-    #     return
-    # else:
-    #     pF = inMat[p_col]
-    #     full_length = len(pF)-1
-
-        #btm = max(pF) # bottom max P ###not needed once we change bin code
-        ### Following two lines are only for btmTime, which is used in edge case check
-        #indBtm = np.argmax(pF) # bottom index
-        #btmTime = inMat[time_col][indBtm] # bottom time
-
-        ##  Initialise input parameters OLD
-        # if (startT > 0.0).bool() and (startT > inMat[time_col][0]).bool(): #patched startT with int() cast, complaining about it being a series
-        #     start = (np.abs(inMat[time_col] - startT)).argmin()
-        #     lenP = np.arange(start,indBtm,1)
-        #     end = indBtm
-        #     prvPrs = inMat[p_col][start]
-        #     if btmTime <= startT:
-        #         print("-startT start time is greater than down cast time. Cast issue.")
-        #         return
-        # elif ((startP > 0.0) and (startP > pF[0])):
-        #     start = (np.abs(inMat[p_col] - startP)).argmin()
-        #     lenP = np.arange(start,indBtm,1)
-        #     end = indBtm
-        #     prvPrs = inMat[p_col][start]
-        #     if btm <= startP:
-        #         print("-startP start pressure is greater than bottom pressure. Cast issue.")
-        #         import pdb; pdb.set_trace() ####
-        #         return
-        # elif up is 'up':
-        #     start = indBtm
-        #     end = full_length
-        #     lenP = np.arange(start,end,1)
-        #     prvPrs = btm
-        # else:
-        #     lenP = np.arange(0,indBtm,1)
-        #     start = 0
-        #     end = indBtm
-        #     prvPrs = 0.0
-
-    df = pd.DataFrame.from_records(inMat)
     start = 0
-#try except to be patched out when serialization changes
-    try:
-        end = df['CTDPRS_DBAR'].idxmax()
-        btm = df['CTDPRS_DBAR'].max()
-    except KeyError:
-        end = df['CTDPRS'].idxmax()
-        btm = df['CTDPRS'].max()
-    # Roll Filter
 
-    roll_filter_matrix = roll_filter(p_col, inMat[:][start:end:sample_rate], up, sample_rate, search_time, start=start, end=end, full_matrix=inMat)
-    ### Needs to be removed and replaced with pd.fillna()
-    # Treat surface data.
-    #roll_filter_matrix = treat_surface_data(p_col, sample_rate, roll_filter_matrix)
+    # Roll Filter
+    roll_filter_matrix = roll_filter(df, p_col, up, sample_rate, search_time, start=start)
+
     df_roll_surface = fill_surface_data(roll_filter_matrix, bin_size=2)
     #bin_size should be moved into config
     binned_df = binning_df(df_roll_surface, bin_size=2)
-    ### OLD code - bin data and find mean of each bin
-    # # Frame Pressure Bins
-    # pressure_bins = np.arange(0,int(btm),intP)
-    # p_bin_index = np.digitize(roll_filter_matrix[p_col],pressure_bins)
-    #
-    # # Define binned output array
-    # binned_matrix = np.empty(shape=(len(pressure_bins),), dtype=inMat.dtype)
-    #
-    # # Iterate over input data by column, sort bins and find mean of binned data.
-    # for col in binned_matrix.dtype.names:
-    #     if col == p_col:
-    #         binned_matrix[col] = pressure_bins
-    #     elif binned_matrix[col].dtype is np.dtype(np.float64):
-    #         binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean() for i in range(1,len(pressure_bins)+1)]
-    #         # Interpolate over NaN or missing data
-    #         if np.isnan(binned_matrix[col]).any():
-    #             binned_matrix[col] = data_interpolater(binned_matrix[col])
-
-    #binned_matrix = binned_df.to_records(index=False)
+    binned_df = binned_df.reset_index(drop=True)
     return binned_df
 ### Once serialization has been fixed, fix try/except to compact code
 
