@@ -6,7 +6,12 @@ Created on Tue Dec  5 11:36:32 2017
 @author: k3jackson
 """
 import sys
+<<<<<<< HEAD
 sys.path.append('../ctdcal/')
+=======
+sys.path.append('./ctd_proc')
+sys.path.append('./odf-ctd-proc/ctdcal/')
+>>>>>>> calibrate_rewrite
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -20,6 +25,7 @@ method = 3
 
 
 # These can be input automatically from configuration file
+
 
 raw_dir = '../data/raw/'
 ssscc_file = '../data/ssscc.csv'
