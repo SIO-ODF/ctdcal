@@ -71,35 +71,42 @@ for cast in range(len(ssscc)):
     coef_concat = pd.concat([coef_concat,oxy_coef_df])
     dataframe_concat = pd.concat([dataframe_concat,btl_data_fit])
 
-    btl_concat_write = pd.concat([btl_concat_write,btl_data_fit])
+    btl_concat_write = pd.concat([btl_concat_write,btl_data_write])
     
 # Save coef to csv
 
 coef_concat.to_csv(log_file)
 btl_concat_write.to_csv(btl_dfile)
 
+#apply coef to CTD data
+
+for cast in range(len(ssscc)):
+    ctdoxy = oxy_fitting.apply_time_data(ssscc[cast])
+    oxy_fitting.write_ct1_file_oxy(ssscc[cast],ctdoxy)
+
+
 
 df=dataframe_concat
 df['BTL_O'] = df['OXYGEN']-df['CTDOXY']
 #
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-cm = ax.scatter(df['BTL_O'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
-ax.set_xlim(-10,10)
-ax.set_title('OXYGEN-CTDOXY vs CTDPRS')
-ax.set_xlabel('CTDOXY Residual (umol/kg)')
-ax.set_ylabel('Pressure (dbar)')
-cbar = fig.colorbar(cm)
-cbar.set_label('Station Number')
-plt.show()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-cm = ax.scatter(df['STNNBR'],df['BTL_O'], marker='+', c=df['CTDPRS'], cmap='rainbow')
-ax.set_ylim(-10,10)
-ax.set_title('OXYGEN-CTDOXY vs STNNBR')
-ax.set_xlabel('Station Number')
-ax.set_ylabel('CTDOXY Residual (umol/kg)')
-cbar = fig.colorbar(cm)
-cbar.set_label('Pressure (dbar)')
-plt.show()
+#fig = plt.figure()
+#ax = fig.add_subplot(1,1,1)
+#cm = ax.scatter(df['BTL_O'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
+#ax.set_xlim(-10,10)
+#ax.set_title('OXYGEN-CTDOXY vs CTDPRS')
+#ax.set_xlabel('CTDOXY Residual (umol/kg)')
+#ax.set_ylabel('Pressure (dbar)')
+#cbar = fig.colorbar(cm)
+#cbar.set_label('Station Number')
+#plt.show()
+#
+#fig = plt.figure()
+#ax = fig.add_subplot(1,1,1)
+#cm = ax.scatter(df['STNNBR'],df['BTL_O'], marker='+', c=df['CTDPRS'], cmap='rainbow')
+#ax.set_ylim(-10,10)
+#ax.set_title('OXYGEN-CTDOXY vs STNNBR')
+#ax.set_xlabel('Station Number')
+#ax.set_ylabel('CTDOXY Residual (umol/kg)')
+#cbar = fig.colorbar(cm)
+#cbar.set_label('Pressure (dbar)')
+#plt.show()

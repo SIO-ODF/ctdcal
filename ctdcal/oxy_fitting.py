@@ -463,11 +463,11 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
 #        print('NEW STANDARD DEVIATION IS:',std_res)
         
 #      Add Station and Cast Numbers to DataFrame
-    time_data_matched['STNNBR']=stn_nbr
-    time_data_matched['CASTNO']=cst_nbr
+    time_data_matched['STNNBR']=int(stn_nbr)
+    time_data_matched['CASTNO']=int(cst_nbr)
 
-    btl_data_clean['STNNBR']=stn_nbr
-    btl_data_clean['CASTNO']=cst_nbr
+    btl_data_clean['STNNBR']=int(stn_nbr)
+    btl_data_clean['CASTNO']=int(cst_nbr)
         
 ##   Sanity PLOT
     plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
@@ -477,6 +477,8 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
         
 #   Flag data    
     bad_values['CTDOXY_FLAG_W'] = 4
+    bad_values['STNNBR'] = int(stn_nbr)
+    bad_values['CASTNO'] = int(cst_nbr)
     btl_data_clean['CTDOXY_FLAG_W'] = 2
     btl_data_clean = pd.concat([btl_data_clean,bad_values])
     btl_data_clean=btl_data_clean.sort_values(by='BTLNBR')
@@ -638,7 +640,7 @@ def write_oxy_coef(coef,sta_cast):
     
     return df
 
-def get_oxy_coef(ssscc,log_file ='../data/logs/oxy_fit_coefs.csv',ind_col = 'SSSCC'):
+def get_oxy_coef(ssscc,log_file ='data/logs/oxy_fit_coefs.csv',ind_col = 'SSSCC'):
     
     df = pd.read_csv(log_file,index_col='SSSCC')
     ssscc = int(ssscc)
@@ -652,7 +654,7 @@ def get_oxy_coef(ssscc,log_file ='../data/logs/oxy_fit_coefs.csv',ind_col = 'SSS
     
     return coef
 
-def load_ct1_file(ssscc, dir_ctd = '../data/pressure/',ctd_postfix = '_ct1.csv',
+def load_ct1_file(ssscc, dir_ctd = 'data/pressure/',ctd_postfix = '_ct1.csv',
                   ctd_skiprows = [0,1,2,3,4,5,6,7,8,9,10,11,13]):
     
     
@@ -674,7 +676,7 @@ def apply_time_data(ssscc,p_col = 'CTDPRS',t_col = 'CTDTMP1',dvdt_col = 'dv_dt_t
                     sal_col = 'CTDSAL',date_time = 'scan_datetime',lon_col='GPSLON',
                     lat_col='GPSLAT',oxyvo_col = 'CTDOXYVOLTS'):
     
-    time_file = '../data/time/'+ssscc+'_time.pkl'
+    time_file = 'data/time/'+ssscc+'_time.pkl'
     time_data = load_time_data(time_file)
     coef = get_oxy_coef(ssscc)
     
@@ -713,7 +715,7 @@ def apply_time_data(ssscc,p_col = 'CTDPRS',t_col = 'CTDTMP1',dvdt_col = 'dv_dt_t
     return time_data['CTDOXY']
 #def oxyfit_to_ctd(ssscc,df):
     
-def write_ct1_file_oxy(ssscc, ctd_oxy, dir_ctd = '../data/pressure/',ctd_postfix = '_ct1.csv'):
+def write_ct1_file_oxy(ssscc, ctd_oxy, dir_ctd = 'data/pressure/',ctd_postfix = '_ct1.csv'):
     
     
     
@@ -723,7 +725,7 @@ def write_ct1_file_oxy(ssscc, ctd_oxy, dir_ctd = '../data/pressure/',ctd_postfix
     
     depth = -999
     
-    iniFile = '../data/ini-files/configuration.ini'
+    iniFile = 'data/ini-files/configuration.ini'
     config = configparser.RawConfigParser()
     config.read(iniFile)
    
