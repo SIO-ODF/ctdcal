@@ -6,12 +6,11 @@ Created on Tue Dec  5 11:36:32 2017
 @author: k3jackson
 """
 import sys
-sys.path.append('/ctd_proc')
-sys.path.append('/odf-ctd-proc/ctdcal/')
+sys.path.append('../ctdcal/')
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-import ctdcal.process_ctd as process_ctd
+import process_ctd
 import pandas as pd
 import oxy_fitting
 #Make this key argument
@@ -20,12 +19,15 @@ method = 3
 
 
 
-# These can be input automatically from configurationn file
+# These can be input automatically from configuration file
 
-raw_dir = '/data/raw/'
-ssscc_file = '/data/ssscc.csv'
-time_dir = '/data/time/'
-btl_dir = '/data/bottle/'
+
+raw_dir = '../data/raw/'
+ssscc_file = '../data/ssscc.csv'
+time_dir = '../data/time/'
+btl_dir = '../data/bottle/'
+log_file = '../data/logs/oxy_fit_coefs.csv'
+btl_dfile = '../data/logs/bottle_fit_data.csv'
 
 
 
@@ -33,7 +35,8 @@ with open(ssscc_file, 'r') as filename:
     ssscc = [line.strip() for line in filename]
 
 dataframe_concat = pd.DataFrame()
-
+coef_concat = pd.DataFrame()
+btl_concat_write = pd.DataFrame()
 
 for cast in range(len(ssscc)):
 
@@ -58,13 +61,27 @@ for cast in range(len(ssscc)):
     btl_data = pd.DataFrame.from_records(btl_data)
 
 
-    btl_data_write, btl_data_fit = oxy_fitting.oxy_fit(time_data,btl_data,stn_cst,hexfile,xmlfile,method=method)
-    print('COMPLETED SSSCC:',stn_cst)
+    btl_data_write, btl_data_fit, coef = oxy_fitting.oxy_fit(time_data,btl_data,stn_cst,hexfile,xmlfile,method=method)
+    print('COMPLETED Fitting for SSSCC:',stn_cst)
+    
+    print('Saving Coefficients...')
+    print('Saved Coef: ',coef)
+    oxy_coef_df = oxy_fitting.write_oxy_coef(coef,stn_cst)
+    
+    coef_concat = pd.concat([coef_concat,oxy_coef_df])
     dataframe_concat = pd.concat([dataframe_concat,btl_data_fit])
+
+    btl_concat_write = pd.concat([btl_concat_write,btl_data_fit])
+    
+# Save coef to csv
+
+coef_concat.to_csv(log_file)
+btl_concat_write.to_csv(btl_dfile)
+
 
 df=dataframe_concat
 df['BTL_O'] = df['OXYGEN']-df['CTDOXY']
-
+#
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 cm = ax.scatter(df['BTL_O'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')

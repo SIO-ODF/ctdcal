@@ -315,12 +315,12 @@ def main(argv):
     report_ctd.report_time_series_data(filename_base, time_directory, expocode, time_column_names, time_column_units, time_column_names, time_column_format, time_data)
 
     # Pressure Sequence
-    pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, timedate, 2.0, -1.0, 0.0, 'down', int(sample_rate), int(search_time), time_data)
+    pressure_seq_data = process_ctd.pressure_sequence(time_data, p_col, 2.0, -1.0, 0.0, 'down', int(sample_rate), int(search_time))
 
-    # Convert dissolved oxygen from ml/l to umol/kg
+    # Convert dissolved oxygen from ml/l to umol/kg FOR OXY
     dopkg = process_ctd.o2pl2pkg(p_col, t1_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, pressure_seq_data)
 
-    # Add quality codes to data
+    # Add quality codes to data FOR OXYFIT
     qual_pseq_data = process_ctd.ctd_quality_codes(dopkg_col, None, None, True, p_column_qual, p_column_one, pressure_seq_data)
 
     # Collect Cast Details from Log
