@@ -5,15 +5,16 @@ Created on Tue Dec  5 11:36:32 2017
 
 @author: k3jackson
 """
-import sys
-sys.path.append('../ctdcal/')
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
+
+#import matplotlib
+#matplotlib.use('TkAgg')
+#import matplotlib.pyplot as plt
 import ctdcal.process_ctd as process_ctd
 import pandas as pd
 import ctdcal.oxy_fitting as oxy_fitting
-#Make this key argument
+
+
+
 method = 3
 
 
@@ -86,9 +87,9 @@ for cast in range(len(ssscc)):
 
 
 
-df=dataframe_concat
-df['BTL_O'] = df['OXYGEN']-df['CTDOXY']
-#
+#df=dataframe_concat
+#df['BTL_O'] = df['OXYGEN']-df['CTDOXY']
+##
 #fig = plt.figure()
 #ax = fig.add_subplot(1,1,1)
 #cm = ax.scatter(df['BTL_O'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')

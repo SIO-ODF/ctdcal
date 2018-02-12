@@ -470,9 +470,9 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     btl_data_clean['CASTNO']=int(cst_nbr)
         
 ##   Sanity PLOT
-    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
-    plt.xlim(xmax=10)
-    plt.show()
+#    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
+#    plt.xlim(xmax=10)
+#    plt.show()
     #dataframe_concat = pd.concat([dataframe_concat,btl_data_clean])
         
 #   Flag data    
@@ -548,10 +548,10 @@ def oxygen_cal_ml(coef0,time_data,btl_data,switch):
             - time_data['NOAA_oxy_mlL'])) / (np.sum(time_data['weights'])**2) 
         
     elif switch == 2:
-        
-        resid = np.sqrt(((btl_data['NOAA_oxy_mlL'] 
-                - time_data['NOAA_oxy_mlL'])**2) 
-                / (np.sqrt(np.std(time_data['NOAA_oxy_mlL'])**2)))
+       
+        resid =np.sqrt(((btl_data['NOAA_oxy_mlL'] - time_data['NOAA_oxy_mlL'])**2))
+
+                
     
     elif switch == 3:
               
