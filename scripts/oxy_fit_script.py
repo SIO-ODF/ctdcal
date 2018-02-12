@@ -6,12 +6,7 @@ Created on Tue Dec  5 11:36:32 2017
 @author: k3jackson
 """
 import sys
-<<<<<<< HEAD
 sys.path.append('../ctdcal/')
-=======
-sys.path.append('./ctd_proc')
-sys.path.append('./odf-ctd-proc/ctdcal/')
->>>>>>> calibrate_rewrite
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -32,6 +27,7 @@ ssscc_file = '../data/ssscc.csv'
 time_dir = '../data/time/'
 btl_dir = '../data/bottle/'
 log_file = '../data/logs/oxy_fit_coefs.csv'
+btl_dfile = '../data/logs/bottle_fit_data.csv'
 
 
 
@@ -40,6 +36,7 @@ with open(ssscc_file, 'r') as filename:
 
 dataframe_concat = pd.DataFrame()
 coef_concat = pd.DataFrame()
+btl_concat_write = pd.DataFrame()
 
 for cast in range(len(ssscc)):
 
@@ -74,9 +71,13 @@ for cast in range(len(ssscc)):
     coef_concat = pd.concat([coef_concat,oxy_coef_df])
     dataframe_concat = pd.concat([dataframe_concat,btl_data_fit])
 
+    btl_concat_write = pd.concat([btl_concat_write,btl_data_fit])
+    
 # Save coef to csv
 
 coef_concat.to_csv(log_file)
+btl_concat_write.to_csv(btl_dfile)
+
 
 df=dataframe_concat
 df['BTL_O'] = df['OXYGEN']-df['CTDOXY']
