@@ -455,11 +455,9 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
 
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function
-
     Function takes full NUMPY ndarray with predefined dtype array
     of filtered ctd raw data the stores, analizes and removes ondeck
     values from data.
-
     Args:
         param1 (str): stacast, station cast info
         param1 (str): p_col, pressure data column name
@@ -469,11 +467,9 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
         param5 (ndarray): numpy ndarray with dtype array
         param6 (float): conductivity_startup, threshold value
         param7 (str): log_file, log file name
-
     Returns:
         Narray: The return ndarray with ondeck data removed.
         Also output start/end ondeck pressure.
-
     """
     start_pressure = []
     tmpMat = []
@@ -533,19 +529,37 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
     return outMat
 
+def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
+    #fix/remove try/except once serialization is fixed
+    try:
+        if direction == 'down':
+            monotonic_sequence = df[pressure_column].expanding().max()
+        elif direction == 'up':
+            monotonic_sequence = df[pressure_column].expanding().min()
+        else:
+            raise ValueError("direction must be one of (up, down)")
+    except KeyError:
+        pressure_column = 'CTDPRS'
+        if direction == 'down':
+            monotonic_sequence = df[pressure_column].expanding().max()
+        elif direction == 'up':
+            monotonic_sequence = df[pressure_column].expanding().min()
+        else:
+            raise ValueError("direction must be one of (up, down)")
+
+    return df[df[pressure_column] == monotonic_sequence]
+
+
 def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15, **kwargs):
     """roll_filter function
-
     Function takes full NUMPY ndarray with predefined dtype array
     and subsample arguments to return a roll filtered ndarray.
-
     Args:
         param1 (str): stacast, station cast info
         param2 (ndarray): inMat, numpy ndarray with dtype array
         param3 (str): up, direction to filter cast (up vs down)
         param4 (int): frames_per_sec, subsample selection rate
         param5 (int): seach_time, search time past pressure inversion
-
     Returns:
         Narray: The return value ndarray of data with ship roll removed
     """
@@ -610,12 +624,9 @@ def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15,
 
 def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15, inMat=None,):
     """pressure_sequence function
-
     Function takes full NUMPY ndarray with predefined dtype array
     and several arguments to return a pressure sequenced data ndarray.
-
     Pressure sequencing includes rollfilter.
-
     Necissary inputs are input Matrix (inMat) and pressure interval (intP).
     The other inputs have default settings. The program will figure out
     specifics for those settings if left blank.
@@ -625,7 +636,6 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
     There is no interpolation to the surface for other sensor values.
     'up' indicates direction for pressure sequence. If up is set startT and startP
     are void.
-
     Args:
         param1 (str): stacast, station cast input
         param2 (str): p_col, pressure column name
@@ -637,10 +647,8 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         param8 (int): sample_rate, sub sample rate for roll_filter. Cleans & speeds processing.
         param9 (int): search_time, truncate search index for the aliasing part of ship roll.
         param10 (ndarray): inMat, input data ndarray
-
     Returns:
         Narray: The return value is a matrix of pressure sequenced data
-
     todo: deep data bin interpolation to manage empty slices
     """
     # change to take dataframe with the following properties

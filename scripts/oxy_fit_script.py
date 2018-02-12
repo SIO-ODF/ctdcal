@@ -10,9 +10,9 @@ sys.path.append('../ctdcal/')
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-import process_ctd
+import ctdcal.process_ctd as process_ctd
 import pandas as pd
-import oxy_fitting
+import ctdcal.oxy_fitting as oxy_fitting
 #Make this key argument
 method = 3
 
@@ -22,12 +22,12 @@ method = 3
 # These can be input automatically from configuration file
 
 
-raw_dir = '../data/raw/'
-ssscc_file = '../data/ssscc.csv'
-time_dir = '../data/time/'
-btl_dir = '../data/bottle/'
-log_file = '../data/logs/oxy_fit_coefs.csv'
-btl_dfile = '../data/logs/bottle_fit_data.csv'
+raw_dir = 'data/raw/'
+ssscc_file = 'data/ssscc.csv'
+time_dir = 'data/time/'
+btl_dir = 'data/bottle/'
+log_file = 'data/logs/oxy_fit_coefs.csv'
+btl_dfile = 'data/logs/bottle_fit_data.csv'
 
 
 
@@ -91,6 +91,7 @@ ax.set_xlabel('CTDOXY Residual (umol/kg)')
 ax.set_ylabel('Pressure (dbar)')
 cbar = fig.colorbar(cm)
 cbar.set_label('Station Number')
+plt.show()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -101,3 +102,4 @@ ax.set_xlabel('Station Number')
 ax.set_ylabel('CTDOXY Residual (umol/kg)')
 cbar = fig.colorbar(cm)
 cbar.set_label('Pressure (dbar)')
+plt.show()

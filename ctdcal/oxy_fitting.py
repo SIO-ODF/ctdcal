@@ -12,15 +12,15 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import scipy
 import numpy as np
-import process_ctd
-import sbe_reader as sbe_rd
-import sbe_equations_dict as sbe_eq
+import ctdcal.process_ctd as process_ctd
+import ctdcal.sbe_reader as sbe_rd
+import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 import pandas as pd
-import oxy_fitting
+#import ctdcal.oxy_fitting as oxy_fitting
 import configparser
 import os
-import report_ctd
+#import report_ctd
 import datetime
 
 #Line 342 module isopycnals
@@ -345,7 +345,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     time_data_matched['weights'] = wgt(time_data_matched['CTDPRS_y'])
     
 #   Least Squares fitting to determine new coefficients   
-    coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef0,
+    coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef0,
                                      args=(time_data_matched,btl_data_clean,
                                            method))
 
@@ -423,7 +423,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
                 / (time_data_matched['TEMPERATURE_CTD'] + 273.15))   
                 
 #       Recalculate coeficients 
-        coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef,
+        coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef,
                                          args=(time_data_matched,btl_data_clean,
                                                method))
         
@@ -686,7 +686,7 @@ def apply_time_data(ssscc,p_col = 'CTDPRS',t_col = 'CTDTMP1',dvdt_col = 'dv_dt_t
     
     time_data = pressure_sequence(time_data)
     
-    time_data = oxy_fitting.apply_oxy_coef(time_data,coef)
+    time_data = apply_oxy_coef(time_data,coef)
     # Fill NA for dv_dt at beginning of the cast with mean
     time_data['dv_dt_time'] = time_data['dv_dt_time'].replace([np.inf, -np.inf], np.nan)
     time_data['dv_dt_time'] = time_data['dv_dt_time'].fillna(time_data['dv_dt_time'].mean())
