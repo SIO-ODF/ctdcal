@@ -799,7 +799,7 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
     df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
     
     #Less than 500
-    lower_lim = df[p_col].min()
+    lower_lim = df[p_col].min() - 1
     upper_lim = 500
     threshold = 0.020
 
@@ -892,7 +892,7 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
 #    fitfilePath = os.path.join(log_directory, fitfile)
 #    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
         
-    return df
+    return coef1,coef2
     
 def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):
     
@@ -902,26 +902,30 @@ def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_
     
     if find == 'good':
     # Find data values for each sensor that are below the threshold (good)
-        df_range_comp_1 = df_range[df_range[d_1].abs() < threshold]
-        df_range_comp_2 = df_range[df_range[d_2].abs() < threshold]
-        df_range_comp_3 = df_range[df_range[d_12].abs() < threshold]
+#        df_range_comp_1 = df_range[df_range[d_1].abs() < threshold]
+#        df_range_comp_2 = df_range[df_range[d_2].abs() < threshold]
+#        df_range_comp_3 = df_range[df_range[d_12].abs() < threshold]
+        
+        df_range_comp = df_range[(df_range[d_1].abs() < threshold) & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
     
     elif find == 'quest':
     # Find data values for each sensor that are above the threshold (questionable)
-        df_range_comp_1 = df_range[df_range[d_1].abs() > threshold]
-        df_range_comp_2 = df_range[df_range[d_2].abs() > threshold]
-        df_range_comp_3 = df_range[df_range[d_12].abs() > threshold]
+#        df_range_comp_1 = df_range[df_range[d_1].abs() > threshold]
+#        df_range_comp_2 = df_range[df_range[d_2].abs() > threshold]
+#        df_range_comp_3 = df_range[df_range[d_12].abs() > threshold]
+        
+        df_range_comp = df_range[(df_range[d_1].abs() > threshold) | (df_range[d_2].abs() > threshold) | (df_range[d_12].abs() > threshold)]
    
     else:
         print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
     
     #concatenate dataframe to merge all values together
-    df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
+#    df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
         
     # Remove duplicate values
-    df_concat = df_concat.drop_duplicates(subset=[col_name],keep='first')
+    df_range_comp = df_range_comp.drop_duplicates(subset=[col_name],keep='first')
     
-    return df_concat
+    return df_range_comp
     
 
     #Combine these three into a dataframe and write out to a csv 
