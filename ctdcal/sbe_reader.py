@@ -72,6 +72,7 @@ class SBEReader():
         #this uses numpy magic to just "apply" the needed operations to the correct part of the array all in one go
         measurements[:,:num_frequencies] = measurements[:,:num_frequencies] / 256
         measurements[:,num_frequencies:num_frequencies+num_voltages] = (5 * (1 - (measurements[:,num_frequencies:num_frequencies+num_voltages] / 4095)))
+        measurements = measurements[:,0:-1] #remove after applying _parse_scans_meta in here
         #print(measurements.shape)
         return measurements
 
@@ -572,11 +573,17 @@ class SBEReader():
 
     @property
     def parsed_scans(self):
-        try:
-            return self._parse_scans
-        except AttributeError:
-            self._parse_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
-            return self._parse_scans
+        """
+        Wrapper for _parse_scans and _parse_scans_meta. Returns np.ndarray
+        """
+        # try:
+        #     return self._parse_scans
+        # except AttributeError:
+        #     self._parse_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
+        #     return self._parse_scans
+        #import pdb; pdb.set_trace()
+        return np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
+        #return self._parse_scans
 
 
     def parsed_config(self):

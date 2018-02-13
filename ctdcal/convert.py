@@ -61,7 +61,7 @@ def convertFromSBEReader(sbeReader, debug=False):
     DEBUG = debug
 
     # Retrieve parsed scans
-    rawData = sbeReader.parsed_scans()
+    rawData = sbeReader.parsed_scans
 
     # Convert raw data to dataframe
     raw_df = pd.DataFrame(rawData)
