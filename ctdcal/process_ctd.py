@@ -892,7 +892,7 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
 #    fitfilePath = os.path.join(log_directory, fitfile)
 #    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
         
-    return coef1,coef2
+    return coef1,coef2,df_ques
     
 def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):
     
