@@ -755,22 +755,29 @@ def load_btl_data(btl_file):
     return btl_data
 
 
-def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
-                          t_col_1 = 'CTDTMP1', t_col_2 = 'CTDTMP2', reft_col = 'T90',
-                          p_col = 'CTDPRS'):
+def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
+                          t_col = 'CTDTMP1', reft_col = 'T90',
+                          p_col = 'CTDPRS'):# t_col_2 = 'CTDTMP2',
     
-    d_1 = 'd_t1' #Difference between ref and prim sensor
-    d_2 = 'd_t2' #Difference between ref and second sensor
-    d_12 = 'd_t1_t2' #Difference between prim and sec sensor
+    if sensor == 1:
+        postfix = 't1'
+    elif sensor ==2:
+        postfix = 't2'
+    else:
+        print('No sensor name supplied, difference column name will be: diff')
+    
+    diff = 'd_'+postfix #Difference between ref and prim sensor
+    #d_2 = 'd_t2' #Difference between ref and second sensor
+    #d_12 = 'd_t1_t2' #Difference between prim and sec sensor
     
     # Calculate absolute differences between sensors and reference thermom
     
-    df['d_t1'] = reft_data[reft_col] - df[t_col_1]
-    #df['d_t1'] = df['d_t1'].abs()
-    df['d_t2'] = reft_data[reft_col] - df[t_col_2]
-    #df['d_t2'] = df['d_t2'].abs()
-    df['d_t1_t2'] = df[t_col_1] - df[t_col_2]
-    #df['d_t1_t2'] = df['d_t1_t2'].abs()
+    df[diff] = reft_data[reft_col] - df[t_col]
+ 
+    #df['d_t2'] = reft_data[reft_col] - df[t_col_2]
+   
+    #df['d_t1_t2'] = df[t_col_1] - df[t_col_2]
+
     
     #split dataframes by pressure ranges
     
@@ -779,32 +786,44 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
     upper_lim = df[p_col].max()
     threshold = 0.002
     
-    df_deep_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-    df_deep_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+#    df_deep_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+#    df_deep_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')  
     
     #Between 2000 and 1000
     lower_lim = 1000
     upper_lim = 2000
     threshold = 0.005
     
-    df_lmid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-    df_lmid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+#    df_lmid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+#    df_lmid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')    
     
     #Between 1000 and 500
     lower_lim = 500
     upper_lim = 1000
     threshold = 0.010
     
-    df_umid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-    df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+#    df_umid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+#    df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')    
     
     #Less than 500
     lower_lim = df[p_col].min() - 1
     upper_lim = 500
     threshold = 0.020
 
-    df_shal_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-    df_shal_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+#    df_shal_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+#    df_shal_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')    
     
     #concat dataframes into two main dfs
     df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
@@ -842,48 +861,48 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
     
     fit = np.arange(x0,x1,(x1-x0)/50)
     
-    cf1 = np.polyfit(df_good_cons[p_col], df_good_cons[d_1], order)
-    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
+    cf1 = np.polyfit(df_good_cons[p_col], df_good_cons[diff], order)
+#    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
     
    
     sensor = '_t'+str(sensor)
     coef1 = np.zeros(shape=5)
-    coef2 = np.zeros(shape=5)
+#    coef2 = np.zeros(shape=5)
     
     if order is 0:
         coef1[4] = cf1[0]
         
-        coef2[4] = cf2[0]
+#        coef2[4] = cf2[0]
         
     elif (order is 1) and (calib_param == 'P'):
         coef1[1] = cf1[0]
         coef1[4] = cf1[1]
         
-        coef2[1] = cf2[0]
-        coef2[4] = cf2[1]
+#        coef2[1] = cf2[0]
+#        coef2[4] = cf2[1]
         
     elif (order is 2) and (calib_param == 'P'):
         coef1[0] = cf1[0]
         coef1[1] = cf1[1]
         coef1[4] = cf1[2]
         
-        coef2[0] = cf2[0]
-        coef2[1] = cf2[1]
-        coef2[4] = cf2[2]
+#        coef2[0] = cf2[0]
+#        coef2[1] = cf2[1]
+#        coef2[4] = cf2[2]
     elif (order is 1) and (calib_param == 'T'):
         coef1[3] = cf1[0]
         coef1[4] = cf1[1]
         
-        coef2[3] = cf2[0]
-        coef2[4] = cf2[1]
+#        coef2[3] = cf2[0]
+#        coef2[4] = cf2[1]
     elif (order is 2) and (calib_param == 'T'):
         coef1[2] = cf1[0]
         coef1[3] = cf1[1]
         coef1[4] = cf1[2]
     
-        coef2[2] = cf2[0]
-        coef2[3] = cf2[1]
-        coef2[4] = cf2[2]
+#        coef2[2] = cf2[0]
+#        coef2[3] = cf2[1]
+#        coef2[4] = cf2[2]
         
 #    Y = fit_ctd.conductivity_polyfit(coef, fit, fit, np.full(len(fit), 0.0))
 #
@@ -892,9 +911,9 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
 #    fitfilePath = os.path.join(log_directory, fitfile)
 #    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
         
-    return coef1,coef2,df_ques
+    return coef1,df_ques
     
-def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):
+def quality_check(df,d_1,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):#d_2,d_12,
     
     #Choose Data range to compare with
     df_range = df[(df[col_name] > lower_lim) & (df[col_name] <= upper_lim)]
@@ -906,7 +925,7 @@ def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_
 #        df_range_comp_2 = df_range[df_range[d_2].abs() < threshold]
 #        df_range_comp_3 = df_range[df_range[d_12].abs() < threshold]
         
-        df_range_comp = df_range[(df_range[d_1].abs() < threshold) & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
+        df_range_comp = df_range[(df_range[d_1].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
     
     elif find == 'quest':
     # Find data values for each sensor that are above the threshold (questionable)
@@ -914,7 +933,7 @@ def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_
 #        df_range_comp_2 = df_range[df_range[d_2].abs() > threshold]
 #        df_range_comp_3 = df_range[df_range[d_12].abs() > threshold]
         
-        df_range_comp = df_range[(df_range[d_1].abs() > threshold) | (df_range[d_2].abs() > threshold) | (df_range[d_12].abs() > threshold)]
+        df_range_comp = df_range[(df_range[d_1].abs() > threshold)]# | (df_range[d_2].abs() > threshold) | (df_range[d_12].abs() > threshold)]
    
     else:
         print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
