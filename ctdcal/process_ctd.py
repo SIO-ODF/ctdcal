@@ -752,22 +752,34 @@ def load_btl_data(btl_file):
 
     btl_data = pd.DataFrame.from_records(btl_data)
     
+    ssscc = btl_file[-18:-13]
+    
+    btl_data['SSSCC'] = ssscc
+    
     return btl_data
 
 
 def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
-                          t_col = 'CTDTMP1', reft_col = 'T90',
+                          t_col_1 = 'CTDTMP1', t_col_2='CTDTMP2', reft_col = 'T90',
                           p_col = 'CTDPRS'):# t_col_2 = 'CTDTMP2',
     
     if sensor == 1:
         postfix = 't1'
-#        t_col = 'CTDTMP1'
+        t_col = 'CTDTMP1'
     elif sensor ==2:
         postfix = 't2'
-#        t_col = 'CTDTMP2'
+        t_col = 'CTDTMP2'
     else:
         print('No sensor name supplied, difference column name will be: diff')
     
+    if calib_param == 'P':
+        calib_col = p_col
+    elif calib_param == 'T':
+        calib_col = t_col
+    else:
+        print('No calib_param supplied')
+ 
+        
     diff = 'd_'+postfix #Difference between ref and prim sensor
     #d_2 = 'd_t2' #Difference between ref and second sensor
     #d_12 = 'd_t1_t2' #Difference between prim and sec sensor
@@ -776,6 +788,10 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
     
     df[diff] = reft_data[reft_col] - df[t_col]
  
+    df['primary_diff'] = reft_data[reft_col] - df[t_col_1]
+    df['secondary_diff'] = reft_data[reft_col] - df[t_col_2]
+    df['P-S'] = df[t_col_1] - df[t_col_2]
+    
     #df['d_t2'] = reft_data[reft_col] - df[t_col_2]
    
     #df['d_t1_t2'] = df[t_col_1] - df[t_col_2]
@@ -792,7 +808,9 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
 #    df_deep_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
     
     df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')  
+    df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_deep_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='reft')
+       
     
     #Between 2000 and 1000
     lower_lim = 1000
@@ -803,7 +821,8 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
 #    df_lmid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
     
     df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')    
+    df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_lmid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='reft')
     
     #Between 1000 and 500
     lower_lim = 500
@@ -814,7 +833,8 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
 #    df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
     
     df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')    
+    df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_umid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='reft')
     
     #Less than 500
     lower_lim = df[p_col].min() - 1
@@ -825,14 +845,31 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
 #    df_shal_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
     
     df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')    
+    df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_shal_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='reft')
     
     #concat dataframes into two main dfs
     df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
     df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
+    df_reft = pd.concat([df_deep_reft,df_lmid_reft,df_umid_reft,df_shal_reft])
     
-    x0 = int(xRange.split(":")[0])
-    x1 = int(xRange.split(":")[1])
+    #Use reft dataframe to recover misinterpreted values:
+    
+    #Add csv information to dataframes:
+    
+    if sensor == 1:
+        df_ques['Parameter'] = 'T1'
+        df_ques['Flag'] = 3
+        
+        df_reft['Parameter'] = 'T'
+        df_reft['Flag'] = 3
+        
+    elif sensor == 2:
+        df_ques['Parameter'] = 'T2'  
+        df_ques['Flag'] = 3
+        
+        df_reft['Flag'] = 3
+           
     
     #report questionable data to a csv file
     
@@ -857,13 +894,15 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
 #            x1 = 
 #            
     else:
-        print('Invalid xRange')
+        #Take full range of temperature values
+        x0 = df_good_cons[t_col].min()
+        x1 = df_good_cons[t_col].max()
     
     # Determine fitting ranges
     
     fit = np.arange(x0,x1,(x1-x0)/50)
     
-    cf1 = np.polyfit(df_good_cons[p_col], df_good_cons[diff], order)
+    cf1 = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
 #    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
     
    
@@ -913,9 +952,11 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
 #    fitfilePath = os.path.join(log_directory, fitfile)
 #    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
         
-    return coef1,df_ques
+    return coef1,df_ques,df_reft
     
-def quality_check(df,d_1,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):#d_2,d_12,
+def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
+                  col_name = 'CTDPRS',P_S = 'P-S',d_1 = 'primary_diff',
+                  d_2 = 'secondary_diff'):#
     
     #Choose Data range to compare with
     df_range = df[(df[col_name] > lower_lim) & (df[col_name] <= upper_lim)]
@@ -923,22 +964,22 @@ def quality_check(df,d_1,lower_lim,upper_lim,threshold,find='good',col_name = 'C
     
     if find == 'good':
     # Find data values for each sensor that are below the threshold (good)
-#        df_range_comp_1 = df_range[df_range[d_1].abs() < threshold]
-#        df_range_comp_2 = df_range[df_range[d_2].abs() < threshold]
-#        df_range_comp_3 = df_range[df_range[d_12].abs() < threshold]
         
-        df_range_comp = df_range[(df_range[d_1].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
+        df_range_comp = df_range[(df_range[diff].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
     
     elif find == 'quest':
     # Find data values for each sensor that are above the threshold (questionable)
-#        df_range_comp_1 = df_range[df_range[d_1].abs() > threshold]
-#        df_range_comp_2 = df_range[df_range[d_2].abs() > threshold]
-#        df_range_comp_3 = df_range[df_range[d_12].abs() > threshold]
         
-        df_range_comp = df_range[(df_range[d_1].abs() > threshold)]# | (df_range[d_2].abs() > threshold) | (df_range[d_12].abs() > threshold)]
+        df_range_comp = df_range[(df_range[diff].abs() > threshold)]# | (df_range[d_2].abs() > threshold) | (df_range[d_12].abs() > threshold)]
+        
+    elif find == 'reft':
+    # Find data points for that are questionable reft values
+        
+        df_range_comp = df_range[(df_range[d_1].abs() > threshold) & (df_range[d_2].abs() > threshold) & (df_range[P_S].abs() < threshold)]
+        
    
     else:
-        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
+        print('Find argument not valid, please enter "good" or "quest" or "reft" to find good or questionable values')
     
     #concatenate dataframe to merge all values together
 #    df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
@@ -948,7 +989,6 @@ def quality_check(df,d_1,lower_lim,upper_lim,threshold,find='good',col_name = 'C
     
     return df_range_comp
     
-
     #Combine these three into a dataframe and write out to a csv 
     #Sort by sta/cast, bottle number, rev. press
     
