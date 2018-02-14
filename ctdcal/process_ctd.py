@@ -761,8 +761,10 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
     
     if sensor == 1:
         postfix = 't1'
+#        t_col = 'CTDTMP1'
     elif sensor ==2:
         postfix = 't2'
+#        t_col = 'CTDTMP2'
     else:
         print('No sensor name supplied, difference column name will be: diff')
     
