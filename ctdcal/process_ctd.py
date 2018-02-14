@@ -879,7 +879,7 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
         x0 = int(xRange.split(":")[0])
         x1 = int(xRange.split(":")[1])
         
-        df_good_cons = df_good[(df_good[p_col] >= x0) & (df_good[p_col] <= x1)]
+        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
      
         #Add here is planning on using for other calibrate code
 #    else: 
@@ -895,9 +895,10 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
 #            
     else:
         #Take full range of temperature values
-        x0 = df_good_cons[t_col].min()
-        x1 = df_good_cons[t_col].max()
-    
+        x0 = df_good[t_col].min()
+        x1 = df_good[t_col].max()
+        
+        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
     # Determine fitting ranges
     
     fit = np.arange(x0,x1,(x1-x0)/50)
