@@ -198,9 +198,11 @@ def process_all():
     ################################################################################
 
     #apply oxygen fits to cast data (time)
-    for x in ssscc:
-        subprocess.run(['odf_fit_ctd.py', 'data/time/' + x + '_time.pkl', '-oxy', 'data/oxygen/' + x], stdout=subprocess.PIPE)
-        print('odf_fit_ctd.py oxy coefficients appplied to SSSCC: ' + x + ' done')
+#    for x in ssscc:
+#        subprocess.run(['odf_fit_ctd.py', 'data/time/' + x + '_time.pkl', '-oxy', 'data/oxygen/' + x], stdout=subprocess.PIPE)
+#        print('odf_fit_ctd.py oxy coefficients appplied to SSSCC: ' + x + ' done')
+    
+    subprocess.run(['oxy_fit_script.py'], stdout=subprocess.PIPE)
     time_oxygen_fit = time.perf_counter()
 
     subprocess.run(['ctd_to_bottle.py'], stdout=subprocess.PIPE)

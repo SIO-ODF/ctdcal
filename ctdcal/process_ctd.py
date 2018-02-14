@@ -7,6 +7,7 @@ import scipy.stats as st
 import time, os
 import pandas as pd
 import math
+#import report_ctd
 import ctdcal.report_ctd as report_ctd
 import warnings
 
@@ -454,11 +455,9 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
 
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function
-
     Function takes full NUMPY ndarray with predefined dtype array
     of filtered ctd raw data the stores, analizes and removes ondeck
     values from data.
-
     Args:
         param1 (str): stacast, station cast info
         param1 (str): p_col, pressure data column name
@@ -468,11 +467,9 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
         param5 (ndarray): numpy ndarray with dtype array
         param6 (float): conductivity_startup, threshold value
         param7 (str): log_file, log file name
-
     Returns:
         Narray: The return ndarray with ondeck data removed.
         Also output start/end ondeck pressure.
-
     """
     start_pressure = []
     tmpMat = []
@@ -555,17 +552,14 @@ def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
 
 def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15, **kwargs):
     """roll_filter function
-
     Function takes full NUMPY ndarray with predefined dtype array
     and subsample arguments to return a roll filtered ndarray.
-
     Args:
         param1 (str): stacast, station cast info
         param2 (ndarray): inMat, numpy ndarray with dtype array
         param3 (str): up, direction to filter cast (up vs down)
         param4 (int): frames_per_sec, subsample selection rate
         param5 (int): seach_time, search time past pressure inversion
-
     Returns:
         Narray: The return value ndarray of data with ship roll removed
     """
@@ -630,12 +624,9 @@ def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15,
 
 def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15, inMat=None,):
     """pressure_sequence function
-
     Function takes full NUMPY ndarray with predefined dtype array
     and several arguments to return a pressure sequenced data ndarray.
-
     Pressure sequencing includes rollfilter.
-
     Necissary inputs are input Matrix (inMat) and pressure interval (intP).
     The other inputs have default settings. The program will figure out
     specifics for those settings if left blank.
@@ -645,7 +636,6 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
     There is no interpolation to the surface for other sensor values.
     'up' indicates direction for pressure sequence. If up is set startT and startP
     are void.
-
     Args:
         param1 (str): stacast, station cast input
         param2 (str): p_col, pressure column name
@@ -657,10 +647,8 @@ def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.
         param8 (int): sample_rate, sub sample rate for roll_filter. Cleans & speeds processing.
         param9 (int): search_time, truncate search index for the aliasing part of ship roll.
         param10 (ndarray): inMat, input data ndarray
-
     Returns:
         Narray: The return value is a matrix of pressure sequenced data
-
     todo: deep data bin interpolation to manage empty slices
     """
     # change to take dataframe with the following properties
@@ -796,6 +784,198 @@ def fill_surface_data(df, **kwargs):
 
     return df_merged.fillna(method='bfill')
 
+def load_reft_data(reft_file,index_name = 'index_memory'):
+    """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
+    
+    reft_data = pd.read_csv(reft_file)
+    reft_data.set_index(index_name)
+    
+    return reft_data
+
+def load_btl_data(btl_file):
+    
+    """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.csv'"""
+    
+    btl_data = dataToNDarray(btl_file,float,True,',',0) 
+
+    btl_data = pd.DataFrame.from_records(btl_data)
+    
+    return btl_data
+
+
+def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
+                          t_col_1 = 'CTDTMP1', t_col_2 = 'CTDTMP2', reft_col = 'T90',
+                          p_col = 'CTDPRS'):
+    
+    d_1 = 'd_t1' #Difference between ref and prim sensor
+    d_2 = 'd_t2' #Difference between ref and second sensor
+    d_12 = 'd_t1_t2' #Difference between prim and sec sensor
+    
+    # Calculate absolute differences between sensors and reference thermom
+    
+    df['d_t1'] = reft_data[reft_col] - df[t_col_1]
+    #df['d_t1'] = df['d_t1'].abs()
+    df['d_t2'] = reft_data[reft_col] - df[t_col_2]
+    #df['d_t2'] = df['d_t2'].abs()
+    df['d_t1_t2'] = df[t_col_1] - df[t_col_2]
+    #df['d_t1_t2'] = df['d_t1_t2'].abs()
+    
+    #split dataframes by pressure ranges
+    
+    #Greater than 2000 dBar
+    lower_lim = 2000
+    upper_lim = df[p_col].max()
+    threshold = 0.002
+    
+    df_deep_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+    df_deep_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    #Between 2000 and 1000
+    lower_lim = 1000
+    upper_lim = 2000
+    threshold = 0.005
+    
+    df_lmid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+    df_lmid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    #Between 1000 and 500
+    lower_lim = 500
+    upper_lim = 1000
+    threshold = 0.010
+    
+    df_umid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+    df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    #Less than 500
+    lower_lim = df[p_col].min()
+    upper_lim = 500
+    threshold = 0.020
+
+    df_shal_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
+    df_shal_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    #concat dataframes into two main dfs
+    df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
+    df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
+    
+    x0 = int(xRange.split(":")[0])
+    x1 = int(xRange.split(":")[1])
+    
+    #report questionable data to a csv file
+    
+    #constrain dataframes to within limits of xRange
+    
+    if xRange != None:
+        x0 = int(xRange.split(":")[0])
+        x1 = int(xRange.split(":")[1])
+        
+        df_good_cons = df_good[(df_good[p_col] >= x0) & (df_good[p_col] <= x1)]
+     
+        #Add here is planning on using for other calibrate code
+#    else: 
+#        if order == 1:
+#            
+#            x0 = 
+#            x1 = 
+#        
+#        elif:
+#            
+#            x0 = 
+#            x1 = 
+#            
+    else:
+        print('Invalid xRange')
+    
+    # Determine fitting ranges
+    
+    fit = np.arange(x0,x1,(x1-x0)/50)
+    
+    cf1 = np.polyfit(df_good_cons[p_col], df_good_cons[d_1], order)
+    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
+    
+   
+    sensor = '_t'+str(sensor)
+    coef1 = np.zeros(shape=5)
+    coef2 = np.zeros(shape=5)
+    
+    if order is 0:
+        coef1[4] = cf1[0]
+        
+        coef2[4] = cf2[0]
+        
+    elif (order is 1) and (calib_param == 'P'):
+        coef1[1] = cf1[0]
+        coef1[4] = cf1[1]
+        
+        coef2[1] = cf2[0]
+        coef2[4] = cf2[1]
+        
+    elif (order is 2) and (calib_param == 'P'):
+        coef1[0] = cf1[0]
+        coef1[1] = cf1[1]
+        coef1[4] = cf1[2]
+        
+        coef2[0] = cf2[0]
+        coef2[1] = cf2[1]
+        coef2[4] = cf2[2]
+    elif (order is 1) and (calib_param == 'T'):
+        coef1[3] = cf1[0]
+        coef1[4] = cf1[1]
+        
+        coef2[3] = cf2[0]
+        coef2[4] = cf2[1]
+    elif (order is 2) and (calib_param == 'T'):
+        coef1[2] = cf1[0]
+        coef1[3] = cf1[1]
+        coef1[4] = cf1[2]
+    
+        coef2[2] = cf2[0]
+        coef2[3] = cf2[1]
+        coef2[4] = cf2[2]
+        
+#    Y = fit_ctd.conductivity_polyfit(coef, fit, fit, np.full(len(fit), 0.0))
+#
+#
+#    fitfile = str('fitting'+sensor+'.' + FILE_EXT)
+#    fitfilePath = os.path.join(log_directory, fitfile)
+#    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
+        
+    return df
+    
+def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):
+    
+    #Choose Data range to compare with
+    df_range = df[(df[col_name] > lower_lim) & (df[col_name] <= upper_lim)]
+    
+    
+    if find == 'good':
+    # Find data values for each sensor that are below the threshold (good)
+        df_range_comp_1 = df_range[df_range[d_1].abs() < threshold]
+        df_range_comp_2 = df_range[df_range[d_2].abs() < threshold]
+        df_range_comp_3 = df_range[df_range[d_12].abs() < threshold]
+    
+    elif find == 'quest':
+    # Find data values for each sensor that are above the threshold (questionable)
+        df_range_comp_1 = df_range[df_range[d_1].abs() > threshold]
+        df_range_comp_2 = df_range[df_range[d_2].abs() > threshold]
+        df_range_comp_3 = df_range[df_range[d_12].abs() > threshold]
+   
+    else:
+        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
+    
+    #concatenate dataframe to merge all values together
+    df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
+        
+    # Remove duplicate values
+    df_concat = df_concat.drop_duplicates(subset=[col_name],keep='first')
+    
+    return df_concat
+    
+
+    #Combine these three into a dataframe and write out to a csv 
+    #Sort by sta/cast, bottle number, rev. press
+    
+    
 ###End try/except fix
 
 ### OLD UNUSED

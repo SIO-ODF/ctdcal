@@ -67,7 +67,7 @@ def OxSol(T,S):
     """
 
     x = S
-    y = math.log((298.15 - T)/(273.15 + T))
+    y = np.log((298.15 - T)/(273.15 + T))
 
     """umol/kg coefficients
     a0 =  5.80871
@@ -96,7 +96,7 @@ def OxSol(T,S):
     b3 = -8.17083e-3
     c0 = -4.88682e-7
 
-    O2sol = math.exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
+    O2sol = np.exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
     return O2sol
 
 
