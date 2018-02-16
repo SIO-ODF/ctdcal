@@ -23,6 +23,7 @@ import os
 #import report_ctd
 import datetime
 
+
 #Line 342 module isopycnals
 
 def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1, 
@@ -375,7 +376,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
  
     cutoff = np.std(btl_data_output['residual']) * 2.8
     btl_data_output['index'][btl_data_output['residual']<=cutoff]
-    btl_data_clean=btl_data_output[btl_data_output['residual']<=cutoff]
+    btl_data_clean=btl_data_output[btl_data_output['residual']<=cutoff].copy()
     thrown_values = btl_data_output[btl_data_output['residual']>cutoff]
     bad_values = btl_data_output[btl_data_output['residual']>cutoff]
     btl_data_clean
@@ -392,7 +393,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
                                    direction='nearest')
         
         btl_data_clean.index = pd.RangeIndex(len(btl_data_clean.index)) #reindex DF
-        time_data_matched = matched_df
+        time_data_matched = matched_df.copy()
         
 #       Re-Interpolate dV/dT
         btl_len_x = np.arange(np.size(btl_data_clean['dv_dt_conv_btl']))
@@ -404,9 +405,9 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
         time_data_matched['dv_dt_time'] = dv_dt_inter*-1
         
 #       Recalculate Oxygen Solubility
-
-        btl_data_clean['OS'] = sbe_eq.OxSol(btl_data_clean[t_btl_col],
-                                            btl_data_clean['CTDSAL'])
+        
+        btl_data_clean.loc[:,'OS'] = sbe_eq.OxSol(btl_data_clean[t_btl_col].values,
+                                            btl_data_clean['CTDSAL'].values)
         
         time_data_matched['OS'] = sbe_eq.OxSol(time_data_matched['TEMPERATURE_CTD'],
                                                time_data_matched['SALINITY_CTD'])
@@ -454,7 +455,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
         cutoff = np.std(btl_data_output['residual'])*2.8
                   
 #       Use residuals to determine cutoff and collect outliers
-        btl_data_clean=btl_data_clean[btl_data_output['residual']<=cutoff]
+        btl_data_clean=btl_data_clean[btl_data_output['residual']<=cutoff].copy()
         bad_values2 = btl_data_output[btl_data_output['residual']>cutoff]
         thrown_values = btl_data_clean[btl_data_output['residual']>cutoff]
 #        print(thrown_values['BTLNBR'])
@@ -587,8 +588,11 @@ def apply_oxy_coef(df,coef,oxyvo_col = 'CTDOXYVOLTS',p_col = 'CTDPRS',
    df['OS'] = sbe_eq.OxSol(df[t_col], df[sal_col])
    
    #Calculate dv_dt and filter
-   doxyv = np.diff(df[oxyvo_col])
-   dt = np.diff(df[date_time])
+   doxyv = pd.Series(np.diff(df[oxyvo_col]))
+   dt = pd.Series(np.diff(df[date_time]))
+   #Remove 0s and replace with means
+   dt = dt.replace(0,dt.mean())
+   
     
    dv_dt = doxyv/dt
    #df[dvdt_col] = dv_dt
