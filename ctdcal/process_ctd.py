@@ -809,7 +809,7 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
     
     df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_deep_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='reft')
+    df_deep_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
        
     
     #Between 2000 and 1000
@@ -822,7 +822,7 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
     
     df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_lmid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='reft')
+    df_lmid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
     
     #Between 1000 and 500
     lower_lim = 500
@@ -834,7 +834,7 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
     
     df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_umid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='reft')
+    df_umid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
     
     #Less than 500
     lower_lim = df[p_col].min() - 1
@@ -846,7 +846,7 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
     
     df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_shal_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='reft')
+    df_shal_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
     
     #concat dataframes into two main dfs
     df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
@@ -901,7 +901,7 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
         df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
     # Determine fitting ranges
     
-    fit = np.arange(x0,x1,(x1-x0)/50)
+    #fit = np.arange(x0,x1,(x1-x0)/50)
     
     cf1 = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
 #    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
@@ -973,14 +973,14 @@ def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
         
         df_range_comp = df_range[(df_range[diff].abs() > threshold)]# | (df_range[d_2].abs() > threshold) | (df_range[d_12].abs() > threshold)]
         
-    elif find == 'reft':
-    # Find data points for that are questionable reft values
+    elif find == 'ref':
+    # Find data points for that are questionable reference values
         
         df_range_comp = df_range[(df_range[d_1].abs() > threshold) & (df_range[d_2].abs() > threshold) & (df_range[P_S].abs() < threshold)]
         
    
     else:
-        print('Find argument not valid, please enter "good" or "quest" or "reft" to find good or questionable values')
+        print('Find argument not valid, please enter "good" or "quest" or "ref" to find good or questionable values')
     
     #concatenate dataframe to merge all values together
 #    df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
@@ -993,7 +993,39 @@ def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
     #Combine these three into a dataframe and write out to a csv 
     #Sort by sta/cast, bottle number, rev. press
     
-    
+#def calibrate_conductivity(df,refc_data,order,calib_param,sensor,xRange=None,
+#                           refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2'
+#                           ):
+#
+#    if sensor == 1:
+#        postfix = 'c1'
+#        cond_col = 'CTDCOND1'
+#    elif sensor ==2:
+#        postfix = 'c2'
+#        cond_col = 'CTDCOND2'
+#    else:
+#        print('No sensor name supplied, difference column name will be: diff')
+#        
+#    if calib_param == 'P':
+#        calib_col = p_col
+#    elif calib_param == 'T':
+#        calib_col = t_col
+#    elif calib_param == 'C':
+#        calib_col = cond_col
+#    else:
+#        print('No calib_param supplied')
+#    
+#    diff = 'd_'+postfix #Difference between ref and prim sensor
+#    
+#    # Calculate absolute differences between sensors and salt sample data
+#    
+#    df[diff] = refc_data[refc_col] - df[cond_col]
+# 
+#    df['primary_diff'] = refc_data[refc_col] - df[cond_col_1]
+#    df['secondary_diff'] = refc_data[refc_col] - df[cond_col_2]
+#    df['P-S'] = df[cond_col_1] - df[cond_col_2]
+#    
+#    return df    
 ###End try/except fix
 
 ### OLD UNUSED
