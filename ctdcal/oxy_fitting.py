@@ -7,9 +7,9 @@ Created on Mon Jan  8 10:04:19 2018
 """
 
 
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
+#import matplotlib
+#matplotlib.use('TkAgg')
+#import matplotlib.pyplot as plt
 import scipy
 import numpy as np
 import ctdcal.process_ctd as process_ctd
@@ -660,7 +660,45 @@ def get_oxy_coef(ssscc,log_file ='data/logs/oxy_fit_coefs.csv',ind_col = 'SSSCC'
 
 def load_ct1_file(ssscc, dir_ctd = 'data/pressure/',ctd_postfix = '_ct1.csv',
                   ctd_skiprows = [0,1,2,3,4,5,6,7,8,9,10,11,13]):
+    """ Loads in ct1 pressure File.
     
+    This function loads in the SSSCC_ct1.csv file from the pressure directory 
+    and converts it to a Pandas DataFrame
+    
+    Parameters
+    ----------
+    
+    ssscc : str
+        The name of the station/cast pressure file to be loaded in. 
+        Ex. '00101'
+        
+    dir_ctd : str
+        The name of the directory that the ssscc file is located
+        
+    ctd_postfix : str
+        The the postfix for the ssscc file. Default '_ct1.csv'
+        
+    ctd_skiprows : array
+        Header rows to skip in .csv file
+        
+    Returns
+    -------
+    DataFrame
+        DataFrame containing the CTD pressure data found in the `ssscc` 
+        csv file.
+    
+    Example
+    -------
+    >>> df = oxy_fitting.load_ct1_file('00101')
+            index  CTDTMP1  CTDTMP2       CTDPRS  CTDCOND1  CTDCOND2     CTDSAL  \
+    0         0     17.1067  17.1071     2.933453   45.5290   45.5339  35.456234   
+    1         1     17.1068  17.1071     2.933497   45.5291   45.5339  35.456233   
+    2         2     17.1068  17.1071     2.935130   45.5291   45.5339  35.456233   
+    3         3     17.1069  17.1072     2.938334   45.5292   45.5339  35.456231   
+    4         4     17.1070  17.1072     2.942899   45.5292   45.5339  35.456141   
+    5         5     17.1070  17.1073     2.948284   45.5293   45.5340  35.456226      
+    
+    """
     
     df = pd.read_csv(dir_ctd + ssscc + ctd_postfix, skiprows=ctd_skiprows, skipfooter=1, engine='python')
     
@@ -669,6 +707,39 @@ def load_ct1_file(ssscc, dir_ctd = 'data/pressure/',ctd_postfix = '_ct1.csv',
     return df
 
 def load_time_data(time_file):
+    """ Loads in CTD time file.
+    
+    This function returns a pandas DataFrame of the CTD time data (in .pkl format)
+    using the path string `time_file`.
+    
+    Parameters
+    ----------
+    time_file : str
+        String containing the full path including filename with extension of
+        the CTD time pickle file you wish to load and convert to a pandas DataFrame
+    
+    Returns
+    -------
+    DataFrame
+            DataFrame containing the CTD time data found in the `time_file` 
+            pickle file.
+        
+    
+    Example
+    -------
+    
+    >>> df = oxy_fitting.load_time_data('data/time/00101_time.pkl')
+            index  CTDTMP1  CTDTMP2       CTDPRS  CTDCOND1  CTDCOND2     CTDSAL  \
+    0         0     17.1067  17.1071     2.933453   45.5290   45.5339  35.456234   
+    1         1     17.1068  17.1071     2.933497   45.5291   45.5339  35.456233   
+    2         2     17.1068  17.1071     2.935130   45.5291   45.5339  35.456233   
+    3         3     17.1069  17.1072     2.938334   45.5292   45.5339  35.456231   
+    4         4     17.1070  17.1072     2.942899   45.5292   45.5339  35.456141   
+    5         5     17.1070  17.1073     2.948284   45.5293   45.5340  35.456226  
+
+    
+    
+    """
     
     time_data = process_ctd.dataToNDarray(time_file,float,True,',',1)
     time_data = pd.DataFrame.from_records(time_data)  
