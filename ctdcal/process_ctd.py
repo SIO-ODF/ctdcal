@@ -1103,6 +1103,17 @@ def calibrate_conductivity(df,refc_data,order,calib_param,sensor,xRange=None,
         coef[5] = cf[1]
         coef[6] = cf[2]
     return coef,df_ques,df_ref   
+
+#def prepare_fit_data(df,ref_data,param):
+#    
+#    #Determine fitting parameter
+#    
+#    
+#    
+#    
+#    
+#    
+#    return 
 ###End try/except fix
 
 ### OLD UNUSED

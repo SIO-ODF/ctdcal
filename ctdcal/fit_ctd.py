@@ -2,6 +2,7 @@
 import math
 import scipy
 import numpy as np
+import pandas as pd
 import ctdcal.process_ctd as process_ctd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
@@ -538,6 +539,9 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
 
         psu['SALNTY'] = SP_salinometer(psu['SALNTY'], bath_tmp)
         mspcm['BTLCOND'] = gsw.C_from_SP(psu['SALNTY'], tmp_tmp, tmp_p)
+        
+        mspcm = pd.DataFrame(mspcm)
+        psu = pd.DataFrame(psu)
 #           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
     return mspcm, psu
 #
