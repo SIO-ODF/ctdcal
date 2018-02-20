@@ -993,39 +993,87 @@ def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
     #Combine these three into a dataframe and write out to a csv 
     #Sort by sta/cast, bottle number, rev. press
     
-#def calibrate_conductivity(df,refc_data,order,calib_param,sensor,xRange=None,
-#                           refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2'
-#                           ):
-#
-#    if sensor == 1:
-#        postfix = 'c1'
-#        cond_col = 'CTDCOND1'
-#    elif sensor ==2:
-#        postfix = 'c2'
-#        cond_col = 'CTDCOND2'
-#    else:
-#        print('No sensor name supplied, difference column name will be: diff')
-#        
-#    if calib_param == 'P':
-#        calib_col = p_col
-#    elif calib_param == 'T':
-#        calib_col = t_col
-#    elif calib_param == 'C':
-#        calib_col = cond_col
-#    else:
-#        print('No calib_param supplied')
-#    
-#    diff = 'd_'+postfix #Difference between ref and prim sensor
-#    
-#    # Calculate absolute differences between sensors and salt sample data
-#    
-#    df[diff] = refc_data[refc_col] - df[cond_col]
-# 
-#    df['primary_diff'] = refc_data[refc_col] - df[cond_col_1]
-#    df['secondary_diff'] = refc_data[refc_col] - df[cond_col_2]
-#    df['P-S'] = df[cond_col_1] - df[cond_col_2]
-#    
-#    return df    
+def calibrate_conductivity(df,refc_data,order,calib_param,sensor,xRange=None,
+                           refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2'
+                           ):
+
+    if sensor == 1:
+        postfix = 'c1'
+        cond_col = 'CTDCOND1'
+    elif sensor ==2:
+        postfix = 'c2'
+        cond_col = 'CTDCOND2'
+    else:
+        print('No sensor name supplied, difference column name will be: diff')
+        
+    if calib_param == 'P':
+        calib_col = p_col
+    elif calib_param == 'T':
+        calib_col = t_col
+    elif calib_param == 'C':
+        calib_col = cond_col
+    else:
+        print('No calib_param supplied')
+    
+    diff = 'd_'+postfix #Difference between ref and prim sensor
+    
+    # Calculate absolute differences between sensors and salt sample data
+    
+    df[diff] = refc_data[refc_col] - df[cond_col]
+ 
+    df['primary_diff'] = refc_data[refc_col] - df[cond_col_1]
+    df['secondary_diff'] = refc_data[refc_col] - df[cond_col_2]
+    df['P-S'] = df[cond_col_1] - df[cond_col_2]
+    
+    
+    #Greater than 2000 dBar
+    lower_lim = 2000
+    upper_lim = df[p_col].max()
+    threshold = 0.002
+    
+    df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_deep_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
+       
+    
+    #Between 2000 and 1000
+    lower_lim = 1000
+    upper_lim = 2000
+    threshold = 0.005
+    
+
+    df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_lmid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
+    
+    #Between 1000 and 500
+    lower_lim = 500
+    upper_lim = 1000
+    threshold = 0.010
+    
+    
+    df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_umid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
+    
+    #Less than 500
+    lower_lim = df[p_col].min() - 1
+    upper_lim = 500
+    threshold = 0.020
+
+    
+    df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_shal_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
+    
+    #concat dataframes into two main dfs
+    df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
+    df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
+    df_ref = pd.concat([df_deep_reft,df_lmid_reft,df_umid_reft,df_shal_reft])
+    
+    
+    
+    return df    
 ###End try/except fix
 
 ### OLD UNUSED
