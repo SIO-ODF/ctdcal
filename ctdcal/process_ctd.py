@@ -881,28 +881,15 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
         
         df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
      
-        #Add here is planning on using for other calibrate code
-#    else: 
-#        if order == 1:
-#            
-#            x0 = 
-#            x1 = 
-#        
-#        elif:
-#            
-#            x0 = 
-#            x1 = 
-#            
+         
     else:
         #Take full range of temperature values
         x0 = df_good[t_col].min()
         x1 = df_good[t_col].max()
         
         df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
-    # Determine fitting ranges
-    
-    #fit = np.arange(x0,x1,(x1-x0)/50)
-    
+    # Determine fitting ranges    
+    #fit = np.arange(x0,x1,(x1-x0)/50)   
     cf1 = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
 #    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
     
@@ -994,15 +981,17 @@ def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
     #Sort by sta/cast, bottle number, rev. press
     
 def calibrate_conductivity(df,refc_data,order,calib_param,sensor,xRange=None,
-                           refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2'
-                           ):
+                           refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2',
+                           p_col='CTDPRS'):
 
     if sensor == 1:
         postfix = 'c1'
         cond_col = 'CTDCOND1'
+        t_col = 'CTDTMP1'
     elif sensor ==2:
         postfix = 'c2'
         cond_col = 'CTDCOND2'
+        t_col = 'CTDTMP2'
     else:
         print('No sensor name supplied, difference column name will be: diff')
         
@@ -1069,11 +1058,51 @@ def calibrate_conductivity(df,refc_data,order,calib_param,sensor,xRange=None,
     #concat dataframes into two main dfs
     df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
     df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
-    df_ref = pd.concat([df_deep_reft,df_lmid_reft,df_umid_reft,df_shal_reft])
+    df_ref = pd.concat([df_deep_ref,df_lmid_ref,df_umid_ref,df_shal_ref])
     
+    if xRange != None:
+        x0 = int(xRange.split(":")[0])
+        x1 = int(xRange.split(":")[1])
+        
+        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
+     
+         
+    else:
+        #Take full range of temperature values
+        x0 = df_good[t_col].min()
+        x1 = df_good[t_col].max()
+        
+        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
     
+    cf = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
     
-    return df    
+    sensor = '_c'+str(sensor)
+    coef = np.zeros(shape=7)
+    
+    if order is 0:
+        coef[6] = cf[0]
+    elif (order is 1) and (calib_param == 'P'):
+        coef[1] = cf[0]
+        coef[6] = cf[1]
+    elif (order is 2) and (calib_param == 'P'):
+        coef[0] = cf[0]
+        coef[1] = cf[1]
+        coef[6] = cf[2]
+    elif (order is 1) and (calib_param == 'T'):
+        coef[3] = cf[0]
+        coef[6] = cf[1]
+    elif (order is 2) and (calib_param == 'T'):
+        coef[2] = cf[0]
+        coef[3] = cf[1]
+        coef[6] = cf[2]
+    elif (order is 1) and (calib_param == 'C'):
+        coef[5] = cf[0]
+        coef[6] = cf[1]
+    elif (order is 2) and (calib_param == 'C'):
+        coef[4] = cf[0]
+        coef[5] = cf[1]
+        coef[6] = cf[2]
+    return coef,df_ques,df_ref   
 ###End try/except fix
 
 ### OLD UNUSED
