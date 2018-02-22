@@ -1133,7 +1133,11 @@ def prepare_fit_data(df,ref_data,param):
         #df_missing = df.iloc[indices] #Collect unmeasured values in new matrix
         df_good = df.loc[~df['btl_fire_num'].isin(indices)]
     
+    #Reindex Dataframe
+    df_good = df_good.reset_index(drop=True)
+    
     return df_good
+
 ###End try/except fix
 
 ### OLD UNUSED

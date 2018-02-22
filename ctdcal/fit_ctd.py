@@ -367,11 +367,11 @@ def conductivity_polyfit(C, P, T, cond):
     try:
         c_arr = []
         for P_x, T_x, cond_x in zip(P, T, cond):
-            tmp = cond_x + C[0] * math.pow(P_x,2) + C[1] * P_x + C[2] * math.pow(T_x,2) + C[3] * T_x + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
+            tmp = cond_x + C[0] * np.power(P_x,2) + C[1] * P_x + C[2] * np.power(T_x,2) + C[3] * T_x + C[4] * np.power(cond_x,2) + C[5] * cond_x + C[6]
             c_arr.append(round(tmp,4))
     #Single mode.
     except:
-        tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
+        tmp = cond + C[0] * np.power(P,2) + C[1] * P + C[2] * np.power(T,2) + C[3] * T + C[4] * np.power(cond_x,2) + C[5] * cond_x + C[6]
         c_arr = round(tmp,4)
     #tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
     #c_arr = tmp.round(decimals=4)
@@ -544,7 +544,70 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
         psu = pd.DataFrame(psu)
 #           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
     return mspcm, psu
+
+def write_calib_coef(ssscc,coef,param):
+    """ Write coef to csv
+    
+    
+    """
+    df = pd.DataFrame()
+    df['SSSCC'] = ssscc  
+    
+    if param == 'T':
+
+        df['coef_0'] = coef[0]
+        df['coef_1'] = coef[1]
+        df['coef_2'] = coef[2]
+        df['coef_3'] = coef[3]
+        df['coef_4'] = coef[4]
+        df['coef_5'] = coef[5]
+        df['coef_6'] = coef[6]
+        
+    if param == 'C':
+       
+        df['coef_0'] = coef[0]
+        df['coef_1'] = coef[1]
+        df['coef_2'] = coef[2]
+        df['coef_3'] = coef[3]
+        df['coef_4'] = coef[4]
+        
+
+    return df
+
 #
+def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
+                   cond_col = 'CTDCOND'):
+    """ Applies Coef to time and bottle Data
+    
+    
+    """
+    
+    coef = coef_frame.loc[coef_frame['SSSCC']== ssscc]
+    
+    if sensor == 1:
+        t_col = t_col+'1'
+        cond_col = cond_col+'1'
+        
+    elif sensor == 2:
+        t_col = t_col+'2'
+        cond_col = cond_col+'2'
+           
+    
+    if param == 'T':
+        
+        df[t_col] = temperature_polyfit(coef,df[p_col],df[t_col])
+        
+    
+    elif param == 'C':
+    
+        df[cond_col] = conductivity_polyfit(coef,df[p_col],df[t_col],
+                                              df[cond_col])
+    
+    
+    
+    
+    return df
+##
 #            key = (station, cast, bottle, "o2")
 #            if key in qual:
 #                flag, comment = qual[key]
