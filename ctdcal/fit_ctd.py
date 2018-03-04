@@ -399,11 +399,11 @@ def temperature_polyfit(C, P, T):
     try:
         t_arr = []
         for P_x, T_x in zip(P, T):
-            tmp = T_x + C[0] * math.pow(P_x,2) + C[1] * P_x + C[2] * math.pow(T_x,2) + C[3] * T_x + C[4]
+            tmp = T_x + C[0] * np.power(P_x,2) + C[1] * P_x + C[2] * np.power(T_x,2) + C[3] * T_x + C[4]
             t_arr.append(round(tmp,4))
        #Single mode.
     except:
-        tmp = T + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4]
+        tmp = T + C[0] * np.power(P,2) + C[1] * P + C[2] * np.power(T,2) + C[3] * T + C[4]
         t_arr = round(tmp,4)
 
     return t_arr
