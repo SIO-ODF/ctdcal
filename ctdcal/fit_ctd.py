@@ -607,6 +607,13 @@ def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CT
     
     
     return df
+
+def apply_pressure_offset(df,p_off,p_col='CTDPRS'):
+    
+    df[p_col] = offset(p_off, df[p_col])
+    
+    return df
+  
 ##
 #            key = (station, cast, bottle, "o2")
 #            if key in qual:

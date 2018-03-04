@@ -1138,6 +1138,44 @@ def prepare_fit_data(df,ref_data,param):
     
     return df_good
 
+def get_pressure_offset(df,start_col='ondeck_start_p',end_col='ondeck_end_p'):
+    """Finds unique values and calclates mean for pressure offset
+    
+    """
+    p_start = np.unique(df[start_col])
+    p_end = np.unique(df[end_col])
+    p_off = np.mean(p_start) - np.mean(p_end)   
+    
+    return p_off
+
+def load_pressure_logs(file):
+    
+    df = pd.read_csv(file,names=['SSSCC','ondeck_start_p','ondeck_end_p'])
+    
+    # Change vaules in each row by removing non-number parts
+    for i in range(len(df['SSSCC'])):
+        df['SSSCC'][i] = int(df['SSSCC'].loc[i][-5:])
+        df['ondeck_start_p'][i] = float(df['ondeck_start_p'].loc[i][16:])
+        df['ondeck_end_p'][i] = float(df['ondeck_end_p'].loc[i][14:])
+        
+    return df
+def write_offset_file(df,p_off,write_file='data/logs/poffset_test.csv'):
+    """
+    
+    """
+    df_out = pd.DataFrame()
+    df_out['SSSCC'] = df['SSSCC']
+    df_out['offset'] = p_off
+    
+    df_out.to_csv(write_file,index=False)
+    
+    return
+    
+    
+    
+    
+    
+    
 ###End try/except fix
 
 ### OLD UNUSED
