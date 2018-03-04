@@ -742,8 +742,22 @@ def load_reft_data(reft_file,index_name = 'index_memory'):
     reft_data = pd.read_csv(reft_file)
     reft_data.set_index(index_name)
     
+    reft_data['SSSCC'] = reft_file[-14:-9]
+    
     return reft_data
 
+def prepare_all_calibration(ssscc,reft_prefix='data/reft/',reft_postfix='_reft.csv'):
+    
+    
+    reft_all = pd.DataFrame()
+    for x in ssscc:
+        reft_file = reft_prefix + x + reft_postfix
+        reft_data = load_reft_data(reft_file)
+        reft_all = pd.concat([reft_all,reft_data])
+        
+    return reft_all
+    
+    
 def load_btl_data(btl_file):
     
     """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.csv'"""
@@ -757,6 +771,13 @@ def load_btl_data(btl_file):
     btl_data['SSSCC'] = ssscc
     
     return btl_data
+
+def load_time_data(time_file):
+    
+    time_data = dataToNDarray(time_file,float,True,',',1)
+    time_data = pd.DataFrame.from_records(time_data)
+    
+    return time_data
 
 
 def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
@@ -1138,6 +1159,20 @@ def prepare_fit_data(df,ref_data,param):
     
     return df_good
 
+def prepare_all_fit_data(ssscc,df,ref_data,param):
+    
+    data_concat = pd.DataFrame()
+    
+
+    for x in ssscc:
+        btl_data = df[df['SSSCC']==x]
+        ref_data_stn= ref_data[ref_data['SSSCC']==x]
+        btl_data_good = prepare_fit_data(btl_data,ref_data_stn,param)
+        data_concat = pd.concat([data_concat,btl_data_good])
+        
+    return data_concat
+              
+
 def get_pressure_offset(df,start_col='ondeck_start_p',end_col='ondeck_end_p'):
     """Finds unique values and calclates mean for pressure offset
     
@@ -1171,8 +1206,33 @@ def write_offset_file(df,p_off,write_file='data/logs/poffset_test.csv'):
     
     return
     
+def pressure_calibrate(file):
     
+    pressure_log = load_pressure_logs(file)
+    p_off = get_pressure_offset(pressure_log)
     
+    return p_off
+    
+def load_all_ctd_files(ssscc,prefix,postfix,series):
+    
+    df_data_all = pd.DataFrame()
+    
+    if series == 'bottle':
+        for x in ssscc:
+            file = prefix + x + postfix
+            btl_data = load_btl_data(file)
+            df_data_all = pd.concat([df_data_all,btl_data])
+            
+    elif series == 'time':
+        for x in ssscc:
+            file = prefix + x + postfix
+            time_data = load_time_data(file)
+            time_data['SSSCC'] = int(x)
+            df_data_all = pd.concat([df_data_all,time_data])
+            
+    return df_data_all
+            
+
     
     
     
