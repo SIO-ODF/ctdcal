@@ -793,7 +793,7 @@ def load_time_data(time_file):
     return time_data
 
 
-def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
+def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,coef=None,
                           t_col_1 = 'CTDTMP1', t_col_2='CTDTMP2', reft_col = 'T90',
                           p_col = 'CTDPRS'):# t_col_2 = 'CTDTMP2',
     
@@ -929,39 +929,40 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
     
    
     sensor = '_t'+str(sensor)
-    coef1 = np.zeros(shape=5)
+    if coef == None:
+        coef = np.zeros(shape=5)
 #    coef2 = np.zeros(shape=5)
     
     if order is 0:
-        coef1[4] = cf1[0]
+        coef[4] = cf1[0]
         
 #        coef2[4] = cf2[0]
         
     elif (order is 1) and (calib_param == 'P'):
-        coef1[1] = cf1[0]
-        coef1[4] = cf1[1]
+        coef[1] = cf1[0]
+        coef[4] = cf1[1]
         
 #        coef2[1] = cf2[0]
 #        coef2[4] = cf2[1]
         
     elif (order is 2) and (calib_param == 'P'):
-        coef1[0] = cf1[0]
-        coef1[1] = cf1[1]
-        coef1[4] = cf1[2]
+        coef[0] = cf1[0]
+        coef[1] = cf1[1]
+        coef[4] = cf1[2]
         
 #        coef2[0] = cf2[0]
 #        coef2[1] = cf2[1]
 #        coef2[4] = cf2[2]
     elif (order is 1) and (calib_param == 'T'):
-        coef1[3] = cf1[0]
-        coef1[4] = cf1[1]
+        coef[3] = cf1[0]
+        coef[4] = cf1[1]
         
 #        coef2[3] = cf2[0]
 #        coef2[4] = cf2[1]
     elif (order is 2) and (calib_param == 'T'):
-        coef1[2] = cf1[0]
-        coef1[3] = cf1[1]
-        coef1[4] = cf1[2]
+        coef[2] = cf1[0]
+        coef[3] = cf1[1]
+        coef[4] = cf1[2]
     
 #        coef2[2] = cf2[0]
 #        coef2[3] = cf2[1]
@@ -974,7 +975,7 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,
 #    fitfilePath = os.path.join(log_directory, fitfile)
 #    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
         
-    return coef1,df_ques,df_reft
+    return coef,df_ques,df_reft
     
 def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
                   col_name = 'CTDPRS',P_S = 'P-S',d_1 = 'primary_diff',
