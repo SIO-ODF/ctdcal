@@ -793,7 +793,7 @@ def load_time_data(time_file):
     return time_data
 
 
-def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,coef=None,
+def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,coef=[],
                           t_col_1 = 'CTDTMP1', t_col_2='CTDTMP2', reft_col = 'T90',
                           p_col = 'CTDPRS'):# t_col_2 = 'CTDTMP2',
     
@@ -929,7 +929,7 @@ def calibrate_temperature(df,reft_data,order,calib_param,sensor,xRange=None,coef
     
    
     sensor = '_t'+str(sensor)
-    if coef == None:
+    if len(coef) == 0:#if not coef:
         coef = np.zeros(shape=5)
 #    coef2 = np.zeros(shape=5)
     
