@@ -9,6 +9,7 @@ import pandas as pd
 import math
 import ctdcal.report_ctd as report_ctd
 import warnings
+import ctd_cal.fit_ctd as fit_ctd
 
 import gsw
 
@@ -746,7 +747,7 @@ def load_reft_data(reft_file,index_name = 'index_memory'):
     
     return reft_data
 
-def prepare_all_calibration(ssscc,reft_prefix='data/reft/',reft_postfix='_reft.csv'):
+def collect_all_reft(ssscc,reft_prefix='data/reft/',reft_postfix='_reft.csv'):
     
     
     reft_all = pd.DataFrame()
@@ -756,6 +757,18 @@ def prepare_all_calibration(ssscc,reft_prefix='data/reft/',reft_postfix='_reft.c
         reft_all = pd.concat([reft_all,reft_data])
         
     return reft_all
+
+def collect_all_refc(ssscc,df,refc_prefix='data/salt/',refc_postfix='',index_col='btl_fire_num',
+                     t_col='CTDTMP1',p_col='CTDPRS',ssscc_col='SSSCC'):
+    
+    refc_all = pd.DataFrame()
+    for x in ssscc:
+        btl_data = df[df[ssscc_col]==x]
+        refc_file = refc_prefix + x + refc_postfix
+        refc_data,salt = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
+        refc_all = pd.concat([refc_all,refc_data])
+    
+    return refc_all
     
     
 def load_btl_data(btl_file):
