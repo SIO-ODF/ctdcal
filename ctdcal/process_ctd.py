@@ -766,8 +766,10 @@ def collect_all_refc(ssscc,df,refc_prefix='data/salt/',refc_postfix='',index_col
         btl_data = df[df[ssscc_col]==x]
         refc_file = refc_prefix + x + refc_postfix
         refc_data,salt = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
+        refc_data['SSSCC'] = x
         refc_all = pd.concat([refc_all,refc_data])
-    
+        
+    refc_all=refc_all[refc_all[index_col] != 0]
     return refc_all
     
     
