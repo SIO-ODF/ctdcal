@@ -3,7 +3,7 @@ import math
 import scipy
 import numpy as np
 import pandas as pd
-import ctdcal.process_ctd as process_ctd
+#import ctdcal.process_ctd as process_ctd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 from scipy.optimize import leastsq

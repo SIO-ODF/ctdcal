@@ -9,7 +9,7 @@ import pandas as pd
 import math
 import ctdcal.report_ctd as report_ctd
 import warnings
-import ctd_cal.fit_ctd as fit_ctd
+import ctdcal.fit_ctd as fit_ctd
 
 import gsw
 
