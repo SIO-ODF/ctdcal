@@ -1175,6 +1175,20 @@ def prepare_fit_data(df,ref_data,param):
     
     return df_good
 
+def prepare_conductivity_data(ssscc,df,refc,ssscc_col = 'SSSCC',index_col = 'btl_fire_num'):
+    
+    btl_concat = pd.DataFrame()
+    for x in ssscc:
+        btl_data = df[df[ssscc_col] == x]
+        refc_data = refc[refc[ssscc_col] == x]
+        btl_data_clean = prepare_fit_data(btl_data,refc_data,'C')
+        btl_concat = pd.concat([btl_concat,btl_data_clean])
+    refc = refc[refc[index_col] != 0]
+    refc = refc.reset_index(drop=True)
+    btl_concat = btl_concat.reset_index(drop=True)  
+     
+    return btl_concat, refc
+
 def prepare_all_fit_data(ssscc,df,ref_data,param):
     
     data_concat = pd.DataFrame()
