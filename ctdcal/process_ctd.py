@@ -769,7 +769,6 @@ def collect_all_refc(ssscc,df,refc_prefix='data/salt/',refc_postfix='',index_col
         refc_data['SSSCC'] = x
         refc_all = pd.concat([refc_all,refc_data])
         
-    refc_all=refc_all[refc_all[index_col] != 0]
     return refc_all
     
     
