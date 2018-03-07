@@ -1105,10 +1105,10 @@ def calibrate_conductivity(df,refc_data,order,calib_param,sensor,xRange=None,
          
     else:
         #Take full range of temperature values
-        x0 = df_good[t_col].min()
-        x1 = df_good[t_col].max()
+#        x0 = df_good[t_col].min()
+#        x1 = df_good[t_col].max()
         
-        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
+        df_good_cons = df_good#[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
     
     cf = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
     
