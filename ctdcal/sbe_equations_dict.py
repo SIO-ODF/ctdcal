@@ -1,10 +1,11 @@
-"""
-November 23, 2016
-Joseph Gum
+"""A module for SBE conversion equations and related helper equations.
 
-A module for SBE conversion equations and related helper equations.
 Eventual goal is to convert all outputs to numpy arrays to make compatible with
 gsw libraries, and remove written wrappers.
+
+SBE internally references each sensor with an assigned SensorID for indexing. The 
+given sensor numbers are determined empirically from .XMLCON files in 2016-2017 and
+not via an official document, and may change according to SBE wishes.
 
 """
 
@@ -14,13 +15,23 @@ import numpy as np
 
 def temp_its90_dict(calib, freq, verbose = 0):
     """SBE equation for converting engineering units to Celcius according to ITS-90.
+    
+    TO BE DEPRECIATED
     SensorID: 55
 
-    Inputs:
-    calib is a dict holding G, H, I, J, F0
-    G, H, I, J, F0: coefficients given in calibration.
-    f: frequency sampled by sensor, either as a single value or a list or tuple.
+    Parameters
+    ----------
+    calib : dict
+        calib is a dict holding G, H, I, J, F0
+        G, H, I, J, F0: coefficients given in calibration.
+    freq : float
+        freq = frequency sampled by sensor, either as a single value or a list or tuple.
 
+    Returns
+    -------
+    ITS90: arrylike or float
+        A float depicting ITS90 temperature.
+        
     Original form from calib sheet dated 2012:
     Temperature ITS-90 = 1/{g+h[ln(f0/f )]+i[ln2(f0/f)]+j[ln3(f0/f)]} - 273.15 (°C)
 
@@ -54,6 +65,42 @@ def temp_its90_dict(calib, freq, verbose = 0):
                    + calib['J'] * math.pow((math.log(calib['F0']/f)),3)
                   ) - 273.15
         ITS90 = round(ITS90,4)
+    return ITS90
+
+def temp_its90(calib, f):
+    """SBE equation for converting engineering units to Celcius according to ITS-90.
+    
+    SensorID: 55
+
+    Parameters
+    ----------
+    calib : dict
+        calib is a dict holding G, H, I, J, F0
+        G, H, I, J, F0: coefficients given in calibration.
+    f : float
+        f = frequency sampled by sensor, either as a single value or a list or tuple.
+
+    Returns
+    -------
+    ITS90: arraylike or float
+        A float depicting ITS90 temperature.
+        
+    Original form from calib sheet dated 2012:
+    Temperature ITS-90 = 1/{g+h[ln(f0/f )]+i[ln2(f0/f)]+j[ln3(f0/f)]} - 273.15 (°C)
+
+    """
+    # The array might come in as type=object, which throws AttributeError. Maybe this should be in try/except?
+    f = f.astype(float)
+
+    ITS90 = np.around(
+            (1/(calib['G']
+              + calib['H'] * (np.log(calib['F0']/f))
+              + calib['I'] * np.power((np.log(calib['F0']/f)),2)
+              + calib['J'] * np.power((np.log(calib['F0']/f)),3)
+            ) - 273.15
+            ),4)
+#     Was used when using raw python and not numpy. Need to figure out how to handle 0s now, it defaults
+#     to not producing a value where 0 is used, ending in a -273.15 value being output
     return ITS90
 
 
