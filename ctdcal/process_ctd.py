@@ -999,8 +999,13 @@ def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
     elif find == 'ref':
     # Find data points for that are questionable reference values
         
-        df_range_comp = df_range[(df_range[d_1].abs() > threshold) & (df_range[d_2].abs() > threshold) & (df_range[P_S].abs() < threshold)]
+        #Original Logic:
+        df_range_comp = df_range[(df_range[P_S].abs() > threshold)]
+    
+        #JACKSON THINKS THIS IS THE BETTER LOGIC:
+        #df_range_comp = df_range[(df_range[d_1].abs() > threshold) & (df_range[d_2].abs() > threshold) & (df_range[P_S].abs() < threshold)] JACKSON THINKS THIS IS THE BETTER LOGIC!
         
+        #abs(d12) < 0.010:
    
     else:
         print('Find argument not valid, please enter "good" or "quest" or "ref" to find good or questionable values')
@@ -1012,6 +1017,23 @@ def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
     df_range_comp = df_range_comp.drop_duplicates(subset=[col_name],keep='first')
     
     return df_range_comp
+
+def combine_quality_flags(df_sens1,df_sens2,df_ref):
+    
+    combined_df = pd.DataFrame()
+    
+    combined_df = pd.concat([combined_df,df_sens1,df_sens2,df_ref])
+    
+    combined_df = combined_df.sort_values(['SSSCC','btl_fire_num'])
+    
+    combined_df = combined_df[['SSSCC','btl_fire_num','Parameter','CTDPRS','Flag','primary_diff','secondary_diff','P-S']]
+    
+    combined_df = combined_df.rename(index=str, columns={'btl_fire_num':'Bottle', 'CTDPRS':'Pressure', 'primary_diff':'Primary_Diff','secondary_diff':'Secondary_Diff'})
+    # Outdated
+    #combined_df = combined_df.rename_axis({'btl_fire_num':'Bottle', 'CTDPRS':'Pressure', 'primary_diff':'Primary_Diff','secondary_diff':'Secondary_Diff'}, axis='columns')
+    
+    
+    return combined_df
     
     #Combine these three into a dataframe and write out to a csv 
     #Sort by sta/cast, bottle number, rev. press
