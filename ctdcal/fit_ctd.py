@@ -381,10 +381,10 @@ def residualO2(calib, o2pl, P, K, T, S, V):
 
 def conductivity_polyfit(df,coef,t_col,cond_col,p_col='CTDPRS'):
 #    
-     df[cond_col] = (coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) \
+     fitted_cond = (coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) \
                     + coef[3] * df[t_col] + coef[4] * (df[cond_col]**2) + coef[5] * df[cond_col] + coef[6])
      
-     return df
+     return fitted_cond
      
      
 #def temperature_polyfit(C, P, T):
@@ -416,10 +416,10 @@ def conductivity_polyfit(df,coef,t_col,cond_col,p_col='CTDPRS'):
 
 def temperature_polyfit(df,coef,t_col,p_col='CTDPRS'):
     
-    df[t_col] = df[t_col] + coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) + coef[3] * df[t_col] + coef[4]
+    fitted_temp = df[t_col] + coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) + coef[3] * df[t_col] + coef[4]
     
     
-    return df
+    return fitted_temp
 
 #def load_qual(path):
 #    comment_dict = {}
