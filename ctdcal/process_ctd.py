@@ -1118,6 +1118,19 @@ def calibrate_conductivity(df,refc_data,order,calib_param,sensor,xRange=None,
     df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
     df_ref = pd.concat([df_deep_ref,df_lmid_ref,df_umid_ref,df_shal_ref])
     
+    if sensor == 1:
+        df_ques['Parameter'] = 'C1'
+        df_ques['Flag'] = 3
+        
+        df_ref['Parameter'] = 'C'
+        df_ref['Flag'] = 3
+        
+    elif sensor == 2:
+        df_ques['Parameter'] = 'C2'  
+        df_ques['Flag'] = 3
+        
+        df_ref['Flag'] = 3
+    
     if xRange != None:
         x0 = int(xRange.split(":")[0])
         x1 = int(xRange.split(":")[1])
