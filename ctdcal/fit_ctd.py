@@ -350,64 +350,76 @@ def residualO2(calib, o2pl, P, K, T, S, V):
     return weight
 
 
-def conductivity_polyfit(C, P, T, cond):
-    """Polynomial used to fit conductivity data with pressure effect.
-    The following are single or list/tuple:
-    C is starting estimate for coefficients
-    P is pressure in decibars
-    T is temperature in Celcius
-    cond is conductivity in mS/cm
+#def conductivity_polyfit(C, P, T, cond):
+#    """Polynomial used to fit conductivity data with pressure effect.
+#    The following are single or list/tuple:
+#    C is starting estimate for coefficients
+#    P is pressure in decibars
+#    T is temperature in Celcius
+#    cond is conductivity in mS/cm
+#
+#    Original equation from ...
+#    Conductivity mS/cm = cond + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4 * cond^2 + C5 * cond + C6
+#
+#    Another time based fit must be run at the end of cruise to account for time dependent drift.
+#
+#    """
+#    try:
+#        c_arr = []
+#        for P_x, T_x, cond_x in zip(P, T, cond):
+#            tmp = cond_x + C[0] * np.power(P_x,2) + C[1] * P_x + C[2] * np.power(T_x,2) + C[3] * T_x + C[4] * np.power(cond_x,2) + C[5] * cond_x + C[6]
+#            c_arr.append(round(tmp,4))
+#    #Single mode.
+#    except:
+#        tmp = cond + C[0] * np.power(P,2) + C[1] * P + C[2] * np.power(T,2) + C[3] * T + C[4] * np.power(cond_x,2) + C[5] * cond_x + C[6]
+#        c_arr = round(tmp,4)
+#    #tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
+#    #c_arr = tmp.round(decimals=4)
+#    #c_arr = round(tmp,4)
+#
+#    return c_arr
 
-    Original equation from ...
-    Conductivity mS/cm = cond + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4 * cond^2 + C5 * cond + C6
+def conductivity_polyfit(df,coef,t_col,cond_col,p_col='CTDPRS'):
+#    
+     df[cond_col] = (coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) \
+                    + coef[3] * df[t_col] + coef[4] * (df[cond_col]**2) + coef[5] * df[cond_col] + coef[6])
+     
+     return df
+     
+     
+#def temperature_polyfit(C, P, T):
+#    """Polynomial used to fit data with pressure effect.
+#
+#    The following are single or list/tuple:
+#    fit declares fit type
+#    C is starting estimate for coefficients
+#    P is pressure in decibars
+#    T is temperature in Celcius
+#
+#    Original equation from ...
+#    Temperature degC ITS-90 = T + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4
+#
+#    Another time based fit must be run at the end of cruise to account for time dependent drift.
+#
+#    """
+#    try:
+#        t_arr = []
+#        for P_x, T_x in zip(P, T):
+#            tmp = T_x + C[0] * np.power(P_x,2) + C[1] * P_x + C[2] * np.power(T_x,2) + C[3] * T_x + C[4]
+#            t_arr.append(round(tmp,4))
+#       #Single mode.
+#    except:
+#        tmp = T + C[0] * np.power(P,2) + C[1] * P + C[2] * np.power(T,2) + C[3] * T + C[4]
+#        t_arr = round(tmp,4)
+#
+#    return t_arr
 
-    Another time based fit must be run at the end of cruise to account for time dependent drift.
-
-    """
-    try:
-        c_arr = []
-        for P_x, T_x, cond_x in zip(P, T, cond):
-            tmp = cond_x + C[0] * np.power(P_x,2) + C[1] * P_x + C[2] * np.power(T_x,2) + C[3] * T_x + C[4] * np.power(cond_x,2) + C[5] * cond_x + C[6]
-            c_arr.append(round(tmp,4))
-    #Single mode.
-    except:
-        tmp = cond + C[0] * np.power(P,2) + C[1] * P + C[2] * np.power(T,2) + C[3] * T + C[4] * np.power(cond_x,2) + C[5] * cond_x + C[6]
-        c_arr = round(tmp,4)
-    #tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
-    #c_arr = tmp.round(decimals=4)
-    #c_arr = round(tmp,4)
-
-
-    return c_arr
-
-
-def temperature_polyfit(C, P, T):
-    """Polynomial used to fit data with pressure effect.
-
-    The following are single or list/tuple:
-    fit declares fit type
-    C is starting estimate for coefficients
-    P is pressure in decibars
-    T is temperature in Celcius
-
-    Original equation from ...
-    Temperature degC ITS-90 = T + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4
-
-    Another time based fit must be run at the end of cruise to account for time dependent drift.
-
-    """
-    try:
-        t_arr = []
-        for P_x, T_x in zip(P, T):
-            tmp = T_x + C[0] * np.power(P_x,2) + C[1] * P_x + C[2] * np.power(T_x,2) + C[3] * T_x + C[4]
-            t_arr.append(round(tmp,4))
-       #Single mode.
-    except:
-        tmp = T + C[0] * np.power(P,2) + C[1] * P + C[2] * np.power(T,2) + C[3] * T + C[4]
-        t_arr = round(tmp,4)
-
-    return t_arr
-
+def temperature_polyfit(df,coef,t_col,p_col='CTDPRS'):
+    
+    df[t_col] = df[t_col] + coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) + coef[3] * df[t_col] + coef[4]
+    
+    
+    return df
 
 #def load_qual(path):
 #    comment_dict = {}
