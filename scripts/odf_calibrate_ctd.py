@@ -520,6 +520,7 @@ def main(argv):
                                                         filename_base, ref_btl[btl_num_col][i],
                                                         btl_data[p_btl_col][k], param,
                                                         d1, d2, d12)
+#        Debug_Frame = pd.DataFrame({'CTDPRS':P2,'CTDTMP2':T2,'CTDCOND2':C2})
 
         # Get Range
         if args.xRange:
