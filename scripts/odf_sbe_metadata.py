@@ -8,7 +8,6 @@ import pandas as pd
 import ctdcal.convert as cnv
 import ctdcal.process_ctd as process_ctd
 import ctdcal.report_ctd as report_ctd
-
 import pickle
 
 #remove and streamline imports below later
@@ -144,8 +143,8 @@ def main(argv):
     #import pdb; pdb.set_trace()
 
     # Pressure Sequence
-    pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, time_col, 2.0, stime, startP, 'down', int(sample_rate), int(search_time), cast_data)
-
+    #pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, time_col, 2.0, stime, startP, 'down', int(sample_rate), int(search_time), cast_data)
+    pressure_seq_data = process_ctd.pressure_sequence(cast_data,p_col,2.0,stime,startP,'down',int(sample_rate),int(search_time))
     # Convert dissolved oxygen from ml/l to umol/kg
     dopkg = process_ctd.o2pl2pkg(p_col, t1_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, pressure_seq_data)
 
