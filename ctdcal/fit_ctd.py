@@ -383,7 +383,7 @@ def conductivity_polyfit(df,coef,t_col,cond_col,p_col='CTDPRS'):
 #    
      fitted_cond = df[cond_col] + (coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) \
                     + coef[3] * df[t_col] + coef[4] * (df[cond_col]**2) + coef[5] * df[cond_col] + coef[6])
-     
+     fitted_cond = fitted_cond.round(4)
      return fitted_cond
      
      
