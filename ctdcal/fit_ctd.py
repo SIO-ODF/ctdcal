@@ -417,7 +417,7 @@ def conductivity_polyfit(df,coef,t_col,cond_col,p_col='CTDPRS'):
 def temperature_polyfit(df,coef,t_col,p_col='CTDPRS'):
     
     fitted_temp = df[t_col] + coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) + coef[3] * df[t_col] + coef[4]
-    
+    fitted_temp = fitted_temp.round(4)
     
     return fitted_temp
 
