@@ -1185,39 +1185,47 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
         coef[6] = cf[2]
     return coef,df_ques,df_ref   
 
-def prepare_fit_data(df,ref_data,param):
+def prepare_fit_data(df,ref_col):
     
-    #Determine fitting parameter
-    
-    if param == 'C':
-        #Find and separate the measured datapoints from measured
-        ref_data_good = ref_data[ref_data['btl_fire_num'] != 0]
-        ref_data_empty = ref_data[ref_data['btl_fire_num'] == 0]
-        
-        indices_miss = list(ref_data_empty.index.values)
-        indices_good = list(ref_data_good.index.values)
-        
+    good_data = df.copy()
+    good_data = good_data[np.isfinite(good_data[ref_col])]
+       
+    return good_data
+
+#def prepare_fit_data(df,ref_data,param):
+#    
+#    #Determine fitting parameter
+#    
+#    if param == 'C':
+#        #Find and separate the measured datapoints from measured
+#        ref_data_good = ref_data[ref_data['btl_fire_num'] != 0]
+#        ref_data_empty = ref_data[ref_data['btl_fire_num'] == 0]
+#        
+#        indices_miss = list(ref_data_empty.index.values)
+#        indices_good = list(ref_data_good.index.values)
+#        
+##        df_missing = df.loc[df['btl_fire_num'].isin(indices)]
+##        df_good = df.loc[~df['btl_fire_num'].isin(indices)]
+#        df_missing = df.loc[indices_miss]
+#        df_good = df.loc[indices_good]
+#    
+#    
+#    if param == 'T':
+#        # Get index number of missing reft values
+#        
+#        indices = np.setdiff1d(df['btl_fire_num'],ref_data['btl_fire_num'])# This is arg-order dependent, use setxor1d for values non-order dependent values
+#        #put indices in Reverse order
+#        indices[::-1].sort()
+#        #
 #        df_missing = df.loc[df['btl_fire_num'].isin(indices)]
+#        #df_missing = df.iloc[indices] #Collect unmeasured values in new matrix
 #        df_good = df.loc[~df['btl_fire_num'].isin(indices)]
-        df_missing = df.loc[indices_miss]
-        df_good = df.loc[indices_good]
-    
-    
-    if param == 'T':
-        # Get index number of missing reft values
-        
-        indices = np.setdiff1d(df['btl_fire_num'],ref_data['btl_fire_num'])# This is arg-order dependent, use setxor1d for values non-order dependent values
-        #put indices in Reverse order
-        indices[::-1].sort()
-        #
-        df_missing = df.loc[df['btl_fire_num'].isin(indices)]
-        #df_missing = df.iloc[indices] #Collect unmeasured values in new matrix
-        df_good = df.loc[~df['btl_fire_num'].isin(indices)]
-    
-    #Reindex Dataframe
-    df_good = df_good.reset_index(drop=True)
-    
-    return df_good
+#    
+#    #Reindex Dataframe
+#    df_good = df_good.reset_index(drop=True)
+#    
+#    return df_good
+
 
 def prepare_conductivity_data(ssscc,df,refc,ssscc_col = 'SSSCC',index_col = 'btl_fire_num'):
     
@@ -1253,7 +1261,8 @@ def get_pressure_offset(df,start_col='ondeck_start_p',end_col='ondeck_end_p'):
     """
     p_start = np.unique(df[start_col])
     p_end = np.unique(df[end_col])
-    p_off = np.mean(p_start) - np.mean(p_end)   
+    p_off = np.mean(p_start) - np.mean(p_end)
+    p_off = np.around(p_off,decimals=4)
     
     return p_off
 
