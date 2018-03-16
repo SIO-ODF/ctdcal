@@ -10,6 +10,7 @@ import math
 import ctdcal.report_ctd as report_ctd
 import warnings
 import ctdcal.fit_ctd as fit_ctd
+import datetime
 
 import gsw
 
@@ -1185,6 +1186,7 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
         coef[6] = cf[2]
     return coef,df_ques,df_ref   
 
+
 def prepare_fit_data(df,ref_col):
     
     good_data = df.copy()
@@ -1339,11 +1341,185 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,reft_prefix='data/reft/',reft
         for x in ssscc:
             file = prefix + x + postfix
             time_data = load_time_data(file)
-            time_data['SSSCC'] = int(x)
+            time_data['SSSCC'] = str(x)
             df_data_all = pd.concat([df_data_all,time_data])
             
     return df_data_all
             
+
+def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
+                     t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
+                     logFile='data/logs/cast_details.csv'):
+    """ Export Time data to pressure directory as well as adding qual_flags and 
+    removing unneeded columns"""
+     
+#    pressure_seq_data = pressure_sequence(df,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
+    
+    df[stacst_col] = df[stacst_col].astype(int)
+    df[stacst_col] = df[stacst_col].astype(str)
+    
+    # Choose Sensors
+    if t_sensor == 1:
+        df['CTDTMP'] = df['CTDTMP1']
+    elif t_sensor ==2:
+       df['CTDTMP'] = df['CTDTMP1']
+    
+    # Change column names
+    
+    df['CTDFLUOR'] = df['FLUOR']
+    #df['CTDOXY'] = np.NaN
+    df['CTDRINKO'] = df['FREE1']
+    
+    # Add Flagged colummns
+    
+    df['CTDPRS_FLAG_W'] = 2
+    df['CTDTMP_FLAG_W'] = 2
+    df['CTDSAL_FLAG_W'] = 2
+    df['CTDOXY_FLAG_W'] = 2
+    df['CTDXMISS_FLAG_W'] = 1
+    df['CTDFLUOR_FLAG_W'] = 1
+    df['CTDBACKSCATTER_FLAG_W'] = 1
+    df['CTDRINKO_FLAG_W'] = 1
+    
+    # Round to 4 decimal places
+    
+    df = df.round(4)
+    
+    #Remove unwanted columns
+    
+#    pressure_seq_data = pressure_seq_data[['CTDPRS','CTDPRS_FLAG_W','CTDTMP','CTDTMP_FLAG_W','CTDSAL','CTDSAL_FLAG_W','CTDOXY','CTDOXY_FLAG_W',
+#                                           'CTDXMISS','CTDXMISS_FLAG_W','CTDFLUOR','CTDFLUOR_FLAG_W','CTDBACKSCATTER','CTDBACKSCATTER_FLAG_W',
+#                                           'CTDRINKO','CTDRINKO_FLAG_W']]
+
+    cast_details = dataToNDarray(logFile,str,None,',',0)
+    
+    for cast in ssscc:
+        #time_data = pressure_seq_data.copy()
+        #time_data = time_data[pressure_seq_data['SSSCC'] == cast]
+        time_data = df[df['SSSCC'] == cast]
+        time_data = pressure_sequence(df,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
+        time_data = time_data[['CTDPRS','CTDPRS_FLAG_W','CTDTMP','CTDTMP_FLAG_W','CTDSAL','CTDSAL_FLAG_W','CTDOXY','CTDOXY_FLAG_W',
+                               'CTDXMISS','CTDXMISS_FLAG_W','CTDFLUOR','CTDFLUOR_FLAG_W','CTDBACKSCATTER','CTDBACKSCATTER_FLAG_W',
+                               'CTDRINKO','CTDRINKO_FLAG_W']]
+        
+        time_data=time_data.round(4)
+        
+        
+        s_num = cast[-5:-2]
+        c_num = cast[-2:]
+#        line_ID = 'stacast:'+sss
+#        print(line_ID)
+        for line in cast_details:
+            if cast in line[0]:
+                for val in line:
+                    if 'at_depth' in val: btime = float(str.split(val, ':')[1])
+                    if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
+                    if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
+                    if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
+                break
+        
+        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
+        b_date = bdt[0]
+        b_time = bdt[1]
+        depth = -999
+        now = datetime.datetime.now()
+        file_datetime = now.strftime("%Y%m%d %H:%M")
+        
+        outfile = open(out_dir+cast+'_ct1.csv', "w+")
+        outfile.write("CTD, %s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\n DATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nDEPTH = %s\nINSTRUMENT_ID = %s\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, depth, ctd))
+        cn = np.asarray(p_column_names)
+        cn.tofile(outfile,sep=',', format='%s')
+        outfile.write('\n')
+        cu = np.asarray(p_column_units)
+        cu.tofile(outfile,sep=',', format='%s')
+        outfile.write('\n')
+        outfile.close()
+
+        file = out_dir+cast+'_ct1.csv'
+        with open(file,'a') as f:
+            time_data.to_csv(f, header=False,index=False)
+        f.close()
+        
+        outfile = open(out_dir+cast+'_ct1.csv', "a")
+        outfile.write('\n')
+        outfile.write('END_DATA')
+        outfile.close()
+        
+def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t_sensor=1,org='ODF'):
+    
+    btl_columns = ['EXPOCODE','SECT_ID','STNNBR','CASTNO','SAMPNO','BTLNBR','BTLNBR_FLAG','DATE','TIME','LATITUDE','LONGITUDE','DEPTH',
+                   'CTDPRS','CTDTMP','REFTMP','REFTMP_FLAG','CTDSAL','CTDSAL_FLAG','SALNTY','SALNTY_FLAG','SALTREF','SALTREF_FLAG',
+                   'CTDOXY','CTDOXY_FLAG','OXYGEN','OXYGEN_FLAG']
+    btl_units = ['','','','','','','','','','','','METERS','DBARS','ITS-90','C','','PSS-78','','PSS-78','','G/KG','','UMOL/KG','','UMOL/KG','']
+    
+    btl_data = df.copy()
+    
+    if t_sensor ==1:
+        btl_data['CTDTMP'] = btl_data['CTDTMP1']
+    elif t_sensor ==2:
+        btl_data['CTDTMP'] = btl_data['CTDTMP2']
+        
+    
+    btl_data['EXPOCODE'] = expocode
+    btl_data['SECT_ID'] = sectionID
+    btl_data['STNNBR'] = btl_data['SSSCC'].str[0:3]
+    btl_data['CASTNO'] = btl_data['SSSCC'].str[3:5]
+    btl_data['SAMPNO'] = btl_data['btl_fire_num']
+    btl_data['BTLNBR'] = btl_data['btl_fire_num']
+    btl_data['BTLNBR_FLAG'] = '2_HARDCODE'
+    btl_data['DATE'] = np.NaN
+    btl_data['TIME'] = np.NaN
+    btl_data['LATITUDE'] = btl_data['GPSLAT']
+    btl_data['LONGITUDE'] = btl_data['GPSLON']
+    btl_data['DEPTH'] = np.NaN
+    btl_data['REFTMP'] = btl_data['T90']
+    btl_data['REFTMP_FLAG'] = '2_HARDCODE'
+    btl_data['CTDSAL_FLAG'] = '2_HARDCODE'
+    btl_data['SALNTY'] = gsw.SP_from_C(btl_data['BTLCOND'],btl_data['CTDTMP'],btl_data['CTDPRS'])
+    btl_data['SALNTY_FLAG'] = '2_HARDCODE'
+    btl_data['SALTREF'] = gsw.SR_from_SP(btl_data['SALNTY'])
+    btl_data['SALTREF_FLAG'] = '2_HARDCODE'
+    btl_data['CTDOXY'] = np.NaN
+    btl_data['CTDOXY_FLAG'] = '2_HARDCODE'
+#    btl_data['OXYGEN'] = np.NaN
+    btl_data['OXYGEN_FLAG'] = '2_HARDCODE'
+    
+    
+    
+    btl_data = btl_data[btl_columns]
+    btl_data = btl_data.round(4)
+    
+    
+    now = datetime.datetime.now()
+    file_datetime = now.strftime("%Y%m%d")
+    
+    time_stamp = file_datetime+org
+    
+    outfile = open(out_dir+cruise_line+'_hy1.csv', "w+")
+    outfile.write("BOTTLE, %s\n" % (time_stamp))
+    cn = np.asarray(btl_columns)
+    cn.tofile(outfile,sep=',', format='%s')
+    outfile.write('\n')
+    cu = np.asarray(btl_units)
+    cu.tofile(outfile,sep=',', format='%s')
+    outfile.write('\n')
+    outfile.close()
+    
+    file = out_dir+cruise_line+'_hy1.csv'
+    with open(file,'a') as f:
+        btl_data.to_csv(f, header=False,index=False)
+    f.close()
+    
+    outfile = open(out_dir+cruise_line+'_hy1.csv', "a")    
+    outfile.write('\n')
+    outfile.write('END_DATA')
+    outfile.close()
+    
+    return
+        
+        
+    
+    
 
     
     

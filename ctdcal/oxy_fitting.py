@@ -6,22 +6,122 @@ Created on Mon Jan  8 10:04:19 2018
 @author: k3jackson
 """
 
-import sys
-sys.path.append('/Users/k3jackson/p06e/ctd_proc')
-sys.path.append('/Users/k3jackson/odf-ctd-proc/ctdcal/')
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
+#import sys
+#sys.path.append('/Users/k3jackson/p06e/ctd_proc')
+#sys.path.append('/Users/k3jackson/odf-ctd-proc/ctdcal/')
+#import matplotlib
+#matplotlib.use('TkAgg')
+#import matplotlib.pyplot as plt
 import scipy
 import numpy as np
-import libODF_process_ctd as process_ctd
-import libODF_sbe_reader as sbe_rd
-import libODF_sbe_equations_dict as sbe_eq
+import ctdcal.process_ctd as process_ctd
+import ctdcal.sbe_reader as sbe_rd
+import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 import pandas as pd
 import oxy_fitting
 
 #Line 342 module isopycnals
+
+def calibrate_oxygen(df_time,df_btl,ssscc,method=3,raw_dir='data/raw/'):
+    
+    btl_concat = pd.DataFrame()
+    time_concat = pd.DataFrame()
+    for x in ssscc:
+
+        hexfile = raw_dir+x+'.hex'
+        xmlfile = raw_dir+x+'.XMLCON'
+        
+        time_data = df_time[df_time['SSSCC'] == x]
+        btl_data = df_btl[df_btl['SSSCC'] == x]
+        coef = oxy_fitting.oxy_fit(time_data,btl_data,x,hexfile,xmlfile,method=method)
+        #btl_data_write, btl_data_fit = oxy_fitting.oxy_fit(time_data,btl_data,x,hexfile,xmlfile,method=method)
+        print('COMPLETED SSSCC:',x)
+        #dataframe_concat = pd.concat([dataframe_concat,btl_data_fit])
+        
+        btl_data['OXYGEN'] = apply_oxy_coef(btl_data,coef)
+        time_data['CTDOXY'] = apply_oxy_coef(time_data,coef)
+    
+        btl_concat = pd.concat([btl_concat,btl_data])
+        time_concat = pd.concat([time_concat,time_data])
+          
+    return btl_concat, time_concat
+
+def apply_oxy_coef(df,coef,cc=[1.92634e-4,-4.64803e-2],oxyvo_col='CTDOXYVOLTS',p_col='CTDPRS',t_col='CTDTMP1',sal_col='CTDSAL'):
+    
+    sigma0 = sigma0_from_CTD(df)
+    
+    df['OS'] = sbe_eq.OxSol(df[t_col],df[sal_col])
+    df['dv_dt'] = calculate_dVdT(df)
+    
+    new_OXY = coef[0] * (df[oxyvo_col] + coef[1] + coef[2] \
+            * np.exp(cc[0] * df[p_col] + cc[0] \
+            * df[t_col]) \
+            * df['dv_dt']) * df['OS'] \
+            * np.exp(coef[3] * df[t_col]) \
+            * np.exp((coef[4] * df[p_col]) \
+            / (df[t_col]+273.15))
+            
+    oxy_uMolkg = oxy_ml_to_umolkg(new_OXY,sigma0)
+    
+    return oxy_uMolkg
+    
+def sigma0_from_CTD(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS',lon_col='GPSLON',lat_col='GPSLAT'):
+    
+    CT = gsw.CT_from_t(df[sal_col],df[t_col],df[p_col])
+    
+    SA = gsw.SA_from_SP(df[sal_col],df[p_col],df[lon_col],df[lat_col])
+    
+    sigma0 = gsw.sigma0(SA,CT)
+    
+    return sigma0
+
+def calculate_dVdT(df,oxyvo_col='CTDOXYVOLTS',time_col='scan_datetime'):
+#    
+     doxyv = df[oxyvo_col].diff()
+     dt = df[time_col].diff()
+     dv_dt = doxyv/dt
+     dv_dt_mean = np.mean(dv_dt[(dv_dt != np.inf) & (dv_dt !=-np.inf)])
+     dv_dt = dv_dt.replace([np.inf,-np.inf],np.NaN)
+     dv_dt = dv_dt.fillna(dv_dt_mean)
+     
+     #dv_dt_conv = np.convolve(dv_dt,[0.5,0.5])
+     
+     a = 1
+     windowsize = 5
+     b = (1/windowsize)*np.ones(windowsize)
+     #filtered_dvdt = scipy.signal.filtfilt(b,a,dv_dt_conv)
+     filtered_dvdt = scipy.signal.filtfilt(b,a,dv_dt)
+     
+     
+     return filtered_dvdt
+
+def oxy_ml_to_umolkg(oxy_mlL,sigma0):
+    
+    oxy_uMolkg = oxy_mlL * 44660 / (sigma0 + 1000)
+    
+    return oxy_uMolkg
+    
+#    dt_btl = df[]
+#    dv_dt_btl = doxyv_btl/dt_btl
+#    dv_dt_conv_btl = np.convolve(dv_dt_btl,[0.5,0.5])
+#    btl_data_clean['dv_dt_conv_btl'] = dv_dt_conv_btl
+#    
+##   Calculate dV/dT for CTD data, convolve, and filter
+#    doxyv = np.diff(time_data_clean['CTDOXYVOLTS_time'])
+#    dt = np.diff(time_data_clean['scan_datetime'])
+#    
+#    dv_dt = doxyv/dt
+#    dv_dt_conv = np.convolve(dv_dt,[0.5,0.5])
+#    
+#    a = 1
+#    windowsize = 5
+#    b = (1/windowsize)*np.ones(windowsize)
+#    
+#    #filt = scipy.signal.lfilter(b,a,dv_dt_conv)
+#    filtfilt = scipy.signal.filtfilt(b,a,dv_dt_conv)
+#    
+#    time_data_clean['dv_dt_time'] = filtfilt
 
 def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1, 
             sal_col='CTDSAL', t_col='CTDTMP1', p_col='CTDPRS', 
@@ -465,9 +565,9 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     btl_data_clean['CASTNO']=cst_nbr
         
 #   Sanity PLOT
-    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
-    plt.xlim(xmax=10)
-    plt.show()
+#    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
+#    plt.xlim(xmax=10)
+#    plt.show()
     #dataframe_concat = pd.concat([dataframe_concat,btl_data_clean])
         
 #   Flag data    
@@ -488,7 +588,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
 #    btl_data_write.to_csv(filestring,index=False)
 #    btl_write_concat = pd.concat([btl_write_concat,btl_data_write])
     
-    return btl_data_write, btl_data_clean
+    return coef #btl_data_write, btl_data_clean, coef
 
 def oxygen_cal_ml(coef0,time_data,btl_data,switch):
 
