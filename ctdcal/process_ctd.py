@@ -1466,23 +1466,23 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     btl_data['CASTNO'] = btl_data['SSSCC'].str[3:5]
     btl_data['SAMPNO'] = btl_data['btl_fire_num']
     btl_data['BTLNBR'] = btl_data['btl_fire_num']
-    btl_data['BTLNBR_FLAG'] = '2_HARDCODE'
+    btl_data['BTLNBR_FLAG'] = '2'
     btl_data['DATE'] = np.NaN
     btl_data['TIME'] = np.NaN
     btl_data['LATITUDE'] = btl_data['GPSLAT']
     btl_data['LONGITUDE'] = btl_data['GPSLON']
     btl_data['DEPTH'] = np.NaN
     btl_data['REFTMP'] = btl_data['T90']
-    btl_data['REFTMP_FLAG'] = '2_HARDCODE'
+    btl_data['REFTMP_FLAG'] = '2'
     btl_data['CTDSAL_FLAG'] = '2_HARDCODE'
     btl_data['SALNTY'] = gsw.SP_from_C(btl_data['BTLCOND'],btl_data['CTDTMP'],btl_data['CTDPRS'])
     btl_data['SALNTY_FLAG'] = '2_HARDCODE'
     btl_data['SALTREF'] = gsw.SR_from_SP(btl_data['SALNTY'])
     btl_data['SALTREF_FLAG'] = '2_HARDCODE'
     btl_data['CTDOXY'] = np.NaN
-    btl_data['CTDOXY_FLAG'] = '2_HARDCODE'
+    btl_data['CTDOXY_FLAG'] = '2'
 #    btl_data['OXYGEN'] = np.NaN
-    btl_data['OXYGEN_FLAG'] = '2_HARDCODE'
+    btl_data['OXYGEN_FLAG'] = '2'
     
     
     
@@ -1518,7 +1518,7 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     return
         
         
-    
+   
     
 
     
