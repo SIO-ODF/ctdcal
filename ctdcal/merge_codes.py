@@ -120,7 +120,7 @@ def load_exchange_bottle_file(bottle_file):
     Output:
     dataframe
     '''
-    return pd.read_csv(bottle_file, skiprows=[0,1,2,3,4,6], skipfooter=1, engine='python')
+    return pd.read_csv(bottle_file, skiprows=[0,1,2,3,4,5,6,7,8,9,11], skipfooter=1, engine='python')
 
 def write_to_odf_db_bottle_file(df_bottle, output_file):
     '''Write WHP_exchange file for odf_db to load.
@@ -185,7 +185,7 @@ def merge_bottle_trip_dfs(file_ssscc):
         cast = int(ssscc[3:5])
 
         ### rewrite this line to be more portable
-        df = pd.read_pickle(f'/Users/jgum/work_code/cruises/P06_2017/ctd_proc_rewrite/data/bottle/{ssscc}_btl_mean.pkl')
+        df = pd.read_pickle(f'data/bottle/{ssscc}_btl_mean.pkl')
 
         ### chop dataframe shorter for ease of use
         df = df[['CTDPRS','CTDTMP1','CTDTMP2','CTDCOND1','CTDCOND2','btl_fire_num']]
@@ -322,11 +322,11 @@ def residual_stddev(df, param):
 
 def main(argv):
     '''Example run'''
-    qual_codes_filepath = f'/Users/jgum/work_code/cruises/P06_2017/quality_codes/'
-    cruise_dir = f'/Users/jgum/work_code/cruises/P06_2017/'
+    qual_codes_filepath = f'data/quality_codes/'
+    cruise_dir = f'data/'
 
     file_ssscc = f'{cruise_dir}ssscc.csv'
-    bottle_file= f'{qual_codes_filepath}320620170703_hy1.csv'
+    bottle_file= f'{qual_codes_filepath}320620180309_hy1.csv'
 
     ### compile bottle trips into one file, then merge with odf_db bottle file
     df_bottle = prelim_ctd_bottle_df(file_ssscc, bottle_file)
