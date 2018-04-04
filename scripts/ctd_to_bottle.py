@@ -66,6 +66,7 @@ def main(argv):
         df_complete_reft['CASTNO'] = cast
         df_complete_reft = df_complete_reft.groupby('SAMPNO').first()
         df_complete_reft.reset_index(inplace=True)
+        df_complete_reft = df_complete_reft.sort_index(axis=1)
         df_all = df_all.append(df_complete_reft)
 
     #create the stupid string
