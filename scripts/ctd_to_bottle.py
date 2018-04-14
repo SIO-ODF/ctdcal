@@ -68,6 +68,28 @@ def main(argv):
         df_complete_reft.reset_index(inplace=True)
         df_complete_reft = df_complete_reft.sort_index(axis=1)
         df_all = df_all.append(df_complete_reft)
+        #turn any nans to flag 9 values
+        fillna_values = {
+                        'CTDBACKSCATTER':-999,
+                        'CTDBACKSCATTER_FLAG_W':9,
+                        'CTDFLUOR':-999,
+                        'CTDFLUOR_FLAG_W':9,
+                        'CTDOXY':-999,
+                        'CTDOXY_FLAG_W':9,
+                        'CTDPRS':-999,
+                        'CTDPRS_FLAG_W':9,
+                        'CTDRINKO':-999,
+                        'CTDRINKO_FLAG_W':9,
+                        'CTDSAL':-999,
+                        'CTDSAL_FLAG_W':9,
+                        'CTDTMP':-999,
+                        'CTDTMP_FLAG_W':9,
+                        'CTDXMISS':-999,
+                        'CTDXMISS_FLAG_W':9,
+                        'REFTMP':-999,
+                        'REFTMP_FLAG_W':9
+                        }
+        df_all = df_all.fillna(fillna_values)
 
     #create the stupid string
     stringy = 'CASTNO,CTDBACKSCATTER,CTDBACKSCATTER_FLAG_W,CTDFLUOR,CTDFLUOR_FLAG_W,'
