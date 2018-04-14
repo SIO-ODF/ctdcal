@@ -440,8 +440,8 @@ def altimeter_voltage(calib, volts):
     # The array might come in as type=object, which throws AttributeError. Maybe this should be in try/except?
     volts = volts.astype(float)
 
-    bottom_distance = np.around(
+    bottom_distance = np.around((
                                 (300 * volts / calib['ScaleFactor'])
                                 + calib['Offset']
-                               ),1)
+                                ),1)
     return bottom_distance
