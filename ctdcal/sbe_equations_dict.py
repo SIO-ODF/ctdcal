@@ -3,7 +3,7 @@
 Eventual goal is to convert all outputs to numpy arrays to make compatible with
 gsw libraries, and remove written wrappers.
 
-SBE internally references each sensor with an assigned SensorID for indexing. The 
+SBE internally references each sensor with an assigned SensorID for indexing. The
 given sensor numbers are determined empirically from .XMLCON files in 2016-2017 and
 not via an official document, and may change according to SBE wishes.
 
@@ -15,7 +15,7 @@ import numpy as np
 
 def temp_its90_dict(calib, freq, verbose = 0):
     """SBE equation for converting engineering units to Celcius according to ITS-90.
-    
+
     TO BE DEPRECIATED
     SensorID: 55
 
@@ -31,7 +31,7 @@ def temp_its90_dict(calib, freq, verbose = 0):
     -------
     ITS90: arrylike or float
         A float depicting ITS90 temperature.
-        
+
     Original form from calib sheet dated 2012:
     Temperature ITS-90 = 1/{g+h[ln(f0/f )]+i[ln2(f0/f)]+j[ln3(f0/f)]} - 273.15 (°C)
 
@@ -69,7 +69,7 @@ def temp_its90_dict(calib, freq, verbose = 0):
 
 def temp_its90(calib, f):
     """SBE equation for converting engineering units to Celcius according to ITS-90.
-    
+
     SensorID: 55
 
     Parameters
@@ -82,9 +82,9 @@ def temp_its90(calib, f):
 
     Returns
     -------
-    ITS90: arraylike or float
+    ITS90 : arraylike or float
         A float depicting ITS90 temperature.
-        
+
     Original form from calib sheet dated 2012:
     Temperature ITS-90 = 1/{g+h[ln(f0/f )]+i[ln2(f0/f)]+j[ln3(f0/f)]} - 273.15 (°C)
 
@@ -410,3 +410,38 @@ def fluoro_seapoint_dict(calib, signal):
     except:
         fluoro = round(signal,6)
     return fluoro
+
+def altimeter_voltage(calib, volts):
+    """
+    SBE Equation for converting voltages from an altimeter to meters.
+
+    While the SBE documentation refers to a Teledyne Benthos altimeter, the equation
+    works for all altimeters typically found in the wild.
+
+    Sensor ID: 0
+
+    Parameters
+    ----------
+    calib : dict
+        calib is a dict holding SerialNumber, CalibrationDate, ScaleFactor, and Offset
+    volts : array-like
+        volts is the voltage from the altimeter
+
+    Returns
+    -------
+    bottom_distance : array-like
+        bottom_distance is the distance from the altimeter to an object below it, in meters.
+
+    Equation provided by SBE as AN95, or here:
+    http://www.seabird.com/document/an95-setting-teledyne-benthos-altimeter-sea-bird-profiling-ctd
+    Equation stated as: altimeter height = [300 * voltage / scale factor] + offset
+    """
+
+    # The array might come in as type=object, which throws AttributeError. Maybe this should be in try/except?
+    volts = volts.astype(float)
+
+    bottom_distance = np.around(
+                                (300 * volts / calib['ScaleFactor'])
+                                + calib['Offset']
+                               ),1)
+    return bottom_distance
