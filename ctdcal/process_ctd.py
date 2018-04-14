@@ -52,7 +52,8 @@ def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_c
     dfs = find_pump_on_off_dfs(df_test)
     dfs_1 = find_pumps_on_dfs(dfs)
     df_cast = find_max_pressure_df(dfs_1)
-    df_cast2 = trim_soak_period_from_df(df_cast)
+    df_cast1 = find_last_soak_period(df_cast)
+    df_cast2 = trim_soak_period_from_df(df_cast1)
 
     start_cast_time = float(df_cast2['scan_datetime'].head(1))
     start_pressure = float(df_cast2['CTDPRS'].head(1))
@@ -96,8 +97,97 @@ def find_pumps_on_dfs(dfs):
 def trim_soak_period_from_df(df):
     '''Look for minimum pressure in dataframe, then return everything after minimum pressure/top of cast.
     '''
-    test = int(df.loc[1:(len(df)/4),['CTDPRS']].idxmin())
+    test = int(df.iloc[1:int((len(df)/4))]['CTDPRS'].idxmin())
     return df.loc[test:]
+
+def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
+    """Find the soak period before the downcast starts.
+
+    The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
+    parameters. This assumes the soak depth will be somewhere between 10 and 30
+    meters, the package will sit at the soak depth for at least 20 to 30 seconds
+    before starting ascent to the surface and descent to target depth.
+
+    Parameters
+    ----------
+    df_cast : DataFrame
+        DataFrame of the entire cast
+    surface_pressure : integer
+        Minimum surface pressure threshold required to look for soak depth.
+        2 dbar was chosen as an average rosette is roughly 1.5 to 2 meters tall.
+    time_bin : integer
+        Time, in whole seconds.
+    downcast_pressure : integer
+        Minimum pressure threshold required to assume downcast has started.
+        50 dbar has been chosen as double the deep soak depth of 20-30 dbar.
+
+    Returns
+    -------
+    df_cast_ret : DataFrame
+        DataFrame starting within time_bin seconds of the last soak period.
+
+    The algorithm is not guaranteed to catch the exact start of the soak period,
+    but within a minimum period of time_bin seconds(?) from end of the soak if
+    the soak period assumption is valid. This should be shorter than the total
+    soak period time, and able to catch the following rise and descent of the 
+    package that signals the start of the cast.
+
+    The algorithm has been designed to handle four general cases of casts:
+        * A routine cast with pumps turning on in water and normal soak
+        * A cast where the pumps turn on in air/on deck
+        * A cast where the pumps turn on and off due to rosette coming out of water
+        * A cast where there are multiple stops on the downcast to the target depth
+
+    """
+    #Validate user input
+    if time_bin <= 0:
+        raise ValueError('Time bin value should be positive whole seconds.')
+    if downcast_pressure <=0:
+        raise ValueError('Starting downcast pressure threshold must be positive integers.')
+    if downcast_pressure < surface_pressure:
+        raise ValueError(f'Starting downcast pressure threshold must be greater \
+                        than surface pressure threshold.')
+
+    # If pumps have not turned on until in water, return DataFrame
+    if df_cast.iloc[0]['CTDPRS'] > surface_pressure:
+        return df_cast
+
+    #Bin the data by time, and compute the average rate of descent
+    df_blah = df_cast.loc[:,:]
+    df_blah['bin'] = pd.cut(df_blah.loc[:,'index'],
+                            range(df_blah.iloc[0]['index'],df_blah.iloc[-1]['index'],time_bin*24),
+                            labels=False, include_lowest=True)
+    df_blah2 = df_blah.groupby('bin').mean()
+
+    #Compute difference of descent rates and label bins
+    df_blah2['prs_diff'] = df_blah2['CTDPRS'].diff().fillna(0).round(0)
+    df_blah2['movement'] = pd.cut(df_blah2['prs_diff'], [-1000,-0.5,0.5,1000], labels=['up','stop','down'])
+
+    #Find all periods where the rosette is not moving
+    df_stop = df_blah2.groupby('movement').get_group('stop')
+    groupby_test = df_blah2.groupby(df_blah2['movement'].ne(df_blah2['movement'].shift()).cumsum())
+    list_test = [g for i,g in groupby_test]
+
+    #Find a dataframe index of the last soak period before starting descent
+    def poop(list_obj, downcast_pressure):
+        """ Return dataframe index in the last soak period before starting
+            descent to target depth.
+        """
+        for i, x in zip(range(len(list_test)),list_test):
+            if x['CTDPRS'].max() < downcast_pressure:
+                if x.max()['movement'] == 'stop':
+                    index = i
+            if x['CTDPRS'].max() > downcast_pressure:
+                return index
+        return index
+
+    #Truncate dataframe to new starting index : end of dataframe
+    start_index = np.around(list_test[poop(list_test, downcast_pressure)].head(1)['index'])
+    df_cast = df_cast.set_index('index')
+    df_cast = df_cast.loc[int(start_index):,:]
+    df_cast_ret = df_cast.reset_index()
+    return df_cast_ret
+
 #End move four functions
 # def cast_details_old(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
 #     """cast_details function
@@ -786,66 +876,66 @@ def fill_surface_data(df, **kwargs):
 
 def load_reft_data(reft_file,index_name = 'index_memory'):
     """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
-    
+
     reft_data = pd.read_csv(reft_file)
     reft_data.set_index(index_name)
-    
+
     return reft_data
 
 def load_btl_data(btl_file):
-    
+
     """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.csv'"""
-    
-    btl_data = dataToNDarray(btl_file,float,True,',',0) 
+
+    btl_data = dataToNDarray(btl_file,float,True,',',0)
 
     btl_data = pd.DataFrame.from_records(btl_data)
-    
+
     return btl_data
 
 
 def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
                           t_col_1 = 'CTDTMP1', t_col_2 = 'CTDTMP2', reft_col = 'T90',
                           p_col = 'CTDPRS'):
-    
+
     d_1 = 'd_t1' #Difference between ref and prim sensor
     d_2 = 'd_t2' #Difference between ref and second sensor
     d_12 = 'd_t1_t2' #Difference between prim and sec sensor
-    
+
     # Calculate absolute differences between sensors and reference thermom
-    
+
     df['d_t1'] = reft_data[reft_col] - df[t_col_1]
     #df['d_t1'] = df['d_t1'].abs()
     df['d_t2'] = reft_data[reft_col] - df[t_col_2]
     #df['d_t2'] = df['d_t2'].abs()
     df['d_t1_t2'] = df[t_col_1] - df[t_col_2]
     #df['d_t1_t2'] = df['d_t1_t2'].abs()
-    
+
     #split dataframes by pressure ranges
-    
+
     #Greater than 2000 dBar
     lower_lim = 2000
     upper_lim = df[p_col].max()
     threshold = 0.002
-    
+
     df_deep_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
     df_deep_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
-    
+
     #Between 2000 and 1000
     lower_lim = 1000
     upper_lim = 2000
     threshold = 0.005
-    
+
     df_lmid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
     df_lmid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
-    
+
     #Between 1000 and 500
     lower_lim = 500
     upper_lim = 1000
     threshold = 0.010
-    
+
     df_umid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
     df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
-    
+
     #Less than 500
     lower_lim = df[p_col].min()
     upper_lim = 500
@@ -853,129 +943,129 @@ def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
 
     df_shal_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
     df_shal_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
-    
+
     #concat dataframes into two main dfs
     df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
     df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
-    
+
     x0 = int(xRange.split(":")[0])
     x1 = int(xRange.split(":")[1])
-    
+
     #report questionable data to a csv file
-    
+
     #constrain dataframes to within limits of xRange
-    
+
     if xRange != None:
         x0 = int(xRange.split(":")[0])
         x1 = int(xRange.split(":")[1])
-        
+
         df_good_cons = df_good[(df_good[p_col] >= x0) & (df_good[p_col] <= x1)]
-     
+
         #Add here is planning on using for other calibrate code
-#    else: 
+#    else:
 #        if order == 1:
-#            
-#            x0 = 
-#            x1 = 
-#        
+#
+#            x0 =
+#            x1 =
+#
 #        elif:
-#            
-#            x0 = 
-#            x1 = 
-#            
+#
+#            x0 =
+#            x1 =
+#
     else:
         print('Invalid xRange')
-    
+
     # Determine fitting ranges
-    
+
     fit = np.arange(x0,x1,(x1-x0)/50)
-    
+
     cf1 = np.polyfit(df_good_cons[p_col], df_good_cons[d_1], order)
     cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
-    
-   
+
+
     sensor = '_t'+str(sensor)
     coef1 = np.zeros(shape=5)
     coef2 = np.zeros(shape=5)
-    
+
     if order is 0:
         coef1[4] = cf1[0]
-        
+
         coef2[4] = cf2[0]
-        
+
     elif (order is 1) and (calib_param == 'P'):
         coef1[1] = cf1[0]
         coef1[4] = cf1[1]
-        
+
         coef2[1] = cf2[0]
         coef2[4] = cf2[1]
-        
+
     elif (order is 2) and (calib_param == 'P'):
         coef1[0] = cf1[0]
         coef1[1] = cf1[1]
         coef1[4] = cf1[2]
-        
+
         coef2[0] = cf2[0]
         coef2[1] = cf2[1]
         coef2[4] = cf2[2]
     elif (order is 1) and (calib_param == 'T'):
         coef1[3] = cf1[0]
         coef1[4] = cf1[1]
-        
+
         coef2[3] = cf2[0]
         coef2[4] = cf2[1]
     elif (order is 2) and (calib_param == 'T'):
         coef1[2] = cf1[0]
         coef1[3] = cf1[1]
         coef1[4] = cf1[2]
-    
+
         coef2[2] = cf2[0]
         coef2[3] = cf2[1]
         coef2[4] = cf2[2]
-        
+
 #    Y = fit_ctd.conductivity_polyfit(coef, fit, fit, np.full(len(fit), 0.0))
 #
 #
 #    fitfile = str('fitting'+sensor+'.' + FILE_EXT)
 #    fitfilePath = os.path.join(log_directory, fitfile)
 #    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
-        
+
     return df
-    
+
 def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):
-    
+
     #Choose Data range to compare with
     df_range = df[(df[col_name] > lower_lim) & (df[col_name] <= upper_lim)]
-    
-    
+
+
     if find == 'good':
     # Find data values for each sensor that are below the threshold (good)
         df_range_comp_1 = df_range[df_range[d_1].abs() < threshold]
         df_range_comp_2 = df_range[df_range[d_2].abs() < threshold]
         df_range_comp_3 = df_range[df_range[d_12].abs() < threshold]
-    
+
     elif find == 'quest':
     # Find data values for each sensor that are above the threshold (questionable)
         df_range_comp_1 = df_range[df_range[d_1].abs() > threshold]
         df_range_comp_2 = df_range[df_range[d_2].abs() > threshold]
         df_range_comp_3 = df_range[df_range[d_12].abs() > threshold]
-   
+
     else:
         print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
-    
+
     #concatenate dataframe to merge all values together
     df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
-        
+
     # Remove duplicate values
     df_concat = df_concat.drop_duplicates(subset=[col_name],keep='first')
-    
-    return df_concat
-    
 
-    #Combine these three into a dataframe and write out to a csv 
+    return df_concat
+
+
+    #Combine these three into a dataframe and write out to a csv
     #Sort by sta/cast, bottle number, rev. press
-    
-    
+
+
 ###End try/except fix
 
 ### OLD UNUSED
