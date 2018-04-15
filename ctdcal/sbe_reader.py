@@ -12,8 +12,6 @@ import sys
 import datetime
 from pytz import timezone
 import numpy as np
-import pandas as pd
-
 
 class SBEReader():
     """Code originally written by Andrew Barna, January-March 2016."""
@@ -581,7 +579,6 @@ class SBEReader():
         # except AttributeError:
         #     self._parse_scans = np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
         #     return self._parse_scans
-        #import pdb; pdb.set_trace()
         return np.concatenate((self._parse_scans(), self._parse_scans_meta().reshape(self._parse_scans_meta().size,1)), axis = 1)
         #return self._parse_scans
 
