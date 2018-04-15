@@ -8,6 +8,7 @@
 *.kdev4
 .project
 .pydevproject
+*.ipynb_*
 
 # Compiled source #
 ###################
