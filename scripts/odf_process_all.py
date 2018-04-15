@@ -26,7 +26,7 @@ def merge_files(file1, file2, file_out_path):
     return True
 
 def process_all():
-    prefix = 'nbp1707_'
+    prefix = 'nbp1802_'
     btl = '.btl'
     ros = '.ros'
     cnv = '.cnv'
@@ -153,7 +153,7 @@ def process_all():
         print('Primary conductivity wrt P calibrated')
 
         #using 6000 because nominal bottom depth - change if not to not bias data
-        subprocess.run(['odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'P', '-secondary', '-order', '2', '-xRange', '800:5000'], stdout=subprocess.PIPE)
+        subprocess.run(['odf_calibrate_ctd.py', ssscc_file, '-cond', '-calib', 'P', '-secondary', '-order', '2', '-xRange', '1000:5000'], stdout=subprocess.PIPE)
         subprocess.run(['cp', f'{dir_logs}quality_flag_cond.csv', f'{dir_logs}{qual_dir_cond_secondary}{qual_flag_cond}_pressure{csv}'], stdout=subprocess.PIPE)
         subprocess.run(['cp', f'{dir_logs}{fit_c2}.csv', f'{dir_logs}{qual_dir_cond_secondary}{fit_c2}_pressure{csv}'], stdout=subprocess.PIPE)
         time_conductivity_calibrate = time.perf_counter()
