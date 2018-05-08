@@ -23,4 +23,10 @@ merge.ctd_residuals_df(df_bottle)
 df_bottle = merge.merge_ctd_codes(log_dir, df_bottle)
 df_coded = merge.get_qc_all_from_df(df_bottle)
 
+##### PATCHED IN FOR NBP1802 #####
+#df_coded = df_coded.rename(index=str, columns={'CTDCOND1_FLAG_W': 'CTDSAL_FLAG_W'})
+df_coded.to_pickle('data/values_and_codes.pkl')
+print(df_coded.axes)
+##### PATCHED IN FOR NBP1802 #####
+
 ctd_plots.all_plots(df_coded)
