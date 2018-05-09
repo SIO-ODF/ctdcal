@@ -445,7 +445,7 @@ def temperature_polyfit(df,coef,t_col,p_col='CTDPRS'):
 #salts = requests.get("http://go-ship.rrevelle.sio.ucsd.edu/api/salt").json()
 #def o2_calc(path, o2_payload, thio_ns):
 
-def o2_calc(o2flasks, o2path, btl_num, salt):
+def o2_calc(o2flasks, o2path, btl_num): #, salt
 #    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
 
     btl_num.astype(int)
@@ -453,7 +453,7 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
     o2kg = np.zeros(shape=(len(btl_num),), dtype=[('BTLNUM', np.int),('OXYGEN',np.float)])
 
     with open(o2path, 'r') as f:
-        rho = IESRho
+#        rho = IESRho
         params = next(f).strip().split()
 
         titr   = float(params[0])
@@ -464,7 +464,7 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
         thio_t = float(params[5])
 
         thio_n = thio_n_calc(titr, blank, kio3_n, kio3_v, kio3_t, thio_t)
-        rho_stp = rho_t(20)
+#        rho_stp = rho_t(20)
 
         btl_counter = 0
         #try:
@@ -490,7 +490,7 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
                 o2ml['BTLNUM'][bottle-1] = int(bottle)
                 o2ml['OXYGEN'][bottle-1] = (((titr_20c - blank) * thio_n * 5.598 - 0.0017)/((flask_vol - 2.0) * 0.001))
                 o2kg['BTLNUM'][bottle-1] = int(bottle)
-                o2kg['OXYGEN'][bottle-1] = mll_to_umolkg(o2ml['OXYGEN'][bottle-1], salt[bottle-1], draw_temp,rho)
+                #o2kg['OXYGEN'][bottle-1] = mll_to_umolkg(o2ml['OXYGEN'][bottle-1], salt[bottle-1], draw_temp,rho)
             else:
                 btl_counter += 1
                 o2ml['BTLNUM'][bottle-1] = btl_counter
@@ -500,7 +500,7 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
 #           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
         #except ValueError:
             #print('File probably malformed. Check datafile for problems.')
-    return o2kg, o2ml
+    return o2ml #o2kg,
 
 
 def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):

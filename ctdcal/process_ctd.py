@@ -12,6 +12,10 @@ import warnings
 import ctdcal.fit_ctd as fit_ctd
 import datetime
 
+import sys
+sys.path.append('ctdcal/')
+import oxy_fitting
+
 import gsw
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
@@ -1261,9 +1265,17 @@ def get_pressure_offset(df,start_col='ondeck_start_p',end_col='ondeck_end_p'):
     """Finds unique values and calclates mean for pressure offset
     
     """
-    p_start = np.unique(df[start_col])
-    p_end = np.unique(df[end_col])
-    p_off = np.mean(p_start) - np.mean(p_end)
+    p_start = pd.Series(np.unique(df[start_col]))
+    p_end = pd.Series(np.unique(df[end_col]))
+    p_df = pd.DataFrame()
+    
+    p_df = pd.DataFrame()
+    p_df['p_start'] = p_start
+    p_df['p_end'] = p_end
+    p_df = p_df[p_df['p_end'].notnull()]
+    p_df = p_df[p_df['p_start'].notnull()]
+    p_off = p_df['p_start'].mean() - p_df['p_end'].mean()
+
     p_off = np.around(p_off,decimals=4)
     
     return p_off
@@ -1299,9 +1311,12 @@ def pressure_calibrate(file):
     return p_off
     
 def load_all_ctd_files(ssscc,prefix,postfix,series,reft_prefix='data/reft/',reft_postfix='_reft.csv',
-                       refc_prefix='data/salt/',refc_postfix='',index_col='btl_fire_num',
-                       t_col='CTDTMP1',p_col='CTDPRS',ssscc_col='SSSCC'):
-    
+                       refc_prefix='data/salt/',refc_postfix='',oxy_prefix='data/oxygen/', oxy_postfix='',
+                       index_col='btl_fire_num',t_col='CTDTMP1',p_col='CTDPRS',ssscc_col='SSSCC'):
+    """
+    LOAD ALL CTD FILES was changed (commented out)
+    Lines 1324-1328,1335,1337, 1338,345
+    """
     df_data_all = pd.DataFrame()
     
     if series == 'bottle':
@@ -1309,24 +1324,28 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,reft_prefix='data/reft/',reft
             btl_file = prefix + x + postfix
             btl_data = load_btl_data(btl_file)
             
-            reft_file = reft_prefix + x + reft_postfix
-            reft_data = load_reft_data(reft_file)
-            
-            refc_file = refc_prefix + x + refc_postfix
-            refc_data,salt = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
+#            reft_file = reft_prefix + x + reft_postfix
+#            reft_data = load_reft_data(reft_file)
+#            
+#            refc_file = refc_prefix + x + refc_postfix
+#            refc_data,salt = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
             
             #Fix Index for each parameter to bottle number
             
             btl_data[index_col] = btl_data[index_col].astype(int)
             btl_data=btl_data.set_index(btl_data[index_col].values)
             
-            reft_data = reft_data.set_index(reft_data[index_col].values)
+#            reft_data = reft_data.set_index(reft_data[index_col].values)
+#            
+#            refc_data = refc_data[refc_data[index_col] != 0]
+#            refc_data = refc_data.set_index(refc_data[index_col].values)
             
-            refc_data = refc_data[refc_data[index_col] != 0]
-            refc_data = refc_data.set_index(refc_data[index_col].values)
+            oxy_file = oxy_prefix + x + oxy_postfix
+            oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
             
             #Horizontally concat DFs to have all data in one DF
-            btl_data_full = pd.concat([btl_data,reft_data,refc_data],axis=1)
+            #btl_data_full = pd.concat([btl_data,reft_data,refc_data,oxy_data],axis=1)
+            btl_data_full = pd.concat([btl_data,oxy_data],axis=1)
             
             
 #            reft_data = load_reft_data(reft_file,index_name = 'index_memory') LOad Reft
@@ -1343,6 +1362,8 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,reft_prefix='data/reft/',reft
             time_data = load_time_data(file)
             time_data['SSSCC'] = str(x)
             df_data_all = pd.concat([df_data_all,time_data])
+            
+    df_data_all['master_index'] = range(len(df_data_all))
             
     return df_data_all
             

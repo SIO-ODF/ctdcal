@@ -3,38 +3,39 @@
 """
 Created on Sat Aug 26 06:04:34 2017
 
-This program loads in a salt file (no extension) from the autosal salinometer,
-converts it into a dataframe and appropriately attaches headers based on the 
-parameters of the measurement. From there, it determines the amount of offset
-from the salinometer as a function of time and applies a correction to each value
-in the file.
-
-INPUT:
-    unextended salt file/Pandas Dataframe.
-    
-OUTPUT: 4-column dataframe with Station Number (STNNBR), Cast Number (CASTNO),
-        Sample Number (SAMPNO) and the corrected average Conductivity Ratio 
-        (CRavg).
-
+A set of functions to analyze autosal conductivity files/data
 
 @author: Kenneth Jackson
 """
+# break into two
+#docstrings
+# keyword argument in calibration default = worm
 
 import csv
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use('agg')
-import matplotlib.pyplot as plt
 import sys
 import os
-import pdb
 
-def Cr_Calibration(saltFile):
-  
-#  IF isfile statement    
-#   if os.path.isfile('./00101')==True:
-    #Load in salt file
+def SaltLoad(saltFile):
+    
+    """ Converts a autosal salinometer output file to a Pandas Dataframe.
+
+    Input:
+        - saltFile (file), an unextended file containing the output file
+        from the autosal salinometer. Contains columns/values such
+        as STATION NUMBER, CAST NUMBER,SAMPLENUMBER, CONDUCTIVITY RATIO, 
+        etc. 
+        Ex. saltFile = '/data/salt/ssscc'
+        
+    Output:
+        - saltDF (Pandas Dataframe),Dataframe with 15 Columns containing the input data with 
+        appropriate column names for the data.
+
+    Usage:
+        >>> saltDF = SaltLoad(saltFile)
+    """
+    
     f = open(saltFile, newline='')
     saltF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
     
@@ -42,8 +43,7 @@ def Cr_Calibration(saltFile):
     for row in saltF:
         saltArray.append(row)
     del saltArray[0]
-    
-     
+         
     header = ['STNNBR','CASTNO','SAMPNO','BathTEMP','CRavg','autosalSAMPNO',\
               'Unknown','StartTime','EndTime','Attempts','Reading1','Reading2',\
               'Reading3', 'Reading4', 'Reading5']
@@ -57,66 +57,110 @@ def Cr_Calibration(saltFile):
     
     saltDF = pd.DataFrame(saltArray,columns=header) # change to DataFrame
     saltDF = saltDF.apply(pd.to_numeric, errors='ignore')
+    
+    return saltDF
         
-    CrStrt = saltDF['CRavg'][saltDF.autosalSAMPNO=='worm'][0] #First Standard Cr Value
-    CrEnd = saltDF['CRavg'][saltDF.autosalSAMPNO=='worm'][len(saltDF['CRavg'])-1] #Second Standard Cr Value
+def Cr_Calibration(saltDF,StandName='worm'):
+    
+    """
+        Cleans up a salinity dataframe as well as applied a time-dependent correction
+        for the offset associated with prolonged use of the autosal
+        
+        Input:
+            -saltDF (pandas dataframe), a Dataframe containing the data from
+            the output of the autosal salinometer (usually the output of the 
+            SaltLoad function)
+            -StandName, the value given to the standard seawater calibration
+            standard used to calibrate the Conductivity Ratio values. 
+            Default Value: worm
+            Ex.shown in 5th column:
+                Column:     0   1  2  3     4     5                    
+                Standard: 0001 01 00 24 1.99967 worm 3807 04:40:13  04:40:13  01 1.99967
+                Sample 1: 0001 01 01 24 2.03956    1 3808 04:44:55  04:45:38  03 2.03938
+            
+        Output:
+            -outputDF (pandas dataframe), a corrected Dataframe containing 4 columns: 
+            Station Number, Cast Number, Sample Number, and a new Conductivity
+            Ratio which has the time-dependent offset from the salinometer
+            removed from it.
+            
+        Usage:
+            outputDF = Cr_Calibration(saltDF)
+    
+    """
+    
+    CrStrt = saltDF['CRavg'][saltDF.autosalSAMPNO==StandName][0] #First Standard Cr Value
+    CrEnd = saltDF['CRavg'][saltDF.autosalSAMPNO==StandName][len(saltDF['CRavg'])-1] #Second Standard Cr Value
    
     #calculate start and end times (endtimes are when measurements are taken)    
     saltDF['EndTime'] = saltDF['EndTime'].apply(pd.Timedelta)
 
-    #start = pd.Timedelta('00:00:00')    
-    saltDF['ElapsedTime_(s)'] = 0 
-    t = pd.Timedelta('00:00:00')
-    for i in range(1,len(saltDF['EndTime'])):        
-        t = t+saltDF['EndTime'][i] - saltDF['EndTime'][i-1]
-        saltDF['ElapsedTime_(s)'].iat[i] = t.seconds
+    startTime = saltDF['EndTime'][0]
+    saltDF['ElapsedTime_(s)'] = (saltDF['EndTime']-startTime) / np.timedelta64(1,'s')
 
     duration = saltDF['ElapsedTime_(s)'][len(saltDF['ElapsedTime_(s)'])-1]
     Offset = CrEnd-CrStrt
     Offset = Offset/duration # Offset per second
        
     #Apply Offsets to Measured Data
-    saltDF['CRavg_Corr']=saltDF['CRavg'][0]
-      
-    for i in range(1,len(saltDF['CRavg'])-1):
-        if Offset>=0:   #Positive or 0 Drift (Samples Hi or no drift)
-            saltDF['CRavg_Corr'].iat[i] = saltDF['CRavg'][i]-(Offset*saltDF['ElapsedTime_(s)'][i])
-        else:     #Negative Drift (Samples Low)
-            saltDF['CRavg_Corr'].iat[i] = saltDF['CRavg'][i]+(Offset*saltDF['ElapsedTime_(s)'][i])    
+    saltDF['CRavg_Corr'] = saltDF['CRavg']-(Offset*saltDF['ElapsedTime_(s)'])       
             
-#    #Plots Original Data vs. Corrected
-#    plt.figure(999)
-#    plt.plot(saltDF['ElapsedTime_(s)'][1:len(saltDF['ElapsedTime_(s)'])-1],\
-#                    saltDF['CRavg'][1:len(saltDF['CRavg'])-1],"bo",label='Original Data')
-#    plt.plot(saltDF['ElapsedTime_(s)'][1:len(saltDF['ElapsedTime_(s)'])-1],\
-#                    saltDF['CRavg_Corr'][1:len(saltDF['CRavg_Corr'])-1],"rx",label='Corrected Data')
-#    plt.xlabel('Elapsed Time (s)')
-#    plt.ylabel('CR Value')
-#    plt.title('Conductivity Ratio Comparison')
-#    plt.legend()
-#    plt.show()
-    
+    saltDF = saltDF[(saltDF['autosalSAMPNO']!=StandName)]  #remove calibration entries
     #Create Export Dataframe
     outputDF = pd.DataFrame()
-    outputDF = saltDF.loc[:,['STNNBR','CASTNO','SAMPNO','CRavg_Corr']] #copy wanted columns to new DF
-       
-    #DATAframe Concatenate Dataframe to a master DF in a file
-    
+    outputDF = saltDF.loc[:,['STNNBR','CASTNO','SAMPNO','CRavg_Corr']] #copy wanted columns to new DF     
     return outputDF
 
-if __name__ == '__main__':
-    pdb.set_trace()
-    outputDF=Cr_Calibration(sys.argv[1:][0])
-    pdb.set_trace()
-    #save data into pickle format
-    exten = '.pkl'
-    fpath = os.path.split(sys.argv[1:][0])
-    file = fpath[1]+exten
+def saltCat(saltDir):
     
-    f = open(file,'w')
-    outputDF.to_pickle(file)
+    """
+        Concatenates all corrected salt dataframes in the user-specified directory
+        and writes dataframe to a master salt .csv/.pkl file in that directory
+        
+        Inputs:
+            - saltDir (Directory), the directory containing the corrected dataframes
+            for each file that is to be concatenated.
+            
+        Outputs:
+            - a master salt .csv/.pkl file containing all a master dataframe saved
+            to the input directory
+            
+        Usage:
+            saltCat('/data/salt')
+        
+    """
+    
+    fileName = 'master_salt_DF.csv'  
+    fileList = os.listdir(path=saltDir) #Creates list of files in the salt Directory
+    exten = '_corr.csv' # type of file to be parsed out into dataframe
+    extFiles = []
+    for i in range(len(fileList)-1): # Parse out files that have the wanted extension
+        if fileList[i][-9:] == exten:
+            extFiles.append(fileList[i])
+    masterDF = pd.DataFrame()
+    for i in extFiles: #concatenate all Dataframes together
+        catFrame = pd.read_csv(i)
+        masterDF = pd.concat([masterDF,catFrame])
+    #Clean up data before saving
+    if 'Count' in masterDF.columns: #Remove extra 'Count' column in DF
+        del masterDF['Count']
+    
+    masterDF.index = range(len(masterDF))
+            
+    f = open(fileName,'w')
+    masterDF.to_csv(fileName,index_label='Count')
     f.close()
 
-    #f=open(file,'r')
-    #data = pd.read_pickle(file)
-    
+#if __name__ == '__main__':
+##   Calibration Analysis:    
+#    outputDF=Cr_Calibration(sys.argv[1:][0])
+##    #save data into pickle format
+#    exten = '_corr.csv'
+#    fpath = os.path.split(sys.argv[1:][0])
+#    file = fpath[1]+exten    
+#    f = open(file,'w')
+#    outputDF.to_csv(file,index_label='Count')
+#    f.close()
+
+#   Concatenation Analysis:
+#    saltCat(sys.argv[1:][0])

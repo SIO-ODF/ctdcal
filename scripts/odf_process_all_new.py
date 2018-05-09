@@ -10,7 +10,7 @@ import os
 import subprocess
 import time
 import sys
-import ctdcal
+#import ctdcal
 import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
 import sys
