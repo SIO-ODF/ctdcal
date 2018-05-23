@@ -65,8 +65,13 @@ def btl_t1_residuals_pressure_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/reftmp_t1_p.ps', format='ps')
     fig.savefig('./images/reftmp_t1_p.png', format='png')
+=======
+    fig.savefig('./data/images/reftmp_t1_p.svg', format='svg')
+    fig.savefig('./data/images/reftmp_t1_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -81,8 +86,13 @@ def btl_t2_residuals_pressure_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/reftmp_t2_p.ps', format='ps')
     fig.savefig('./images/reftmp_t2_p.png', format='png')
+=======
+    fig.savefig('./data/images/reftmp_t2_p.svg', format='svg')
+    fig.savefig('./data/images/reftmp_t2_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -97,8 +107,13 @@ def t1_t2_residuals_pressure_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/t1_t2_p.ps', format='ps')
     fig.savefig('./images/t1_t2_p.png', format='png')
+=======
+    fig.savefig('./data/images/t1_t2_p.svg', format='svg')
+    fig.savefig('./data/images/t1_t2_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -113,8 +128,13 @@ def btl_t1_residuals_station_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/reftmp_t1_stn.ps', format='ps')
     fig.savefig('./images/reftmp_t1_stn.png', format='png')
+=======
+    fig.savefig('./data/images/reftmp_t1_stn.svg', format='svg')
+    fig.savefig('./data/images/reftmp_t1_stn.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -129,8 +149,13 @@ def btl_t2_residuals_station_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/reftmp_t2_stn.ps', format='ps')
     fig.savefig('./images/reftmp_t2_stn.png', format='png')
+=======
+    fig.savefig('./data/images/reftmp_t2_stn.svg', format='svg')
+    fig.savefig('./data/images/reftmp_t2_stn.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -145,8 +170,13 @@ def t1_t2_residuals_station_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/t1_t2_stn.ps', format='ps')
     fig.savefig('./images/t1_t2_stn.png', format='png')
+=======
+    fig.savefig('./data/images/t1_t2_stn.svg', format='svg')
+    fig.savefig('./data/images/t1_t2_stn.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -167,8 +197,13 @@ def btl_t1_residuals_station_deep_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/reftmp_t1_stn_deep.ps', format='ps')
     fig.savefig('./images/reftmp_t1_stn_deep.png', format='png')
+=======
+    fig.savefig('./data/images/reftmp_t1_stn_deep.svg', format='svg')
+    fig.savefig('./data/images/reftmp_t1_stn_deep.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -184,8 +219,13 @@ def btl_t2_residuals_station_deep_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/reftmp_t2_stn_deep.ps', format='ps')
     fig.savefig('./images/reftmp_t2_stn_deep.png', format='png')
+=======
+    fig.savefig('./data/images/reftmp_t2_stn_deep.svg', format='svg')
+    fig.savefig('./data/images/reftmp_t2_stn_deep.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -201,8 +241,13 @@ def t1_t2_residuals_station_deep_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/t1_t2_stn_deep.ps', format='ps')
     fig.savefig('./images/t1_t2_stn_deep.png', format='png')
+=======
+    fig.savefig('./data/images/t1_t2_stn_deep.svg', format='svg')
+    fig.savefig('./data/images/t1_t2_stn_deep.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -221,8 +266,13 @@ def btl_c1_residuals_pressure_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c1_p.ps', format='ps')
     fig.savefig('./images/btlcond_c1_p.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c1_p.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c1_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -237,8 +287,13 @@ def btl_c2_residuals_pressure_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c2_p.ps', format='ps')
     fig.savefig('./images/btlcond_c2_p.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c2_p.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c2_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -253,8 +308,13 @@ def c1_c2_residuals_pressure_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/c1_c2_p.ps', format='ps')
     fig.savefig('./images/c1_c2_p.png', format='png')
+=======
+    fig.savefig('./data/images/c1_c2_p.svg', format='svg')
+    fig.savefig('./data/images/c1_c2_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -269,8 +329,13 @@ def btl_c1_residuals_station_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c1_stn.ps', format='ps')
     fig.savefig('./images/btlcond_c1_stn.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c1_stn.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c1_stn.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -285,8 +350,13 @@ def btl_c2_residuals_station_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c2_stn.ps', format='ps')
     fig.savefig('./images/btlcond_c2_stn.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c2_stn.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c2_stn.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -301,8 +371,13 @@ def c1_c2_residuals_station_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/c1_c2_stn.ps', format='ps')
     fig.savefig('./images/c1_c2_stn.png', format='png')
+=======
+    fig.savefig('./data/images/c1_c2_stn.svg', format='svg')
+    fig.savefig('./data/images/c1_c2_stn.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -318,8 +393,13 @@ def btl_c1_residuals_station_deep_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c1_stn_deep.ps', format='ps')
     fig.savefig('./images/btlcond_c1_stn_deep.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c1_stn_deep.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c1_stn_deep.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -335,8 +415,13 @@ def btl_c2_residuals_station_deep_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c2_stn_deep.ps', format='ps')
     fig.savefig('./images/btlcond_c2_stn_deep.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c2_stn_deep.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c2_stn_deep.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -352,8 +437,13 @@ def c1_c2_residuals_station_deep_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/c1_c2_stn_deep.ps', format='ps')
     fig.savefig('./images/c1_c2_stn_deep.png', format='png')
+=======
+    fig.savefig('./data/images/c1_c2_stn_deep.svg', format='svg')
+    fig.savefig('./data/images/c1_c2_stn_deep.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -368,8 +458,13 @@ def c_t_coherence_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/c_t_coherence_p.ps', format='ps')
     fig.savefig('./images/c_t_coherence_p.png', format='png')
+=======
+    fig.savefig('./data/images/c_t_coherence_p.svg', format='svg')
+    fig.savefig('./data/images/c_t_coherence_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -384,8 +479,13 @@ def btl_c1_residuals_compare_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c1_compare.ps', format='ps')
     fig.savefig('./images/btlcond_c1_compare.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c1_compare.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c1_compare.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -400,8 +500,13 @@ def btl_c2_residuals_compare_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c2_compare.ps', format='ps')
     fig.savefig('./images/btlcond_c2_compare.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c2_compare.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c2_compare.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -416,8 +521,13 @@ def c1_c2_residuals_compare_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/c1_c2_compare.ps', format='ps')
     fig.savefig('./images/c1_c2_compare.png', format='png')
+=======
+    fig.savefig('./data/images/c1_c2_compare.svg', format='svg')
+    fig.savefig('./data/images/c1_c2_compare.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -432,8 +542,13 @@ def btl_c1_residuals_station_uncorrected_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c1_stn_uncorrected.ps', format='ps')
     fig.savefig('./images/btlcond_c1_stn_uncorrected.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c1_stn_uncorrected.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c1_stn_uncorrected.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -448,8 +563,13 @@ def btl_c2_residuals_station_uncorrected_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlcond_c2_stn_uncorrected.ps', format='ps')
     fig.savefig('./images/btlcond_c2_stn_uncorrected.png', format='png')
+=======
+    fig.savefig('./data/images/btlcond_c2_stn_uncorrected.svg', format='svg')
+    fig.savefig('./data/images/btlcond_c2_stn_uncorrected.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -464,15 +584,20 @@ def c1_c2_residuals_station_uncorrected_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/c1_c2_stn_uncorrected.ps', format='ps')
     fig.savefig('./images/c1_c2_stn_uncorrected.png', format='png')
+=======
+    fig.savefig('./data/images/c1_c2_stn_uncorrected.svg', format='svg')
+    fig.savefig('./data/images/c1_c2_stn_uncorrected.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
 def btl_sal_pressure_plot(df):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    cm = ax.scatter(df['BTL_SAL'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
+    cm = ax.scatter(df['BTL_SAL_UP'],-df['CTDPRS'], marker='+', c=df['STNNBR'], cmap='rainbow')
     ax.set_xlim(-0.02,0.02)
     ax.set_title('SALNTY-CTDSAL vs CTDPRS')
     ax.set_xlabel('CTDSAL Residual (mPSU)')
@@ -480,15 +605,20 @@ def btl_sal_pressure_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlsal_sal_p.ps', format='ps')
     fig.savefig('./images/btlsal_sal_p.png', format='png')
+=======
+    fig.savefig('./data/images/btlsal_sal_p.svg', format='svg')
+    fig.savefig('./data/images/btlsal_sal_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
 def btl_sal_station_plot(df):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    cm = ax.scatter(df['STNNBR'], df['BTL_SAL'], marker='+', c=df['CTDPRS'], cmap='rainbow')
+    cm = ax.scatter(df['STNNBR'], df['BTL_SAL_UP'], marker='+', c=df['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
     ax.set_title('SALNTY-CTDSAL vs STNNBR')
     ax.set_xlabel('Station Number')
@@ -496,8 +626,13 @@ def btl_sal_station_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlsal_sal_stn.ps', format='ps')
     fig.savefig('./images/btlsal_sal_stn.png', format='png')
+=======
+    fig.savefig('./data/images/btlsal_sal_stn.svg', format='svg')
+    fig.savefig('./data/images/btlsal_sal_stn.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -505,7 +640,7 @@ def btl_sal_station_deep_plot(df):
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    cm = ax.scatter(df_deep['STNNBR'], df_deep['BTL_SAL'], marker='+', c=df_deep['CTDPRS'], cmap='rainbow')
+    cm = ax.scatter(df_deep['STNNBR'], df_deep['BTL_SAL_UP'], marker='+', c=df_deep['CTDPRS'], cmap='rainbow')
     ax.set_ylim(-0.01,0.01)
     ax.set_title('SALNTY-CTDSAL (>2000 db) vs STNNBR')
     ax.set_xlabel('Station Number')
@@ -513,8 +648,13 @@ def btl_sal_station_deep_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btlsal_sal_stn_deep.ps', format='ps')
     fig.savefig('./images/btlsal_sal_stn_deep.png', format='png')
+=======
+    fig.savefig('./data/images/btlsal_sal_stn_deep.svg', format='svg')
+    fig.savefig('./data/images/btlsal_sal_stn_deep.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -533,8 +673,13 @@ def btl_oxy_residuals_pressure_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/btl_oxy_p.ps', format='ps')
     fig.savefig('./images/btl_oxy_p.png', format='png')
+=======
+    fig.savefig('./data/images/btl_oxy_p.svg', format='svg')
+    fig.savefig('./data/images/btl_oxy_p.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -549,8 +694,13 @@ def btl_oxy_residuals_station_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btl_oxy_stn.ps', format='ps')
     fig.savefig('./images/btl_oxy_stn.png', format='png')
+=======
+    fig.savefig('./data/images/btl_oxy_stn.svg', format='svg')
+    fig.savefig('./data/images/btl_oxy_stn.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -566,8 +716,13 @@ def btl_oxy_residuals_station_deep_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btl_oxy_stn_deep.ps', format='ps')
     fig.savefig('./images/btl_oxy_stn_deep.png', format='png')
+=======
+    fig.savefig('./data/images/btl_oxy_stn_deep.svg', format='svg')
+    fig.savefig('./data/images/btl_oxy_stn_deep.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -582,8 +737,13 @@ def btl_oxy_residuals_temperature_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/btl_oxy_t.ps', format='ps')
     fig.savefig('./images/btl_oxy_t.png', format='png')
+=======
+    fig.savefig('./data/images/btl_oxy_t.svg', format='svg')
+    fig.savefig('./data/images/btl_oxy_t.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -598,8 +758,13 @@ def btl_oxy_residuals_station_temperature_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Temperature (degrees C)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btl_oxy_stn_t.ps', format='ps')
     fig.savefig('./images/btl_oxy_stn_t.png', format='png')
+=======
+    fig.savefig('./data/images/btl_oxy_stn_t.svg', format='svg')
+    fig.savefig('./data/images/btl_oxy_stn_t.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -615,8 +780,13 @@ def btl_oxy_residuals_station_deep_temperature_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Temperature (degrees C)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btl_oxy_stn_deep_t.ps', format='ps')
     fig.savefig('./images/btl_oxy_stn_deep_t.png', format='png')
+=======
+    fig.savefig('./data/images/btl_oxy_stn_deep_t.svg', format='svg')
+    fig.savefig('./data/images/btl_oxy_stn_deep_t.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -631,8 +801,13 @@ def btl_oxy_residuals_pressure_concentration_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Station Number')
 
+<<<<<<< HEAD
     fig.savefig('./images/btl_oxy_p_concentration.ps', format='ps')
     fig.savefig('./images/btl_oxy_p_concentration.png', format='png')
+=======
+    fig.savefig('./data/images/btl_oxy_p_concentration.svg', format='svg')
+    fig.savefig('./data/images/btl_oxy_p_concentration.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
 
@@ -647,7 +822,12 @@ def btl_oxy_residuals_station_concentration_plot(df):
     cbar = fig.colorbar(cm)
     cbar.set_label('Pressure (dbar)')
 
+<<<<<<< HEAD
     fig.savefig('./images/btl_oxy_stn_concentration.ps', format='ps')
     fig.savefig('./images/btl_oxy_stn_concentration.png', format='png')
+=======
+    fig.savefig('./data/images/btl_oxy_stn_concentration.svg', format='svg')
+    fig.savefig('./data/images/btl_oxy_stn_concentration.pdf', format='pdf')
+>>>>>>> 2607dcb... updated plots to make required formats for reports, pt 2
     plt.close()
     return None
