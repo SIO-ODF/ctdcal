@@ -241,6 +241,7 @@ def ctd_residuals_df(df_bottle):
     df_bottle['BTL_T2'] = df_bottle['REFTMP'] - df_bottle['CTDTMP2']
     df_bottle['T1_T2'] = df_bottle['CTDTMP1'] - df_bottle['CTDTMP2']
 
+    df_bottle['BTL_SAL_UP'] = df_bottle['SALNTY'] - gsw.SP_from_C(df_bottle['CTDCOND2'], df_bottle['CTDTMP2'], df_bottle['CTDPRS'])
     df_bottle['BTL_SAL'] = df_bottle['SALNTY'] - df_bottle['CTDSAL']
     return None
 
@@ -306,7 +307,7 @@ def get_qc_all_from_df(df):
         'CTDOXY_FLAG_W']).get_group((2,2,2,2,2,2,2,2,1)).copy()
     return df
 
-def residual_stddev(df, param):
+def residual_stddev(df, param=['BTL_O', 'BTL_C1', 'BTL_C2', 'C1_C2', 'BTL_T1', 'BTL_T2', 'T1_T2', 'BTL_SAL', 'BTL_SAL_UP']):
     '''Calculate standard deviations of parameters or residuals.
     Input:
     df - dataframe containing all data from casts
@@ -315,9 +316,10 @@ def residual_stddev(df, param):
     output - dictionary, key = is parameter name or parameter deep, value is 2 stddevs
     '''
     output = {}
-    output[f'{param}'] = df[f'{param}'].std()*2
-    df = df[df['CTDPRS'] > 2000]
-    output[f'{param}_DEEP'] = df[f'{param}'].std()*2
+    for x in param:
+        output[f'{x}'] = df[f'{x}'].std()*2
+        df_deep = df[df['CTDPRS'] > 2000]
+        output[f'{x}_DEEP'] = df_deep[f'{x}'].std()*2
     return output
 
 def main(argv):
