@@ -1324,28 +1324,28 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,reft_prefix='data/reft/',reft
             btl_file = prefix + x + postfix
             btl_data = load_btl_data(btl_file)
             
-#            reft_file = reft_prefix + x + reft_postfix
-#            reft_data = load_reft_data(reft_file)
-#            
-#            refc_file = refc_prefix + x + refc_postfix
-#            refc_data,salt = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
+            reft_file = reft_prefix + x + reft_postfix
+            reft_data = load_reft_data(reft_file)
+            
+            refc_file = refc_prefix + x + refc_postfix
+            refc_data,salt = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
             
             #Fix Index for each parameter to bottle number
             
             btl_data[index_col] = btl_data[index_col].astype(int)
             btl_data=btl_data.set_index(btl_data[index_col].values)
             
-#            reft_data = reft_data.set_index(reft_data[index_col].values)
-#            
-#            refc_data = refc_data[refc_data[index_col] != 0]
-#            refc_data = refc_data.set_index(refc_data[index_col].values)
+            reft_data = reft_data.set_index(reft_data[index_col].values)
+            
+            refc_data = refc_data[refc_data[index_col] != 0]
+            refc_data = refc_data.set_index(refc_data[index_col].values)
             
             oxy_file = oxy_prefix + x + oxy_postfix
             oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
             
             #Horizontally concat DFs to have all data in one DF
-            #btl_data_full = pd.concat([btl_data,reft_data,refc_data,oxy_data],axis=1)
-            btl_data_full = pd.concat([btl_data,oxy_data],axis=1)
+            btl_data_full = pd.concat([btl_data,reft_data,refc_data,oxy_data],axis=1)
+#            btl_data_full = pd.concat([btl_data,oxy_data],axis=1)
             
             
 #            reft_data = load_reft_data(reft_file,index_name = 'index_memory') LOad Reft
