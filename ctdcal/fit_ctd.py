@@ -624,7 +624,7 @@ def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CT
 def apply_pressure_offset(df,p_off,p_col='CTDPRS'):
     
     df[p_col] = offset(p_off, df[p_col])
-    
+    df[p_col] = np.around(df[p_col],decimals=3)
     return df
   
 ##
