@@ -515,7 +515,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
          
     header = ['STNNBR','CASTNO','SAMPNO','BathTEMP','CRavg','autosalSAMPNO',\
               'Unknown','StartTime','EndTime','Attempts','Reading1','Reading2',\
-              'Reading3', 'Reading4', 'Reading5']
+              'Reading3', 'Reading4', 'Reading5','Reading6']
     f.close()
     # make all rows of Salt files the same length as header   
     for row in saltArray:
