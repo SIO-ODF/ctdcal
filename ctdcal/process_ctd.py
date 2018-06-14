@@ -1311,18 +1311,24 @@ def pressure_calibrate(file):
     return p_off
     
 def load_all_ctd_files(ssscc,prefix,postfix,series,reft_prefix='data/reft/',reft_postfix='_reft.csv',
-                       refc_prefix='data/salt/',refc_postfix='',oxy_prefix='data/oxygen/', oxy_postfix='',
-                       index_col='btl_fire_num',t_col='CTDTMP1',p_col='CTDPRS',ssscc_col='SSSCC'):
+                       refc_prefix='data/salt/',refc_postfix='',press_file='data/logs/ondeck_pressure.csv',
+                       oxy_prefix='data/oxygen/', oxy_postfix='',index_col='btl_fire_num',t_col='CTDTMP1',
+                       p_col='CTDPRS',ssscc_col='SSSCC'):
     """
     LOAD ALL CTD FILES was changed (commented out)
     Lines 1324-1328,1335,1337, 1338,345
     """
     df_data_all = pd.DataFrame()
+    pressure_log = load_pressure_logs(press_file)
+    p_off = get_pressure_offset(pressure_log)
     
     if series == 'bottle':
         for x in ssscc:
             btl_file = prefix + x + postfix
             btl_data = load_btl_data(btl_file)
+            
+            
+            btl_data = fit_ctd.apply_pressure_offset(btl_data,p_off)
             
             reft_file = reft_prefix + x + reft_postfix
             reft_data = load_reft_data(reft_file)
@@ -1362,6 +1368,7 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,reft_prefix='data/reft/',reft
             file = prefix + x + postfix
             time_data = load_time_data(file)
             time_data['SSSCC'] = str(x)
+            time_data = fit_ctd.apply_pressure_offset(time_data,p_off)
             df_data_all = pd.concat([df_data_all,time_data])
             
     df_data_all['master_index'] = range(len(df_data_all))
