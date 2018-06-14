@@ -504,59 +504,104 @@ def o2_calc(o2flasks, o2path, btl_num): #, salt
 
 
 def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
-#    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
-
-    salt_file_name = os.path.basename(saltpath)
-    salt_sta = int(salt_file_name[0:3])
-    salt_cst = int(salt_file_name[3:5])
-
-    btl_num = btl_data[btl_num_col].astype(int)
-
-    psu = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('SALNTY',np.float)])
-    mspcm = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('BTLCOND',np.float)])
-    tmp_tmp = np.zeros(len(btl_num), dtype=np.float)
-    tmp_p = np.zeros(len(btl_num), dtype=np.float)
-    bath_tmp = np.zeros(len(btl_num), dtype=np.float) #patched in - JIG 2017-07-15
-
-    with open(saltpath, 'r') as f:
-        params = next(f).strip().split()
-        #std   = float(params[8])
-
-        params = next(f).strip().split()
-        worm1   = float(params[4])
-
-        #btl_counter = 0
-        for l in f:
-            row = l.split()
-            station = int(row[0])
-            cast = int(row[1])
-            if (station == salt_sta) and (cast == salt_cst):
-                if (row[5] == 'worm'):
-                    worm2 = float(row[4])
-                else:
-                   bottle = int(row[5])
-                   cond = float(row[4])
-                   bath = int(row[3]) #patched in - JIG 2017-07-15
-                   bath_tmp = np.full_like(bath_tmp, bath)
-
-                if bottle in btl_num:
-                    i = int(np.where(btl_num == bottle)[0][0])
-                    j = int(np.where(btl_data[btl_num_col] == bottle)[0][0])
-                    tmp_tmp[j] = btl_data[btl_tmp_col][j]
-                    tmp_p[j] = btl_data[btl_p_col][j]
-                    psu[btl_num_col][i] = int(bottle)
-                    mspcm[btl_num_col][i] = int(bottle)
-                    psu['SALNTY'][i] = cond / 2.0
-                    #import pdb; pdb.set_trace()
-
-
-        psu['SALNTY'] = SP_salinometer(psu['SALNTY'], bath_tmp)
-        mspcm['BTLCOND'] = gsw.C_from_SP(psu['SALNTY'], tmp_tmp, tmp_p)
-        
-        mspcm = pd.DataFrame(mspcm)
-        psu = pd.DataFrame(psu)
-#           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
-    return mspcm, psu
+    
+    f = open(saltpath, newline='')
+    saltF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
+    
+    saltArray = []
+    for row in saltF:
+        saltArray.append(row)
+    del saltArray[0]
+         
+    header = ['STNNBR','CASTNO','SAMPNO','BathTEMP','CRavg','autosalSAMPNO',\
+              'Unknown','StartTime','EndTime','Attempts','Reading1','Reading2',\
+              'Reading3', 'Reading4', 'Reading5']
+    f.close()
+    # make all rows of Salt files the same length as header   
+    for row in saltArray:
+        if len(row) < len(header):
+            row.extend([np.NaN]*(len(header)-len(row)))
+            
+    saltArray = np.array(saltArray) # change to np array
+    
+    saltDF = pd.DataFrame(saltArray,columns=header) # change to DataFrame
+    saltDF = saltDF.apply(pd.to_numeric, errors='ignore')
+    
+    cond = saltDF[['SAMPNO','CRavg','BathTEMP']]
+    # Remove standard measurements
+    cond = cond[(cond['SAMPNO']!=0) & (cond['SAMPNO']!=99)]
+    # Filter unmeansured bottle data from btl_data
+    data = btl_data[btl_data[btl_num_col].isin(cond['SAMPNO'].tolist())]
+    
+    salinity = SP_salinometer((cond['CRavg']/2),cond['BathTEMP'])
+    cond['BTLCOND'] = gsw.C_from_SP(salinity,data[btl_tmp_col],data[btl_p_col])
+    
+    # Create 36-place DF
+    DF = pd.DataFrame(data=np.arange(1,37),columns=['SAMPNO'],index=range(1,37))
+    # Merge
+    DF = DF.merge(cond,on="SAMPNO",how='outer')
+    DF = DF.set_index(np.arange(1,37))
+    
+    return DF
+    
+    
+    
+##    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
+#
+#    salt_file_name = os.path.basename(saltpath)
+#    salt_sta = int(salt_file_name[0:3])
+#    salt_cst = int(salt_file_name[3:5])
+#
+#    btl_num = btl_data[btl_num_col].astype(int)
+#
+#    psu = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('SALNTY',np.float)])
+#    mspcm = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('BTLCOND',np.float)])
+#    tmp_tmp = np.zeros(len(btl_num), dtype=np.float)
+#    tmp_p = np.zeros(len(btl_num), dtype=np.float)
+#    bath_tmp = np.zeros(len(btl_num), dtype=np.float) #patched in - JIG 2017-07-15
+#
+#    with open(saltpath, 'r') as f:
+#        params = next(f).strip().split()
+#        #std   = float(params[8])
+#
+#        params = next(f).strip().split()
+#        worm1   = float(params[4])
+#
+#        #btl_counter = 0
+#        for l in f:
+#            row = l.split()
+#            station = int(row[0])
+#            cast = int(row[1])
+#            if (station == salt_sta) and (cast == salt_cst):
+#                if (row[5] == 'worm'):
+#                    worm2 = float(row[4])
+#                else:
+#                   bottle = int(row[5])
+#                   cond = float(row[4])
+#                   bath = int(row[3]) #patched in - JIG 2017-07-15
+#                   bath_tmp = np.full_like(bath_tmp, bath)
+#
+#                if bottle in btl_num:
+#                    i = int(np.where(btl_num == bottle)[0][0])
+#                    j = int(np.where(btl_data[btl_num_col] == bottle)[0][0])
+#                    tmp_tmp[j] = btl_data[btl_tmp_col][j]
+#                    tmp_p[j] = btl_data[btl_p_col][j]
+#                    psu[btl_num_col][i] = int(bottle)
+#                    mspcm[btl_num_col][i] = int(bottle)
+#                    psu['SALNTY'][i] = cond / 2.0
+#                    #import pdb; pdb.set_trace()
+#
+#
+#        psu['SALNTY'] = SP_salinometer(psu['SALNTY'], bath_tmp)
+#        mspcm['BTLCOND'] = gsw.C_from_SP(psu['SALNTY'], tmp_tmp, tmp_p)
+#        
+#        mspcm = pd.DataFrame(mspcm)
+#        psu = pd.DataFrame(psu)
+##           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
+    
+    
+    
+#    return mspcm, psu
 
 def write_calib_coef(ssscc,coef,param):
     """ Write coef to csv
