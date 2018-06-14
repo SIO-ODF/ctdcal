@@ -533,7 +533,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     # Filter unmeansured bottle data from btl_data
     data = btl_data[btl_data[btl_num_col].isin(cond['SAMPNO'].tolist())]
     
-    salinity = SP_salinometer((cond['CRavg']/2),cond['BathTEMP'])
+    salinity = SP_salinometer((cond['CRavg']/2.0),cond['BathTEMP'])
     cond['BTLCOND'] = gsw.C_from_SP(salinity,data[btl_tmp_col],data[btl_p_col])
     
     # Create 36-place DF
