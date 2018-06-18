@@ -551,8 +551,8 @@ def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
     bath_df = bath_temp.copy()
     nans = np.isnan(cond_df)
     bnans = np.isnan(bath_df)
-    cond_df.loc[nans] = -999
-    bath_df.loc[bnans] = -999
+    cond_df.loc[nans] = 0
+    bath_df.loc[bnans] = 0
     
     
     salinity = SP_salinometer((cond_df / 2.0),bath_df)
