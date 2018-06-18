@@ -1452,10 +1452,10 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         b_time = bdt[1]
         depth = -999
         now = datetime.datetime.now()
-        file_datetime = now.strftime("%Y%m%d %H:%M")
-        
+        file_datetime = now.strftime("%Y%m%d") #%H:%M")
+        file_datetime = file_datetime + 'ODFSIO'
         outfile = open(out_dir+cast+'_ct1.csv', "w+")
-        outfile.write("CTD, %s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\n DATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nDEPTH = %s\nINSTRUMENT_ID = %s\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, depth, ctd))
+        outfile.write("CTD, %s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\n DATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nINSTRUMENT_ID = %s\n" % (file_datetime, 10, expocode, section_id, s_num, c_num[1], b_date, b_time, btm_lat, btm_lon, ctd))
         cn = np.asarray(p_column_names)
         cn.tofile(outfile,sep=',', format='%s')
         outfile.write('\n')
