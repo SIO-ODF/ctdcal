@@ -544,7 +544,26 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     
     return DF
     
+def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
+
+    ### Clean up to avoid runtimewarning ###
+    cond_df = cond_ratio.copy()
+    bath_df = bath_temp.copy()
+    nans = np.isnan(cond_df)
+    bnans = np.isnan(bath_df)
+    cond_df.loc[nans] = -999
+    bath_df.loc[bnans] = -999
     
+    
+    salinity = SP_salinometer((cond_df / 2.0),bath_df)
+    cond = gsw.C_from_SP(salinity,btl_temp,btl_press)  
+    
+    cond[cond<=1] = np.nan
+    
+    #cond = pd.series(cond)
+    
+    
+    return cond
     
 ##    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
 #
