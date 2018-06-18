@@ -238,91 +238,97 @@ def process_all_new():
         qual_flag_temp = process_ctd.combine_quality_flags(df_ques_t1,df_ques_t2,df_reft)
     
     ###########################################################################
-    
+
+    for x in range(2):
 #    
     ### Conductivity Calibration
     
-    df_cond_good = process_ctd.prepare_fit_data(btl_data_all,refc_col)
-    #df_cond_good,refc_data_clean = process_ctd.prepare_conductivity_data(ssscc,btl_data_all,refc_data_all)
+        # Update ref conductivity from salinometer
+        btl_data_all['BTLCOND'] = fit_ctd.CR_to_cond(btl_data_all['CRavg'],btl_data_all['BathTEMP'],btl_data_all['CTDTMP1'],btl_data_all['CTDPRS'])
+    
+        df_cond_good = process_ctd.prepare_fit_data(btl_data_all,refc_col)
+        #df_cond_good,refc_data_clean = process_ctd.prepare_conductivity_data(ssscc,btl_data_all,refc_data_all)
 
     
-    #coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'P',1,xRange='800:6000')
-    coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,2,'P',1,xRange='800:6000')
+        #coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'P',1,xRange='800:6000')
+        coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,2,'P',1,xRange='800:6000')
     
-    #coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'P',2,xRange='1500:6000')
-    coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,2,'P',2,xRange='1500:6000')
+        #coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'P',2,xRange='1500:6000')
+        coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,2,'P',2,xRange='1500:6000')
     
     
     # Apply fitting coef to data
     
-    btl_data_all[c1_btl_col], btl_data_all[sal_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_1,t1_btl_col,c1_btl_col,p_btl_col)
-    time_data_all[c1_col], time_data_all[sal_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_1,t1_col,c1_col,p_col)
+        btl_data_all[c1_btl_col], btl_data_all[sal_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_1,t1_btl_col,c1_btl_col,p_btl_col)
+        time_data_all[c1_col], time_data_all[sal_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_1,t1_col,c1_col,p_col)
     
 #    btl_data_all[c1_btl_col] = fit_ctd.conductivity_polyfit(coef_cond_1,btl_data_all[p_btl_col],btl_data_all[t1_btl_col],btl_data_all[c1_btl_col])
 #    time_data_all[c1_col] = fit_ctd.conductivity_polyfit(coef_cond_1,time_data_all[p_col],time_data_all[t1_col],time_data_all[c1_col])
     
-    btl_data_all[c2_btl_col], sensor_2_sal = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_2,t2_btl_col,c2_btl_col,p_btl_col)
-    time_data_all[c2_col], sensor_2_sal = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_2,t2_col,c2_col,p_col)
+        btl_data_all[c2_btl_col], sensor_2_sal = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_2,t2_btl_col,c2_btl_col,p_btl_col)
+        time_data_all[c2_col], sensor_2_sal = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_2,t2_col,c2_col,p_col)
 
 #    btl_data_all[c2_btl_col] = fit_ctd.conductivity_polyfit(coef_cond_2,btl_data_all[p_btl_col],btl_data_all[t2_btl_col],btl_data_all[c2_btl_col])
 #    time_data_all[c2_col] = fit_ctd.conductivity_polyfit(coef_cond_2,time_data_all[p_col],time_data_all[t2_col],time_data_all[c2_col])
 #    
-    qual_flag_cond = process_ctd.combine_quality_flags(df_ques_c1,df_ques_c2,df_refc)
+        qual_flag_cond = process_ctd.combine_quality_flags(df_ques_c1,df_ques_c2,df_refc)
 
 #    # Repeat WRT Temp
+##    
+#        df_cond_good = process_ctd.prepare_fit_data(btl_data_all,refc_col)
 #    
-    df_cond_good = process_ctd.prepare_fit_data(btl_data_all,refc_col)
-    
-    #coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'T',1)
-    coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,2,'T',1)
-    
-    #coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'T',2)
-    coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,2,'T',2)
-    
-    
-    # Apply fitting coef to data
-    
-    btl_data_all[c1_btl_col], btl_data_all[sal_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_1,t1_btl_col,c1_btl_col,p_btl_col)
-    time_data_all[c1_col], time_data_all[sal_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_1,t1_col,c1_col,p_col)
-    
-    btl_data_all[c2_btl_col], sensor_2_sal = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_2,t2_btl_col,c2_btl_col,p_btl_col)
-    time_data_all[c2_col], sensor_2_sal = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_2,t2_col,c2_col,p_col)
-    
-    qual_flag_cond = process_ctd.combine_quality_flags(df_ques_c1,df_ques_c2,df_refc)
-    
-#    btl_data_all[c1_btl_col] = fit_ctd.conductivity_polyfit(coef_cond_1,btl_data_all[p_btl_col],btl_data_all[t1_btl_col],btl_data_all[c1_btl_col])
-#    time_data_all[c1_col] = fit_ctd.conductivity_polyfit(coef_cond_1,time_data_all[p_col],time_data_all[t1_col],time_data_all[c1_col])
+#        #coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'T',1)
+#        coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,2,'T',1)
 #    
-#    btl_data_all[c2_btl_col] = fit_ctd.conductivity_polyfit(coef_cond_2,btl_data_all[p_btl_col],btl_data_all[t2_btl_col],btl_data_all[c2_btl_col])
-#    time_data_all[c2_col] = fit_ctd.conductivity_polyfit(coef_cond_2,time_data_all[p_col],time_data_all[t2_col],time_data_all[c2_col])
+#        #coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'T',2)
+#        coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,2,'T',2)
 #    
+#    
+#    # Apply fitting coef to data
+#    
+#        btl_data_all[c1_btl_col], btl_data_all[sal_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_1,t1_btl_col,c1_btl_col,p_btl_col)
+#        time_data_all[c1_col], time_data_all[sal_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_1,t1_col,c1_col,p_col)
+#    
+#        btl_data_all[c2_btl_col], sensor_2_sal = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_2,t2_btl_col,c2_btl_col,p_btl_col)
+#        time_data_all[c2_col], sensor_2_sal = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_2,t2_col,c2_col,p_col)
+#    
+#        qual_flag_cond = process_ctd.combine_quality_flags(df_ques_c1,df_ques_c2,df_refc)
+#    
+##    btl_data_all[c1_btl_col] = fit_ctd.conductivity_polyfit(coef_cond_1,btl_data_all[p_btl_col],btl_data_all[t1_btl_col],btl_data_all[c1_btl_col])
+##    time_data_all[c1_col] = fit_ctd.conductivity_polyfit(coef_cond_1,time_data_all[p_col],time_data_all[t1_col],time_data_all[c1_col])
+##    
+##    btl_data_all[c2_btl_col] = fit_ctd.conductivity_polyfit(coef_cond_2,btl_data_all[p_btl_col],btl_data_all[t2_btl_col],btl_data_all[c2_btl_col])
+##    time_data_all[c2_col] = fit_ctd.conductivity_polyfit(coef_cond_2,time_data_all[p_col],time_data_all[t2_col],time_data_all[c2_col])
+##    
     # Finally WRT to Cond
+        
+        btl_data_all['BTLCOND'] = fit_ctd.CR_to_cond(btl_data_all['CRavg'],btl_data_all['BathTEMP'],btl_data_all['CTDTMP1'],btl_data_all['CTDPRS'])
     
-    df_cond_good = process_ctd.prepare_fit_data(btl_data_all,refc_col)
+        df_cond_good = process_ctd.prepare_fit_data(btl_data_all,refc_col)
     
-    #coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'C',1)
-    coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,2,'C',1)
+        #coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'C',1)
+        coef_cond_1,df_ques_c1,df_refc = process_ctd.calibrate_conductivity(df_cond_good,2,'C',1)
     
-    #coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'C',2)
-    coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,2,'C',2)
+        #coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,refc_data_clean,2,'C',2)
+        coef_cond_2,df_ques_c2,df_refc2 = process_ctd.calibrate_conductivity(df_cond_good,2,'C',2)
     
     # Apply fitting coef to data
     
-    btl_data_all[c1_btl_col], btl_data_all[sal_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_1,t1_btl_col,c1_btl_col,p_btl_col)
-    time_data_all[c1_col], time_data_all[sal_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_1,t1_col,c1_col,p_col)
+        btl_data_all[c1_btl_col], btl_data_all[sal_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_1,t1_btl_col,c1_btl_col,p_btl_col)
+        time_data_all[c1_col], time_data_all[sal_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_1,t1_col,c1_col,p_col)
     
-    btl_data_all[c2_btl_col], sensor_2_sal = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_2,t2_btl_col,c2_btl_col,p_btl_col)
-    time_data_all[c2_col], sensor_2_sal = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_2,t2_col,c2_col,p_col)
+        btl_data_all[c2_btl_col], sensor_2_sal = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_2,t2_btl_col,c2_btl_col,p_btl_col)
+        time_data_all[c2_col], sensor_2_sal = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_2,t2_col,c2_col,p_col)
     
-    qual_flag_cond = process_ctd.combine_quality_flags(df_ques_c1,df_ques_c2,df_refc)
+        qual_flag_cond = process_ctd.combine_quality_flags(df_ques_c1,df_ques_c2,df_refc)
     
-#    btl_data_all[c1_btl_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_1,t1_btl_col,c1_btl_col,p_btl_col)
-#    time_data_all[c1_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_1,t1_col,c1_col,p_col)
+#        btl_data_all[c1_btl_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_1,t1_btl_col,c1_btl_col,p_btl_col)
+#        time_data_all[c1_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_1,t1_col,c1_col,p_col)
 #    
-#    btl_data_all[c2_btl_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_2,t2_btl_col,c2_btl_col,p_btl_col)
-#    time_data_all[c2_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_2,t2_col,c2_col,p_col)
+#        btl_data_all[c2_btl_col] = fit_ctd.conductivity_polyfit(btl_data_all,coef_cond_2,t2_btl_col,c2_btl_col,p_btl_col)
+#        time_data_all[c2_col] = fit_ctd.conductivity_polyfit(time_data_all,coef_cond_2,t2_col,c2_col,p_col)
 ##
-#    qual_flag_cond = process_ctd.combine_quality_flags(df_ques_c1,df_ques_c2,df_refc)
+#       qual_flag_cond = process_ctd.combine_quality_flags(df_ques_c1,df_ques_c2,df_refc)
     ###########################################################################
 #
 #    ## Oxygen Calibration    
