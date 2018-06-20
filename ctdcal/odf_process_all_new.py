@@ -174,6 +174,19 @@ def process_all_new():
     time_data_all = process_ctd.load_all_ctd_files(ssscc,time_data_prefix,
                                                    time_data_postfix,'time')
     ###########################################################################
+    
+    ### Pressure Offset
+    
+    # Determine Pressure offset from logs
+    
+    pressure_log = process_ctd.load_pressure_logs(p_log_file)
+    p_off = process_ctd.get_pressure_offset(pressure_log)
+    
+    btl_data_all = fit_ctd.apply_pressure_offset(btl_data_all,p_off)
+    time_data_all = fit_ctd.apply_pressure_offset(time_data_all,p_off)
+    
+    
+    ###########################################################################
        
     ### Temperature Calibration
         
