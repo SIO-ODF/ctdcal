@@ -1267,14 +1267,18 @@ def get_pressure_offset(df,start_col='ondeck_start_p',end_col='ondeck_end_p'):
     """
     p_start = pd.Series(np.unique(df[start_col]))
     p_end = pd.Series(np.unique(df[end_col]))
-    p_df = pd.DataFrame()
-    
-    p_df = pd.DataFrame()
-    p_df['p_start'] = p_start
-    p_df['p_end'] = p_end
-    p_df = p_df[p_df['p_end'].notnull()]
-    p_df = p_df[p_df['p_start'].notnull()]
-    p_off = p_df['p_start'].mean() - p_df['p_end'].mean()
+    p_start = p_start[p_start.notnull()]
+    p_end = p_end[p_end.notnull()]
+    p_off = p_start.mean() - p_end.mean()
+
+# JACKSON THINKS THIS METHOD SHOULD BE USED TO KEEP START END PAIRS    
+#    p_df = pd.DataFrame()
+#    p_df['p_start'] = p_start
+#    p_df['p_end'] = p_end
+#    p_df = p_df[p_df['p_end'].notnull()]
+#    p_df = p_df[p_df['p_start'].notnull()]
+#    p_off = p_df['p_start'].mean() - p_df['p_end'].mean()
+##########################################################
 
     p_off = np.around(p_off,decimals=4)
     
