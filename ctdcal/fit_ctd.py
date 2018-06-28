@@ -515,7 +515,8 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
          
     header = ['STNNBR','CASTNO','SAMPNO','BathTEMP','CRavg','autosalSAMPNO',\
               'Unknown','StartTime','EndTime','Attempts','Reading1','Reading2',\
-              'Reading3', 'Reading4', 'Reading5','Reading6']
+              'Reading3', 'Reading4', 'Reading5','Reading6','Reading7','Reading8',\
+              'Reading9', 'Reading10','Reading11','Reading12']
     f.close()
     # make all rows of Salt files the same length as header   
     for row in saltArray:
@@ -530,6 +531,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     cond = saltDF[['autosalSAMPNO','SAMPNO','CRavg','BathTEMP']]
     # Remove standard measurements
     cond = cond[(cond['autosalSAMPNO']!='worm')]
+    cond = cond.drop('autosalSAMPNO',axis=1)
     cond = cond.apply(pd.to_numeric) # For some reason doesn't completely work the first time
     #cond = cond[(cond['SAMPNO']!=0) & (cond['SAMPNO']!=99)]
     # Filter unmeansured bottle data from btl_data
@@ -541,7 +543,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
         #cond = cond.drop('SAMPNO',1)
     except ValueError:
         print('Possible mis-entered information in salt file (Check salt file)')
-        exit(1)
+        raise ValueError
         #data = btl_data[btl_data[btl_num_col].isin(cond['SAMPNO'].tolist())]
         #salinity = SP_salinometer((cond['CRavg']/2.0),cond['BathTEMP'])
         #cond['BTLCOND'] = gsw.C_from_SP(salinity,data[btl_tmp_col],data[btl_p_col])
@@ -549,10 +551,12 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
         #cond = cond.drop('autosalSAMPNO',1)
         #cond = cond.rename(columns={'SAMPNO':'autosalSAMPNO'})
     # Create 36-place DF
+    cond
     DF = pd.DataFrame(data=np.arange(1,37),columns=['SAMPNO'],index=range(1,37))
     # Merge
     DF = DF.merge(cond,on="SAMPNO",how='outer')
     DF = DF.set_index(np.arange(1,37))
+    
     
     return DF
     
