@@ -531,8 +531,8 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     cond = saltDF[['autosalSAMPNO','SAMPNO','CRavg','BathTEMP']]
     # Remove standard measurements
     cond = cond[(cond['autosalSAMPNO']!='worm')]
-    #if all(cond['autosalSAMPNO'].values != cond['SAMPNO'].values):
-    #    raise ValueError('Problem with sample numbers in salt file (check file)')
+    if all(cond['autosalSAMPNO'].values.astype(int) != cond['SAMPNO'].values.astype(int)):
+        raise ValueError('Problem with sample numbers in salt file (check file: '+ saltpath + ')')
     cond = cond.drop('autosalSAMPNO',axis=1)
     cond = cond.apply(pd.to_numeric) # For some reason doesn't completely work the first time
     #cond = cond[(cond['SAMPNO']!=0) & (cond['SAMPNO']!=99)]
