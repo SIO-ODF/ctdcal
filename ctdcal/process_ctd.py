@@ -1325,17 +1325,13 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
     Lines 1324-1328,1335,1337, 1338,345
     """
     df_data_all = pd.DataFrame()
-#    pressure_log = load_pressure_logs(press_file)
-#    p_off = get_pressure_offset(pressure_log)
-    
+   
     if series == 'bottle':
         for x in ssscc:
             print('Loading BTL data for station: ' + x + '...')
             btl_file = prefix + x + postfix
             btl_data = load_btl_data(btl_file,cols)
             
-            
-#            btl_data = fit_ctd.apply_pressure_offset(btl_data,p_off)
             
             reft_file = reft_prefix + x + reft_postfix
             try:
@@ -1351,7 +1347,7 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             refc_file = refc_prefix + x + refc_postfix
             try:
                 refc_data = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
-            #refc_data,salt = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
+
             except FileNotFoundError:
                 print('Missing (or misnamed) REFC Data Station: ' + x + '...filling with NaNs')
                 refc_data = pd.DataFrame()
@@ -1367,20 +1363,15 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             
             reft_data = reft_data.set_index(reft_data[index_col].values)
             
-            #refc_data = refc_data[refc_data[index_col] != 0]
-            #refc_data = refc_data.set_index(refc_data[index_col].values)
-            
             oxy_file = oxy_prefix + x + oxy_postfix
             oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
             
             #Horizontally concat DFs to have all data in one DF
             btl_data_full = pd.concat([btl_data,reft_data,refc_data,oxy_data],axis=1)
-#            btl_data_full = pd.concat([btl_data,oxy_data],axis=1)
             
-#            reft_data = load_reft_data(reft_file,index_name = 'index_memory') LOad Reft
-#LOad Refc
-#fix indicies btl_146=btl_146.set_index(btl_146['btl_fire_num'].values)
-#concat
+            #Drop columns that have no CTD data
+            btl_data_full = btl_data_full.dropna(subset=cols)
+            
             try:
                 df_data_all = pd.concat([df_data_all,btl_data_full])
             except AssertionError:
@@ -1397,10 +1388,9 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             file = prefix + x + postfix
             time_data = load_time_data(file)
             time_data['SSSCC'] = str(x)
-#            time_data = fit_ctd.apply_pressure_offset(time_data,p_off)
             df_data_all = pd.concat([df_data_all,time_data])
             print('** Finished TIME data station: ' + x + ' **')
-            
+   
     df_data_all['master_index'] = range(len(df_data_all))
             
     return df_data_all
@@ -1507,9 +1497,9 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
 def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t_sensor=1,org='ODF'):
     
     btl_columns = ['EXPOCODE','SECT_ID','STNNBR','CASTNO','SAMPNO','BTLNBR','BTLNBR_FLAG','DATE','TIME','LATITUDE','LONGITUDE','DEPTH',
-                   'CTDPRS','CTDTMP','REFTMP','REFTMP_FLAG','CTDSAL','CTDSAL_FLAG','SALNTY','SALNTY_FLAG','SALTREF','SALTREF_FLAG',
+                   'CTDPRS','CTDTMP','REFTMP','REFTMP_FLAG','CTDSAL','CTDSAL_FLAG','SALNTY','SALNTY_FLAG',
                    'CTDOXY','CTDOXY_FLAG','OXYGEN','OXYGEN_FLAG']
-    btl_units = ['','','','','','','','','','','','METERS','DBARS','ITS-90','C','','PSS-78','','PSS-78','','G/KG','','UMOL/KG','','UMOL/KG','']
+    btl_units = ['','','','','','','','','','','','METERS','DBARS','ITS-90','C','','PSS-78','','PSS-78','','UMOL/KG','','UMOL/KG','']
     
     btl_data = df.copy()
     
@@ -1547,6 +1537,8 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     
     btl_data = btl_data[btl_columns]
     btl_data = btl_data.round(4)
+    
+    btl_data = btl_data.fillna(value=-999)
     
     
     now = datetime.datetime.now()
