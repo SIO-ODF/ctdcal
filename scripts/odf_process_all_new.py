@@ -11,21 +11,10 @@ import subprocess
 import time
 import sys
 import configparser
-import sys
 sys.path.append('ctdcal/')
-import oxy_fitting
-
-import scipy
-import numpy as np
 import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
-import ctdcal.sbe_reader as sbe_rd
-import ctdcal.sbe_equations_dict as sbe_eq
-import gsw
-import pandas as pd
-import oxy_fitting
-import csv
-import matplotlib.pyplot as plt
+
 
 def process_all_new():
 
@@ -270,11 +259,22 @@ def process_all_new():
 #    
 #   ##########################################################################
 
-    # Clean and export data
-#     ### THIS STILL NEEDS TO BE TESTED
-#    process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
-#    cruise_line = 'P06'
-#    process_ctd.export_btl_data(btl_data_all,expocode,sectionID,cruise_line)
+################ Clean and export data #######################
+
+### Export Quality Flags
+    
+    qual_flag_temp.to_csv('data/logs/qual_flag_temp_new.csv',index=False)
+    qual_flag_cond.to_csv('data/logs/qual_flag_cond_new.csv',index=False)
+
+### Create CT Files(oxygen done by hand)
+    
+    btl_data_all['OXYGEN'] = -999
+    btl_data_all['OXYGEN'] = -999
+    
+    process_ctd.export_btl_data(btl_data_all,expocode,sectionID,expocode)
+    process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
+    
+    
 
 
 def main(argv):

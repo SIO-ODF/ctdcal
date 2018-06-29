@@ -6,21 +6,17 @@ Created on Mon Jan  8 10:04:19 2018
 @author: k3jackson
 """
 
-#import sys
-#sys.path.append('/Users/k3jackson/p06e/ctd_proc')
-#sys.path.append('/Users/k3jackson/odf-ctd-proc/ctdcal/')
-#import matplotlib
-#matplotlib.use('TkAgg')
-#import matplotlib.pyplot as plt
+
 import scipy
 import numpy as np
+import sys
+sys.path.append('ctdcal/')
 import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 import pandas as pd
-import oxy_fitting
 import csv
 
 #Line 342 module isopycnals
@@ -228,15 +224,15 @@ def calculate_bottle_oxygen(df,ssscc,ssscc_col='SSSCC',vol_col='FLASK_VOL',titr_
     
 
     
-    params = oxy_fitting.gather_all_oxy_params(ssscc)
+    params = gather_all_oxy_params(ssscc)
     
-    df = oxy_fitting.thio_n_calc(df,params)
+    df = thio_n_calc(df,params)
     
-    df[titr_col] = oxy_fitting.titr_20_calc(df['TITR_VOL'],df['TITR_TEMP'])
+    df[titr_col] = titr_20_calc(df['TITR_VOL'],df['TITR_TEMP'])
     
-    flask_df = oxy_fitting.flask_load()
+    flask_df = flask_load()
     
-    df = oxy_fitting.match_flask(df,flask_df,t=df[d_temp])
+    df = match_flask(df,flask_df,t=df[d_temp])
     
     params = params.loc[df[ssscc_col]]
     params = params.apply(pd.to_numeric)    
@@ -270,7 +266,7 @@ def calibrate_oxygen(df_time,df_btl,ssscc,method=3,raw_dir='data/raw/'):
         
         time_data = df_time[df_time['SSSCC'] == x]
         btl_data = df_btl[df_btl['SSSCC'] == x]
-        coef = oxy_fitting.oxy_fit(time_data,btl_data,x,hexfile,xmlfile,method=method)
+        coef = oxy_fit(time_data,btl_data,x,hexfile,xmlfile,method=method)
         #btl_data_write, btl_data_fit = oxy_fitting.oxy_fit(time_data,btl_data,x,hexfile,xmlfile,method=method)
         print('COMPLETED SSSCC:',x)
         #dataframe_concat = pd.concat([dataframe_concat,btl_data_fit])
@@ -596,7 +592,7 @@ def interpolate_param(param):
 
 def least_squares_resid(coef0,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):
     
-    coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef0,
+    coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef0,
                                      args=(oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch))
     return coef
 
@@ -1011,7 +1007,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     time_data_matched['weights'] = wgt(time_data_matched['CTDPRS_y'])
     
 #   Least Squares fitting to determine new coefficients   
-    coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef0,
+    coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef0,
                                      args=(time_data_matched,btl_data_clean,
                                            method))
 
@@ -1089,7 +1085,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
                 / (time_data_matched['TEMPERATURE_CTD'] + 273.15))   
                 
 #       Recalculate coeficients 
-        coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef,
+        coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef,
                                          args=(time_data_matched,btl_data_clean,
                                                method))
         

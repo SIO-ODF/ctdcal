@@ -1044,6 +1044,7 @@ def combine_quality_flags(df_sens1,df_sens2,df_ref):
     # Outdated
     #combined_df = combined_df.rename_axis({'btl_fire_num':'Bottle', 'CTDPRS':'Pressure', 'primary_diff':'Primary_Diff','secondary_diff':'Secondary_Diff'}, axis='columns')
     
+    combined_df = combined_df.round(4)
     
     return combined_df
     
