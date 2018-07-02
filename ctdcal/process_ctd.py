@@ -1370,8 +1370,8 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             #Horizontally concat DFs to have all data in one DF
             btl_data_full = pd.concat([btl_data,reft_data,refc_data,oxy_data],axis=1)
             
-            #Drop columns that have no CTD data
-            btl_data_full = btl_data_full.dropna(subset=cols)
+#            #Drop columns that have no CTD data
+#            btl_data_full = btl_data_full.dropna(subset=cols)
             
             try:
                 df_data_all = pd.concat([df_data_all,btl_data_full])
