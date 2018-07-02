@@ -793,6 +793,7 @@ def load_btl_data(btl_file,cols=None):
     
     return btl_data
 
+
 def load_time_data(time_file):
     
     time_data = dataToNDarray(time_file,float,True,',',1)
@@ -1563,7 +1564,7 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     f.close()
     
     outfile = open(out_dir+cruise_line+'_hy1.csv', "a")    
-    outfile.write('\n')
+#    outfile.write('\n')
     outfile.write('END_DATA')
     outfile.close()
     

@@ -265,8 +265,13 @@ def process_all_new():
     
     qual_flag_temp.to_csv('data/logs/qual_flag_temp_new.csv',index=False)
     qual_flag_cond.to_csv('data/logs/qual_flag_cond_new.csv',index=False)
+    
+### Clean up Bottle Data by removing rows with no ctd data
+    
+    btl_data_all =  btl_data_all.dropna(subset=cols)
 
 ### Create CT Files(oxygen done by hand)
+    
     
     btl_data_all['OXYGEN'] = -999
     btl_data_all['OXYGEN'] = -999
