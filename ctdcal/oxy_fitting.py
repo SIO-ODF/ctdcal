@@ -64,13 +64,13 @@ def oxy_loader(oxyfile):
     
     df['SSSCC_OXY'] = df['STNNO']+'0'+df['CASTNO']
     
-    # Reindex dataframe to have 36 places
-    DF = pd.DataFrame(data=np.arange(1,37),columns=['BOTTLENO_OXY'],index=range(1,37))
-    DF = DF.merge(df,on="BOTTLENO_OXY",how='outer')
-    DF = DF.set_index(np.arange(1,37))
+#    # Reindex dataframe to have 36 places
+#    DF = pd.DataFrame(data=np.arange(1,37),columns=['BOTTLENO_OXY'],index=range(1,37))
+#    DF = DF.merge(df,on="BOTTLENO_OXY",how='outer')
+#    DF = DF.set_index(np.arange(1,37))
 
     
-    return DF ,params
+    return df ,params #DF
 
 def flask_load(flaskfile='data/oxygen/o2flasks.vol',skip_rows=12):
     """Load information from flask.vol file
