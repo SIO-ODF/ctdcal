@@ -532,7 +532,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     # Remove standard measurements
     cond = cond[(cond['autosalSAMPNO']!='worm')]
     if all(cond['autosalSAMPNO'].values.astype(int) != cond['SAMPNO'].values.astype(int)):
-        raise ValueError('Problem with sample numbers in salt file (check file: '+ saltpath + ')')
+        raise ValueError('Mismatched sample numbers in salt file (check file: '+ saltpath + ')')
     cond = cond.drop('autosalSAMPNO',axis=1)
     cond = cond.apply(pd.to_numeric) # For some reason doesn't completely work the first time
     #cond = cond[(cond['SAMPNO']!=0) & (cond['SAMPNO']!=99)]
@@ -546,21 +546,15 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     except ValueError:
         print('Possible mis-entered information in salt file (Check salt file)')
         raise ValueError
-        #data = btl_data[btl_data[btl_num_col].isin(cond['SAMPNO'].tolist())]
-        #salinity = SP_salinometer((cond['CRavg']/2.0),cond['BathTEMP'])
-        #cond['BTLCOND'] = gsw.C_from_SP(salinity,data[btl_tmp_col],data[btl_p_col])
-        # Drop and rename autosalSAMPNO
-        #cond = cond.drop('autosalSAMPNO',1)
-        #cond = cond.rename(columns={'SAMPNO':'autosalSAMPNO'})
-    # Create 36-place DF
-    cond
-    DF = pd.DataFrame(data=np.arange(1,37),columns=['SAMPNO'],index=range(1,37))
-    # Merge
-    DF = DF.merge(cond,on="SAMPNO",how='outer')
-    DF = DF.set_index(np.arange(1,37))
+
+#    # Create 36-place DF
+#    DF = pd.DataFrame(data=np.arange(1,37),columns=['SAMPNO'],index=range(1,37))
+#    # Merge
+#    DF = DF.merge(cond,on="SAMPNO",how='outer')
+#    DF = DF.set_index(np.arange(1,37))
     
     
-    return DF
+    return cond#DF
     
 def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
 
