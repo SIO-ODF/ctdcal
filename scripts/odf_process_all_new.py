@@ -143,7 +143,7 @@ def process_all_new():
     # Determine Pressure offset from logs
     
     pressure_log = process_ctd.load_pressure_logs(p_log_file)
-    p_off = process_ctd.get_pressure_offset(pressure_log)
+    p_off = process_ctd.get_pressure_offset(pressure_log.ondeck_start_p,pressure_log.ondeck_end_p)
     
     btl_data_all = fit_ctd.apply_pressure_offset(btl_data_all,p_off)
     time_data_all = fit_ctd.apply_pressure_offset(time_data_all,p_off)

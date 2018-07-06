@@ -1242,12 +1242,26 @@ def prepare_all_fit_data(ssscc,df,ref_data,param):
     return data_concat
               
 
-def get_pressure_offset(df,start_col='ondeck_start_p',end_col='ondeck_end_p'):
+def get_pressure_offset(start_vals,end_vals):
     """Finds unique values and calclates mean for pressure offset
+            
+    Parameters
+    ----------
+    
+    start_vals :array_like
+                Array containing initial ondeck pressure values
+           
+    end_vals :array_like
+              Array containing ending ondeck pressure values
+    Returns
+    -------
+    
+    p_off : float
+         Average pressure offset
     
     """
-    p_start = pd.Series(np.unique(df[start_col]))
-    p_end = pd.Series(np.unique(df[end_col]))
+    p_start = pd.Series(np.unique(start_vals))
+    p_end = pd.Series(np.unique(end_vals))
     p_start = p_start[p_start.notnull()]
     p_end = p_end[p_end.notnull()]
     p_off = p_start.mean() - p_end.mean()
@@ -1280,6 +1294,7 @@ def load_pressure_logs(file):
     
     df : DataFrame
          Pandas DataFrame containing ondeck start and end pressure values
+         
     """
     
     df = pd.read_csv(file,names=['SSSCC','ondeck_start_p','ondeck_end_p'])
