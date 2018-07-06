@@ -752,34 +752,11 @@ def load_reft_data(reft_file,index_name = 'btl_fire_num'):
     
     return reft_data
 
-def collect_all_reft(ssscc,reft_prefix='data/reft/',reft_postfix='_reft.csv'):
-    
-    
-    reft_all = pd.DataFrame()
-    for x in ssscc:
-        reft_file = reft_prefix + x + reft_postfix
-        reft_data = load_reft_data(reft_file)
-        reft_all = pd.concat([reft_all,reft_data])
-        
-    return reft_all
-
-def collect_all_refc(ssscc,df,refc_prefix='data/salt/',refc_postfix='',index_col='btl_fire_num',
-                     t_col='CTDTMP1',p_col='CTDPRS',ssscc_col='SSSCC'):
-    
-    refc_all = pd.DataFrame()
-    for x in ssscc:
-        btl_data = df[df[ssscc_col]==x]
-        refc_file = refc_prefix + x + refc_postfix
-        refc_data,salt = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
-        refc_data['SSSCC'] = x
-        refc_all = pd.concat([refc_all,refc_data])
-        
-    return refc_all
     
     
 def load_btl_data(btl_file,cols=None):
     
-    """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.csv'"""
+    """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.pkl'"""
     
     btl_data = dataToNDarray(btl_file,float,True,',',0) 
     
@@ -1289,6 +1266,21 @@ def get_pressure_offset(df,start_col='ondeck_start_p',end_col='ondeck_end_p'):
     return p_off
 
 def load_pressure_logs(file):
+    """
+        Loads pressure offset file from logs.
+        
+    Parameters
+    ----------
+    
+    file : string
+           Path to ondeck_pressure log
+         
+    Returns
+    -------
+    
+    df : DataFrame
+         Pandas DataFrame containing ondeck start and end pressure values
+    """
     
     df = pd.read_csv(file,names=['SSSCC','ondeck_start_p','ondeck_end_p'])
     
@@ -1299,6 +1291,7 @@ def load_pressure_logs(file):
         df['ondeck_end_p'][i] = float(df['ondeck_end_p'].loc[i][14:])
         
     return df
+
 def write_offset_file(df,p_off,write_file='data/logs/poffset_test.csv'):
     """
     
