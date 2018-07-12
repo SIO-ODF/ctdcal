@@ -801,8 +801,7 @@ def calibrate_temperature(df,order,calib_param,sensor,xRange=None,coef=[],
  
         
     diff = 'd_'+postfix #Difference between ref and prim sensor
-    #d_2 = 'd_t2' #Difference between ref and second sensor
-    #d_12 = 'd_t1_t2' #Difference between prim and sec sensor
+
     
     # Calculate absolute differences between sensors and reference thermom
     
@@ -817,10 +816,6 @@ def calibrate_temperature(df,order,calib_param,sensor,xRange=None,coef=[],
     
     df['P-S'] = df[t_col_1] - df[t_col_2]
     
-    #df['d_t2'] = reft_data[reft_col] - df[t_col_2]
-   
-    #df['d_t1_t2'] = df[t_col_1] - df[t_col_2]
-
     
     #split dataframes by pressure ranges
     
@@ -828,9 +823,6 @@ def calibrate_temperature(df,order,calib_param,sensor,xRange=None,coef=[],
     lower_lim = 2000
     upper_lim = df[p_col].max()
     threshold = 0.002
-    
-#    df_deep_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-#    df_deep_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
     
     df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
@@ -842,9 +834,6 @@ def calibrate_temperature(df,order,calib_param,sensor,xRange=None,coef=[],
     upper_lim = 2000
     threshold = 0.005
     
-#    df_lmid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-#    df_lmid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
-    
     df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
     df_lmid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
@@ -854,9 +843,6 @@ def calibrate_temperature(df,order,calib_param,sensor,xRange=None,coef=[],
     upper_lim = 1000
     threshold = 0.010
     
-#    df_umid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-#    df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
-    
     df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
     df_umid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
@@ -865,9 +851,6 @@ def calibrate_temperature(df,order,calib_param,sensor,xRange=None,coef=[],
     lower_lim = df[p_col].min() - 1
     upper_lim = 500
     threshold = 0.020
-
-#    df_shal_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-#    df_shal_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
     
     df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
@@ -913,54 +896,35 @@ def calibrate_temperature(df,order,calib_param,sensor,xRange=None,coef=[],
         x1 = df_good[t_col].max()
         
         df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
-    # Determine fitting ranges    
-    #fit = np.arange(x0,x1,(x1-x0)/50)   
+        
     cf1 = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
-#    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
     
-   
     sensor = '_t'+str(sensor)
     if len(coef) == 0:#if not coef:
         coef = np.zeros(shape=5)
-#    coef2 = np.zeros(shape=5)
+
     
     if order is 0:
         coef[4] = cf1[0]
         
-#        coef2[4] = cf2[0]
-        
     elif (order is 1) and (calib_param == 'P'):
         coef[1] = cf1[0]
         coef[4] = cf1[1]
-        
-#        coef2[1] = cf2[0]
-#        coef2[4] = cf2[1]
         
     elif (order is 2) and (calib_param == 'P'):
         coef[0] = cf1[0]
         coef[1] = cf1[1]
         coef[4] = cf1[2]
         
-#        coef2[0] = cf2[0]
-#        coef2[1] = cf2[1]
-#        coef2[4] = cf2[2]
     elif (order is 1) and (calib_param == 'T'):
         coef[3] = cf1[0]
         coef[4] = cf1[1]
         
-#        coef2[3] = cf2[0]
-#        coef2[4] = cf2[1]
     elif (order is 2) and (calib_param == 'T'):
         coef[2] = cf1[0]
         coef[3] = cf1[1]
         coef[4] = cf1[2]
     
-#        coef2[2] = cf2[0]
-#        coef2[3] = cf2[1]
-#        coef2[4] = cf2[2]
-        
-#    Y = fit_ctd.conductivity_polyfit(coef, fit, fit, np.full(len(fit), 0.0))
-#
 #
 #    fitfile = str('fitting'+sensor+'.' + FILE_EXT)
 #    fitfilePath = os.path.join(log_directory, fitfile)
@@ -1243,7 +1207,8 @@ def prepare_all_fit_data(ssscc,df,ref_data,param):
               
 
 def get_pressure_offset(start_vals,end_vals):
-    """Finds unique values and calclates mean for pressure offset
+    """
+    Finds unique values and calclates mean for pressure offset
             
     Parameters
     ----------
@@ -1256,9 +1221,9 @@ def get_pressure_offset(start_vals,end_vals):
     Returns
     -------
     
-    p_off : float
+    p_off :float
          Average pressure offset
-    
+         
     """
     p_start = pd.Series(np.unique(start_vals))
     p_end = pd.Series(np.unique(end_vals))
@@ -1325,6 +1290,7 @@ def pressure_calibrate(file):
     p_off = get_pressure_offset(pressure_log)
     
     return p_off
+
     
 def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/',reft_postfix='_reft.csv',
                        refc_prefix='data/salt/',refc_postfix='',press_file='data/logs/ondeck_pressure.csv',
@@ -1388,7 +1354,7 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             
 #            #Drop columns that have no CTD data
 #            btl_data_full = btl_data_full.dropna(subset=cols)
-            btl_data = btl_data.set_index(['SSSCC','GPSLAT','GPSLON','CTDPRS'],drop=True)
+            #btl_data = btl_data.set_index(['SSSCC','GPSLAT','GPSLON','CTDPRS'],drop=True)
             try:
                 df_data_all = pd.concat([df_data_all,btl_data])
             except AssertionError:

@@ -697,11 +697,29 @@ def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CT
     
     return df
 
-def apply_pressure_offset(df,p_off,p_col='CTDPRS'):
+def apply_pressure_offset(press,p_off):
+    """
+    Applies pressure offset to pressure data
+            
+    Parameters
+    ----------
     
-    df[p_col] = offset(p_off, df[p_col])
-#    df[p_col] = np.around(df[p_col],decimals=3)
-    return df
+    press :array_like
+            Array containing pressure values
+           
+    p_off :float
+            Array containing ending ondeck pressure values
+    Returns
+    -------
+    
+    new_press :array_like
+                Offset pressure data
+       
+    """
+    
+    new_press = press + p_off
+
+    return new_press
   
 ##
 #            key = (station, cast, bottle, "o2")
