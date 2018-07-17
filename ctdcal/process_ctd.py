@@ -779,198 +779,253 @@ def load_time_data(time_file):
     return time_data
 
 
-def calibrate_temperature(df,order,calib_param,sensor,xRange=None,coef=[],
-                          t_col_1 = 'CTDTMP1', t_col_2='CTDTMP2', reft_col = 'T90',
-                          p_col = 'CTDPRS'):# reft_data,
-    
-    if sensor == 1:
-        postfix = 't1'
-        t_col = 'CTDTMP1'
-    elif sensor ==2:
-        postfix = 't2'
-        t_col = 'CTDTMP2'
-    else:
-        print('No sensor name supplied, difference column name will be: diff')
-    
-    if calib_param == 'P':
-        calib_col = p_col
-    elif calib_param == 'T':
-        calib_col = t_col
-    else:
-        print('No calib_param supplied')
+def calibrate_temperature(param,ref_param,press,calib,order,xRange=None,coef=[]):# reft_data,
+### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION    
+#    if sensor == 1:
+#        postfix = 't1'
+#        t_col = 'CTDTMP1'
+#    elif sensor ==2:
+#        postfix = 't2'
+#        t_col = 'CTDTMP2'
+#    else:
+#        print('No sensor name supplied, difference column name will be: diff')
+#    
+#    if calib_param == 'P':
+#        calib_col = p_col
+#    elif calib_param == 'T':
+#        calib_col = t_col
+#    else:
+#        print('No calib_param supplied')
  
-        
-    diff = 'd_'+postfix #Difference between ref and prim sensor
-
+    df_good = quality_check(param,ref_param,press,find='good')
+    df_ques = quality_check(param,ref_param,press,find='quest')
     
-    # Calculate absolute differences between sensors and reference thermom
+    df_ques['Parameter'] = param.name
     
-    #df[diff] = reft_data[reft_col] - df[t_col]
-    df[diff] = df[reft_col] - df[t_col]
- 
-    #df['primary_diff'] = reft_data[reft_col] - df[t_col_1]
-    df['primary_diff'] = df[reft_col] - df[t_col_1]
-    
-    #df['secondary_diff'] = reft_data[reft_col] - df[t_col_2]
-    df['secondary_diff'] = df[reft_col] - df[t_col_2]
-    
-    df['P-S'] = df[t_col_1] - df[t_col_2]
-    
-    
-    #split dataframes by pressure ranges
-    
-    #Greater than 2000 dBar
-    lower_lim = 2000
-    upper_lim = df[p_col].max()
-    threshold = 0.002
-    
-    df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_deep_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-       
-    
-    #Between 2000 and 1000
-    lower_lim = 1000
-    upper_lim = 2000
-    threshold = 0.005
-    
-    df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_lmid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-    
-    #Between 1000 and 500
-    lower_lim = 500
-    upper_lim = 1000
-    threshold = 0.010
-    
-    df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_umid_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-    
-    #Less than 500
-    lower_lim = df[p_col].min() - 1
-    upper_lim = 500
-    threshold = 0.020
-    
-    df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_shal_reft = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-    
-    #concat dataframes into two main dfs
-    df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
-    df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
-    df_reft = pd.concat([df_deep_reft,df_lmid_reft,df_umid_reft,df_shal_reft])
-    
-    #Use reft dataframe to recover misinterpreted values:
-    
-    #Add csv information to dataframes:
-    
-    if sensor == 1:
-        df_ques['Parameter'] = 'T1'
-        df_ques['Flag'] = 3
-        
-        df_reft['Parameter'] = 'T'
-        df_reft['Flag'] = 3
-        
-    elif sensor == 2:
-        df_ques['Parameter'] = 'T2'  
-        df_ques['Flag'] = 3
-        
-        df_reft['Flag'] = 3
-           
-    
+               
     #report questionable data to a csv file
     
-    #constrain dataframes to within limits of xRange
+    #constrain pressure to within limits of xRange
     
     if xRange != None:
         x0 = int(xRange.split(":")[0])
         x1 = int(xRange.split(":")[1])
         
-        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
+        df_good_cons = df_good[(df_good[press.name] >= x0) & (df_good[press.name] <= x1)]
      
          
     else:
         #Take full range of temperature values
-        x0 = df_good[t_col].min()
-        x1 = df_good[t_col].max()
+        x0 = df_good[param.name].min()
+        x1 = df_good[param.name].max()
         
-        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
+        df_good_cons = df_good[(df_good[param.name] >= x0) & (df_good[param.name] <= x1)]
         
-    cf1 = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
-    
-    sensor = '_t'+str(sensor)
-    if len(coef) == 0:#if not coef:
-        coef = np.zeros(shape=5)
-
-    
-    if order is 0:
-        coef[4] = cf1[0]
+    if 'P' in calib:    
+        coef = get_param_coef(df_good_cons[press.name],df_good_cons['Diff'],order,calib)
+    elif 'T' or 'C' in calib:
+        coef = get_param_coef(df_good_cons[param.name],df_good_cons['Diff'],order,calib)
+    else:
+        print('calib argument not valid, use CP TP T or C')
         
-    elif (order is 1) and (calib_param == 'P'):
-        coef[1] = cf1[0]
-        coef[4] = cf1[1]
-        
-    elif (order is 2) and (calib_param == 'P'):
-        coef[0] = cf1[0]
-        coef[1] = cf1[1]
-        coef[4] = cf1[2]
-        
-    elif (order is 1) and (calib_param == 'T'):
-        coef[3] = cf1[0]
-        coef[4] = cf1[1]
-        
-    elif (order is 2) and (calib_param == 'T'):
-        coef[2] = cf1[0]
-        coef[3] = cf1[1]
-        coef[4] = cf1[2]
-    
+#    if calib == 'P':   
+#        cf1 = np.polyfit(df_good_cons[press.name], df_good_cons['Diff'], order)
+#    else:
+#        cf1 = np.polyfit(df_good_cons[param.name], df_good_cons['Diff'], order)
+#        
 #
-#    fitfile = str('fitting'+sensor+'.' + FILE_EXT)
-#    fitfilePath = os.path.join(log_directory, fitfile)
-#    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
+#    if 'T' in calib:
+#        if len(coef) == 0:#if not coef:
+#            coef = np.zeros(shape=5)
+#    
+#        if order is 0:
+#            coef[4] = cf1[0]
+#        
+#        elif (order is 1) and (calib == 'TP'):
+#            coef[1] = cf1[0]
+#            coef[4] = cf1[1]
+#        
+#        elif (order is 2) and (calib == 'TP'):
+#            coef[0] = cf1[0]
+#            coef[1] = cf1[1]
+#            coef[4] = cf1[2]
+#        
+#        elif (order is 1) and (calib == 'T'):
+#            coef[3] = cf1[0]
+#            coef[4] = cf1[1]
+#        
+#        elif (order is 2) and (calib == 'T'):
+#            coef[2] = cf1[0]
+#            coef[3] = cf1[1]
+#            coef[4] = cf1[2]
+#            
+#    if 'C' in calib:
+#        coef = np.zeros(shape=7)
+#        if order is 0:
+#            coef[6] = cf1[0]
+#        elif (order is 1) and (calib == 'CP'):
+#            coef[1] = cf1[0]
+#            coef[6] = cf1[1]
+#        elif (order is 2) and (calib == 'CP'):
+#            coef[0] = cf1[0]
+#            coef[1] = cf1[1]
+#            coef[6] = cf1[2]
+#        elif (order is 1) and (calib == 'C'):
+#            coef[5] = cf1[0]
+#            coef[6] = cf1[1]
+#        elif (order is 2) and (calib == 'C'):
+#            coef[4] = cf1[0]
+#            coef[5] = cf1[1]
+#            coef[6] = cf1[2]
+#    
+##
+##    fitfile = str('fitting'+sensor+'.' + FILE_EXT)
+##    fitfilePath = os.path.join(log_directory, fitfile)
+##    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
         
-    return coef,df_ques,df_reft
+    return coef,df_ques#,df_reft
     
-def quality_check(df,diff,lower_lim,upper_lim,threshold,find='good',
-                  col_name = 'CTDPRS',P_S = 'P-S',d_1 = 'primary_diff',
-                  d_2 = 'secondary_diff'):#
-    
-    #Choose Data range to compare with
-    df_range = df[(df[col_name] > lower_lim) & (df[col_name] <= upper_lim)]
+def quality_check(param,param_2,press,find,thresh=[0.002, 0.005, 0.010, 0.020]):
+        #df,diff,lower_lim,upper_lim,threshold,find='good',
+        #          col_name = 'CTDPRS',P_S = 'P-S',d_1 = 'primary_diff',
+        #          d_2 = 'secondary_diff'):#
     
     
+    param = pd.Series(param)
+    param.reset_index(drop=True,inplace=True)
+    
+    param_2 = pd.Series(param_2)
+    param_2.reset_index(drop=True,inplace=True)
+    
+    press = pd.Series(press)
+    press.reset_index(drop=True,inplace=True)
+    
+#    ref_param = pd.Series(ref_param)
+#    ref_param.reset_index(drop=True,inplace=True)
+    
+    diff = param - param_2
+    
+    df = pd.concat([param.rename('Param_1'),param_2.rename('Param_2'),press.rename('CTDPRS'),diff.rename('Diff')],axis=1)
+    #df = pd.concat([param,param_2,ref_param],axis=1)
+    
+    
+#    df.primary_diff = ref_param - param
+#    df.secondary_diff = ref_param - param_2
+#    df.P_S = param - param_2
+    
+    
+  
     if find == 'good':
     # Find data values for each sensor that are below the threshold (good)
+        df['Flag'] = 1
+        #df_range_comp = df_range[(df_range[diff].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
+        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() < thresh[0]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() < thresh[1]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() < thresh[2]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() < thresh[3]), 'Flag'] = 2
+#
+        # Filter out bad values
         
-        df_range_comp = df_range[(df_range[diff].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
+        df = df[df['Flag'] == 2]
     
     elif find == 'quest':
     # Find data values for each sensor that are above the threshold (questionable)
         
-        df_range_comp = df_range[(df_range[diff].abs() > threshold)]# | (df_range[d_2].abs() > threshold) | (df_range[d_12].abs() > threshold)]
-        
-    elif find == 'ref':
-    # Find data points for that are questionable reference values
-        
-        #Original Logic:
-        df_range_comp = df_range[(df_range[P_S].abs() > threshold)]
+    #    df_range_comp = df_range[(df_range[diff].abs() > threshold)]# | (df_range[d_2].abs() > threshold) | (df_range[d_12].abs() > threshold)]
     
-        #JACKSON THINKS THIS IS THE BETTER LOGIC:
-        #df_range_comp = df_range[(df_range[d_1].abs() > threshold) & (df_range[d_2].abs() > threshold) & (df_range[P_S].abs() < threshold)] JACKSON THINKS THIS IS THE BETTER LOGIC!
+        df['Flag'] = 1
+        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() > thresh[0]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() > thresh[1]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() > thresh[2]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() > thresh[3]), 'Flag'] = 3
         
-        #abs(d12) < 0.010:
+        # Filter out good values
+        
+        df = df[df['Flag'] == 3]
+       
+#    elif find == 'ref':
+#    # Find data points for that are questionable reference values
+#        
+#        #Original Logic:
+#        df_range_comp = df_range[(df_range[P_S].abs() > threshold)]
+#    
+#        #JACKSON THINKS THIS IS THE BETTER LOGIC:
+#        #df_range_comp = df_range[(df_range[d_1].abs() > threshold) & (df_range[d_2].abs() > threshold) & (df_range[P_S].abs() < threshold)] JACKSON THINKS THIS IS THE BETTER LOGIC!
+#        
+#        #abs(d12) < 0.010:
    
     else:
-        print('Find argument not valid, please enter "good" or "quest" or "ref" to find good or questionable values')
+        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
+
+    # Rename Columns back to what they were
     
+    if param.name != None:
+        df.rename(columns = {'Param_1' : param.name}, inplace=True)
+    
+    if param_2.name != None:
+        df.rename(columns = {'Param_2' : param_2.name},inplace=True)
+    
+    if press.name != None:
+        df.rename(columns = {'CTDPRS' : press.name}, inplace=True )
+        
     #concatenate dataframe to merge all values together
 #    df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
         
     # Remove duplicate values
-    df_range_comp = df_range_comp.drop_duplicates(subset=[col_name],keep='first')
+#    df_range_comp = df_range_comp.drop_duplicates(subset=[col_name],keep='first')
     
-    return df_range_comp
+    return df#_range_comp
+
+def get_param_coef(calib_param,diff,order,calib):
+    
+       
+    cf1 = np.polyfit(calib_param, diff, order)
+        
+
+    if 'T' in calib:
+        coef = np.zeros(shape=5)
+    
+        if order is 0:
+            coef[4] = cf1[0]
+        
+        elif (order is 1) and (calib == 'TP'):
+            coef[1] = cf1[0]
+            coef[4] = cf1[1]
+        
+        elif (order is 2) and (calib == 'TP'):
+            coef[0] = cf1[0]
+            coef[1] = cf1[1]
+            coef[4] = cf1[2]
+        
+        elif (order is 1) and (calib == 'T'):
+            coef[3] = cf1[0]
+            coef[4] = cf1[1]
+        
+        elif (order is 2) and (calib == 'T'):
+            coef[2] = cf1[0]
+            coef[3] = cf1[1]
+            coef[4] = cf1[2]
+            
+    if 'C' in calib:
+        coef = np.zeros(shape=7)
+        if order is 0:
+            coef[6] = cf1[0]
+        elif (order is 1) and (calib == 'CP'):
+            coef[1] = cf1[0]
+            coef[6] = cf1[1]
+        elif (order is 2) and (calib == 'CP'):
+            coef[0] = cf1[0]
+            coef[1] = cf1[1]
+            coef[6] = cf1[2]
+        elif (order is 1) and (calib == 'C'):
+            coef[5] = cf1[0]
+            coef[6] = cf1[1]
+        elif (order is 2) and (calib == 'C'):
+            coef[4] = cf1[0]
+            coef[5] = cf1[1]
+            coef[6] = cf1[2]
+       
+    return coef
 
 def combine_quality_flags(df_sens1,df_sens2,df_ref):
     
@@ -996,7 +1051,7 @@ def combine_quality_flags(df_sens1,df_sens2,df_ref):
 def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
                            refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2',
                            p_col='CTDPRS'):#refc_data
-
+### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION    
     if sensor == 1:
         postfix = 'c1'
         cond_col = 'CTDCOND1'
