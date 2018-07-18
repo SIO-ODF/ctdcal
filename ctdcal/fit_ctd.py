@@ -3,7 +3,6 @@ import math
 import scipy
 import numpy as np
 import pandas as pd
-#import ctdcal.process_ctd as process_ctd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 from scipy.optimize import leastsq
@@ -415,9 +414,9 @@ def conductivity_polyfit(df,coef,t_col,cond_col,p_col='CTDPRS'):
 #
 #    return t_arr
 
-def temperature_polyfit(df,coef,t_col,p_col='CTDPRS'):
+def temperature_polyfit(temp,press,coef):
     
-    fitted_temp = df[t_col] + coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) + coef[3] * df[t_col] + coef[4]
+    fitted_temp = temp + coef[0] * (press**2) + coef[1] * press + coef[2] * (temp**2) + coef[3] * temp + coef[4]
     fitted_temp = fitted_temp.round(4)
     
     return fitted_temp
@@ -559,6 +558,13 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
 def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
 
     ### Clean up to avoid runtimewarning ###
+    cond_ratio = process_ctd.array_like_to_series(cond_ratio)
+    bath_temp = process_ctd.array_like_to_series(bath_temp)
+    btl_temp = process_ctd.array_like_to_series(btl_temp)
+    btl_press = process_ctd.array_like_to_series(btl_press)
+    
+    
+    
     cond_df = cond_ratio.copy()
     bath_df = bath_temp.copy()
     nans = np.isnan(cond_df)
@@ -691,11 +697,15 @@ def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CT
     
         df[cond_col] = conductivity_polyfit(coef,df[p_col],df[t_col],
                                               df[cond_col])
-    
-    
-    
-    
+       
     return df
+    
+def array_like_to_series(array):
+    
+    series = pd.Series(array)
+    series.reset_index(drop=True,inplace=True)
+    
+    return series
 
 def apply_pressure_offset(press,p_off):
     """
