@@ -903,7 +903,7 @@ def quality_check(param,param_2,press,find,thresh=[0.002, 0.005, 0.010, 0.020]):
 #    ref_param = pd.Series(ref_param)
 #    ref_param.reset_index(drop=True,inplace=True)
     
-    diff = param - param_2
+    diff = param_2 - param
     
     df = pd.concat([param.rename('Param_1'),param_2.rename('Param_2'),press.rename('CTDPRS'),diff.rename('Diff')],axis=1)
     #df = pd.concat([param,param_2,ref_param],axis=1)
