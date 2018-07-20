@@ -378,12 +378,12 @@ def residualO2(calib, o2pl, P, K, T, S, V):
 #
 #    return c_arr
 
-def conductivity_polyfit(df,coef,t_col,cond_col,p_col='CTDPRS'):
+def conductivity_polyfit(cond,temp,press,coef):
 #    
-     fitted_cond = df[cond_col] + (coef[0] * (df[p_col]**2) + coef[1] * df[p_col] + coef[2] * (df[t_col]**2) \
-                    + coef[3] * df[t_col] + coef[4] * (df[cond_col]**2) + coef[5] * df[cond_col] + coef[6])
+     fitted_cond = cond + (coef[0] * (press**2) + coef[1] * press + coef[2] * (temp**2) \
+                    + coef[3] * temp + coef[4] * (cond**2) + coef[5] * cond + coef[6])
      fitted_cond = fitted_cond.round(4)
-     fitted_sal =  gsw.SP_from_C(fitted_cond,df[t_col],df[p_col])
+     fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
      return fitted_cond, fitted_sal
      
      
@@ -558,22 +558,25 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
 def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
 
     ### Clean up to avoid runtimewarning ###
-    cond_ratio = process_ctd.array_like_to_series(cond_ratio)
-    bath_temp = process_ctd.array_like_to_series(bath_temp)
-    btl_temp = process_ctd.array_like_to_series(btl_temp)
-    btl_press = process_ctd.array_like_to_series(btl_press)
+    cond_ratio = array_like_to_series(cond_ratio)
+    bath_temp = array_like_to_series(bath_temp)
+    btl_temp = array_like_to_series(btl_temp)
+    btl_press = array_like_to_series(btl_press)
+    
+    nans = np.isnan(cond_ratio)
+    bnans = np.isnan(bath_temp)
+    cond_ratio.loc[nans] = 0
+    bath_temp.loc[bnans] = 0    
+    
+#    cond_df = cond_ratio.copy()
+#    bath_df = bath_temp.copy()
+#    nans = np.isnan(cond_df)
+#    bnans = np.isnan(bath_df)
+#    cond_df.loc[nans] = 0
+#    bath_df.loc[bnans] = 0
     
     
-    
-    cond_df = cond_ratio.copy()
-    bath_df = bath_temp.copy()
-    nans = np.isnan(cond_df)
-    bnans = np.isnan(bath_df)
-    cond_df.loc[nans] = 0
-    bath_df.loc[bnans] = 0
-    
-    
-    salinity = SP_salinometer((cond_df / 2.0),bath_df)
+    salinity = SP_salinometer((cond_ratio / 2.0),bath_temp)
     cond = gsw.C_from_SP(salinity,btl_temp,btl_press)  
     
     cond[cond<=1] = np.nan
@@ -582,6 +585,8 @@ def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
     
     
     return cond
+
+
     
 ##    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
 #
