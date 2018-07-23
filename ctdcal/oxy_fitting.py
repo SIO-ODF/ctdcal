@@ -6,22 +6,689 @@ Created on Mon Jan  8 10:04:19 2018
 @author: k3jackson
 """
 
-import sys
-sys.path.append('/Users/k3jackson/p06e/ctd_proc')
-sys.path.append('/Users/k3jackson/odf-ctd-proc/ctdcal/')
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
+
 import scipy
 import numpy as np
-import libODF_process_ctd as process_ctd
-import libODF_sbe_reader as sbe_rd
-import libODF_sbe_equations_dict as sbe_eq
+import sys
+sys.path.append('ctdcal/')
+import ctdcal.process_ctd as process_ctd
+import ctdcal.fit_ctd as fit_ctd
+import ctdcal.sbe_reader as sbe_rd
+import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 import pandas as pd
-import oxy_fitting
+import csv
 
 #Line 342 module isopycnals
+
+def oxy_loader(oxyfile):
+    
+    f = open(oxyfile,newline='')
+    oxyF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
+    oxy_Array = []
+    
+    for row in oxyF:
+        if len(row) > 9:
+            row = row[:9]
+        oxy_Array.append(row)
+    
+    params = oxy_Array[0]
+    
+    del oxy_Array[0]
+        
+    header = ['STNNO','CASTNO','BOTTLENO_OXY','FLASKNO','TITR_VOL','TITR_TEMP','DRAW_TEMP','TITER_TIME','END_VOLTS']
+    
+    O2 = np.array(oxy_Array)
+    df = pd.DataFrame(O2,columns=header)
+    
+    f.close()
+    
+    df = df.apply(pd.to_numeric, errors='ignore')
+    
+    # Remove "Dummy Data"
+    #df['BOTTLENO_OXY'] = df['BOTTLENO_OXY'].astype(int,errors='ignore')
+    df = df[df['BOTTLENO_OXY']!=99]
+    
+    # Remove "ABORTED DATA"
+    
+    df = df[df['TITR_VOL'] > 0]
+    
+    # Sort and reindex
+    df = df.sort_values('BOTTLENO_OXY')
+    #df = df.reset_index()
+    
+    # Get necessary columns for output
+    df['STNNO'] = df['STNNO'].astype(str)
+    df['CASTNO'] = df['CASTNO'].astype(str)
+    df['FLASKNO']= df['FLASKNO'].astype(str)
+    
+    df['SSSCC_OXY'] = df['STNNO']+'0'+df['CASTNO']
+    
+#    # Reindex dataframe to have 36 places
+#    DF = pd.DataFrame(data=np.arange(1,37),columns=['BOTTLENO_OXY'],index=range(1,37))
+#    DF = DF.merge(df,on="BOTTLENO_OXY",how='outer')
+#    DF = DF.set_index(np.arange(1,37))
+
+    
+    return df ,params #DF
+
+def flask_load(flaskfile='data/oxygen/o2flasks.vol',skip_rows=12):
+    """Load information from flask.vol file
+    
+    """
+## Convert to Dataframe
+    with open(flaskfile, 'r') as f:
+        flasks = {}
+        for l in f:
+            if 'Volume' not in l:
+                if l.strip().startswith("#"):
+                    continue
+                row = l.strip().split()
+                flasks[str(row[0])] = float(row[1])
+                
+    flasks = pd.DataFrame.from_dict(flasks,orient='index')
+    flasks = flasks.rename(columns={0:'FLASK_VOL'})
+    flasks['FLASKNO'] = flasks.index.values
+    flasks = flasks[['FLASKNO','FLASK_VOL']]
+    return flasks
+    
+#    f = open(flaskfile,newline='')
+#    flaskF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
+#
+#    flask_array = []
+#    for row in flaskF:
+#        flask_array.append(row)
+#    
+#    f.close
+#    del flask_array[0:skip_rows]
+#    
+#    df = pd.DataFrame(flask_array)
+#    df['FLASKNO'] = df[0] 
+#    df['FLASK_VOL'] = df[1]
+#    df = df[['FLASKNO','FLASK_VOL']]
+#    df['FLASKNO'] = df['FLASKNO'].astype(float,errors='ignore')
+    
+#    return df
+
+def match_flask(df,flask_df,ssscc_col='SSSCC',vol_col='FLASK_VOL',num_col='FLASKNO',t=20, glass="borosilicate"):
+    ### THIS CODE MAY NEED AN ADAPTATION FOR A NON DF INPUT. E.G. PANDAS SERIES
+    
+    ### NOTE: LOOK AT ANDREW DICKSON'S SOP 13: GRAVIMETRIC CALIBRATION OF A VOLUME CONTAINED USING WATER!!!
+    ### These formulas/values may be out of date
+    _coef = {
+            "borosilicate": 0.00001,
+            "soft": 0.000025,
+            }
+    _t = 20
+    coef = _coef[glass]
+    merge_df = df.merge(flask_df,how='outer')
+    merge_df = merge_df[merge_df[ssscc_col].notnull()]
+    #merge_df = merge_df.reset_index()
+#    
+#    if isinstance(t,int):
+#        merge_df[vol_col] = merge_df[vol_col] * (1.0 + coef * (t - _t))
+#        
+#    elif isinstance(t,pd.core.series.Series):
+#        t.index = merge_df.index.values
+#        merge_df[vol_col] = merge_df[vol_col] * (1.0 + coef * (t - _t))
+    ### CHANGE TO A MERGE/JOIN FUNCTION
+#    flask_array = []
+#    for x in flask:
+#        if x != np.nan:
+#            #flask_vol = float(flask_df[vol_col][flask_df[num_col]==x].values[0])
+#            flask_vol = flask_df[vol_col][flask_df[num_col]==x]
+#            flask_vol = float(flask_vol[0].values[0])
+#        
+#            coef = _coef[glass]
+#            flask_vol = flask_vol * (1.0 + coef * (t - _t));
+#            flask_array.append(flask_vol)
+#        elif x ==np.nan:
+#            flask_array.append(np.nan)
+    merge_df = merge_df.sort_values(by='master_index')
+    merge_df = merge_df.set_index(df.index.values)    
+    
+    return merge_df
+
+def gather_oxy_params(oxyfile):
+
+    f = open(oxyfile,newline='')
+    oxyF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
+    oxy_Array = []
+    
+    for row in oxyF:
+        oxy_Array.append(row)
+    
+    f.close()
+    
+    params = oxy_Array[0]   
+    df = pd.DataFrame(params)
+    df = df.transpose() 
+    
+    df = df[[0,1,2,3,4,5]]
+    
+# If column names are needed later on for the parameters DF    
+#    cols = ['TITR','BLANK','KIO3_N','KIO3_V','KIO3_T','THIO_T']
+#    
+#    df.rename(columns={0:cols[0],1:cols[1],2:cols[2],3:cols[3],4:cols[4],5:cols[5]})
+    
+    return df
+
+def gather_all_oxy_params(ssscc,oxyfile_prefix='data/oxygen/',oxyfile_postfix=''):
+    
+    df_data_all = pd.DataFrame()
+    
+    for x in ssscc:
+        oxyfile = oxyfile_prefix + x + oxyfile_postfix
+        params = gather_oxy_params(oxyfile)
+        params['SSSCC'] = x
+        
+        df_data_all = pd.concat([df_data_all,params])
+        
+    df_data_all = df_data_all.reset_index()
+    df_data_all = df_data_all.set_index('SSSCC')
+    return df_data_all
+
+def thio_n_calc(df,params,ssscc_col='SSSCC',thio_col = 'thio_n'):#(titr, blank, kio3_n, kio3_v, kio3_t, thio_t):
+
+    params = params.loc[df[ssscc_col]]
+    params = params.apply(pd.to_numeric)
+    
+    titr   = params[0]
+    blank  = params[1]
+    kio3_n = params[2]
+    kio3_v = params[3]
+    kio3_t = params[4]
+    thio_t = params[5]
+    
+    rho_stp  = fit_ctd.rho_t(20)
+    rho_kio  = fit_ctd.rho_t(kio3_t)
+    rho_thio = fit_ctd.rho_t(thio_t)
+
+    kio3_v_20c = kio3_v * (rho_kio/rho_stp)
+    thio_v_20c = titr * (rho_thio/rho_stp) - blank
+
+    thio_n = kio3_v_20c * kio3_n / thio_v_20c
+    thio_n = pd.Series(thio_n.values,index=df.index.values)
+    df[thio_col] = thio_n
+    return df
+
+def titr_20_calc(titr, titr_temp):
+    rho_titr = fit_ctd.rho_t(titr_temp)
+    rho_stp = fit_ctd.rho_t(20)
+
+    #convert the titr ammount to 20c equivalent
+    titr_20c = titr * rho_titr/rho_stp
+    return titr_20c
+
+def calculate_bottle_oxygen(df,ssscc,ssscc_col='SSSCC',vol_col='FLASK_VOL',titr_temp_col='TITR_TEMP',titr_col='titr_20C',thio_n_col='thio_n',d_temp='DRAW_TEMP'):
+    
+
+    
+    params = gather_all_oxy_params(ssscc)
+    
+    df = thio_n_calc(df,params)
+    
+    df[titr_col] = titr_20_calc(df['TITR_VOL'],df['TITR_TEMP'])
+    
+    flask_df = flask_load()
+    
+    df = match_flask(df,flask_df,t=df[d_temp])
+    
+    params = params.loc[df[ssscc_col]]
+    params = params.apply(pd.to_numeric)    
+    
+    blank  = params[1]
+    
+    blank = blank.reset_index()
+    blank = blank.set_index(df.index.values)
+    blank = blank[1]
+
+    oxy_mlL = oxygen_eq(df[titr_col],blank,df[thio_n_col],df[vol_col])
+#    oxy_mlL = (((titr_20c - blank) * thio_n * 5.598 - 0.0017)/((df[vol_col] - 2.0) * 0.001))
+    
+    
+    return oxy_mlL
+
+def oxygen_eq(titr,blank,thio_n,flask_vol):
+    
+    oxy_mlL = (((titr - blank) * thio_n * 5.598 - 0.0017)/((flask_vol - 2.0) * 0.001))
+    
+    return oxy_mlL
+
+def calibrate_oxygen(df_time,df_btl,ssscc,method=3,raw_dir='data/raw/'):
+    
+    btl_concat = pd.DataFrame()
+    time_concat = pd.DataFrame()
+    for x in ssscc:
+
+        hexfile = raw_dir+x+'.hex'
+        xmlfile = raw_dir+x+'.XMLCON'
+        
+        time_data = df_time[df_time['SSSCC'] == x]
+        btl_data = df_btl[df_btl['SSSCC'] == x]
+        coef = oxy_fit(time_data,btl_data,x,hexfile,xmlfile,method=method)
+        #btl_data_write, btl_data_fit = oxy_fitting.oxy_fit(time_data,btl_data,x,hexfile,xmlfile,method=method)
+        print('COMPLETED SSSCC:',x)
+        #dataframe_concat = pd.concat([dataframe_concat,btl_data_fit])
+        
+        btl_data['OXYGEN'] = apply_oxy_coef(btl_data,coef)
+        time_data['CTDOXY'] = apply_oxy_coef(time_data,coef)
+    
+        btl_concat = pd.concat([btl_concat,btl_data])
+        time_concat = pd.concat([time_concat,time_data])
+          
+    return btl_concat, time_concat
+
+def oxy_from_ctd_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc=[1.92634e-4,-4.64803e-2]):
+    """
+    
+    coef[0] = Soc
+    coef[1] = Voffset
+    coef[2] = Tau20
+    coef[3] = Tcorr
+    coef[4] = E
+    """
+    
+    
+   # ox=c(1)*(doxvo+c(2)+c(3)*exp(cc(1)*dpres+cc(2)*dtepr).*dsdvdt).*os.*exp(c(4)*dtepr).*exp(c(5)*dpres./(273.15+dtepr));
+    oxy_mlL = coef[0] * (oxyvolts + coef[1] + coef[2] * np.exp(cc[0] * pressure + cc[1] * temp) * dvdt) * os \
+            * np.exp(coef[3] * temp) \
+            * np.exp((coef[4] * pressure) \
+            / (temp+273.15))
+           
+    
+    return oxy_mlL
+
+def SB_oxy_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc=[1.92634e-4,-4.64803e-2]):
+    """    
+    Oxygen (ml/l) = Soc * (V + Voffset) * (1.0 + A * T + B * T + C * T ) * OxSol(T,S) * exp(E * P / K)
+    Original equation from calib sheet dated 2014:
+    
+    coef[0] = Soc
+    coef[1] = Voffset
+    coef[2] = A
+    coef[3] = B
+    coef[4] = C
+    coef[5] = E
+    coef[6] = Tau20
+        
+    """    
+    
+    oxygen = (coef[0]) * ((oxyvolts + coef[1] + (coef[6] * np.exp(cc[0] * pressure + cc[1] * temp) * dvdt))
+                 * (1.0 + coef[2] * temp + coef[3] * np.power(temp,2) + coef[4] * np.power(temp,3) )
+                 * os
+                 * np.exp((coef[5] * pressure) / (temp+273.15)))
+    
+    return oxygen
+
+def get_SB_coef(hexfile,xmlfile):
+    
+    sbeReader = sbe_rd.SBEReader.from_paths(hexfile, xmlfile)
+    rawConfig = sbeReader.parsed_config()
+    for i, x in enumerate(rawConfig['Sensors']):
+        sensor_id = rawConfig['Sensors'][i]['SensorID']
+        if str(sensor_id) == '38':
+            oxy_meta = {'sensor_id': '38', 'list_id': 0, 'channel_pos': 1, 
+                        'ranking': 5, 'column': 'CTDOXYVOLTS', 
+                        'sensor_info': rawConfig['Sensors'][i]}
+
+     
+    Soc = oxy_meta['sensor_info']['Soc'] # Oxygen slope
+    Voff = oxy_meta['sensor_info']['offset'] # Sensor output offset voltage
+    Tau20 = oxy_meta['sensor_info']['Tau20'] #Sensor time constant at 20 deg C and 1 Atm
+    Tcorr = oxy_meta['sensor_info']['Tcor'] # Temperature correction
+    E  = oxy_meta['sensor_info']['E'] #Compensation Coef for pressure effect on membrane permeability (Atkinson et al)
+    A = oxy_meta['sensor_info']['A'] # Compensation Coef for temp effect on mem perm
+    B = oxy_meta['sensor_info']['B'] # Compensation Coef for temp effect on mem perm
+    C = oxy_meta['sensor_info']['C'] # Compensation Coef for temp effect on mem perm
+    D = [oxy_meta['sensor_info']['D0'],oxy_meta['sensor_info']['D1'],oxy_meta['sensor_info']['D2']] # Press effect on time constant Usually not fitted for.
+    
+    #coef = {'Soc':Soc,'Voff':Voff,'Tau20':Tau20,'Tcorr':Tcorr,'E':E,'A':A,'B':B,'C':C,'D':D}
+    
+    # Make into an array in order to do keast squares fitting easier
+#        coef0s:
+#    coef[0] = Soc
+#    coef[1] = Voffset
+#    coef[2] = Tau20
+#    coef[3] = Tcorr
+#    coef[4] = E
+#
+#    cc[0] = D1
+#    cc[1] = D2
+    coef = [Soc,Voff,A,B,C,E,Tau20]
+    
+    return coef
+
+
+def apply_oxy_coef(df,coef,cc=[1.92634e-4,-4.64803e-2],oxyvo_col='CTDOXYVOLTS',p_col='CTDPRS',t_col='CTDTMP1',sal_col='CTDSAL'):
+    
+    sigma0 = sigma0_from_CTD(df,sal_col=sal_col,t_col=t_col,p_col=p_col)
+    
+    df['OS'] = sbe_eq.OxSol(df[t_col],df[sal_col])
+    df['dv_dt'] = calculate_dVdT(df)
+    
+    new_OXY = coef[0] * (df[oxyvo_col] + coef[1] + coef[2] \
+            * np.exp(cc[0] * df[p_col] + cc[0] \
+            * df[t_col]) \
+            * df['dv_dt']) * df['OS'] \
+            * np.exp(coef[3] * df[t_col]) \
+            * np.exp((coef[4] * df[p_col]) \
+            / (df[t_col]+273.15))
+            
+    oxy_uMolkg = oxy_ml_to_umolkg(new_OXY,sigma0)
+    
+    return oxy_uMolkg
+    
+def sigma_from_CTD(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS',lon_col='GPSLON',lat_col='GPSLAT',ref=0):
+    
+    CT = gsw.CT_from_t(df[sal_col],df[t_col],df[p_col])
+    
+    SA = gsw.SA_from_SP(df[sal_col],df[p_col],df[lon_col],df[lat_col])
+    
+    # Reference pressure in ref*1000 dBars
+    if ref == 0:
+        sigma = gsw.sigma0(SA,CT)
+    elif ref == 1:
+        sigma = gsw.sigma1(SA,CT)
+    elif ref == 2:
+        sigma = gsw.sigma2(SA,CT)
+    elif ref == 3:
+        sigma = gsw.sigma3(SA,CT)
+    elif ref == 4:
+        sigma = gsw.sigma4(SA,CT)
+    
+    return sigma
+
+def os_umol_kg(SA,temp,press):
+    """ 
+    Oxygen solubility in umol/kg from Gordon and Garcia 1992
+    """
+    
+    
+    
+    a0=5.80871
+    a1=3.20291
+    a2=4.17887
+    a3=5.10006
+    a4=-9.86643e-2
+    a5=3.80369
+    b0=-7.01577e-3
+    b1=-7.70028e-3
+    b2=-1.13864e-2
+    b3=-9.51519e-3
+    c0=-2.75915e-7
+    
+    
+    # Calculate potential temp
+    PT = gsw.pt0_from_t(SA,temp,press)
+    
+    TS= np.log((298.15-PT)/(273.15+PT))
+    
+    x= a0 + a1 * TS + a2 * TS**2 + a3 * TS**3 + a4 * TS**4 + a5 * TS**5 + SA * (b0 + b1 * TS + b2 * TS**2 + b3 * TS**3) + c0 * SA**2
+    
+    os_umol = np.exp(x)
+    
+    return os_umol
+
+def calculate_dVdT(df,oxyvo_col='CTDOXYVOLTS',time_col='scan_datetime'):
+#    
+     doxyv = df[oxyvo_col].diff()
+     dt = df[time_col].diff()
+     dv_dt = doxyv/dt
+     dv_dt_mean = np.mean(dv_dt[(dv_dt != np.inf) & (dv_dt !=-np.inf)])
+     dv_dt = dv_dt.replace([np.inf,-np.inf],np.NaN)
+     dv_dt = dv_dt.fillna(dv_dt_mean)
+     
+     #dv_dt_conv = np.convolve(dv_dt,[0.5,0.5])
+     
+     a = 1
+     windowsize = 5
+     b = (1/windowsize)*np.ones(windowsize)
+     #filtered_dvdt = scipy.signal.filtfilt(b,a,dv_dt_conv)
+     filtered_dvdt = scipy.signal.filtfilt(b,a,dv_dt)
+     
+     
+     return filtered_dvdt
+ 
+def merge_parameters(btl_df,time_df,l_param='sigma0_btl',r_param='sigma0_ctd'):
+        
+    merge_df = pd.merge_asof(btl_df,time_df,left_on=l_param,right_on=r_param,direction='nearest')
+    
+    # Clean up merged dataframe
+    # These column names can be taken as a variable from the ini file
+    keep_columns = ['CTDTMP1_y','CTDTMP2_y', 'CTDPRS_y', 'CTDCOND1_y', 'CTDCOND2_y', 'CTDSAL_y',
+       'CTDOXY1_y', 'CTDOXYVOLTS_y', 'FREE1_y', 'FREE2_y', 'FREE3_y',
+       'FREE4_y', 'FLUOR_y', 'CTDBACKSCATTER_y', 'CTDXMISS_y', 'ALT_y',
+       'REF_PAR_y', 'GPSLAT_y', 'GPSLON_y', 'new_fix_y', 'pressure_temp_int_y',
+       'pump_on_y', 'btl_fire_y', 'scan_datetime_y', 'SSSCC_y',
+       'master_index_y','OS_y','dv_dt_y','CTDOXY',r_param]
+    
+    merge_df = merge_df[keep_columns]
+    
+    col_names = ['CTDTMP1','CTDTMP2', 'CTDPRS', 'CTDCOND1', 'CTDCOND2','CTDSAL',
+       'CTDOXY1', 'CTDOXYVOLTS', 'FREE1', 'FREE2', 'FREE3',
+       'FREE4', 'FLUOR', 'CTDBACKSCATTER', 'CTDXMISS', 'ALT',
+       'REF_PAR', 'GPSLAT', 'GPSLON', 'new_fix', 'pressure_temp_int',
+       'pump_on', 'btl_fire', 'scan_datetime', 'SSSCC',
+       'master_index','OS','dv_dt','CTDOXY', r_param]
+    
+    merge_df.columns = [col_names]
+
+    
+    return merge_df
+
+def get_sbe_coef(hexfile,xmlfile):
+
+
+    sbeReader = sbe_rd.SBEReader.from_paths(hexfile, xmlfile)
+    rawConfig = sbeReader.parsed_config()
+    for i, x in enumerate(rawConfig['Sensors']):
+        sensor_id = rawConfig['Sensors'][i]['SensorID']
+        if str(sensor_id) == '38':
+            oxy_meta = {'sensor_id': '38', 'list_id': 0, 'channel_pos': 1, 
+                        'ranking': 5, 'column': 'CTDOXYVOLTS', 
+                        'sensor_info': rawConfig['Sensors'][i]}
+
+     
+    Soc = oxy_meta['sensor_info']['Soc'] # Oxygen slope
+    Voff = oxy_meta['sensor_info']['offset'] # Sensor output offset voltage
+    Tau20 = oxy_meta['sensor_info']['Tau20'] #Sensor time constant at 20 deg C and 1 Atm
+    Tcorr = oxy_meta['sensor_info']['Tcor'] # Temperature correction
+    E  = oxy_meta['sensor_info']['E'] #Compensation Coef for pressure effect on membrane permeability (Atkinson et al)
+    A = oxy_meta['sensor_info']['A'] # Compensation Coef for temp effect on mem perm
+    B = oxy_meta['sensor_info']['B'] # Compensation Coef for temp effect on mem perm
+    C = oxy_meta['sensor_info']['C'] # Compensation Coef for temp effect on mem perm
+    D = [oxy_meta['sensor_info']['D0'],oxy_meta['sensor_info']['D1'],oxy_meta['sensor_info']['D2']] # Press effect on time constant Usually not fitted for.
+    
+    #coef = {'Soc':Soc,'Voff':Voff,'Tau20':Tau20,'Tcorr':Tcorr,'E':E,'A':A,'B':B,'C':C,'D':D}
+    
+    # Make into an array in order to do keast squares fitting easier
+#        coef0s:
+#    coef[0] = Soc
+#    coef[1] = Voffset
+#    coef[2] = Tau20
+#    coef[3] = Tcorr
+#    coef[4] = E
+#
+#    cc[0] = D1
+#    cc[1] = D2
+    coef = [Soc,Voff,Tau20,Tcorr,E]#,A,B,C,D]
+    
+    return coef
+
+def calculate_weights(pressure):
+    
+    eps=1e-5
+    wrow1 = [0,100,100+eps,300,300+eps,500,500+eps,1200,1200+eps,2000,2000+eps,7000]
+    wrow2 = [20,20,25,25,50,50,100,100,200,200,500,500]#[20,20,25,25,50,50,100,100,200,200,500,500]
+    wgt = scipy.interpolate.interp1d(wrow1,wrow2)
+    
+    weights = wgt(pressure)
+    
+    return weights
+
+def interpolate_sigma(ctd_sigma,btl_sigma):
+    
+#    all_sigma0 = time_data_clean['sigma0_time'].append(btl_data_clean['sigma0_btl'])
+#    fsg = pd.Series(np.min(all_sigma0)-1e-4)
+#    lsg = pd.Series(np.max(all_sigma0)+1e-4)
+#    new_sigma0 = fsg.append(time_data_clean['sigma0_time'])
+#    new_sigma0 = new_sigma0.append(lsg)
+    
+    all_sigma = ctd_sigma.append(btl_sigma)
+    fsg = pd.Series(np.min(all_sigma)-1e-4)
+    lsg = pd.Series(np.max(all_sigma)+1e-4)
+    new_sigma = fsg.append(ctd_sigma)
+    new_sigma = new_sigma.append(lsg)
+    new_sigma = new_sigma.reset_index()
+    new_sigma = new_sigma[0]
+    
+    
+    #x = np.arange(np.size(ctd_sigma))
+#    x_inter = np.arange(np.size(new_sigma0))
+#    inter_sigma2 = scipy.interpolate.interp1d(x_inter,new_sigma0)
+#    new_x = np.linspace(0,np.max(x_inter),np.size(ctd_sigma))
+#    new_sigma0=inter_sigma2(new_x)
+#    new_sigma0 = pd.Series(new_sigma0)    
+    
+    return new_sigma
+
+def interpolate_pressure(ctd_pres,btl_pres):
+    
+    all_press = ctd_pres.append(btl_pres)
+    fsg = pd.Series(np.min(all_press) - 1)
+    lsg = pd.Series(np.max(all_press) + 1)
+    new_pres = fsg.append(ctd_pres)
+    new_pres = new_pres.append(lsg)
+    new_pres = new_pres.reset_index()
+    new_pres = new_pres[0]
+    
+    return new_pres
+
+def interpolate_param(param):
+    """
+    First extends 
+    Generates function using x_inter
+    calculates values over a new range "new_x"
+    x_inter is the x-range of the extended parameter
+    new_x is the x-range of the "interpolated-down" parameter 
+    
+    """
+    ex_param = pd.Series(param.iloc[0])
+    ex_param = ex_param.append(param)#,index=[])
+    ex_param = ex_param.append(pd.Series(param.iloc[-1]))
+    ex_param = ex_param.reset_index()
+    ex_param = ex_param[0]
+
+#    x_inter = np.arange(len(ex_param))
+#    
+#    inter_param = scipy.interpolate.interp1d(x_inter,ex_param)
+#    
+#    new_x = np.arange(len(param))
+#    dparam = inter_param(new_x)
+    
+    return ex_param
+
+
+def least_squares_resid(coef0,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):
+    
+    coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef0,
+                                     args=(oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch))
+    return coef
+
+def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):#temp,dvdt,os,
+
+    """"
+
+    NOAA's oxygen fitting routine using the equation:
+    OXY(ml/L) = SOC * (doxy_volts+Voffset+Tau20*exp(cc1*PRES+cc2*TEMP)*dvdt) \
+                *os*exp(Tcorr*TEMP)*exp(E*PRESS/TEMP_K)
+
+    coef0s:
+    coef[0] = Soc
+    coef[1] = Voffset
+    coef[2] = Tau20
+    coef[3] = Tcorr
+    coef[4] = E
+
+    cc[0] = D1
+    cc[1] = D2
+    
+    """
+
+#    cc = [1.92634e-4,-4.64803e-2]
+
+
+    #MODIFIED CODE
+    
+    
+#    time_data['NOAA_oxy_mlL'] = coef0[0] * (time_data[oxyvo_col] 
+#            + coef0[1] + coef0[2] * np.exp(cc[0] * time_data[p_col] \
+#            + cc[0] * time_data[t_col]) * time_data[dvdt_col]) \
+#            * time_data[os_col] * np.exp(coef0[3] * time_data[t_col]) \
+#            * np.exp((coef0[4] * time_data[p_col]) \
+#            / (time_data[t_col] + 273.15))
+    
+#    oxy_mlL = coef[0] * (oxyvolts + coef[1] + coef[2] \
+#            * np.exp(cc[0] * pressure + cc[0] \
+#            * temp) \
+#            * dvdt) * os \
+#            * np.exp(coef[3] * temp) \
+#            * np.exp((coef[4] * pressure) \
+#            / (temp+273.15))
+#    
+#    ctd_oxy_mlL = apply_oxy_coef(time_data,coef,cc=[1.92634e-4,-4.64803e-2],oxyvo_col='CTDOXYVOLTS',p_col='CTDPRS',t_col='CTDTMP1',sal_col='CTDSAL')
+    ctd_oxy_mlL = oxy_from_ctd_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc)
+#    ctd_oxy_mlL = SB_oxy_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc)
+    #Weight Determination
+    if switch == 1:
+        
+#        eps = 1e-5
+#        
+#        wrow1 = [0, 100, 100 + eps, 300, 300 + eps, 500, 500 + eps, 1200, 1200 
+#                 + eps, 2000, 2000 + eps, 7000]
+#        
+#        wrow2 = [20, 20, 25, 25, 50, 50, 100, 100, 200, 200, 500, 500]
+#        
+#        wgt = scipy.interpolate.interp1d(wrow1,wrow2)
+#
+#        #Modified CODE
+#        weights = wgt(time_data[p_col])
+        
+        weights = calculate_weights(pressure)
+
+        #resid = ((weights * (ref_oxy - ctd_oxy_mlL))**2) / (np.sum(weights)**2) #Original way (np.sum(weights)**2)
+        resid = ((weights * (ref_oxy - ctd_oxy_mlL))**2) #/ #(np.sum(weights)**2) #Original way (np.sum(weights)**2)
+    elif switch == 2:
+        #L2 Norm
+        resid = (ref_oxy - ctd_oxy_mlL)**2
+    
+    elif switch == 3:
+        #ODF residuals      
+        
+        resid = np.sqrt(((ref_oxy - ctd_oxy_mlL)**2) / (np.std(ctd_oxy_mlL)**2))
+        
+    elif switch == 4:
+        # Weighted ODF residuals
+        
+        weights = calculate_weights(pressure)
+        resid = np.sqrt(weights * ((ref_oxy - ctd_oxy_mlL)**2) / (np.sum(weights)**2))#(np.std(ctd_oxy_mlL)**2))
+        
+    elif switch == 5:
+        
+        weights = calculate_weights(pressure)
+
+        resid = ((weights * (ref_oxy - ctd_oxy_mlL))**2) / (np.sum(weights**2))
+        
+        
+    return resid    
+
+def oxy_ml_to_umolkg(oxy_mlL,sigma0):
+    
+    oxy_uMolkg = oxy_mlL * 44660 / (sigma0 + 1000)
+    
+    return oxy_uMolkg
+
 
 def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1, 
             sal_col='CTDSAL', t_col='CTDTMP1', p_col='CTDPRS', 
@@ -340,7 +1007,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     time_data_matched['weights'] = wgt(time_data_matched['CTDPRS_y'])
     
 #   Least Squares fitting to determine new coefficients   
-    coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef0,
+    coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef0,
                                      args=(time_data_matched,btl_data_clean,
                                            method))
 
@@ -418,7 +1085,7 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
                 / (time_data_matched['TEMPERATURE_CTD'] + 273.15))   
                 
 #       Recalculate coeficients 
-        coef,flag=scipy.optimize.leastsq(oxy_fitting.oxygen_cal_ml,coef,
+        coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef,
                                          args=(time_data_matched,btl_data_clean,
                                                method))
         
@@ -465,9 +1132,9 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
     btl_data_clean['CASTNO']=cst_nbr
         
 #   Sanity PLOT
-    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
-    plt.xlim(xmax=10)
-    plt.show()
+#    plt.plot(btl_data_clean['residual'],btl_data_clean['CTDPRS']*-1,'bx')
+#    plt.xlim(xmax=10)
+#    plt.show()
     #dataframe_concat = pd.concat([dataframe_concat,btl_data_clean])
         
 #   Flag data    
@@ -488,69 +1155,9 @@ def oxy_fit(time_data, btl_data, ssscc, hexfile, xmlfile, method = 1,
 #    btl_data_write.to_csv(filestring,index=False)
 #    btl_write_concat = pd.concat([btl_write_concat,btl_data_write])
     
-    return btl_data_write, btl_data_clean
-
-def oxygen_cal_ml(coef0,time_data,btl_data,switch):
-
-    """"
-
-    NOAA's oxygen fitting routine using the equation:
-    OXY(ml/L) = SOC * (doxy_volts+Voffset+Tau20*exp(cc1*PRES+cc2*TEMP)*dvdt) \
-                *os*exp(Tcorr*TEMP)*exp(E*PRESS/TEMP_K)
-
-    coef0s:
-    coef[0] = Soc
-    coef[1] = Voffset
-    coef[2] = Tau20
-    coef[3] = Tcorr
-    coef[4] = E
-
-    cc[0] = D1
-    cc[1] = D2
-    
-    """
-
-    cc = [1.92634e-4,-4.64803e-2]
+    return coef #btl_data_write, btl_data_clean, coef
 
 
-    #MODIFIED CODE
-    time_data['NOAA_oxy_mlL'] = coef0[0] * (time_data['CTDOXYVOLTS_time'] 
-            + coef0[1] + coef0[2] * np.exp(cc[0] * time_data['PRESSURE_CTD'] \
-            + cc[0] * time_data['TEMPERATURE_CTD']) * time_data['dv_dt_time']) \
-            * time_data['OS'] * np.exp(coef0[3] * time_data['TEMPERATURE_CTD']) \
-            * np.exp((coef0[4] * time_data['PRESSURE_CTD']) \
-            / (time_data['TEMPERATURE_CTD'] + 273.15))
-
-    #Weight Determination
-    if switch == 1:
-        
-        eps = 1e-5
-        
-        wrow1 = [0, 100, 100 + eps, 300, 300 + eps, 500, 500 + eps, 1200, 1200 
-                 + eps, 2000, 2000 + eps, 7000]
-        
-        wrow2 = [20, 20, 25, 25, 50, 50, 100, 100, 200, 200, 500, 500]
-        
-        wgt = scipy.interpolate.interp1d(wrow1,wrow2)
-
-        #Modified CODE
-        time_data['weights'] = wgt(time_data['PRESSURE_CTD'])
-
-        resid = (time_data['weights'] * (btl_data['NOAA_oxy_mlL'] 
-            - time_data['NOAA_oxy_mlL'])) / (np.sum(time_data['weights'])**2) 
-        
-    elif switch == 2:
-        #L2 Norm
-        resid = (btl_data['CTDOXY1'] - time_data['NOAA_oxy_mlL'])**2
-    
-    elif switch == 3:
-        #ODF residuals      
-        
-        resid = np.sqrt(((btl_data['NOAA_oxy_mlL'] 
-                - time_data['NOAA_oxy_mlL'])**2) 
-                / (np.std(time_data['NOAA_oxy_mlL'])**2))
-
-    return resid    
     
     
     
