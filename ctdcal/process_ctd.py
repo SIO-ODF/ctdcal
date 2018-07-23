@@ -819,24 +819,12 @@ def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,
 def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
 
         
-#    param = pd.Series(param)
-#    param.reset_index(drop=True,inplace=True)
-#    
-#    param_2 = pd.Series(param_2)
-#    param_2.reset_index(drop=True,inplace=True)
-#    
-#    press = pd.Series(press)
-#    press.reset_index(drop=True,inplace=True)
-        
     param = fit_ctd.array_like_to_series(param)
     param_2 = fit_ctd.array_like_to_series(param_2)
     press = fit_ctd.array_like_to_series(press)
     ssscc = fit_ctd.array_like_to_series(ssscc)
     btl_num = fit_ctd.array_like_to_series(btl_num)
-    
-#    ref_param = pd.Series(ref_param)
-#    ref_param.reset_index(drop=True,inplace=True)
-    
+        
     diff = param_2 - param
     
     df = pd.concat([ssscc,btl_num.rename('Bottle'),param.rename('Param_1'),param_2.rename('Param_2'),press.rename('CTDPRS'),diff.rename('Diff')],axis=1)
@@ -943,19 +931,10 @@ def get_param_coef(calib_param,diff,order,calib):
        
     return coef
 
-def combine_quality_flags(df_sens1,df_sens2,df_ref):
+def combine_quality_flags(df_list):
     
-    combined_df = pd.DataFrame()
-    
-    combined_df = pd.concat([combined_df,df_sens1,df_sens2,df_ref])
-    
-    combined_df = combined_df.sort_values(['SSSCC','btl_fire_num'])
-    
-    combined_df = combined_df[['SSSCC','btl_fire_num','Parameter','CTDPRS','Flag','primary_diff','secondary_diff','P-S']]
-    
-    combined_df = combined_df.rename(index=str, columns={'btl_fire_num':'Bottle', 'CTDPRS':'Pressure', 'primary_diff':'Primary_Diff','secondary_diff':'Secondary_Diff'})
-    # Outdated
-    #combined_df = combined_df.rename_axis({'btl_fire_num':'Bottle', 'CTDPRS':'Pressure', 'primary_diff':'Primary_Diff','secondary_diff':'Secondary_Diff'}, axis='columns')
+    combined_df = pd.concat(df_list)
+    combined_df = combined_df.sort_values(['SSSCC','Bottle'])
     
     combined_df = combined_df.round(4)
     
