@@ -11,7 +11,7 @@ import subprocess
 import time
 import sys
 import configparser
-sys.path.append('ctdcal/')
+#sys.path.append('ctdcal/')
 import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
 
@@ -226,8 +226,8 @@ def process_all_new():
         btl_data_all['CTDCOND1'],btl_data_all['CTDSAL'] = fit_ctd.conductivity_polyfit(btl_data_all['CTDCOND1'],btl_data_all['CTDTMP1'],btl_data_all['CTDPRS'],coef_cond_1)
         btl_data_all['CTDCOND2'],sal_2 = fit_ctd.conductivity_polyfit(btl_data_all['CTDCOND2'],btl_data_all['CTDTMP2'],btl_data_all['CTDPRS'],coef_cond_2)
         
-        time_data_all['CTDCOND1'],time_data_all['CTDSAL'] = fit_ctd.conductivity_polyfit(time_data_all['CTDCOND1'], time_data_all['CTDTMP1'], btl_data_all['CTDPRS'], coef_cond_1)
-        time_data_all['CTDCOND2'],sal2 = fit_ctd.conductivity_polyfit(time_data_all['CTDCOND2'], time_data_all['CTDTMP2'], btl_data_all['CTDPRS'], coef_cond_2)
+        time_data_all['CTDCOND1'],time_data_all['CTDSAL'] = fit_ctd.conductivity_polyfit(time_data_all['CTDCOND1'], time_data_all['CTDTMP1'], time_data_all['CTDPRS'], coef_cond_1)
+        time_data_all['CTDCOND2'],sal2 = fit_ctd.conductivity_polyfit(time_data_all['CTDCOND2'], time_data_all['CTDTMP2'], time_data_all['CTDPRS'], coef_cond_2)
     
 
         qual_flag_cond = process_ctd.combine_quality_flags([df_ques_c1,df_ques_c2,df_ques_refc])
@@ -245,8 +245,8 @@ def process_all_new():
         btl_data_all['CTDCOND1'],sal_1 = fit_ctd.conductivity_polyfit(btl_data_all['CTDCOND1'],btl_data_all['CTDTMP1'],btl_data_all['CTDPRS'],coef_cond_prim)
         btl_data_all['CTDCOND2'],sal_2 = fit_ctd.conductivity_polyfit(btl_data_all['CTDCOND2'],btl_data_all['CTDTMP2'],btl_data_all['CTDPRS'],coef_cond_sec)
     
-        time_data_all['CTDCOND1'],time_data_all['CTDSAL'] = fit_ctd.conductivity_polyfit(time_data_all['CTDCOND1'], time_data_all['CTDTMP1'], btl_data_all['CTDPRS'], coef_cond_prim)
-        time_data_all['CTDCOND2'],sal2 = fit_ctd.conductivity_polyfit(time_data_all['CTDCOND2'], time_data_all['CTDTMP2'], btl_data_all['CTDPRS'], coef_cond_sec)
+        time_data_all['CTDCOND1'],time_data_all['CTDSAL'] = fit_ctd.conductivity_polyfit(time_data_all['CTDCOND1'], time_data_all['CTDTMP1'], time_data_all['CTDPRS'], coef_cond_prim)
+        time_data_all['CTDCOND2'],sal2 = fit_ctd.conductivity_polyfit(time_data_all['CTDCOND2'], time_data_all['CTDTMP2'], time_data_all['CTDPRS'], coef_cond_sec)
     
         qual_flag_cond = process_ctd.combine_quality_flags([df_ques_c1,df_ques_c2,df_ques_refc])
     ###########################################################################
@@ -278,9 +278,10 @@ def process_all_new():
     
     btl_data_all['OXYGEN'] = -999
     btl_data_all['OXYGEN'] = -999
+    time_data_all['CTDOXY'] = -999
     
     process_ctd.export_btl_data(btl_data_all,expocode,sectionID,expocode)
-    process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
+    #process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
     
     
 
