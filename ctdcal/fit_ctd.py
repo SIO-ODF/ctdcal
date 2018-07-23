@@ -543,8 +543,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
         cond['BTLCOND'] = gsw.C_from_SP(salinity,data[btl_tmp_col],data[btl_p_col])
         #cond = cond.drop('SAMPNO',1)
     except ValueError:
-        print('Possible mis-entered information in salt file (Check salt file)')
-        raise ValueError
+        raise ValueError('Possible mis-entered information in salt file (Check salt file)')
 
 #    # Create 36-place DF
 #    DF = pd.DataFrame(data=np.arange(1,37),columns=['SAMPNO'],index=range(1,37))
