@@ -15,7 +15,6 @@ import datetime
 import sys
 sys.path.append('ctdcal/')
 import oxy_fitting
-
 import gsw
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
@@ -738,7 +737,7 @@ def fill_surface_data(df, **kwargs):
         for x in range(1, int(np.floor(df.iloc[0]['CTDPRS'])), bin_size):
             surface_values.append(x)
         df_surface = pd.DataFrame({'CTDPRS': surface_values})
-        df_merged = pd.merge(df_surface, df, on='CTDPRS', how='outer')
+        df_merged = pd.merge(df_surface.astype('float64'), df, on='CTDPRS', how='outer')
 
     return df_merged.fillna(method='bfill')
 
@@ -1345,7 +1344,7 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         #time_data = pressure_seq_data.copy()
         #time_data = time_data[pressure_seq_data['SSSCC'] == cast]
         time_data = df[df['SSSCC'] == cast]
-        time_data = pressure_sequence(df,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
+        time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
         time_data = time_data[['CTDPRS','CTDPRS_FLAG_W','CTDTMP','CTDTMP_FLAG_W','CTDSAL','CTDSAL_FLAG_W','CTDOXY','CTDOXY_FLAG_W',
                                'CTDXMISS','CTDXMISS_FLAG_W','CTDFLUOR','CTDFLUOR_FLAG_W','CTDBACKSCATTER','CTDBACKSCATTER_FLAG_W',
                                'CTDRINKO','CTDRINKO_FLAG_W']]

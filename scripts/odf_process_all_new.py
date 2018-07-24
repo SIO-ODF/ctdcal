@@ -281,7 +281,7 @@ def process_all_new():
     time_data_all['CTDOXY'] = -999
     
     process_ctd.export_btl_data(btl_data_all,expocode,sectionID,expocode)
-    #process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
+    process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
     
     
 
