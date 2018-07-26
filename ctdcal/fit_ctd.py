@@ -399,7 +399,8 @@ def cell_therm_mass_corr(temp,cond,sample_int,alpha=alpha,beta=beta):
     CTM = calculate_CTM(b, 0, a, dC_dT, dT)
     
     CTM = calculate_CTM(b, shift(CTM,1,order=0), a, dC_dT, dT)
-    CTM = np.nan_to_num(CTM)   
+    CTM = np.nan_to_num(CTM) 
+    CTM = S_M_to_mS_cm(CTM) 
     cond_corr = apply_CTM(cond, CTM)
        
     return cond_corr
