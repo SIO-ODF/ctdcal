@@ -8,6 +8,7 @@ import ctdcal.sbe_equations_dict as sbe_eq
 from scipy.optimize import leastsq
 import gsw
 import csv
+from scipy.ndimage.interpolation import shift
 #import requests
 import os
 import json
@@ -15,6 +16,9 @@ import json
 M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
 D = 1.42905481 #  /* density O2 g/l @ 0 C */
+
+alpha = 0.03 #0.043 - 1999 Value # Seabird Covered glass inital fluid thermal anomaly
+beta = 1.0 / 7 #1.0 / 4.3 1999 Value # Thermal anomaly time constant
 
 
 def offset(offset, inArr):
@@ -386,33 +390,95 @@ def conductivity_polyfit(cond,temp,press,coef):
      fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
      return fitted_cond, fitted_sal
      
-     
-#def temperature_polyfit(C, P, T):
-#    """Polynomial used to fit data with pressure effect.
-#
-#    The following are single or list/tuple:
-#    fit declares fit type
-#    C is starting estimate for coefficients
-#    P is pressure in decibars
-#    T is temperature in Celcius
-#
-#    Original equation from ...
-#    Temperature degC ITS-90 = T + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4
-#
-#    Another time based fit must be run at the end of cruise to account for time dependent drift.
-#
-#    """
-#    try:
-#        t_arr = []
-#        for P_x, T_x in zip(P, T):
-#            tmp = T_x + C[0] * np.power(P_x,2) + C[1] * P_x + C[2] * np.power(T_x,2) + C[3] * T_x + C[4]
-#            t_arr.append(round(tmp,4))
-#       #Single mode.
-#    except:
-#        tmp = T + C[0] * np.power(P,2) + C[1] * P + C[2] * np.power(T,2) + C[3] * T + C[4]
-#        t_arr = round(tmp,4)
-#
-#    return t_arr
+def cell_therm_mass_corr(temp,cond,sample_int,alpha=alpha,beta=beta):
+    
+    a = calculate_a_CTM(alpha, sample_int, beta)
+    b = calculate_b_CTM(a, alpha)
+    dC_dT = calculate_dc_dT_CTM(temp)
+    dT = calculate_dT_CTM(temp)
+    CTM = calculate_CTM(b, 0, a, dC_dT, dT)
+    
+    CTM = calculate_CTM(b, shift(CTM,1,order=0), a, dC_dT, dT)
+    CTM = np.nan_to_num(CTM)   
+    cond_corr = apply_CTM(cond, CTM)
+       
+    return cond_corr
+
+def apply_CTM(cond, CTM):
+    
+    c_corr = cond + CTM
+    
+    return c_corr
+
+def calculate_CTM(b, CTM_0, a, dC_dT, dT):
+    
+    CTM = -1.0 * b * CTM_0 + a * (dC_dT) * dT
+    
+    return CTM
+
+
+def calculate_dT_CTM(temp):
+    """
+    Seabird eq: dT = temperature - previous temperature
+    
+    """
+    
+    dT = np.diff(temp)
+    dT = np.insert(dT,0,0)
+    
+    return dT
+
+def calculate_dc_dT_CTM(temp):
+    """
+    
+    Seabird eq: dc/dT = 0.1 * (1 + 0.006 * [temperature - 20])
+    
+    """
+    
+    dc_dT = 0.1 * (1 + 0.006 * (temp - 20))
+    
+    return dc_dT
+
+def calculate_mS_from_S(CTM):
+    
+    CTM_ms = 10.0 * CTM
+    
+    return CTM_ms
+
+def S_M_to_mS_cm(CTM_S_M):
+    
+    """
+    
+    Seabird eq: ctm [mS/cm] = ctm [S/m] * 10.0
+    
+    """
+    ctm_mS_cm = CTM_S_M * 10.0
+    
+    return ctm_mS_cm
+    
+
+def calculate_a_CTM(alpha, sample_int, beta):
+    
+    """
+    Seabird eq: a = 2 * alpha / (sample interval * beta + 2)
+    
+    """
+    
+    a = 2 * (alpha / (sample_int * beta + 2))
+    
+    return a
+
+def calculate_b_CTM(a, alpha):
+    
+    """
+    Seabird eq: b = 1 - (2 * a / alpha)
+        
+    """
+    
+    b = 1 - (2 * (a / alpha))
+    
+    return b
+
 
 def temperature_polyfit(temp,press,coef):
     
