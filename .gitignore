@@ -60,4 +60,9 @@ images/*
 # pytest
 .cache
 
+# Ipython notebook #
+####################
+
+*.ipynb*
+
 __pycache__/
