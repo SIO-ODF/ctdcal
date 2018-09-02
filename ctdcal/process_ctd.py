@@ -1233,7 +1233,8 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
                 reft_data = pd.DataFrame()
                 reft_data[index_col] = pd.Series(btl_data[index_col].values.astype(int))
                 reft_data['T90'] = pd.Series([np.nan]*len(btl_data))
-                reft_data[ssscc_col] = x
+                ref_ssscc = ssscc_col + '_TEMP'
+                reft_data[ref_ssscc] = x
                 reft_data.index = btl_data.index
             
             refc_file = refc_prefix + x + refc_postfix
@@ -1272,7 +1273,7 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
 #            btl_data_full = btl_data_full.dropna(subset=cols)
             #btl_data = btl_data.set_index(['SSSCC','GPSLAT','GPSLON','CTDPRS'],drop=True)
             try:
-                df_data_all = pd.concat([df_data_all,btl_data])
+                df_data_all = pd.concat([df_data_all,btl_data],sort=False)
             except AssertionError:
                 raise AssertionError('Colums of ' + x + ' do not match those of previous columns')
             print('* Finished BTL data station: ' + x + ' *')
@@ -1286,7 +1287,7 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             file = prefix + x + postfix
             time_data = load_time_data(file)
             time_data['SSSCC'] = str(x)
-            df_data_all = pd.concat([df_data_all,time_data])
+            df_data_all = pd.concat([df_data_all,time_data], sort=False)
             print('** Finished TIME data station: ' + x + ' **')
    
     df_data_all['master_index'] = range(len(df_data_all))

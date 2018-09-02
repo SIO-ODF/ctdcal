@@ -130,9 +130,11 @@ def match_flask(flask_nums, flask_list, flask_vols, t=20, glass="borosilicate"):
     
     
     coef = _coef[glass]
-    merge_df = flask_num_df.merge(flask_list_vols, how='inner')
+    merge_df = flask_num_df.merge(flask_list_vols, how='left')
     
     volumes = merge_df['FLASK_VOL'].values
+    #volumes = merge_df['FLASK_VOL']
+    
     #bottle_num = merge_df['BOTTLENO_OXY'].values
 #    merge_df = merge_df[merge_df[ssscc_col].notnull()]
 
@@ -271,6 +273,7 @@ def thio_n_calc(params,ssscc):#(titr, blank, kio3_n, kio3_v, kio3_t, thio_t):
     thio_v_20c = titr * (rho_thio/rho_stp) - blank
 
     thio_n = kio3_v_20c * kio3_n / thio_v_20c
+    thio_n = thio_n.values
 
     return thio_n
 
@@ -317,15 +320,15 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
     blank  = params[1]
     
     blank = blank.reset_index()
-    blank = blank[1]
+    blank = blank[1].apply(pd.to_numeric)
 
-    oxy_mlL = oxygen_eq(titr_20C, blank, thio_n, volumes)
+    oxy_mlL = oxygen_eq(titr_20C, blank.values, thio_n, volumes)
         
     return oxy_mlL
 
 def oxygen_eq(titr,blank,thio_n,flask_vol):
     
-    oxy_mlL = (((titr - blank) * thio_n * 5.598 - 0.0017)/((flask_vol - 2.0) * 0.001))
+    oxy_mlL = (((titr - blank) * thio_n * 5.598 - 0.0017) / ((flask_vol - 2.0) * 0.001))
     
     return oxy_mlL
 
@@ -345,7 +348,7 @@ def oxy_from_ctd_eq(coef, oxyvolts, pressure, temp, dvdt, os, cc=[1.92634e-4,-4.
     oxy_mlL = coef[0] * (oxyvolts + coef[1] + coef[2] * np.exp(cc[0] * pressure + cc[1] * temp) * dvdt) * os \
             * np.exp(coef[3] * temp) \
             * np.exp((coef[4] * pressure) \
-            / (temp+273.15))
+            / (temp + 273.15))
            
     
     return oxy_mlL
@@ -533,13 +536,23 @@ def os_umol_kg( sal, PT):
     
     return O2sol_umol
 
+def oxy_ml_to_umolkg(oxy_mlL,sigma0):
+    
+    oxy_uMolkg = oxy_mlL * 44660 / (sigma0 + 1000)
+    
+    return oxy_uMolkg
+
 def calculate_dVdT(oxyvolts, time):
 #    
      doxyv = np.diff(oxyvolts)
-     #doxyv = np.insert(doxyv, 0, np.NaN)
+
      
      dt = np.diff(time)
-     #dt = np.insert(dt,0,np.NaN)
+     
+     # Replace 0 values with median value
+     m = np.median(dt[dt > 0])
+     dt[dt == 0] = m
+
      
      dv_dt = doxyv/dt
      dv_dt = np.insert(dv_dt,0,0)
@@ -700,6 +713,178 @@ def interpolate_param(param):
     
     return ex_param
 
+def oxy_equation(X, Soc, Voffset, A, B, C, E, Tau20):
+    
+    cc=[1.92634e-4,-4.64803e-2]
+    oxyvolts, pressure, temp, dvdt, os = X
+    
+    oxygen = (Soc * ((oxyvolts + Voffset + (Tau20 * np.exp(cc[0] * pressure + cc[1] * temp) * dvdt))
+                 * (1.0 + A * temp + B * np.power(temp,2) + C * np.power(temp,3) )
+                 * os
+                 * np.exp((E * pressure) / (temp + 273.15))))
+              
+    return oxygen
+
+
+def oxy_fit(btl_prs, btl_oxy, btl_sigma, ctd_sigma, ctd_os, ctd_prs, ctd_tmp, ctd_oxyvolts, ctd_time, coef0):
+    
+    
+    # Create DF for good and questionable values
+    
+    bad_df = pd.DataFrame()
+    good_df = pd.DataFrame()
+    
+    # Construct Dataframe from bottle and ctd values for merging
+    btl_dict = {'CTDPRS_btl':btl_prs, 'OXYGEN':btl_oxy, 'sigma_btl':btl_sigma}
+    btl_data = pd.DataFrame(btl_dict)
+    time_dict = {'CTDPRS':ctd_prs, 'sigma_ctd':ctd_sigma, 'OS_ctd':ctd_os, 'CTDTMP':ctd_tmp, 'CTDOXYVOLTS':ctd_oxyvolts, 'CTDTIME':ctd_time}
+    time_data = pd.DataFrame(time_dict)
+    
+    # Sort DataFrames by sigma0
+    time_data.sort_values('sigma_ctd', inplace=True)
+    btl_data.sort_values('sigma_btl', inplace=True)
+    
+    # Merge DF
+    merged_df = pd.merge_asof(btl_data, time_data, left_on='sigma_btl', right_on='sigma_ctd', direction='nearest', suffixes=['_btl','_ctd'])
+    
+    #Calculate dv_dt
+    merged_df['dv_dt'] = calculate_dVdT(merged_df['CTDOXYVOLTS'], merged_df['CTDTIME'])
+    
+    # Apply coef and calculate CTDOXY 
+    merged_df['CTDOXY'] = SB_oxy_eq(coef0, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd'])
+    merged_df.dropna(subset=['OXYGEN'], inplace=True)
+    
+    
+    # Curve fit (weighted)
+    p0 = coef0[0], coef0[1], coef0[2], coef0[3], coef0[4], coef0[5], coef0[6]
+    weights = 1/(np.sqrt(merged_df['CTDPRS']))
+    
+    try:
+        cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd']), merged_df['OXYGEN'], p0, sigma=weights, absolute_sigma=False)
+        merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd'])
+
+        merged_df['res'] = merged_df['OXYGEN'] - merged_df['CTDOXY']
+        stdres = np.std(merged_df['res'])
+        cutoff = stdres * 2.8
+
+        thrown_values = merged_df[np.abs(merged_df['res']) > cutoff]
+        bad_values = merged_df[np.abs(merged_df['res']) > cutoff]
+        bad_df = pd.concat([bad_df, bad_values])
+        merged_df = merged_df[np.abs(merged_df['res']) <= cutoff]
+        
+        while not thrown_values.empty:
+
+            p0 = cfw_coef[0], cfw_coef[1], cfw_coef[2], cfw_coef[3], cfw_coef[4], cfw_coef[5], cfw_coef[6]
+            weights = 1/((merged_df['CTDPRS']))
+            cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd']), merged_df['OXYGEN'], p0, sigma=weights, absolute_sigma=False)
+            merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd'])
+            merged_df['res'] = merged_df['OXYGEN'] - merged_df['CTDOXY']
+            stdres = np.std(merged_df['res'])
+            cutoff = stdres * 2.8
+            thrown_values = merged_df[np.abs(merged_df['res']) > cutoff]
+            bad_values = merged_df[np.abs(merged_df['res']) > cutoff]
+            merged_df = merged_df[np.abs(merged_df['res']) <= cutoff]
+        
+    except RuntimeError:
+        
+        try:#Nested try/except could be better
+            print('Weighted Curve fitting failed...using Unweighted Fitting')
+            cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd']), merged_df['OXYGEN'], p0)
+            merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd'])
+
+            merged_df['res'] = merged_df['OXYGEN'] - merged_df['CTDOXY']
+            stdres = np.std(merged_df['res'])
+            cutoff = stdres * 2.8
+        
+            thrown_values = merged_df[np.abs(merged_df['res']) > cutoff]
+            bad_values = merged_df[np.abs(merged_df['res']) > cutoff]
+            bad_df = pd.concat([bad_df, bad_values])
+            merged_df = merged_df[np.abs(merged_df['res']) <= cutoff]
+        
+            while not thrown_values.empty:
+
+                p0 = cfw_coef[0], cfw_coef[1], cfw_coef[2], cfw_coef[3], cfw_coef[4], cfw_coef[5], cfw_coef[6]
+                cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd']), merged_df['OXYGEN'], p0)
+                merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS_ctd'])
+                merged_df['res'] = merged_df['OXYGEN'] - merged_df['CTDOXY']
+                stdres = np.std(merged_df['res'])
+                cutoff = stdres * 2.8
+                thrown_values = merged_df[np.abs(merged_df['res']) > cutoff]
+                bad_values = merged_df[np.abs(merged_df['res']) > cutoff]
+                merged_df = merged_df[np.abs(merged_df['res']) <= cutoff]
+            
+        except:
+            print('Curve fitting failed...using SBE coef')
+            cfw_coef = coef0
+            merged_df['res'] = merged_df['OXYGEN'] - merged_df['CTDOXY']
+            stdres = np.std(merged_df['res'])
+            cutoff = stdres * 2.8        
+            thrown_values = merged_df[np.abs(merged_df['res']) > cutoff]
+            bad_values = merged_df[np.abs(merged_df['res']) > cutoff]
+            merged_df = merged_df[np.abs(merged_df['res']) <= cutoff]
+            
+            
+    good_df = pd.concat([good_df, merged_df])
+    good_df['CTDOXY_FLAG_W'] = 2
+    bad_df = pd.concat([bad_df, bad_values])
+    bad_df['CTDOXY_FLAG_W'] = 3
+    df = pd.concat([good_df,bad_df])
+    df.sort_values(by='CTDPRS_btl',ascending=False,inplace=True)
+    
+    return cfw_coef, df
+
+def apply_oxygen_coef_ctd(df, coef_df, ssscc, ssscc_col='SSSCC',oxyvo_col='CTDOXYVOLTS', 
+                          time_col='scan_datetime',prs_col='CTDPRS',tmp_col='CTDTMP1',
+                          os_col='OS_ctd'):
+    
+    df['CTDOXY'] = -99
+    for station in ssscc:
+        coef = coef_df.loc[station].values
+        mask = (df[ssscc_col] == station)
+        time_mask = df[mask].copy()
+        time_mask['dv_dt'] = calculate_dVdT(time_mask[oxyvo_col],time_mask[time_col])
+        df.loc[mask, 'CTDOXY'] = oxy_equation((time_mask[oxyvo_col],time_mask[prs_col],time_mask[tmp_col],
+                                              time_mask['dv_dt'],time_mask[os_col]),coef[0],coef[1],coef[2],
+                                                coef[3],coef[4],coef[5],coef[6])
+    
+    df['CTDOXY_FLAG_W'] = 2
+        
+    return df
+
+
+
+def merge_oxy_df(df,oxy_df,btl_stn_col='SSSCC',btl_prs_col='CTDPRS',
+                 oxy_stn_col='SSSCC',oxy_prs_col='CTDPRS_btl'):
+    
+    df = df.merge(oxy_df,left_on=[btl_stn_col, btl_prs_col], right_on=[oxy_stn_col, oxy_prs_col])
+    
+    return df
+
+def clean_oxygen_df(df):
+    
+    df.rename(columns={'CTDPRS_x':'CTDPRS','OXYGEN_x':'OXYGEN','CTDOXYVOLTS_y':'CTDOXYVOLTS'},inplace=True)
+
+    drop_list = []
+    for key in df.keys():
+        if '_x'in key:
+            drop_list.append(key)
+        elif '_y' in key:
+                drop_list.append(key)
+
+    df.drop(columns=drop_list, inplace=True)
+    
+    return df
+
+def create_coef_df(coef_dict):
+    
+    coef_df = pd.DataFrame(coef_dict)
+    coef_df = coef_df.transpose()
+    coef_df.rename(columns={0:'Soc',1:'Voffset',2:'A',3:'B',4:'C',5:'E',6:'Tau20'})
+    
+    return coef_df
+    
+    
+
 
 def least_squares_resid(coef0,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):
     
@@ -726,45 +911,13 @@ def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634
     cc[1] = D2
     
     """
-
-#    cc = [1.92634e-4,-4.64803e-2]
-
-
-    #MODIFIED CODE
     
-    
-#    time_data['NOAA_oxy_mlL'] = coef0[0] * (time_data[oxyvo_col] 
-#            + coef0[1] + coef0[2] * np.exp(cc[0] * time_data[p_col] \
-#            + cc[0] * time_data[t_col]) * time_data[dvdt_col]) \
-#            * time_data[os_col] * np.exp(coef0[3] * time_data[t_col]) \
-#            * np.exp((coef0[4] * time_data[p_col]) \
-#            / (time_data[t_col] + 273.15))
-    
-#    oxy_mlL = coef[0] * (oxyvolts + coef[1] + coef[2] \
-#            * np.exp(cc[0] * pressure + cc[0] \
-#            * temp) \
-#            * dvdt) * os \
-#            * np.exp(coef[3] * temp) \
-#            * np.exp((coef[4] * pressure) \
-#            / (temp+273.15))
 #    
 #    ctd_oxy_mlL = apply_oxy_coef(time_data,coef,cc=[1.92634e-4,-4.64803e-2],oxyvo_col='CTDOXYVOLTS',p_col='CTDPRS',t_col='CTDTMP1',sal_col='CTDSAL')
     ctd_oxy_mlL = oxy_from_ctd_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc)
 #    ctd_oxy_mlL = SB_oxy_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc)
     #Weight Determination
     if switch == 1:
-        
-#        eps = 1e-5
-#        
-#        wrow1 = [0, 100, 100 + eps, 300, 300 + eps, 500, 500 + eps, 1200, 1200 
-#                 + eps, 2000, 2000 + eps, 7000]
-#        
-#        wrow2 = [20, 20, 25, 25, 50, 50, 100, 100, 200, 200, 500, 500]
-#        
-#        wgt = scipy.interpolate.interp1d(wrow1,wrow2)
-#
-#        #Modified CODE
-#        weights = wgt(time_data[p_col])
         
         weights = calculate_weights(pressure)
 
@@ -790,39 +943,6 @@ def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634
         weights = calculate_weights(pressure)
 
         resid = ((weights * (ref_oxy - ctd_oxy_mlL))**2) / (np.sum(weights**2))
-        
-        
+                
     return resid    
 
-def oxy_ml_to_umolkg(oxy_mlL,sigma0):
-    
-    oxy_uMolkg = oxy_mlL * 44660 / (sigma0 + 1000)
-    
-    return oxy_uMolkg
-
-
-
-
-    
-    
-    
-    #####           GRAVEYARD             ##########
-        
-    #NOAA Calucaltion (unmodified):
-        #ORIGINAL CODE
-        #time_data['NOAA_oxy_mlL'] =coef0[0]*(time_data['CTDOXYVOLTS_y']+\
-        #coef0[1]+coef0[2]*np.exp(cc[0]*time_data['CTDPRS_y']+cc[0]*time_data['TEMPERATURE_CTD'])\
-        #*time_data['dv_dt_time'])*time_data['OS']*np.exp(coef0[3]*time_data['TEMPERATURE_CTD'])\
-        #*np.exp((coef0[4]*time_data['CTDPRS_y'])/(time_data['TEMPERATURE_CTD']+273.15))
-    
-    #SWITCH 1 code:
-    
-        #Original Code
-        #time_data['weights'] = wgt(time_data['CTDPRS_y'])
-        #resid = np.sum((time_data['weights']*(btl_data['CTDOXY1']-time_data['NOAA_oxy_mlL']))/(np.sum(time_data['weights'])**2))
-        #resid = (time_data['weights']*(btl_data['CTDOXY1']-time_data['NOAA_oxy_mlL']))/(np.sum(time_data['weights'])**2) Working
-        
-    #SWITCH 3 code:
-    
-        #Original Code
-        #resid = np.sqrt(((btl_data['CTDOXY1']-time_data['NOAA_oxy_mlL'])**2)/(np.std(time_data['NOAA_oxy_mlL'])**2))
