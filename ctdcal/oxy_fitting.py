@@ -857,6 +857,18 @@ def merge_oxy_df(df,oxy_df,btl_stn_col='SSSCC',btl_prs_col='CTDPRS',
                  oxy_stn_col='SSSCC',oxy_prs_col='CTDPRS_btl'):
     
     df = df.merge(oxy_df,left_on=[btl_stn_col, btl_prs_col], right_on=[oxy_stn_col, oxy_prs_col])
+    # Rename Columns 
+    df.rename(columns={'CTDPRS_x':'CTDPRS','OXYGEN_x':'OXYGEN','CTDOXYVOLTS_y':'CTDOXYVOLTS'},inplace=True)
+
+    drop_list = []
+    for key in df.keys():
+        if '_x'in key:
+            drop_list.append(key)
+        elif '_y' in key:
+            drop_list.append(key)
+        
+
+    df.drop(columns=drop_list, inplace=True)
     
     return df
 

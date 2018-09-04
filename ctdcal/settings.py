@@ -69,7 +69,7 @@ bottle_inputs = dict(
     dopl = 'CTDOXY1', # CTD Oxygen (ml/L)
     dov = 'CTDOXYVOLTS', # CTD Oxygen volts
     xmis = 'CTDXMISS', # Transmissometer column
-    fluor = 'FLUOR', # Fluorometer column
+    fluor = 'CTDFLUOR', # Fluorometer column
     backscatter = 'CTDBACKSCATTER', # Backscatter column
     rinko_oxy = 'FREE1', # Rinko Oxygen column (additional column)
     rinko_temp = 'FREE2', # Rinko Temp column (additional column)
@@ -85,7 +85,7 @@ bottle_inputs = dict(
     time_zone = 'UTC', # Time Zone
     reft = 'T90', # Reference Temp
     bath_temp = 'BathTEMP', # Salinometer bath temp
-    cond_ratio = 'CRAVG', # Salinometer conductivity ratio
+    cond_ratio = 'CRavg', # Salinometer conductivity ratio
     btl_cond = 'BTLCOND', # Salinometer bottle conductivity
     btl_oxy = 'OXYGEN', # Bottle Oxygen
 
@@ -94,7 +94,7 @@ bottle_inputs = dict(
 btl_input_array = [bottle_inputs['p'], bottle_inputs['t1'], bottle_inputs['t2'], bottle_inputs['c1'], bottle_inputs['c2'],
                    bottle_inputs['dov'], bottle_inputs['dopl'], bottle_inputs['xmis'], bottle_inputs['alt'],
                    bottle_inputs['rinko_oxy'], bottle_inputs['rinko_temp'], bottle_inputs['lat'], bottle_inputs['lon'], bottle_inputs['pump_on'], bottle_inputs['btl_fire'], 
-                   bottle_inputs['scan_datetime'], bottle_inputs['btl_num']]
+                   bottle_inputs['scan_datetime'], bottle_inputs['btl_num']]#bottle_inputs['fluor']
 
 #btl_input_array = [bottle_inputs['p'], bottle_inputs['t1'], bottle_inputs['t2'], bottle_inputs['c1'], bottle_inputs['c2'],
 #                   bottle_inputs['dov'], bottle_inputs['dopl'], bottle_inputs['xmis'], bottle_inputs['alt'], bottle_inputs['fluor'], bottle_inputs['backscatter'],
@@ -130,7 +130,7 @@ ctd_inputs = dict(
 
 ctd_input_array = [ctd_inputs['p'], ctd_inputs['t1'], ctd_inputs['t2'], ctd_inputs['c1'], ctd_inputs['c2'], ctd_inputs['dov'], ctd_inputs['dopl'],
                    ctd_inputs['xmis'], ctd_inputs['alt'], ctd_inputs['rinko_oxy'],ctd_inputs['rinko_tmp'],
-                   ctd_inputs['lat'], ctd_inputs['lon'], ctd_inputs['pump_on'], ctd_inputs['scan_datetime']]
+                   ctd_inputs['lat'], ctd_inputs['lon'], ctd_inputs['pump_on'], ctd_inputs['scan_datetime']]#,ctd_inputs['fluor']
 
 #ctd_input_array = [ctd_inputs['p'], ctd_inputs['t1'], ctd_inputs['t2'], ctd_inputs['c1'], ctd_inputs['c2'], ctd_inputs['dov'], ctd_inputs['dopl'],
 #                   ctd_inputs['xmis'], ctd_inputs['alt'], ctd_inputs['fluor'], ctd_inputs['backscatter'], ctd_inputs['rinko_oxy'],ctd_inputs['rinko_tmp'],

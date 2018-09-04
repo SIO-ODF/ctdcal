@@ -11,7 +11,7 @@ import subprocess
 import time
 import sys
 import configparser
-#sys.path.append('ctdcal/')
+sys.path.append('ctdcal/')
 import settings
 import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
@@ -22,7 +22,7 @@ import ctdcal.oxy_fitting as oxy_fitting
 
 def process_all_new():
 
-    ssscc_file = 'data/ssscc.csv'
+#    ssscc_file = 'data/ssscc.csv'
     iniFile = 'data/ini-files/configuration.ini'
     config = configparser.RawConfigParser()
     config.read(iniFile)
@@ -98,12 +98,12 @@ def process_all_new():
     btl_cols = settings.btl_input_array
     ctd_cols = settings.ctd_input_array
     
-
+    ssscc = settings.ssscc
     # Load ssscc from file
-    ssscc = []
-    with open(ssscc_file, 'r') as filename:
-        ssscc = [line.strip() for line in filename]
-        
+#    ssscc = []
+#    with open(ssscc_file, 'r') as filename:
+#        ssscc = [line.strip() for line in filename]
+#        
         #check for already converted files to skip later
     time_start = time.perf_counter()
     cnv_dir_list = os.listdir('data/converted/')
@@ -301,6 +301,10 @@ def process_all_new():
         
     coef_df = oxy_fitting.create_coef_df(coef_dict)
     
+    # Merge oxygen fitting DF to btl_data_all
+    
+    btl_data_all = oxy_fitting.merge_oxy_df(btl_data_all,oxy_df)
+    
     # Apply coef to Time Data
     
     time_data_all = oxy_fitting.apply_oxygen_coef_ctd(time_data_all, coef_df, ssscc)
@@ -318,7 +322,7 @@ def process_all_new():
     
     btl_data_all =  btl_data_all.dropna(subset=btl_cols)
 
-### Create CT Files
+### Create CT Files and HY files
     
     
     process_ctd.export_btl_data(btl_data_all,expocode,sectionID,expocode)
