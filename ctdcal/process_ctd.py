@@ -1094,6 +1094,7 @@ def prepare_fit_data(df,ref_col):
     return good_data
 
 
+
 def prepare_conductivity_data(ssscc,df,refc,ssscc_col = 'SSSCC',index_col = 'btl_fire_num'):
     
     btl_concat = pd.DataFrame()
@@ -1233,7 +1234,8 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
                 reft_data = pd.DataFrame()
                 reft_data[index_col] = pd.Series(btl_data[index_col].values.astype(int))
                 reft_data['T90'] = pd.Series([np.nan]*len(btl_data))
-                reft_data[ssscc_col] = x
+                ref_ssscc = ssscc_col + '_TEMP'
+                reft_data[ref_ssscc] = x
                 reft_data.index = btl_data.index
             
             refc_file = refc_prefix + x + refc_postfix
@@ -1272,7 +1274,7 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
 #            btl_data_full = btl_data_full.dropna(subset=cols)
             #btl_data = btl_data.set_index(['SSSCC','GPSLAT','GPSLON','CTDPRS'],drop=True)
             try:
-                df_data_all = pd.concat([df_data_all,btl_data])
+                df_data_all = pd.concat([df_data_all,btl_data],sort=False)
             except AssertionError:
                 raise AssertionError('Colums of ' + x + ' do not match those of previous columns')
             print('* Finished BTL data station: ' + x + ' *')
@@ -1286,13 +1288,26 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             file = prefix + x + postfix
             time_data = load_time_data(file)
             time_data['SSSCC'] = str(x)
-            df_data_all = pd.concat([df_data_all,time_data])
+            df_data_all = pd.concat([df_data_all,time_data], sort=False)
             print('** Finished TIME data station: ' + x + ' **')
    
     df_data_all['master_index'] = range(len(df_data_all))
             
     return df_data_all
-            
+
+def merge_cond_flags(btl_data, qual_flag_cond):
+    # Merge df
+    mask = qual_flag_cond[qual_flag_cond['Parameter'] == 'REF_COND'].copy()
+    mask['SSSCC'] = mask['SSSCC'].astype(str)
+    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
+    # Rename Columns
+    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'SALNTY_FLAG_W'},inplace=True)
+    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
+    btl_data['SALNTY_FLAG_W'].fillna(value=2,inplace=True)
+    btl_data['SALNTY_FLAG_W'] = btl_data['SALNTY_FLAG_W'].astype(int)
+    
+    return btl_data
+           
 
 def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
                      t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
@@ -1368,7 +1383,7 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
         b_date = bdt[0]
         b_time = bdt[1]
-        depth = -999
+        depth = -99
         now = datetime.datetime.now()
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
@@ -1424,10 +1439,8 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     btl_data['CTDSAL_FLAG'] = '2_HARDCODE'
     btl_data['SALNTY'] = gsw.SP_from_C(btl_data['BTLCOND'],btl_data['CTDTMP'],btl_data['CTDPRS'])
     btl_data['SALNTY_FLAG'] = '2_HARDCODE'
-    btl_data['SALTREF'] = gsw.SR_from_SP(btl_data['SALNTY'])
-    btl_data['SALTREF_FLAG'] = '2_HARDCODE'
-    btl_data['CTDOXY'] = np.NaN
-    btl_data['CTDOXY_FLAG'] = '2'
+#    btl_data['CTDOXY'] = np.NaN
+#    btl_data['CTDOXY_FLAG'] = '2'
 #    btl_data['OXYGEN'] = np.NaN
     btl_data['OXYGEN_FLAG'] = '2'
     
@@ -1436,7 +1449,7 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     btl_data = btl_data[btl_columns]
     btl_data = btl_data.round(4)
     
-    btl_data = btl_data.fillna(value=-999)
+    btl_data = btl_data.fillna(value=-99)
     
     
     now = datetime.datetime.now()
