@@ -7,6 +7,7 @@ Created on Mon Jan  8 10:04:19 2018
 """
 
 
+
 import scipy
 import numpy as np
 #import sys
@@ -382,8 +383,8 @@ def get_SB_coef(hexfile,xmlfile):
     for i, x in enumerate(rawConfig['Sensors']):
         sensor_id = rawConfig['Sensors'][i]['SensorID']
         if str(sensor_id) == '38':
-            oxy_meta = {'sensor_id': '38', 'list_id': 0, 'channel_pos': 1, 
-                        'ranking': 5, 'column': 'CTDOXYVOLTS', 
+            oxy_meta = {'sensor_id': '38', 'list_id': 0, 'channel_pos': 1,
+                        'ranking': 5, 'column': 'CTDOXYVOLTS',
                         'sensor_info': rawConfig['Sensors'][i]}
 
      
@@ -921,9 +922,8 @@ def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634
 
     cc[0] = D1
     cc[1] = D2
-    
-    """
-    
+
+    """    
 #    
 #    ctd_oxy_mlL = apply_oxy_coef(time_data,coef,cc=[1.92634e-4,-4.64803e-2],oxyvo_col='CTDOXYVOLTS',p_col='CTDPRS',t_col='CTDTMP1',sal_col='CTDSAL')
     ctd_oxy_mlL = oxy_from_ctd_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc)
@@ -957,4 +957,3 @@ def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634
         resid = ((weights * (ref_oxy - ctd_oxy_mlL))**2) / (np.sum(weights**2))
                 
     return resid    
-

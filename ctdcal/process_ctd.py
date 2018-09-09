@@ -7,6 +7,7 @@ import scipy.stats as st
 import time, os
 import pandas as pd
 import math
+#import report_ctd
 import ctdcal.report_ctd as report_ctd
 import warnings
 import ctdcal.fit_ctd as fit_ctd
@@ -56,7 +57,8 @@ def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_c
     dfs = find_pump_on_off_dfs(df_test)
     dfs_1 = find_pumps_on_dfs(dfs)
     df_cast = find_max_pressure_df(dfs_1)
-    df_cast2 = trim_soak_period_from_df(df_cast)
+    df_cast1 = find_last_soak_period(df_cast)
+    df_cast2 = trim_soak_period_from_df(df_cast1)
 
     start_cast_time = float(df_cast2['scan_datetime'].head(1))
     start_pressure = float(df_cast2['CTDPRS'].head(1))
@@ -100,8 +102,97 @@ def find_pumps_on_dfs(dfs):
 def trim_soak_period_from_df(df):
     '''Look for minimum pressure in dataframe, then return everything after minimum pressure/top of cast.
     '''
-    test = int(df.loc[1:(len(df)/4),['CTDPRS']].idxmin())
+    test = int(df.iloc[1:int((len(df)/4))]['CTDPRS'].idxmin())
     return df.loc[test:]
+
+def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
+    """Find the soak period before the downcast starts.
+
+    The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
+    parameters. This assumes the soak depth will be somewhere between 10 and 30
+    meters, the package will sit at the soak depth for at least 20 to 30 seconds
+    before starting ascent to the surface and descent to target depth.
+
+    Parameters
+    ----------
+    df_cast : DataFrame
+        DataFrame of the entire cast
+    surface_pressure : integer
+        Minimum surface pressure threshold required to look for soak depth.
+        2 dbar was chosen as an average rosette is roughly 1.5 to 2 meters tall.
+    time_bin : integer
+        Time, in whole seconds.
+    downcast_pressure : integer
+        Minimum pressure threshold required to assume downcast has started.
+        50 dbar has been chosen as double the deep soak depth of 20-30 dbar.
+
+    Returns
+    -------
+    df_cast_ret : DataFrame
+        DataFrame starting within time_bin seconds of the last soak period.
+
+    The algorithm is not guaranteed to catch the exact start of the soak period,
+    but within a minimum period of time_bin seconds(?) from end of the soak if
+    the soak period assumption is valid. This should be shorter than the total
+    soak period time, and able to catch the following rise and descent of the 
+    package that signals the start of the cast.
+
+    The algorithm has been designed to handle four general cases of casts:
+        * A routine cast with pumps turning on in water and normal soak
+        * A cast where the pumps turn on in air/on deck
+        * A cast where the pumps turn on and off due to rosette coming out of water
+        * A cast where there are multiple stops on the downcast to the target depth
+
+    """
+    #Validate user input
+    if time_bin <= 0:
+        raise ValueError('Time bin value should be positive whole seconds.')
+    if downcast_pressure <=0:
+        raise ValueError('Starting downcast pressure threshold must be positive integers.')
+    if downcast_pressure < surface_pressure:
+        raise ValueError(f'Starting downcast pressure threshold must be greater \
+                        than surface pressure threshold.')
+
+    # If pumps have not turned on until in water, return DataFrame
+    if df_cast.iloc[0]['CTDPRS'] > surface_pressure:
+        return df_cast
+
+    #Bin the data by time, and compute the average rate of descent
+    df_blah = df_cast.loc[:,:]
+    df_blah['bin'] = pd.cut(df_blah.loc[:,'index'],
+                            range(df_blah.iloc[0]['index'],df_blah.iloc[-1]['index'],time_bin*24),
+                            labels=False, include_lowest=True)
+    df_blah2 = df_blah.groupby('bin').mean()
+
+    #Compute difference of descent rates and label bins
+    df_blah2['prs_diff'] = df_blah2['CTDPRS'].diff().fillna(0).round(0)
+    df_blah2['movement'] = pd.cut(df_blah2['prs_diff'], [-1000,-0.5,0.5,1000], labels=['up','stop','down'])
+
+    #Find all periods where the rosette is not moving
+    df_stop = df_blah2.groupby('movement').get_group('stop')
+    groupby_test = df_blah2.groupby(df_blah2['movement'].ne(df_blah2['movement'].shift()).cumsum())
+    list_test = [g for i,g in groupby_test]
+
+    #Find a dataframe index of the last soak period before starting descent
+    def poop(list_obj, downcast_pressure):
+        """ Return dataframe index in the last soak period before starting
+            descent to target depth.
+        """
+        for i, x in zip(range(len(list_test)),list_test):
+            if x['CTDPRS'].max() < downcast_pressure:
+                if x.max()['movement'] == 'stop':
+                    index = i
+            if x['CTDPRS'].max() > downcast_pressure:
+                return index
+        return index
+
+    #Truncate dataframe to new starting index : end of dataframe
+    start_index = np.around(list_test[poop(list_test, downcast_pressure)].head(1)['index'])
+    df_cast = df_cast.set_index('index')
+    df_cast = df_cast.loc[int(start_index):,:]
+    df_cast_ret = df_cast.reset_index()
+    return df_cast_ret
+
 #End move four functions
 # def cast_details_old(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
 #     """cast_details function
@@ -459,11 +550,9 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
 
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function
-
     Function takes full NUMPY ndarray with predefined dtype array
     of filtered ctd raw data the stores, analizes and removes ondeck
     values from data.
-
     Args:
         param1 (str): stacast, station cast info
         param1 (str): p_col, pressure data column name
@@ -473,11 +562,9 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
         param5 (ndarray): numpy ndarray with dtype array
         param6 (float): conductivity_startup, threshold value
         param7 (str): log_file, log file name
-
     Returns:
         Narray: The return ndarray with ondeck data removed.
         Also output start/end ondeck pressure.
-
     """
     start_pressure = []
     tmpMat = []
@@ -558,101 +645,84 @@ def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
     return df[df[pressure_column] == monotonic_sequence]
 
 
-def roll_filter(df, p_col='CTDPRS', up='down', frames_per_sec=24, search_time=15, start=0):
+def roll_filter(p_col, inMat=None, up='down', frames_per_sec=24, search_time=15, **kwargs):
     """roll_filter function
-
     Function takes full NUMPY ndarray with predefined dtype array
     and subsample arguments to return a roll filtered ndarray.
-
-    
-    Jackson Notes: calculate sampling frequency 
-        Two types of filters: differential filter, alias filt
-        Get index of second diff function and do discrete analysis
-
     Args:
         param1 (str): stacast, station cast info
         param2 (ndarray): inMat, numpy ndarray with dtype array
         param3 (str): up, direction to filter cast (up vs down)
         param4 (int): frames_per_sec, subsample selection rate
         param5 (int): seach_time, search time past pressure inversion
-
     Returns:
         Narray: The return value ndarray of data with ship roll removed
     """
     #When the "pressure sequence" code is fixed, uncomment and use this instead
-    #start = kwargs.get("start", 0)
-    if df is None:
-        print("Roll filter function: No input data.")
-        return
-    
-    end = df[p_col].idxmax()
-    full_matrix = df
-    tmp_df = df[start:end]
+    start = kwargs.get("start", 0)
+    end = kwargs.get("end", -1)
+    full_matrix = kwargs.get("full_matrix", inMat)
+    tmp_df = pd.DataFrame.from_records(full_matrix[start:end])
     tmp_df = _roll_filter(tmp_df)
-
+    #return tmp_df.to_records(index=False)
     return tmp_df
 
-#    remove = []
-#    frequency = 24 # Hz of package
-#
-#    if (frames_per_sec > 0) & (frames_per_sec <= 24):
-#        sample = int(frequency/frames_per_sec) # establish subsample rate to time ratio
-#    else: sample = frequency
-#
-#    # Adjusted search time with subsample rate
-#    search_time = int(sample*frequency*int(search_time))
+    remove = []
+    frequency = 24 # Hz of package
 
-#    else:
-#        P = df[p_col]
-#        dP = P.diff()
-#        
-#        if up is 'down':
-#            #index_to_remove = np.where(dP < 0)[0] # Differential filter Use DIff command
-#            #subMat = np.delete(df, index_to_remove, axis=0)# use dataframe boolean
-#            
-#            P = P[(dP>0) | (dP.isna()==True)]#Remove pressure value increases and recover first element with or
-#            P = P.reset_index(drop=True)
-#            dP2 = P.diff()
-#            P2 = P[(dP2<0)]# Questionable data points
-#            indicies = P2.index
-#
-#            tmp = np.array([])
-#            for i in range(0,len(P)-1):#Lose If Statement
-#               if P[i] > P[i+1]:# Use another diff command to find indicies
-#                   deltaP = P[i+1] + abs(P[i] - P[i+1])
-#                   # Remove aliasing
-#                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
-#                   tmp = np.arange(i+1,k[0]+1,1)
-#               remove = np.append(remove,tmp)
-#               deltaP = 0
-#        elif up is 'up':
-#            index_to_remove = np.where(dP > 0)[0] # Differential filter
-#            subMat = np.delete(inMat, index_to_remove, axis=0)
-#
-#            P = subMat[p_col]
-#            tmp = np.array([])
-#            for i in range(0,len(P)-1):
-#               if P[i] < P[i+1]:
-#                   deltaP = P[i+1] - abs(P[i] - P[i+1])
-#                   # Remove aliasing
-#                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
-#                   tmp = np.arange(i+1,k[0]+1,1)
-#               remove = np.append(remove,tmp)
-#               deltaP = 0
-#
-#        subMat = np.delete(subMat,remove,axis=0)
-#
-#    return subMat
+    if (frames_per_sec > 0) & (frames_per_sec <= 24):
+        sample = int(frequency/frames_per_sec) # establish subsample rate to time ratio
+    else: sample = frequency
 
-def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15):
+    # Adjusted search time with subsample rate
+    search_time = int(sample*frequency*int(search_time))
+
+    if inMat is None:
+        print("Roll filter function: No input data.")
+        return
+    else:
+        P = inMat[p_col]
+        dP = np.diff(P,1)
+
+        if up is 'down':
+            index_to_remove = np.where(dP < 0)[0] # Differential filter
+            subMat = np.delete(inMat, index_to_remove, axis=0)
+
+            P = subMat[p_col]
+            tmp = np.array([])
+            for i in range(0,len(P)-1):
+               if P[i] > P[i+1]:
+                   deltaP = P[i+1] + abs(P[i] - P[i+1])
+                   # Remove aliasing
+                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
+                   tmp = np.arange(i+1,k[0]+1,1)
+               remove = np.append(remove,tmp)
+               deltaP = 0
+        elif up is 'up':
+            index_to_remove = np.where(dP > 0)[0] # Differential filter
+            subMat = np.delete(inMat, index_to_remove, axis=0)
+
+            P = subMat[p_col]
+            tmp = np.array([])
+            for i in range(0,len(P)-1):
+               if P[i] < P[i+1]:
+                   deltaP = P[i+1] - abs(P[i] - P[i+1])
+                   # Remove aliasing
+                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
+                   tmp = np.arange(i+1,k[0]+1,1)
+               remove = np.append(remove,tmp)
+               deltaP = 0
+
+        subMat = np.delete(subMat,remove,axis=0)
+
+    return subMat
+
+def pressure_sequence(stacast, p_col, time_col, intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15, inMat=None,):
     """pressure_sequence function
-
-    Function takes a dataframe and several arguments to return a pressure 
-    sequenced data ndarray.
-
+    Function takes full NUMPY ndarray with predefined dtype array
+    and several arguments to return a pressure sequenced data ndarray.
     Pressure sequencing includes rollfilter.
-
-    Necessary inputs are input Matrix (inMat) and pressure interval (intP).
+    Necissary inputs are input Matrix (inMat) and pressure interval (intP).
     The other inputs have default settings. The program will figure out
     specifics for those settings if left blank.
     Start time (startT), start pressure (startP) and up are mutually exclusive.
@@ -661,21 +731,19 @@ def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up=
     There is no interpolation to the surface for other sensor values.
     'up' indicates direction for pressure sequence. If up is set startT and startP
     are void.
-
     Args:
-        param1 (Dataframe: Dataframe containing measurement data
+        param1 (str): stacast, station cast input
         param2 (str): p_col, pressure column name
-        param3 (float): starting pressure interval
+        param3 (str): time_col, time column name
+        param4 (float): starting pressure interval
         param5 (float): start time (startT) for pressure sequence
         param6 (float): start pressure (startP) for pressure sequence
         param7 (str): pressure sequence direction (down/up)
         param8 (int): sample_rate, sub sample rate for roll_filter. Cleans & speeds processing.
         param9 (int): search_time, truncate search index for the aliasing part of ship roll.
         param10 (ndarray): inMat, input data ndarray
-
     Returns:
         Narray: The return value is a matrix of pressure sequenced data
-
     todo: deep data bin interpolation to manage empty slices
     """
     # change to take dataframe with the following properties
@@ -694,16 +762,86 @@ def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up=
     #lenP, prvPrs not used
     # Passed Time-Series, Create Pressure Series
 
+    ###forget the check, let it crash
+    # if inMat is None:
+    #     print("Pressure sequence function: No input data.")
+    #     return
+    # else:
+    #     pF = inMat[p_col]
+    #     full_length = len(pF)-1
+
+        #btm = max(pF) # bottom max P ###not needed once we change bin code
+        ### Following two lines are only for btmTime, which is used in edge case check
+        #indBtm = np.argmax(pF) # bottom index
+        #btmTime = inMat[time_col][indBtm] # bottom time
+
+        ##  Initialise input parameters OLD
+        # if (startT > 0.0).bool() and (startT > inMat[time_col][0]).bool(): #patched startT with int() cast, complaining about it being a series
+        #     start = (np.abs(inMat[time_col] - startT)).argmin()
+        #     lenP = np.arange(start,indBtm,1)
+        #     end = indBtm
+        #     prvPrs = inMat[p_col][start]
+        #     if btmTime <= startT:
+        #         print("-startT start time is greater than down cast time. Cast issue.")
+        #         return
+        # elif ((startP > 0.0) and (startP > pF[0])):
+        #     start = (np.abs(inMat[p_col] - startP)).argmin()
+        #     lenP = np.arange(start,indBtm,1)
+        #     end = indBtm
+        #     prvPrs = inMat[p_col][start]
+        #     if btm <= startP:
+        #         print("-startP start pressure is greater than bottom pressure. Cast issue.")
+        #         import pdb; pdb.set_trace() ####
+        #         return
+        # elif up is 'up':
+        #     start = indBtm
+        #     end = full_length
+        #     lenP = np.arange(start,end,1)
+        #     prvPrs = btm
+        # else:
+        #     lenP = np.arange(0,indBtm,1)
+        #     start = 0
+        #     end = indBtm
+        #     prvPrs = 0.0
+
+    df = pd.DataFrame.from_records(inMat)
     start = 0
-
+#try except to be patched out when serialization changes
+    try:
+        end = df['CTDPRS_DBAR'].idxmax()
+        btm = df['CTDPRS_DBAR'].max()
+    except KeyError:
+        end = df['CTDPRS'].idxmax()
+        btm = df['CTDPRS'].max()
     # Roll Filter
-    roll_filter_matrix = roll_filter(df, p_col, up, sample_rate, search_time, start=start)
 
+    roll_filter_matrix = roll_filter(p_col, inMat[:][start:end:sample_rate], up, sample_rate, search_time, start=start, end=end, full_matrix=inMat)
+    ### Needs to be removed and replaced with pd.fillna()
+    # Treat surface data.
+    #roll_filter_matrix = treat_surface_data(p_col, sample_rate, roll_filter_matrix)
     df_roll_surface = fill_surface_data(roll_filter_matrix, bin_size=2)
     #bin_size should be moved into config
     binned_df = binning_df(df_roll_surface, bin_size=2)
-    binned_df = binned_df.reset_index(drop=True)
-    return binned_df
+    ### OLD code - bin data and find mean of each bin
+    # # Frame Pressure Bins
+    # pressure_bins = np.arange(0,int(btm),intP)
+    # p_bin_index = np.digitize(roll_filter_matrix[p_col],pressure_bins)
+    #
+    # # Define binned output array
+    # binned_matrix = np.empty(shape=(len(pressure_bins),), dtype=inMat.dtype)
+    #
+    # # Iterate over input data by column, sort bins and find mean of binned data.
+    # for col in binned_matrix.dtype.names:
+    #     if col == p_col:
+    #         binned_matrix[col] = pressure_bins
+    #     elif binned_matrix[col].dtype is np.dtype(np.float64):
+    #         binned_matrix[col] = [roll_filter_matrix[col][p_bin_index == i].mean() for i in range(1,len(pressure_bins)+1)]
+    #         # Interpolate over NaN or missing data
+    #         if np.isnan(binned_matrix[col]).any():
+    #             binned_matrix[col] = data_interpolater(binned_matrix[col])
+
+    binned_matrix = binned_df.to_records(index=False)
+    return binned_matrix
 ### Once serialization has been fixed, fix try/except to compact code
 
 def binning_df(df, **kwargs):
@@ -983,10 +1121,12 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
     df['P-S'] = df[cond_col_1] - df[cond_col_2]
     
     
+
     #Greater than 2000 dBar
     lower_lim = 2000
     upper_lim = df[p_col].max()
     threshold = 0.002
+
     
     df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
@@ -1003,21 +1143,23 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
     df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
     df_lmid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
     
+
     #Between 1000 and 500
     lower_lim = 500
     upper_lim = 1000
     threshold = 0.010
+
     
     
     df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
     df_umid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
     
+
     #Less than 500
     lower_lim = df[p_col].min() - 1
     upper_lim = 500
     threshold = 0.020
-
     
     df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
     df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
@@ -1480,12 +1622,7 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     return
         
         
-   
-    
 
-    
-    
-    
 ###End try/except fix
 
 ### OLD UNUSED

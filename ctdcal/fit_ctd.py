@@ -37,11 +37,80 @@ def offset(offset, inArr):
     #return inArr
     return inArr + offset
 
-
-def IESRho(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
+def IESRho(s, t, p):
+    bars  = p * 0.1
+#/* pressure in bars */
+#/*
+#**  Calculate Rho(s,t,0.0)
+#*/
+    rhow  =  (999.842594 +t*
+       ( 0.06793952 +t*
+       (-0.00909529 +t*
+       ( 1.001685e-4+t*
+       (-1.120083e-6+t*
+       6.536332e-9)))))
+    #/* rhow = density of pure water kg/m**3 */
+    kw    = (((t*(-0.0040899+
+       t*( 7.6438e-5+
+       t*(-8.2467e-7+
+       t*  5.3875e-9))))+
+       0.824493)*s)
+    #/* pure water secant bulk modulus */
+    termc = s * math.sqrt(s);
+    kst0  = ((-0.00572466 +
+       t*( 1.0227e-4  +
+       t*(-1.6546e-6))) * termc)
+    #/* k(s,t,0) */
+    rho   = rhow + kw + kst0 + 4.8314e-4 *s*s
+#      /* rho(s,t,0.0)  kg/m**3 */
+#      /*
+#      **  Calculate pressure effects.
+#      */
+    if (bars > 0.0):
+#  	/*
+#  	**                 Rho(s,t,0)
+#  	**  Rho(s,t,p) = -------------
+#  	**                        p
+#  	**               1.0 - -------
+#  	**                     k(s,t,p)
+#  	*/
+        kw    = (t*(148.4206          +
+           t*( -2.327105        +
+           t*(  0.01360477      +
+           t*( -5.155288e-5)))) +
+           1.965221e4)
+        kst0  =  ( (54.6746    +
+           t*(-0.603459  +
+           t*( 0.0109987 +
+           t*(-6.167e-5))))*s + kw +
+           ( 0.07944   +
+           t*( 0.016483  +
+           t*(-5.3009e-4)))*termc)
+#  	/*
+#  	**  Calculate pressure terms.
+#  	*/
+        terma = (    3.239908     +
+           t*( 0.00143713   +
+           t*( 1.16092e-4   +
+           t*(-5.77905e-7)))+
+           ( 0.0022838    +
+           t*(-1.0981e-5    +
+           t*(-1.6078e-6)))*s +
+           1.91075e-4*termc)
+        termb = (8.50935e-5  +
+           t*(-6.12293e-6  +
+           t*  5.2787e-8)  +
+           (-9.9348e-7   +
+           t*( 2.0816e-8   +
+           t*  9.1697e-10))*s)
+        kstp  = kst0 + bars*(terma + bars*termb)
+        rho   = rho/(1.0-bars/kstp)
+    return rho
+    
+def IESRho_df(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
     """
         Calculate the IES density
-    
+
     Parameters
     ----------
     df : Dataframe
@@ -49,10 +118,10 @@ def IESRho(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
 
     sal_col : string
              dataframe column name of salinity data [PSU]
-    
+
     t_col : string
             dataframe colum,n name of temperature data [C (ITS-90)]
-    
+
     p_col : string
             dataframe column name of pressure data [dBar]
 
@@ -61,29 +130,29 @@ def IESRho(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
     df : Dataframe
          input dataframe but with an addition 'rho' column
 
-    
-    
+
+
     """
-    
-    
+
+
     bars  = df[p_col] * 0.1
 #/* pressure in bars */
 #/*
 #**  Calculate Rho(s,t,0.0)
 #*/
-    
-    rhow = (999.842594 + df[t_col] *( 0.06793952 + df[t_col] * (-0.00909529 
+
+    rhow = (999.842594 + df[t_col] *( 0.06793952 + df[t_col] * (-0.00909529
             + df[t_col] * (1.001685e-4 + df[t_col] * (-1.120083e-6 + df[t_col]
             * 6.536332e-9)))))
-    
+
     #/* rhow = density of pure water kg/m**3 */
-    
+
     kw = (((df[t_col] * (-0.0040899+ df[t_col] *( 7.6438e-5+ df[t_col]
          * (-8.2467e-7 + df[t_col] *  5.3875e-9)))) + 0.824493) * df[sal_col])
     #/* pure water secant bulk modulus */
-    
+
     termc = df[sal_col] * np.sqrt(df[sal_col]);
-    kst0  = ((-0.00572466 + df[t_col] * ( 1.0227e-4  + df[t_col] 
+    kst0  = ((-0.00572466 + df[t_col] * ( 1.0227e-4  + df[t_col]
              * (-1.6546e-6))) * termc)
     #/* k(s,t,0) */
     rho   = rhow + kw + kst0 + 4.8314e-4 * df[sal_col] * df[sal_col]
@@ -98,11 +167,11 @@ def IESRho(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
 #  	**               1.0 - -------
 #  	**                     k(s,t,p)
 #  	*/
-    kw    = (df[t_col] * (148.4206 + df[t_col] * ( -2.327105+ df[t_col] 
+    kw    = (df[t_col] * (148.4206 + df[t_col] * ( -2.327105+ df[t_col]
             * (0.01360477 + df[t_col] * ( -5.155288e-5)))) + 1.965221e4)
-    
-    kst0  =  ((54.6746 + df[t_col] * (-0.603459 + df[t_col] * (0.0109987 
-               + df[t_col] * (-6.167e-5)))) * df[sal_col] + kw + (0.07944 
+
+    kst0  =  ((54.6746 + df[t_col] * (-0.603459 + df[t_col] * (0.0109987
+               + df[t_col] * (-6.167e-5)))) * df[sal_col] + kw + (0.07944
               + df[t_col] * (0.016483 + df[t_col] * (-5.3009e-4))) * termc)
 #  	/*
 #  	**  Calculate pressure terms.
@@ -111,11 +180,11 @@ def IESRho(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
              + df[t_col] * (-5.77905e-7))) + (0.0022838 + df[t_col]
             * (-1.0981e-5 + df[t_col] * (-1.6078e-6))) * df[sal_col]
             + 1.91075e-4 * termc)
-    
+
     termb = (8.50935e-5  + df[t_col] * (-6.12293e-6  + df[t_col] *  5.2787e-8)
              + (-9.9348e-7 + df[t_col] * (2.0816e-8 + df[t_col] * 9.1697e-10))
              * df[sal_col])
-    
+
     kstp  = kst0 + bars * (terma + bars * termb)
     df['rho']   = rho/(1.0-bars/kstp)
     return df

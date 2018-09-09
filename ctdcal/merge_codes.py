@@ -120,7 +120,7 @@ def load_exchange_bottle_file(bottle_file):
     Output:
     dataframe
     '''
-    return pd.read_csv(bottle_file, skiprows=[0,1,2,3,4,6], skipfooter=1, engine='python')
+    return pd.read_csv(bottle_file, skiprows=[0,1,2,3,4,5,6,7,8,9,11], skipfooter=1, engine='python')
 
 def write_to_odf_db_bottle_file(df_bottle, output_file):
     '''Write WHP_exchange file for odf_db to load.
@@ -185,7 +185,7 @@ def merge_bottle_trip_dfs(file_ssscc):
         cast = int(ssscc[3:5])
 
         ### rewrite this line to be more portable
-        df = pd.read_pickle(f'/Users/jgum/work_code/cruises/P06_2017/ctd_proc_rewrite/data/bottle/{ssscc}_btl_mean.pkl')
+        df = pd.read_pickle(f'data/bottle/{ssscc}_btl_mean.pkl')
 
         ### chop dataframe shorter for ease of use
         df = df[['CTDPRS','CTDTMP1','CTDTMP2','CTDCOND1','CTDCOND2','btl_fire_num']]
@@ -241,6 +241,7 @@ def ctd_residuals_df(df_bottle):
     df_bottle['BTL_T2'] = df_bottle['REFTMP'] - df_bottle['CTDTMP2']
     df_bottle['T1_T2'] = df_bottle['CTDTMP1'] - df_bottle['CTDTMP2']
 
+    df_bottle['BTL_SAL_UP'] = df_bottle['SALNTY'] - gsw.SP_from_C(df_bottle['CTDCOND2'], df_bottle['CTDTMP2'], df_bottle['CTDPRS'])
     df_bottle['BTL_SAL'] = df_bottle['SALNTY'] - df_bottle['CTDSAL']
     return None
 
@@ -306,7 +307,7 @@ def get_qc_all_from_df(df):
         'CTDOXY_FLAG_W']).get_group((2,2,2,2,2,2,2,2,1)).copy()
     return df
 
-def residual_stddev(df, param):
+def residual_stddev(df, param=['BTL_O', 'BTL_C1', 'BTL_C2', 'C1_C2', 'BTL_T1', 'BTL_T2', 'T1_T2', 'BTL_SAL', 'BTL_SAL_UP']):
     '''Calculate standard deviations of parameters or residuals.
     Input:
     df - dataframe containing all data from casts
@@ -315,18 +316,19 @@ def residual_stddev(df, param):
     output - dictionary, key = is parameter name or parameter deep, value is 2 stddevs
     '''
     output = {}
-    output[f'{param}'] = df[f'{param}'].std()*2
-    df = df[df['CTDPRS'] > 2000]
-    output[f'{param}_DEEP'] = df[f'{param}'].std()*2
+    for x in param:
+        output[f'{x}'] = df[f'{x}'].std()*2
+        df_deep = df[df['CTDPRS'] > 2000]
+        output[f'{x}_DEEP'] = df_deep[f'{x}'].std()*2
     return output
 
 def main(argv):
     '''Example run'''
-    qual_codes_filepath = f'/Users/jgum/work_code/cruises/P06_2017/quality_codes/'
-    cruise_dir = f'/Users/jgum/work_code/cruises/P06_2017/'
+    qual_codes_filepath = f'data/quality_codes/'
+    cruise_dir = f'data/'
 
     file_ssscc = f'{cruise_dir}ssscc.csv'
-    bottle_file= f'{qual_codes_filepath}320620170703_hy1.csv'
+    bottle_file= f'{qual_codes_filepath}320620180309_hy1.csv'
 
     ### compile bottle trips into one file, then merge with odf_db bottle file
     df_bottle = prelim_ctd_bottle_df(file_ssscc, bottle_file)

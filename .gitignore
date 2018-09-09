@@ -8,6 +8,7 @@
 *.kdev4
 .project
 .pydevproject
+*.ipynb_*
 
 # Compiled source #
 ###################
@@ -58,5 +59,10 @@ images/*
 
 # pytest
 .cache
+
+# Ipython notebook #
+####################
+
+*.ipynb*
 
 __pycache__/

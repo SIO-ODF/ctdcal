@@ -3,6 +3,7 @@ import csv
 import pandas as pd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
+import gsw
 
 DEBUG = False
 
@@ -61,7 +62,7 @@ def convertFromSBEReader(sbeReader, debug=False):
     DEBUG = debug
 
     # Retrieve parsed scans
-    rawData = sbeReader.parsed_scans()
+    rawData = sbeReader.parsed_scans
 
     # Convert raw data to dataframe
     raw_df = pd.DataFrame(rawData)
@@ -221,8 +222,13 @@ def convertFromSBEReader(sbeReader, debug=False):
         ###Salinity block
         elif temp_meta['sensor_id'] == '1000':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.sp_dict(c_array, t_array, p_array)
+            converted_df[column_name] = gsw.SP_from_C(c_array, t_array, p_array)
             #processed_data.append(temp_meta)
+
+        ###Altimeter block
+        elif temp_meta['sensor_id'] == '0':
+            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            converted_df[column_name] = sbe_eq.altimeter_voltage(temp_meta['sensor_info'], raw_df[temp_meta['column']])
 
         ### Aux block
         else:

@@ -1,12 +1,46 @@
+# ctdcal project
+
+The ctdcal project is a library designed to process CTD cast data and calibrate
+them against taken bottle samples, and scripts providing an example case of how
+to use the library.
+
+In the future parts of the ctdcal library will be split off into additional packages,
+such as an "ocean sensors" package with Python implementations of conversion routines
+for in-situ sensors used for ocean measurement.
+
+### Installation and Dependencies
+Run ```python setup.py```
+
+Dependencies:
+ - python3 (3.6)
+ - numpy (1.12.1)
+ - scipy (0.19.0)
+ - gsw (3.2)
+ - matplotlib (2.0.1)
+ - pandas (== 0.20.3)
+
+### Running the scripts
+Once installed, copy the test data set into the working directory.
+Afterwards go into the working directory and type:
+```odf_process_all.py
+```
+This will run the scripts against the currently loaded data.
+
+### LICENSING
+BSD 3-clause
+
+
+# DEPRECIATED
+
 # General Utilities for processing SBE Data
 
 ### Dependencies:
- - python3 (need minimum version info)
- - numpy (need minimum version info)
- - scipy (need minimum version info)
- - gsw (need minimum version info)
- - matplotlib (need minimum version info)
- - pandas (>= v0.18.1)
+ - python3 (3.6)
+ - numpy (1.12.1)
+ - scipy (0.19.0)
+ - gsw (3.2)
+ - matplotlib (2.0.1)
+ - pandas (== 0.20.3)
 
 ###Overview of available scripts
 #### Utility for converting Seabird Electronics .hex/.XMLCON raw data into csv-formatted text files
@@ -100,4 +134,4 @@ optional arguments:
  - Please take a look at [COOKBOOK.md](./COOKBOOK.md) for suggestions on how to leverage the ODF-CTD-PROC Utilites in a real-world, at-sea scenario.
 
 ### LICENSING
-Coming soon 
+BSD 3-clause
