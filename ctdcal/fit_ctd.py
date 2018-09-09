@@ -2,12 +2,13 @@
 import math
 import scipy
 import numpy as np
-import ctdcal.process_ctd as process_ctd
+import pandas as pd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 from scipy.optimize import leastsq
 import gsw
 import csv
+from scipy.ndimage.interpolation import shift
 #import requests
 import os
 import json
@@ -15,6 +16,9 @@ import json
 M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
 D = 1.42905481 #  /* density O2 g/l @ 0 C */
+
+alpha = 0.03 #0.043 - 1999 Value # Seabird Covered glass inital fluid thermal anomaly
+beta = 1.0 / 7 #1.0 / 4.3 1999 Value # Thermal anomaly time constant
 
 
 def offset(offset, inArr):
@@ -418,64 +422,140 @@ def residualO2(calib, o2pl, P, K, T, S, V):
     return weight
 
 
-def conductivity_polyfit(C, P, T, cond):
-    """Polynomial used to fit conductivity data with pressure effect.
-    The following are single or list/tuple:
-    C is starting estimate for coefficients
-    P is pressure in decibars
-    T is temperature in Celcius
-    cond is conductivity in mS/cm
+#def conductivity_polyfit(C, P, T, cond):
+#    """Polynomial used to fit conductivity data with pressure effect.
+#    The following are single or list/tuple:
+#    C is starting estimate for coefficients
+#    P is pressure in decibars
+#    T is temperature in Celcius
+#    cond is conductivity in mS/cm
+#
+#    Original equation from ...
+#    Conductivity mS/cm = cond + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4 * cond^2 + C5 * cond + C6
+#
+#    Another time based fit must be run at the end of cruise to account for time dependent drift.
+#
+#    """
+#    try:
+#        c_arr = []
+#        for P_x, T_x, cond_x in zip(P, T, cond):
+#            tmp = cond_x + C[0] * np.power(P_x,2) + C[1] * P_x + C[2] * np.power(T_x,2) + C[3] * T_x + C[4] * np.power(cond_x,2) + C[5] * cond_x + C[6]
+#            c_arr.append(round(tmp,4))
+#    #Single mode.
+#    except:
+#        tmp = cond + C[0] * np.power(P,2) + C[1] * P + C[2] * np.power(T,2) + C[3] * T + C[4] * np.power(cond_x,2) + C[5] * cond_x + C[6]
+#        c_arr = round(tmp,4)
+#    #tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
+#    #c_arr = tmp.round(decimals=4)
+#    #c_arr = round(tmp,4)
+#
+#    return c_arr
 
-    Original equation from ...
-    Conductivity mS/cm = cond + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4 * cond^2 + C5 * cond + C6
+def conductivity_polyfit(cond,temp,press,coef):
+#    
+     fitted_cond = cond + (coef[0] * (press**2) + coef[1] * press + coef[2] * (temp**2) \
+                    + coef[3] * temp + coef[4] * (cond**2) + coef[5] * cond + coef[6])
+     fitted_cond = fitted_cond.round(4)
+     fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
+     return fitted_cond, fitted_sal
+     
+def cell_therm_mass_corr(temp,cond,sample_int,alpha=alpha,beta=beta):
+    
+    a = calculate_a_CTM(alpha, sample_int, beta)
+    b = calculate_b_CTM(a, alpha)
+    dC_dT = calculate_dc_dT_CTM(temp)
+    dT = calculate_dT_CTM(temp)
+    CTM = calculate_CTM(b, 0, a, dC_dT, dT)
+    
+    CTM = calculate_CTM(b, shift(CTM,1,order=0), a, dC_dT, dT)
+    CTM = np.nan_to_num(CTM) 
+    CTM = S_M_to_mS_cm(CTM) 
+    cond_corr = apply_CTM(cond, CTM)
+       
+    return cond_corr
 
-    Another time based fit must be run at the end of cruise to account for time dependent drift.
+def apply_CTM(cond, CTM):
+    
+    c_corr = cond + CTM
+    
+    return c_corr
 
+def calculate_CTM(b, CTM_0, a, dC_dT, dT):
+    
+    CTM = -1.0 * b * CTM_0 + a * (dC_dT) * dT
+    
+    return CTM
+
+
+def calculate_dT_CTM(temp):
     """
-    try:
-        c_arr = []
-        for P_x, T_x, cond_x in zip(P, T, cond):
-            tmp = cond_x + C[0] * math.pow(P_x,2) + C[1] * P_x + C[2] * math.pow(T_x,2) + C[3] * T_x + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
-            c_arr.append(round(tmp,4))
-    #Single mode.
-    except:
-        tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
-        c_arr = round(tmp,4)
-    #tmp = cond + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4] * math.pow(cond_x,2) + C[5] * cond_x + C[6]
-    #c_arr = tmp.round(decimals=4)
-    #c_arr = round(tmp,4)
-
-
-    return c_arr
-
-
-def temperature_polyfit(C, P, T):
-    """Polynomial used to fit data with pressure effect.
-
-    The following are single or list/tuple:
-    fit declares fit type
-    C is starting estimate for coefficients
-    P is pressure in decibars
-    T is temperature in Celcius
-
-    Original equation from ...
-    Temperature degC ITS-90 = T + C0 * P^2 + C1 * P + C2 * T^2 + C3 * T + C4
-
-    Another time based fit must be run at the end of cruise to account for time dependent drift.
-
+    Seabird eq: dT = temperature - previous temperature
+    
     """
-    try:
-        t_arr = []
-        for P_x, T_x in zip(P, T):
-            tmp = T_x + C[0] * math.pow(P_x,2) + C[1] * P_x + C[2] * math.pow(T_x,2) + C[3] * T_x + C[4]
-            t_arr.append(round(tmp,4))
-       #Single mode.
-    except:
-        tmp = T + C[0] * math.pow(P,2) + C[1] * P + C[2] * math.pow(T,2) + C[3] * T + C[4]
-        t_arr = round(tmp,4)
+    
+    dT = np.diff(temp)
+    dT = np.insert(dT,0,0)
+    
+    return dT
 
-    return t_arr
+def calculate_dc_dT_CTM(temp):
+    """
+    
+    Seabird eq: dc/dT = 0.1 * (1 + 0.006 * [temperature - 20])
+    
+    """
+    
+    dc_dT = 0.1 * (1 + 0.006 * (temp - 20))
+    
+    return dc_dT
 
+def calculate_mS_from_S(CTM):
+    
+    CTM_ms = 10.0 * CTM
+    
+    return CTM_ms
+
+def S_M_to_mS_cm(CTM_S_M):
+    
+    """
+    
+    Seabird eq: ctm [mS/cm] = ctm [S/m] * 10.0
+    
+    """
+    ctm_mS_cm = CTM_S_M * 10.0
+    
+    return ctm_mS_cm
+    
+
+def calculate_a_CTM(alpha, sample_int, beta):
+    
+    """
+    Seabird eq: a = 2 * alpha / (sample interval * beta + 2)
+    
+    """
+    
+    a = 2 * (alpha / (sample_int * beta + 2))
+    
+    return a
+
+def calculate_b_CTM(a, alpha):
+    
+    """
+    Seabird eq: b = 1 - (2 * a / alpha)
+        
+    """
+    
+    b = 1 - (2 * (a / alpha))
+    
+    return b
+
+
+def temperature_polyfit(temp,press,coef):
+    
+    fitted_temp = temp + coef[0] * (press**2) + coef[1] * press + coef[2] * (temp**2) + coef[3] * temp + coef[4]
+    fitted_temp = fitted_temp.round(4)
+    
+    return fitted_temp
 
 #def load_qual(path):
 #    comment_dict = {}
@@ -500,7 +580,7 @@ def temperature_polyfit(C, P, T):
 #salts = requests.get("http://go-ship.rrevelle.sio.ucsd.edu/api/salt").json()
 #def o2_calc(path, o2_payload, thio_ns):
 
-def o2_calc(o2flasks, o2path, btl_num, salt):
+def o2_calc(o2flasks, o2path, btl_num): #, salt
 #    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
 
     btl_num.astype(int)
@@ -508,7 +588,7 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
     o2kg = np.zeros(shape=(len(btl_num),), dtype=[('BTLNUM', np.int),('OXYGEN',np.float)])
 
     with open(o2path, 'r') as f:
-        rho = IESRho
+#        rho = IESRho
         params = next(f).strip().split()
 
         titr   = float(params[0])
@@ -519,7 +599,7 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
         thio_t = float(params[5])
 
         thio_n = thio_n_calc(titr, blank, kio3_n, kio3_v, kio3_t, thio_t)
-        rho_stp = rho_t(20)
+#        rho_stp = rho_t(20)
 
         btl_counter = 0
         #try:
@@ -545,7 +625,7 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
                 o2ml['BTLNUM'][bottle-1] = int(bottle)
                 o2ml['OXYGEN'][bottle-1] = (((titr_20c - blank) * thio_n * 5.598 - 0.0017)/((flask_vol - 2.0) * 0.001))
                 o2kg['BTLNUM'][bottle-1] = int(bottle)
-                o2kg['OXYGEN'][bottle-1] = mll_to_umolkg(o2ml['OXYGEN'][bottle-1], salt[bottle-1], draw_temp,rho)
+                #o2kg['OXYGEN'][bottle-1] = mll_to_umolkg(o2ml['OXYGEN'][bottle-1], salt[bottle-1], draw_temp,rho)
             else:
                 btl_counter += 1
                 o2ml['BTLNUM'][bottle-1] = btl_counter
@@ -555,61 +635,243 @@ def o2_calc(o2flasks, o2path, btl_num, salt):
 #           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
         #except ValueError:
             #print('File probably malformed. Check datafile for problems.')
-    return o2kg, o2ml
+    return o2ml #o2kg,
 
 
 def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
-#    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
+    
+    f = open(saltpath, newline='')
+    saltF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
+    
+    saltArray = []
+    for row in saltF:
+        saltArray.append(row)
+    del saltArray[0]
+         
+    header = ['STNNBR','CASTNO','SAMPNO','BathTEMP','CRavg','autosalSAMPNO',\
+              'Unknown','StartTime','EndTime','Attempts','Reading1','Reading2',\
+              'Reading3', 'Reading4', 'Reading5','Reading6','Reading7','Reading8',\
+              'Reading9', 'Reading10','Reading11','Reading12']
+    f.close()
+    # make all rows of Salt files the same length as header   
+    for row in saltArray:
+        if len(row) < len(header):
+            row.extend([np.NaN]*(len(header)-len(row)))
+            
+    saltArray = np.array(saltArray) # change to np array
+    
+    saltDF = pd.DataFrame(saltArray,columns=header) # change to DataFrame
+    saltDF = saltDF.apply(pd.to_numeric, errors='ignore')
+    
+    cond = saltDF[['autosalSAMPNO','SAMPNO','CRavg','BathTEMP']]
+    # Remove standard measurements
+    cond = cond[(cond['autosalSAMPNO']!='worm')]
+    if all(cond['autosalSAMPNO'].values.astype(int) != cond['SAMPNO'].values.astype(int)):
+        raise ValueError('Mismatched sample numbers in salt file (check file: '+ saltpath + ')')
+    cond = cond.drop('autosalSAMPNO',axis=1)
+    cond = cond.apply(pd.to_numeric) # For some reason doesn't completely work the first time
+    #cond = cond[(cond['SAMPNO']!=0) & (cond['SAMPNO']!=99)]
+    # Filter unmeansured bottle data from btl_data
+    data = btl_data[btl_data[btl_num_col].isin(cond['SAMPNO'].tolist())]
+    
+    salinity = SP_salinometer((cond['CRavg']/2.0),cond['BathTEMP'])
+    try:
+        cond['BTLCOND'] = gsw.C_from_SP(salinity,data[btl_tmp_col],data[btl_p_col])
+        #cond = cond.drop('SAMPNO',1)
+    except ValueError:
+        raise ValueError('Possible mis-entered information in salt file (Check salt file)')
 
-    salt_file_name = os.path.basename(saltpath)
-    salt_sta = int(salt_file_name[0:3])
-    salt_cst = int(salt_file_name[3:5])
+#    # Create 36-place DF
+#    DF = pd.DataFrame(data=np.arange(1,37),columns=['SAMPNO'],index=range(1,37))
+#    # Merge
+#    DF = DF.merge(cond,on="SAMPNO",how='outer')
+#    DF = DF.set_index(np.arange(1,37))
+    
+    
+    return cond#DF
+    
+def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
 
-    btl_num = btl_data[btl_num_col].astype(int)
-
-    psu = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('SALNTY',np.float)])
-    mspcm = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('BTLCOND',np.float)])
-    tmp_tmp = np.zeros(len(btl_num), dtype=np.float)
-    tmp_p = np.zeros(len(btl_num), dtype=np.float)
-    bath_tmp = np.zeros(len(btl_num), dtype=np.float) #patched in - JIG 2017-07-15
-
-    with open(saltpath, 'r') as f:
-        params = next(f).strip().split()
-        #std   = float(params[8])
-
-        params = next(f).strip().split()
-        worm1   = float(params[4])
-
-        #btl_counter = 0
-        for l in f:
-            row = l.split()
-            station = int(row[0])
-            cast = int(row[1])
-            if (station == salt_sta) and (cast == salt_cst):
-                if (row[5] == 'worm'):
-                    worm2 = float(row[4])
-                else:
-                   bottle = int(row[5])
-                   cond = float(row[4])
-                   bath = int(row[3]) #patched in - JIG 2017-07-15
-                   bath_tmp = np.full_like(bath_tmp, bath)
-
-                if bottle in btl_num:
-                    i = int(np.where(btl_num == bottle)[0][0])
-                    j = int(np.where(btl_data[btl_num_col] == bottle)[0][0])
-                    tmp_tmp[j] = btl_data[btl_tmp_col][j]
-                    tmp_p[j] = btl_data[btl_p_col][j]
-                    psu[btl_num_col][i] = int(bottle)
-                    mspcm[btl_num_col][i] = int(bottle)
-                    psu['SALNTY'][i] = cond / 2.0
-                    #import pdb; pdb.set_trace()
+    ### Clean up to avoid runtimewarning ###
+    cond_ratio = array_like_to_series(cond_ratio)
+    bath_temp = array_like_to_series(bath_temp)
+    btl_temp = array_like_to_series(btl_temp)
+    btl_press = array_like_to_series(btl_press)
+    
+    nans = np.isnan(cond_ratio)
+    bnans = np.isnan(bath_temp)
+    cond_ratio.loc[nans] = 0
+    bath_temp.loc[bnans] = 0    
+    
+#    cond_df = cond_ratio.copy()
+#    bath_df = bath_temp.copy()
+#    nans = np.isnan(cond_df)
+#    bnans = np.isnan(bath_df)
+#    cond_df.loc[nans] = 0
+#    bath_df.loc[bnans] = 0
+    
+    
+    salinity = SP_salinometer((cond_ratio / 2.0),bath_temp)
+    cond = gsw.C_from_SP(salinity,btl_temp,btl_press)  
+    
+    cond[cond<=1] = np.nan
+    
+    #cond = pd.series(cond)
+    
+    
+    return cond
 
 
-        psu['SALNTY'] = SP_salinometer(psu['SALNTY'], bath_tmp)
-        mspcm['BTLCOND'] = gsw.C_from_SP(psu['SALNTY'], tmp_tmp, tmp_p)
-#           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
-    return mspcm, psu
+    
+##    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
 #
+#    salt_file_name = os.path.basename(saltpath)
+#    salt_sta = int(salt_file_name[0:3])
+#    salt_cst = int(salt_file_name[3:5])
+#
+#    btl_num = btl_data[btl_num_col].astype(int)
+#
+#    psu = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('SALNTY',np.float)])
+#    mspcm = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('BTLCOND',np.float)])
+#    tmp_tmp = np.zeros(len(btl_num), dtype=np.float)
+#    tmp_p = np.zeros(len(btl_num), dtype=np.float)
+#    bath_tmp = np.zeros(len(btl_num), dtype=np.float) #patched in - JIG 2017-07-15
+#
+#    with open(saltpath, 'r') as f:
+#        params = next(f).strip().split()
+#        #std   = float(params[8])
+#
+#        params = next(f).strip().split()
+#        worm1   = float(params[4])
+#
+#        #btl_counter = 0
+#        for l in f:
+#            row = l.split()
+#            station = int(row[0])
+#            cast = int(row[1])
+#            if (station == salt_sta) and (cast == salt_cst):
+#                if (row[5] == 'worm'):
+#                    worm2 = float(row[4])
+#                else:
+#                   bottle = int(row[5])
+#                   cond = float(row[4])
+#                   bath = int(row[3]) #patched in - JIG 2017-07-15
+#                   bath_tmp = np.full_like(bath_tmp, bath)
+#
+#                if bottle in btl_num:
+#                    i = int(np.where(btl_num == bottle)[0][0])
+#                    j = int(np.where(btl_data[btl_num_col] == bottle)[0][0])
+#                    tmp_tmp[j] = btl_data[btl_tmp_col][j]
+#                    tmp_p[j] = btl_data[btl_p_col][j]
+#                    psu[btl_num_col][i] = int(bottle)
+#                    mspcm[btl_num_col][i] = int(bottle)
+#                    psu['SALNTY'][i] = cond / 2.0
+#                    #import pdb; pdb.set_trace()
+#
+#
+#        psu['SALNTY'] = SP_salinometer(psu['SALNTY'], bath_tmp)
+#        mspcm['BTLCOND'] = gsw.C_from_SP(psu['SALNTY'], tmp_tmp, tmp_p)
+#        
+#        mspcm = pd.DataFrame(mspcm)
+#        psu = pd.DataFrame(psu)
+##           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
+    
+    
+    
+#    return mspcm, psu
+
+def write_calib_coef(ssscc,coef,param):
+    """ Write coef to csv
+    
+    
+    """
+    df = pd.DataFrame()
+    df['SSSCC'] = ssscc  
+    
+    if param == 'T':
+
+        df['coef_0'] = coef[0]
+        df['coef_1'] = coef[1]
+        df['coef_2'] = coef[2]
+        df['coef_3'] = coef[3]
+        df['coef_4'] = coef[4]
+        df['coef_5'] = coef[5]
+        df['coef_6'] = coef[6]
+        
+    if param == 'C':
+       
+        df['coef_0'] = coef[0]
+        df['coef_1'] = coef[1]
+        df['coef_2'] = coef[2]
+        df['coef_3'] = coef[3]
+        df['coef_4'] = coef[4]
+        
+
+    return df
+
+#
+def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
+                   cond_col = 'CTDCOND'):
+    """ Applies Coef to time and bottle Data
+    
+    
+    """
+    
+    coef = coef_frame.loc[coef_frame['SSSCC']== ssscc]
+    
+    if sensor == 1:
+        t_col = t_col+'1'
+        cond_col = cond_col+'1'
+        
+    elif sensor == 2:
+        t_col = t_col+'2'
+        cond_col = cond_col+'2'
+           
+    
+    if param == 'T':
+        
+        df[t_col] = temperature_polyfit(coef,df[p_col],df[t_col])
+        
+    
+    elif param == 'C':
+    
+        df[cond_col] = conductivity_polyfit(coef,df[p_col],df[t_col],
+                                              df[cond_col])
+       
+    return df
+    
+def array_like_to_series(array):
+    
+    series = pd.Series(array)
+    series.reset_index(drop=True,inplace=True)
+    
+    return series
+
+def apply_pressure_offset(press,p_off):
+    """
+    Applies pressure offset to pressure data
+            
+    Parameters
+    ----------
+    
+    press :array_like
+            Array containing pressure values
+           
+    p_off :float
+            Array containing ending ondeck pressure values
+    Returns
+    -------
+    
+    new_press :array_like
+                Offset pressure data
+       
+    """
+    
+    new_press = press + p_off
+
+    return new_press
+  
+##
 #            key = (station, cast, bottle, "o2")
 #            if key in qual:
 #                flag, comment = qual[key]

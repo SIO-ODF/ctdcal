@@ -10,7 +10,12 @@ import math
 #import report_ctd
 import ctdcal.report_ctd as report_ctd
 import warnings
+import ctdcal.fit_ctd as fit_ctd
+import datetime
 
+import sys
+sys.path.append('ctdcal/')
+import oxy_fitting
 import gsw
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
@@ -870,201 +875,753 @@ def fill_surface_data(df, **kwargs):
         for x in range(1, int(np.floor(df.iloc[0]['CTDPRS'])), bin_size):
             surface_values.append(x)
         df_surface = pd.DataFrame({'CTDPRS': surface_values})
-        df_merged = pd.merge(df_surface, df, on='CTDPRS', how='outer')
+        df_merged = pd.merge(df_surface.astype('float64'), df, on='CTDPRS', how='outer')
 
     return df_merged.fillna(method='bfill')
 
-def load_reft_data(reft_file,index_name = 'index_memory'):
+def load_reft_data(reft_file,index_name = 'btl_fire_num'):
     """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
-
-    reft_data = pd.read_csv(reft_file)
+    
+    reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90'])
     reft_data.set_index(index_name)
-
+    
+    reft_data['SSSCC_TEMP'] = reft_file[-14:-9]
+    
     return reft_data
 
-def load_btl_data(btl_file):
-
-    """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.csv'"""
-
-    btl_data = dataToNDarray(btl_file,float,True,',',0)
-
+    
+    
+def load_btl_data(btl_file,cols=None):
+    
+    """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.pkl'"""
+    
+    btl_data = dataToNDarray(btl_file,float,True,',',0) 
+    
     btl_data = pd.DataFrame.from_records(btl_data)
-
+    if cols != None:
+        btl_data = btl_data[cols]
+    
+    ssscc = btl_file[-18:-13]
+    
+    btl_data['SSSCC'] = ssscc
+    
     return btl_data
 
 
-def calibrate_temperature(df,order,reft_data,calib_param,sensor,xRange=None,
-                          t_col_1 = 'CTDTMP1', t_col_2 = 'CTDTMP2', reft_col = 'T90',
-                          p_col = 'CTDPRS'):
+def load_time_data(time_file):
+    
+    time_data = dataToNDarray(time_file,float,True,',',1)
+    time_data = pd.DataFrame.from_records(time_data)
+    
+    return time_data
 
-    d_1 = 'd_t1' #Difference between ref and prim sensor
-    d_2 = 'd_t2' #Difference between ref and second sensor
-    d_12 = 'd_t1_t2' #Difference between prim and sec sensor
 
-    # Calculate absolute differences between sensors and reference thermom
+def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
+### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION    
 
-    df['d_t1'] = reft_data[reft_col] - df[t_col_1]
-    #df['d_t1'] = df['d_t1'].abs()
-    df['d_t2'] = reft_data[reft_col] - df[t_col_2]
-    #df['d_t2'] = df['d_t2'].abs()
-    df['d_t1_t2'] = df[t_col_1] - df[t_col_2]
-    #df['d_t1_t2'] = df['d_t1_t2'].abs()
+ 
+    df_good = quality_check(param,ref_param,press,ssscc,btl_num,find='good')
+    df_ques = quality_check(param,ref_param,press,ssscc,btl_num,find='quest')
+    
+    df_ques['Parameter'] = param.name
+    
+               
+    #report questionable data to a csv file
+    
+    #constrain pressure to within limits of xRange
+    
+    if xRange != None:
+        x0 = int(xRange.split(":")[0])
+        x1 = int(xRange.split(":")[1])
+        
+        df_good_cons = df_good[(df_good[press.name] >= x0) & (df_good[press.name] <= x1)]
+     
+         
+    else:
+        #Take full range of temperature values
+        x0 = df_good[param.name].min()
+        x1 = df_good[param.name].max()
+        
+        df_good_cons = df_good[(df_good[param.name] >= x0) & (df_good[param.name] <= x1)]
+        
+    if 'P' in calib:    
+        coef = get_param_coef(df_good_cons[press.name],df_good_cons['Diff'],order,calib)
+    elif 'T' or 'C' in calib:
+        coef = get_param_coef(df_good_cons[param.name],df_good_cons['Diff'],order,calib)
+    else:
+        print('calib argument not valid, use CP TP T or C')
+                
+    return coef,df_ques
+    
+def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
 
-    #split dataframes by pressure ranges
+        
+    param = fit_ctd.array_like_to_series(param)
+    param_2 = fit_ctd.array_like_to_series(param_2)
+    press = fit_ctd.array_like_to_series(press)
+    ssscc = fit_ctd.array_like_to_series(ssscc)
+    btl_num = fit_ctd.array_like_to_series(btl_num)
+        
+    diff = param_2 - param
+    
+    df = pd.concat([ssscc,btl_num.rename('Bottle'),param.rename('Param_1'),param_2.rename('Param_2'),press.rename('CTDPRS'),diff.rename('Diff')],axis=1)
+  
+    if find == 'good':
+    # Find data values for each sensor that are below the threshold (good)
+        df['Flag'] = 1
+        #df_range_comp = df_range[(df_range[diff].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
+        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() < thresh[0]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() < thresh[1]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() < thresh[2]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() < thresh[3]), 'Flag'] = 2
+#
+        # Filter out bad values
+        
+        df = df[df['Flag'] == 2]
+        
+        # Rename Columns back to what they were
+        
+        if param.name != None:
+            df.rename(columns = {'Param_1' : param.name}, inplace=True)
+    
+        if param_2.name != None:
+            df.rename(columns = {'Param_2' : param_2.name},inplace=True)
+    
+        if press.name != None:
+            df.rename(columns = {'CTDPRS' : press.name}, inplace=True )
+    
+    elif find == 'quest':
+    # Find data values for each sensor that are above the threshold (questionable)
+            
+        df['Flag'] = 1
+        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() > thresh[0]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() > thresh[1]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() > thresh[2]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() > thresh[3]), 'Flag'] = 3
+        
+        # Filter out good values
+        
+        df = df[df['Flag'] == 3]
+        
+        # Remove unneeded columns
+        
+        df = df.drop(['Param_1','Param_2'],axis=1)
+        
+        # Re-Order Columns for better readability
+        
+        df = df[[ssscc.name,'Bottle',press.name,'Flag','Diff']]
+       
+
+    else:
+        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
+ 
+    return df
+
+def get_param_coef(calib_param,diff,order,calib):
+    
+       
+    cf1 = np.polyfit(calib_param, diff, order)
+        
+
+    if 'T' in calib:
+        coef = np.zeros(shape=5)
+    
+        if order is 0:
+            coef[4] = cf1[0]
+        
+        elif (order is 1) and (calib == 'TP'):
+            coef[1] = cf1[0]
+            coef[4] = cf1[1]
+        
+        elif (order is 2) and (calib == 'TP'):
+            coef[0] = cf1[0]
+            coef[1] = cf1[1]
+            coef[4] = cf1[2]
+        
+        elif (order is 1) and (calib == 'T'):
+            coef[3] = cf1[0]
+            coef[4] = cf1[1]
+        
+        elif (order is 2) and (calib == 'T'):
+            coef[2] = cf1[0]
+            coef[3] = cf1[1]
+            coef[4] = cf1[2]
+            
+    if 'C' in calib:
+        coef = np.zeros(shape=7)
+        if order is 0:
+            coef[6] = cf1[0]
+        elif (order is 1) and (calib == 'CP'):
+            coef[1] = cf1[0]
+            coef[6] = cf1[1]
+        elif (order is 2) and (calib == 'CP'):
+            coef[0] = cf1[0]
+            coef[1] = cf1[1]
+            coef[6] = cf1[2]
+        elif (order is 1) and (calib == 'C'):
+            coef[5] = cf1[0]
+            coef[6] = cf1[1]
+        elif (order is 2) and (calib == 'C'):
+            coef[4] = cf1[0]
+            coef[5] = cf1[1]
+            coef[6] = cf1[2]
+       
+    return coef
+
+def combine_quality_flags(df_list):
+    
+    combined_df = pd.concat(df_list)
+    combined_df = combined_df.sort_values(['SSSCC','Bottle'])
+    
+    combined_df = combined_df.round(4)
+    
+    return combined_df
+    
+    #Combine these three into a dataframe and write out to a csv 
+    #Sort by sta/cast, bottle number, rev. press
+
+
+def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
+                           refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2',
+                           p_col='CTDPRS'):#refc_data
+### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION    
+    if sensor == 1:
+        postfix = 'c1'
+        cond_col = 'CTDCOND1'
+        t_col = 'CTDTMP1'
+    elif sensor ==2:
+        postfix = 'c2'
+        cond_col = 'CTDCOND2'
+        t_col = 'CTDTMP2'
+    else:
+        print('No sensor name supplied, difference column name will be: diff')
+        
+    if calib_param == 'P':
+        calib_col = p_col
+    elif calib_param == 'T':
+        calib_col = t_col
+    elif calib_param == 'C':
+        calib_col = cond_col
+    else:
+        print('No calib_param supplied')
+    
+    diff = 'd_'+postfix #Difference between ref and prim sensor
+    
+    # Calculate absolute differences between sensors and salt sample data
+    
+    #df[diff] = refc_data[refc_col] - df[cond_col]
+    df[diff] = df[refc_col] - df[cond_col]
+ 
+    #df['primary_diff'] = refc_data[refc_col] - df[cond_col_1]
+    df['primary_diff'] = df[refc_col] - df[cond_col_1]
+    
+    #df['secondary_diff'] = refc_data[refc_col] - df[cond_col_2]
+    df['secondary_diff'] = df[refc_col] - df[cond_col_2]
+    
+    df['P-S'] = df[cond_col_1] - df[cond_col_2]
+    
+    
 
     #Greater than 2000 dBar
     lower_lim = 2000
     upper_lim = df[p_col].max()
     threshold = 0.002
 
-    df_deep_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-    df_deep_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
-
+    
+    df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_deep_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
+       
+    
     #Between 2000 and 1000
     lower_lim = 1000
     upper_lim = 2000
     threshold = 0.005
+    
 
-    df_lmid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-    df_lmid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_lmid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
+    
 
     #Between 1000 and 500
     lower_lim = 500
     upper_lim = 1000
     threshold = 0.010
 
-    df_umid_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-    df_umid_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
+    
+    
+    df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_umid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
+    
 
     #Less than 500
-    lower_lim = df[p_col].min()
+    lower_lim = df[p_col].min() - 1
     upper_lim = 500
     threshold = 0.020
-
-    df_shal_good = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold)
-    df_shal_ques = quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='quest')
-
+    
+    df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
+    df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
+    df_shal_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
+    
     #concat dataframes into two main dfs
     df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
     df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
-
-    x0 = int(xRange.split(":")[0])
-    x1 = int(xRange.split(":")[1])
-
-    #report questionable data to a csv file
-
-    #constrain dataframes to within limits of xRange
-
+    df_ref = pd.concat([df_deep_ref,df_lmid_ref,df_umid_ref,df_shal_ref])
+    
+    if sensor == 1:
+        df_ques['Parameter'] = 'C1'
+        df_ques['Flag'] = 3
+        
+        df_ref['Parameter'] = 'C'
+        df_ref['Flag'] = 3
+        
+    elif sensor == 2:
+        df_ques['Parameter'] = 'C2'  
+        df_ques['Flag'] = 3
+        
+        df_ref['Flag'] = 3
+    
     if xRange != None:
         x0 = int(xRange.split(":")[0])
         x1 = int(xRange.split(":")[1])
-
-        df_good_cons = df_good[(df_good[p_col] >= x0) & (df_good[p_col] <= x1)]
-
-        #Add here is planning on using for other calibrate code
-#    else:
-#        if order == 1:
-#
-#            x0 =
-#            x1 =
-#
-#        elif:
-#
-#            x0 =
-#            x1 =
-#
+        
+        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
+     
+         
     else:
-        print('Invalid xRange')
-
-    # Determine fitting ranges
-
-    fit = np.arange(x0,x1,(x1-x0)/50)
-
-    cf1 = np.polyfit(df_good_cons[p_col], df_good_cons[d_1], order)
-    cf2 = np.polyfit(df_good_cons[p_col], df_good_cons[d_2], order)
-
-
-    sensor = '_t'+str(sensor)
-    coef1 = np.zeros(shape=5)
-    coef2 = np.zeros(shape=5)
-
+        #Take full range of temperature values
+#        x0 = df_good[t_col].min()
+#        x1 = df_good[t_col].max()
+        
+        df_good_cons = df_good#[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
+    
+    cf = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
+    
+    sensor = '_c'+str(sensor)
+    coef = np.zeros(shape=7)
+    
     if order is 0:
-        coef1[4] = cf1[0]
-
-        coef2[4] = cf2[0]
-
+        coef[6] = cf[0]
     elif (order is 1) and (calib_param == 'P'):
-        coef1[1] = cf1[0]
-        coef1[4] = cf1[1]
-
-        coef2[1] = cf2[0]
-        coef2[4] = cf2[1]
-
+        coef[1] = cf[0]
+        coef[6] = cf[1]
     elif (order is 2) and (calib_param == 'P'):
-        coef1[0] = cf1[0]
-        coef1[1] = cf1[1]
-        coef1[4] = cf1[2]
-
-        coef2[0] = cf2[0]
-        coef2[1] = cf2[1]
-        coef2[4] = cf2[2]
+        coef[0] = cf[0]
+        coef[1] = cf[1]
+        coef[6] = cf[2]
     elif (order is 1) and (calib_param == 'T'):
-        coef1[3] = cf1[0]
-        coef1[4] = cf1[1]
-
-        coef2[3] = cf2[0]
-        coef2[4] = cf2[1]
+        coef[3] = cf[0]
+        coef[6] = cf[1]
     elif (order is 2) and (calib_param == 'T'):
-        coef1[2] = cf1[0]
-        coef1[3] = cf1[1]
-        coef1[4] = cf1[2]
+        coef[2] = cf[0]
+        coef[3] = cf[1]
+        coef[6] = cf[2]
+    elif (order is 1) and (calib_param == 'C'):
+        coef[5] = cf[0]
+        coef[6] = cf[1]
+    elif (order is 2) and (calib_param == 'C'):
+        coef[4] = cf[0]
+        coef[5] = cf[1]
+        coef[6] = cf[2]
+    return coef,df_ques,df_ref   
 
-        coef2[2] = cf2[0]
-        coef2[3] = cf2[1]
-        coef2[4] = cf2[2]
 
-#    Y = fit_ctd.conductivity_polyfit(coef, fit, fit, np.full(len(fit), 0.0))
-#
-#
-#    fitfile = str('fitting'+sensor+'.' + FILE_EXT)
-#    fitfilePath = os.path.join(log_directory, fitfile)
-#    report_ctd.report_polyfit(coef, file_base_arr, fitfilePath)
+def prepare_fit_data(df,ref_col):
+    
+    good_data = df.copy()
+    good_data = good_data[np.isfinite(good_data[ref_col])]
+       
+    return good_data
 
+
+
+def prepare_conductivity_data(ssscc,df,refc,ssscc_col = 'SSSCC',index_col = 'btl_fire_num'):
+    
+    btl_concat = pd.DataFrame()
+    for x in ssscc:
+        btl_data = df[df[ssscc_col] == x]
+        refc_data = refc[refc[ssscc_col] == x]
+        btl_data_clean = prepare_fit_data(btl_data,refc_data,'C')
+        btl_concat = pd.concat([btl_concat,btl_data_clean])
+    refc = refc[refc[index_col] != 0]
+    refc = refc.reset_index(drop=True)
+    btl_concat = btl_concat.reset_index(drop=True)  
+     
+    return btl_concat, refc
+
+def prepare_all_fit_data(ssscc,df,ref_data,param):
+    
+    data_concat = pd.DataFrame()
+    
+
+    for x in ssscc:
+        btl_data = df[df['SSSCC']==x]
+        ref_data_stn= ref_data[ref_data['SSSCC']==x]
+        btl_data_good = prepare_fit_data(btl_data,ref_data_stn,param)
+        data_concat = pd.concat([data_concat,btl_data_good])
+        
+    return data_concat
+              
+
+def get_pressure_offset(start_vals,end_vals):
+    """
+    Finds unique values and calclates mean for pressure offset
+            
+    Parameters
+    ----------
+    
+    start_vals :array_like
+                Array containing initial ondeck pressure values
+           
+    end_vals :array_like
+              Array containing ending ondeck pressure values
+    Returns
+    -------
+    
+    p_off :float
+         Average pressure offset
+         
+    """
+    p_start = pd.Series(np.unique(start_vals))
+    p_end = pd.Series(np.unique(end_vals))
+    p_start = p_start[p_start.notnull()]
+    p_end = p_end[p_end.notnull()]
+    p_off = p_start.mean() - p_end.mean()
+
+# JACKSON THINKS THIS METHOD SHOULD BE USED TO KEEP START END PAIRS    
+#    p_df = pd.DataFrame()
+#    p_df['p_start'] = p_start
+#    p_df['p_end'] = p_end
+#    p_df = p_df[p_df['p_end'].notnull()]
+#    p_df = p_df[p_df['p_start'].notnull()]
+#    p_off = p_df['p_start'].mean() - p_df['p_end'].mean()
+##########################################################
+
+    p_off = np.around(p_off,decimals=4)
+    
+    return p_off
+
+def load_pressure_logs(file):
+    """
+        Loads pressure offset file from logs.
+        
+    Parameters
+    ----------
+    
+    file : string
+           Path to ondeck_pressure log
+         
+    Returns
+    -------
+    
+    df : DataFrame
+         Pandas DataFrame containing ondeck start and end pressure values
+         
+    """
+    
+    df = pd.read_csv(file,names=['SSSCC','ondeck_start_p','ondeck_end_p'])
+    
+    # Change vaules in each row by removing non-number parts
+    for i in range(len(df['SSSCC'])):
+        df['SSSCC'][i] = int(df['SSSCC'].loc[i][-5:])
+        df['ondeck_start_p'][i] = float(df['ondeck_start_p'].loc[i][16:])
+        df['ondeck_end_p'][i] = float(df['ondeck_end_p'].loc[i][14:])
+        
     return df
 
-def quality_check(df,d_1,d_2,d_12,lower_lim,upper_lim,threshold,find='good',col_name = 'CTDPRS'):
+def write_offset_file(df,p_off,write_file='data/logs/poffset_test.csv'):
+    """
+    
+    """
+    df_out = pd.DataFrame()
+    df_out['SSSCC'] = df['SSSCC']
+    df_out['offset'] = p_off
+    
+    df_out.to_csv(write_file,index=False)
+    
+    return
+    
+def pressure_calibrate(file):
+    
+    pressure_log = load_pressure_logs(file)
+    p_off = get_pressure_offset(pressure_log)
+    
+    return p_off
 
-    #Choose Data range to compare with
-    df_range = df[(df[col_name] > lower_lim) & (df[col_name] <= upper_lim)]
+    
+def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/',reft_postfix='_reft.csv',
+                       refc_prefix='data/salt/',refc_postfix='',press_file='data/logs/ondeck_pressure.csv',
+                       oxy_prefix='data/oxygen/', oxy_postfix='',index_col='btl_fire_num',t_col='CTDTMP1',
+                       p_col='CTDPRS',ssscc_col='SSSCC'):
+    """
+    LOAD ALL CTD FILES was changed (commented out)
+    Lines 1324-1328,1335,1337, 1338,345
+    """
+    df_data_all = pd.DataFrame()
+   
+    if series == 'bottle':
+        for x in ssscc:
+            print('Loading BTL data for station: ' + x + '...')
+            btl_file = prefix + x + postfix
+            btl_data = load_btl_data(btl_file,cols)
+            
+            
+            reft_file = reft_prefix + x + reft_postfix
+            try:
+                reft_data = load_reft_data(reft_file)
+            except FileNotFoundError:
+                print('Missing (or misnamed) REFT Data Station: ' + x + '...filling with NaNs')
+                reft_data = pd.DataFrame()
+                reft_data[index_col] = pd.Series(btl_data[index_col].values.astype(int))
+                reft_data['T90'] = pd.Series([np.nan]*len(btl_data))
+                ref_ssscc = ssscc_col + '_TEMP'
+                reft_data[ref_ssscc] = x
+                reft_data.index = btl_data.index
+            
+            refc_file = refc_prefix + x + refc_postfix
+            try:
+                refc_data = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
 
+            except FileNotFoundError:
+                print('Missing (or misnamed) REFC Data Station: ' + x + '...filling with NaNs')
+                refc_data = pd.DataFrame()
+                refc_data['SAMPNO'] = pd.Series(btl_data[index_col].values.astype(int))
+                refc_data['CRavg'] = pd.Series([np.nan]*len(btl_data))
+                refc_data['BathTEMP'] = pd.Series([np.nan]*len(btl_data))
+                refc_data['BTLCOND'] = pd.Series([np.nan]*len(btl_data))
+                refc_data.index = btl_data.index
+                
+            
+            #Fix Index for each parameter to bottle number
+            
+#            btl_data[index_col] = btl_data[index_col].astype(int)
+#            btl_data=btl_data.set_index(btl_data[index_col].values)
+#            
+#            reft_data = reft_data.set_index(reft_data[index_col].values)
+            
+            oxy_file = oxy_prefix + x + oxy_postfix
+            oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
+            
+#            #Horizontally concat DFs to have all data in one DF
+#            btl_data_full = pd.concat([btl_data,reft_data,refc_data,oxy_data],axis=1)
+            
+            btl_data = pd.merge(btl_data,reft_data,on='btl_fire_num',how='outer')
+            btl_data = pd.merge(btl_data,refc_data,left_on='btl_fire_num',right_on='SAMPNO',how='outer')
+            btl_data = pd.merge(btl_data,oxy_data,left_on='btl_fire_num',right_on='BOTTLENO_OXY',how='outer')
+            
+            
+#            #Drop columns that have no CTD data
+#            btl_data_full = btl_data_full.dropna(subset=cols)
+            #btl_data = btl_data.set_index(['SSSCC','GPSLAT','GPSLON','CTDPRS'],drop=True)
+            try:
+                df_data_all = pd.concat([df_data_all,btl_data],sort=False)
+            except AssertionError:
+                raise AssertionError('Colums of ' + x + ' do not match those of previous columns')
+            print('* Finished BTL data station: ' + x + ' *')
+            
+        #Drops duplicated columns generated by concatenation
+        df_data_all = df_data_all.loc[:,~df_data_all.columns.duplicated()]
+    elif series == 'time':
+        for x in ssscc:
+            
+            print('Loading TIME data for station: ' + x + '...')
+            file = prefix + x + postfix
+            time_data = load_time_data(file)
+            time_data['SSSCC'] = str(x)
+            df_data_all = pd.concat([df_data_all,time_data], sort=False)
+            print('** Finished TIME data station: ' + x + ' **')
+   
+    df_data_all['master_index'] = range(len(df_data_all))
+            
+    return df_data_all
 
-    if find == 'good':
-    # Find data values for each sensor that are below the threshold (good)
-        df_range_comp_1 = df_range[df_range[d_1].abs() < threshold]
-        df_range_comp_2 = df_range[df_range[d_2].abs() < threshold]
-        df_range_comp_3 = df_range[df_range[d_12].abs() < threshold]
+def merge_cond_flags(btl_data, qual_flag_cond):
+    # Merge df
+    mask = qual_flag_cond[qual_flag_cond['Parameter'] == 'REF_COND'].copy()
+    mask['SSSCC'] = mask['SSSCC'].astype(str)
+    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
+    # Rename Columns
+    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'SALNTY_FLAG_W'},inplace=True)
+    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
+    btl_data['SALNTY_FLAG_W'].fillna(value=2,inplace=True)
+    btl_data['SALNTY_FLAG_W'] = btl_data['SALNTY_FLAG_W'].astype(int)
+    
+    return btl_data
+           
 
-    elif find == 'quest':
-    # Find data values for each sensor that are above the threshold (questionable)
-        df_range_comp_1 = df_range[df_range[d_1].abs() > threshold]
-        df_range_comp_2 = df_range[df_range[d_2].abs() > threshold]
-        df_range_comp_3 = df_range[df_range[d_12].abs() > threshold]
+def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
+                     t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
+                     logFile='data/logs/cast_details.csv'):
+    """ Export Time data to pressure directory as well as adding qual_flags and 
+    removing unneeded columns"""
+     
+#    pressure_seq_data = pressure_sequence(df,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
+    
+    df[stacst_col] = df[stacst_col].astype(int)
+    df[stacst_col] = df[stacst_col].astype(str)
+    
+    # Choose Sensors
+    if t_sensor == 1:
+        df['CTDTMP'] = df['CTDTMP1']
+    elif t_sensor ==2:
+       df['CTDTMP'] = df['CTDTMP1']
+    
+    # Change column names
+    
+    df['CTDFLUOR'] = df['FLUOR']
+    #df['CTDOXY'] = np.NaN
+    df['CTDRINKO'] = df['FREE1']
+    
+    # Add Flagged colummns
+    
+    df['CTDPRS_FLAG_W'] = 2
+    df['CTDTMP_FLAG_W'] = 2
+    df['CTDSAL_FLAG_W'] = 2
+    df['CTDOXY_FLAG_W'] = 2
+    df['CTDXMISS_FLAG_W'] = 1
+    df['CTDFLUOR_FLAG_W'] = 1
+    df['CTDBACKSCATTER_FLAG_W'] = 1
+    df['CTDRINKO_FLAG_W'] = 1
+    
+    # Round to 4 decimal places
+    
+    df = df.round(4)
+    
+    #Remove unwanted columns
+    
+#    pressure_seq_data = pressure_seq_data[['CTDPRS','CTDPRS_FLAG_W','CTDTMP','CTDTMP_FLAG_W','CTDSAL','CTDSAL_FLAG_W','CTDOXY','CTDOXY_FLAG_W',
+#                                           'CTDXMISS','CTDXMISS_FLAG_W','CTDFLUOR','CTDFLUOR_FLAG_W','CTDBACKSCATTER','CTDBACKSCATTER_FLAG_W',
+#                                           'CTDRINKO','CTDRINKO_FLAG_W']]
 
-    else:
-        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
+    cast_details = dataToNDarray(logFile,str,None,',',0)
+    
+    for cast in ssscc:
+        #time_data = pressure_seq_data.copy()
+        #time_data = time_data[pressure_seq_data['SSSCC'] == cast]
+        time_data = df[df['SSSCC'] == cast]
+        time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
+        time_data = time_data[['CTDPRS','CTDPRS_FLAG_W','CTDTMP','CTDTMP_FLAG_W','CTDSAL','CTDSAL_FLAG_W','CTDOXY','CTDOXY_FLAG_W',
+                               'CTDXMISS','CTDXMISS_FLAG_W','CTDFLUOR','CTDFLUOR_FLAG_W','CTDBACKSCATTER','CTDBACKSCATTER_FLAG_W',
+                               'CTDRINKO','CTDRINKO_FLAG_W']]
+        
+        time_data=time_data.round(4)
+        
+        
+        s_num = cast[-5:-2]
+        c_num = cast[-2:]
+#        line_ID = 'stacast:'+sss
+#        print(line_ID)
+        for line in cast_details:
+            if cast in line[0]:
+                for val in line:
+                    if 'at_depth' in val: btime = float(str.split(val, ':')[1])
+                    if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
+                    if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
+                    if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
+                break
+        
+        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
+        b_date = bdt[0]
+        b_time = bdt[1]
+        depth = -99
+        now = datetime.datetime.now()
+        file_datetime = now.strftime("%Y%m%d") #%H:%M")
+        file_datetime = file_datetime + 'ODFSIO'
+        outfile = open(out_dir+cast+'_ct1.csv', "w+")
+        outfile.write("CTD, %s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\n DATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nINSTRUMENT_ID = %s\n" % (file_datetime, 10, expocode, section_id, s_num, c_num[1], b_date, b_time, btm_lat, btm_lon, ctd))
+        cn = np.asarray(p_column_names)
+        cn.tofile(outfile,sep=',', format='%s')
+        outfile.write('\n')
+        cu = np.asarray(p_column_units)
+        cu.tofile(outfile,sep=',', format='%s')
+        outfile.write('\n')
+        outfile.close()
 
-    #concatenate dataframe to merge all values together
-    df_concat = pd.concat([df_range_comp_1,df_range_comp_2,df_range_comp_3])
-
-    # Remove duplicate values
-    df_concat = df_concat.drop_duplicates(subset=[col_name],keep='first')
-
-    return df_concat
-
-
-    #Combine these three into a dataframe and write out to a csv
-    #Sort by sta/cast, bottle number, rev. press
-
+        file = out_dir+cast+'_ct1.csv'
+        with open(file,'a') as f:
+            time_data.to_csv(f, header=False,index=False)
+        f.close()
+        
+        outfile = open(out_dir+cast+'_ct1.csv', "a")
+        outfile.write('\n')
+        outfile.write('END_DATA')
+        outfile.close()
+        
+def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t_sensor=1,org='ODF'):
+    
+    btl_columns = ['EXPOCODE','SECT_ID','STNNBR','CASTNO','SAMPNO','BTLNBR','BTLNBR_FLAG','DATE','TIME','LATITUDE','LONGITUDE','DEPTH',
+                   'CTDPRS','CTDTMP','REFTMP','REFTMP_FLAG','CTDSAL','CTDSAL_FLAG','SALNTY','SALNTY_FLAG',
+                   'CTDOXY','CTDOXY_FLAG','OXYGEN','OXYGEN_FLAG']
+    btl_units = ['','','','','','','','','','','','METERS','DBARS','ITS-90','C','','PSS-78','','PSS-78','','UMOL/KG','','UMOL/KG','']
+    
+    btl_data = df.copy()
+    
+    if t_sensor ==1:
+        btl_data['CTDTMP'] = btl_data['CTDTMP1']
+    elif t_sensor ==2:
+        btl_data['CTDTMP'] = btl_data['CTDTMP2']
+        
+    
+    btl_data['EXPOCODE'] = expocode
+    btl_data['SECT_ID'] = sectionID
+    btl_data['STNNBR'] = btl_data['SSSCC'].str[0:3]
+    btl_data['CASTNO'] = btl_data['SSSCC'].str[3:5]
+    btl_data['SAMPNO'] = btl_data['btl_fire_num']
+    btl_data['BTLNBR'] = btl_data['btl_fire_num']
+    btl_data['BTLNBR_FLAG'] = '2'
+    btl_data['DATE'] = np.NaN
+    btl_data['TIME'] = np.NaN
+    btl_data['LATITUDE'] = btl_data['GPSLAT']
+    btl_data['LONGITUDE'] = btl_data['GPSLON']
+    btl_data['DEPTH'] = np.NaN
+    btl_data['REFTMP'] = btl_data['T90']
+    btl_data['REFTMP_FLAG'] = '2'
+    btl_data['CTDSAL_FLAG'] = '2_HARDCODE'
+    btl_data['SALNTY'] = gsw.SP_from_C(btl_data['BTLCOND'],btl_data['CTDTMP'],btl_data['CTDPRS'])
+    btl_data['SALNTY_FLAG'] = '2_HARDCODE'
+#    btl_data['CTDOXY'] = np.NaN
+#    btl_data['CTDOXY_FLAG'] = '2'
+#    btl_data['OXYGEN'] = np.NaN
+    btl_data['OXYGEN_FLAG'] = '2'
+    
+    
+    
+    btl_data = btl_data[btl_columns]
+    btl_data = btl_data.round(4)
+    
+    btl_data = btl_data.fillna(value=-99)
+    
+    
+    now = datetime.datetime.now()
+    file_datetime = now.strftime("%Y%m%d")
+    
+    time_stamp = file_datetime+org
+    
+    outfile = open(out_dir+cruise_line+'_hy1.csv', "w+")
+    outfile.write("BOTTLE, %s\n" % (time_stamp))
+    cn = np.asarray(btl_columns)
+    cn.tofile(outfile,sep=',', format='%s')
+    outfile.write('\n')
+    cu = np.asarray(btl_units)
+    cu.tofile(outfile,sep=',', format='%s')
+    outfile.write('\n')
+    outfile.close()
+    
+    file = out_dir+cruise_line+'_hy1.csv'
+    with open(file,'a') as f:
+        btl_data.to_csv(f, header=False,index=False)
+    f.close()
+    
+    outfile = open(out_dir+cruise_line+'_hy1.csv', "a")    
+#    outfile.write('\n')
+    outfile.write('END_DATA')
+    outfile.close()
+    
+    return
+        
+        
 
 ###End try/except fix
 

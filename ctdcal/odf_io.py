@@ -190,6 +190,29 @@ def formatted_salt_file(df):
     df = df[['STNNBR', 'CASTNO', 'SAMPNO', 'SALNTY']]
     return df
 
+def create_multi_index(df,index=['SSSCC','GPSLAT','GPSLON','CTDPRS']):
+    """
+    Changes a normal dataframe to a multiindexed dataframe
+    
+    Parameters
+    ----------
+    
+    df : DataFrame
+         Pandas DataFrame containing indicies to become multi indexed
+         
+    index : List
+            List of columns to be made into multi indexed DataFrame
+            
+    Returns
+    -------
+    
+    df : DataFrame
+        Multi indexed pandas DataFrame
+    
+    """
+    df = df.set_index(index,drop=True)
+    return df
+
 def main(argv):
     '''Example script on how to run functions. Not intended for use.'''
     #argv should be a filename
