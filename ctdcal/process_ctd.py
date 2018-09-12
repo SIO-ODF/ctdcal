@@ -520,10 +520,19 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
         tmp = len(inMat);
         # Searches last half of NDarray for conductivity threshold
-        for j in range(int(len(inMat)*0.5), len(inMat)):
-            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
-                ep.append(inMat[p_col][j])
-                if (tmp > j): tmp = j
+        
+        if len(inMat) % 2 == 0:
+            inMat_2 = inMat.copy()
+        else:
+            inMat_2 = inMat.iloc[1:].copy()
+            
+        inMat_half1, inMat_half2 = np.split(inMat_2,2)
+        ep = inMat_half2[(inMat_half2[c1_col] < conductivity_startup) & (inMat_half2[c2_col] < conductivity_startup)][p_col]
+            
+#        for j in range(int(len(inMat)*0.5), len(inMat)):
+#            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
+#                ep.append(inMat[p_col][j])
+#                if (tmp > j): tmp = j
 
         # Evaluate ending pressures
         if (len(ep) > (time_delay)): end_p = np.average(ep[(time_delay):])
@@ -1295,7 +1304,7 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             
     return df_data_all
 
-def merge_cond_flags(btl_data, qual_flag_cond):
+def merge_refcond_flags(btl_data, qual_flag_cond):
     # Merge df
     mask = qual_flag_cond[qual_flag_cond['Parameter'] == 'REF_COND'].copy()
     mask['SSSCC'] = mask['SSSCC'].astype(str)
@@ -1304,10 +1313,48 @@ def merge_cond_flags(btl_data, qual_flag_cond):
     btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'SALNTY_FLAG_W'},inplace=True)
     btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
     btl_data['SALNTY_FLAG_W'].fillna(value=2,inplace=True)
+    try:
+        btl_data[btl_data['BTLCOND'].isna()]['SALNTY_FLAG_W'] = 9
+    except:
+        btl_data[btl_data['SALNTY'].isna()]['SALNTY_FLAG_W'] = 9
     btl_data['SALNTY_FLAG_W'] = btl_data['SALNTY_FLAG_W'].astype(int)
     
     return btl_data
-           
+
+def merge_cond_flags(btl_data, qual_flag_cond,sensor=1):
+    # Merge df
+    if sensor == 1:
+        parameter = 'CTDCOND1'
+    elif sensor == 2:
+        parameter = 'CTDCOND2'
+    mask = qual_flag_cond[qual_flag_cond['Parameter'] == parameter].copy() 
+    mask['SSSCC'] = mask['SSSCC'].astype(str)
+    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
+    # Rename Columns
+    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'CTDSAL_FLAG_W'},inplace=True)
+    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
+    btl_data['CTDSAL_FLAG_W'].fillna(value=2,inplace=True)
+    btl_data[btl_data[parameter].isna()]['CTDSAL_FLAG_W'] = 9
+    btl_data['CTDSAL_FLAG_W'] = btl_data['CTDSAL_FLAG_W'].astype(int)
+    
+    return btl_data
+
+def merged_reftemp_flags(btl_data, qual_flag_temp):
+    
+    mask = qual_flag_temp[qual_flag_temp['Parameter'] == 'REF_TEMP'].copy()
+    mask['SSSCC'] = mask['SSSCC'].astype(str)
+    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
+    # Rename Columns
+    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'REFTMP_FLAG_W'},inplace=True)
+    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
+    btl_data['REFTMP_FLAG_W'].fillna(value=2,inplace=True)
+    try:
+        btl_data[btl_data['T90'].isna()]['REFTMP_FLAG_W'] = 9
+    except:
+        btl_data[btl_data['REFTMP'].isna()]['REFTMP_FLAG_W'] = 9
+    btl_data['REFTMP_FLAG_W'] = btl_data['REFTMP_FLAG_W'].astype(int)
+    
+    return btl_data
 
 def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
                      t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
@@ -1409,9 +1456,9 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         
 def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t_sensor=1,org='ODF'):
     
-    btl_columns = ['EXPOCODE','SECT_ID','STNNBR','CASTNO','SAMPNO','BTLNBR','BTLNBR_FLAG','DATE','TIME','LATITUDE','LONGITUDE','DEPTH',
-                   'CTDPRS','CTDTMP','REFTMP','REFTMP_FLAG','CTDSAL','CTDSAL_FLAG','SALNTY','SALNTY_FLAG',
-                   'CTDOXY','CTDOXY_FLAG','OXYGEN','OXYGEN_FLAG']
+    btl_columns = ['EXPOCODE','SECT_ID','STNNBR','CASTNO','SAMPNO','BTLNBR','BTLNBR_FLAG_W','DATE','TIME','LATITUDE','LONGITUDE','DEPTH',
+                   'CTDPRS','CTDTMP','REFTMP','REFTMP_FLAG_W','CTDSAL','CTDSAL_FLAG_W','SALNTY','SALNTY_FLAG_W',
+                   'CTDOXY','CTDOXY_FLAG_W','OXYGEN','OXYGEN_FLAG_W']
     btl_units = ['','','','','','','','','','','','METERS','DBARS','ITS-90','C','','PSS-78','','PSS-78','','UMOL/KG','','UMOL/KG','']
     
     btl_data = df.copy()
@@ -1428,28 +1475,28 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     btl_data['CASTNO'] = btl_data['SSSCC'].str[3:5]
     btl_data['SAMPNO'] = btl_data['btl_fire_num']
     btl_data['BTLNBR'] = btl_data['btl_fire_num']
-    btl_data['BTLNBR_FLAG'] = '2'
+    btl_data['BTLNBR_FLAG_W'] = '2'
     btl_data['DATE'] = np.NaN
     btl_data['TIME'] = np.NaN
     btl_data['LATITUDE'] = btl_data['GPSLAT']
     btl_data['LONGITUDE'] = btl_data['GPSLON']
     btl_data['DEPTH'] = np.NaN
     btl_data['REFTMP'] = btl_data['T90']
-    btl_data['REFTMP_FLAG'] = '2'
-    btl_data['CTDSAL_FLAG'] = '2_HARDCODE'
+#    btl_data['REFTMP_FLAG'] = '2'
+#    btl_data['CTDSAL_FLAG'] = '2_HARDCODE'
     btl_data['SALNTY'] = gsw.SP_from_C(btl_data['BTLCOND'],btl_data['CTDTMP'],btl_data['CTDPRS'])
-    btl_data['SALNTY_FLAG'] = '2_HARDCODE'
+#    btl_data['SALNTY_FLAG'] = '2_HARDCODE'
 #    btl_data['CTDOXY'] = np.NaN
 #    btl_data['CTDOXY_FLAG'] = '2'
 #    btl_data['OXYGEN'] = np.NaN
-    btl_data['OXYGEN_FLAG'] = '2'
+    btl_data['OXYGEN_FLAG_W'] = '2'
     
     
     
     btl_data = btl_data[btl_columns]
     btl_data = btl_data.round(4)
     
-    btl_data = btl_data.fillna(value=-99)
+    btl_data = btl_data.fillna(value=-999)
     
     
     now = datetime.datetime.now()
