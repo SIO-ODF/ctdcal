@@ -1314,9 +1314,9 @@ def merge_refcond_flags(btl_data, qual_flag_cond):
     btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
     btl_data['SALNTY_FLAG_W'].fillna(value=2,inplace=True)
     try:
-        btl_data[btl_data['BTLCOND'].isna()]['SALNTY_FLAG_W'] = 9
+        btl_data.loc[btl_data['BTLCOND'].isna(),'SALNTY_FLAG_W'] = 9
     except:
-        btl_data[btl_data['SALNTY'].isna()]['SALNTY_FLAG_W'] = 9
+        btl_data[btl_data['SALNTY'].isna(),'SALNTY_FLAG_W'] = 9
     btl_data['SALNTY_FLAG_W'] = btl_data['SALNTY_FLAG_W'].astype(int)
     
     return btl_data
@@ -1334,7 +1334,7 @@ def merge_cond_flags(btl_data, qual_flag_cond,sensor=1):
     btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'CTDSAL_FLAG_W'},inplace=True)
     btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
     btl_data['CTDSAL_FLAG_W'].fillna(value=2,inplace=True)
-    btl_data[btl_data[parameter].isna()]['CTDSAL_FLAG_W'] = 9
+    btl_data.loc[btl_data[parameter].isna(),'CTDSAL_FLAG_W'] = 9
     btl_data['CTDSAL_FLAG_W'] = btl_data['CTDSAL_FLAG_W'].astype(int)
     
     return btl_data
@@ -1349,12 +1349,25 @@ def merged_reftemp_flags(btl_data, qual_flag_temp):
     btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
     btl_data['REFTMP_FLAG_W'].fillna(value=2,inplace=True)
     try:
-        btl_data[btl_data['T90'].isna()]['REFTMP_FLAG_W'] = 9
+        btl_data.loc[btl_data['T90'].isna(),'REFTMP_FLAG_W'] = 9
     except:
         btl_data[btl_data['REFTMP'].isna()]['REFTMP_FLAG_W'] = 9
     btl_data['REFTMP_FLAG_W'] = btl_data['REFTMP_FLAG_W'].astype(int)
     
     return btl_data
+
+def get_btl_time(df,btl_num_col,time_col):
+    # Get time for first btl fire
+    time = df[df[btl_num_col]== df[btl_num_col].min()][time_col].values
+    ts = pd.to_datetime(time,unit='s')
+    date = ts.strftime('%Y%m%d')
+    hour= ts.strftime('%H%M')
+    df['DATE'] = date[0]
+    df['TIME'] = hour[0]
+    
+    return df
+    
+    
 
 def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
                      t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
@@ -1450,7 +1463,6 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         f.close()
         
         outfile = open(out_dir+cast+'_ct1.csv', "a")
-        outfile.write('\n')
         outfile.write('END_DATA')
         outfile.close()
         
@@ -1476,8 +1488,8 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     btl_data['SAMPNO'] = btl_data['btl_fire_num']
     btl_data['BTLNBR'] = btl_data['btl_fire_num']
     btl_data['BTLNBR_FLAG_W'] = '2'
-    btl_data['DATE'] = np.NaN
-    btl_data['TIME'] = np.NaN
+#    btl_data['DATE'] = np.NaN
+#    btl_data['TIME'] = np.NaN
     btl_data['LATITUDE'] = btl_data['GPSLAT']
     btl_data['LONGITUDE'] = btl_data['GPSLON']
     btl_data['DEPTH'] = np.NaN
@@ -1497,7 +1509,7 @@ def export_btl_data(df,expocode,sectionID,cruise_line,out_dir='data/pressure/',t
     btl_data = btl_data.round(4)
     
     btl_data = btl_data.fillna(value=-999)
-    
+    btl_data = btl_data.round(4)    
     
     now = datetime.datetime.now()
     file_datetime = now.strftime("%Y%m%d")

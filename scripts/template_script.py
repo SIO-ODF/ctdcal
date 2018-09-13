@@ -291,6 +291,7 @@ def process_all_new():
         print(station, ' Completed')
         
     coef_df = oxy_fitting.create_coef_df(coef_dict)
+    oxy_df = oxy_fitting.flag_oxy_data(oxy_df)
     
     # Merge oxygen fitting DF to btl_data_all
     
@@ -303,7 +304,9 @@ def process_all_new():
 
 
 ################ Clean and export data #######################
-
+    btl_data_all = process_ctd.merge_cond_flags(btl_data_all,qual_flag_cond)
+    btl_data_all = process_ctd.merge_refcond_flags(btl_data_all,qual_flag_cond)
+    btl_data_all = process_ctd.merged_reftemp_flags(btl_data_all,qual_flag_temp)
 ### Export Quality Flags
     
     qual_flag_temp.to_csv('data/logs/qual_flag_temp_new.csv',index=False)
@@ -312,6 +315,14 @@ def process_all_new():
 ### Clean up Bottle Data by removing rows with no ctd data
     
     btl_data_all =  btl_data_all.dropna(subset=btl_cols)
+
+### Add DATE and TIME
+    
+    btl_data_all['DATE'] = ''
+    btl_data_all['TIME'] = ''
+    for station in ssscc:
+        df = btl_data_all.loc[btl_data_all['SSSCC'] == station].copy()
+        btl_data_all.loc[btl_data_all['SSSCC'] == station] = process_ctd.get_btl_time(df,'btl_fire_num',time_col)
 
 ### Create CT Files and HY files
     

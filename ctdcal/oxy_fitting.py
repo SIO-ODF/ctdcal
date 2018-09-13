@@ -895,7 +895,16 @@ def create_coef_df(coef_dict):
     
     return coef_df
     
+def flag_oxy_data(df):
+    df_deep = df.loc[(df['CTDPRS_btl'] >= 2000) & (df['CTDOXY_FLAG_W']==2)]
+    std = df_deep['res'].std()
+    df.loc[(df['CTDPRS_btl'] >= 2000) & (df['CTDOXY_FLAG_W']==2) & (np.abs(df['res']) >= (std * 2.8)),'CTDOXY_FLAG_W'] = 3
     
+    df_shallow = df.loc[(df['CTDPRS_btl'] < 2000) & (df['CTDPRS_btl'] >= 500) & (df['CTDOXY_FLAG_W']==2)]
+    std_shal = df_shallow['res'].std()
+    df.loc[(df['CTDPRS_btl'] < 2000) & (df['CTDPRS_btl'] >= 500) & (df['CTDOXY_FLAG_W']==2) & (np.abs(df['res']) >= (std_shal * 2.8)),'CTDOXY_FLAG_W'] = 3
+    
+    return df
 
 
 def least_squares_resid(coef0,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):
