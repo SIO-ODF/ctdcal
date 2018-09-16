@@ -189,7 +189,7 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
     """
     try:
         inMat = pd.DataFrame.from_records(inMat)
-        inMat = inMat.iloc[:, 1:]
+        #inMat = inMat.iloc[:, 1:]
         inMat.to_pickle(printdir+stacast+'_time.pkl')
     except:
         if inMat is None:

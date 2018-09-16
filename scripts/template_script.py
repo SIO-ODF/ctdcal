@@ -7,10 +7,8 @@ Created on Tue Jul 31 11:42:27 2018
 """
 
 import os
-import subprocess
 import time
 import sys
-import configparser
 sys.path.append('ctdcal/')
 import settings
 import ctdcal.process_ctd as process_ctd
@@ -18,20 +16,17 @@ import ctdcal.fit_ctd as fit_ctd
 import pandas as pd
 import gsw
 import ctdcal.oxy_fitting as oxy_fitting
-
+import sbe_convert
 
 def process_all_new():
 
-#    ssscc_file = 'data/ssscc.csv'
-    iniFile = 'data/ini-files/configuration.ini'
-    config = configparser.RawConfigParser()
-    config.read(iniFile)
     
     # Directory and file information
     expocode = settings.cruise['expocode']
     sectionID = settings.cruise['sectionid']
     raw_directory = settings.ctd_processing_dir['raw_data_directory']
     time_directory = settings.ctd_processing_dir['time_data_directory']
+    converted_directory = settings.ctd_processing_dir['converted_directory']
     pressure_directory = settings.ctd_processing_dir['pressure_data_directory']
     oxygen_directory = settings.ctd_processing_dir['oxygen_directory']
     btl_directory = settings.ctd_processing_dir['bottle_directory']
@@ -80,7 +75,9 @@ def process_all_new():
     sample_rate = settings.ctd_processing_constants['sample_rate']
     search_time = settings.ctd_processing_constants['roll_filter_time']
     ctd = settings.ctd_processing_constants['ctd_serial']
-
+    
+    p_column_names = settings.pressure_series_output['column_name']
+    p_column_units = settings.pressure_series_output['column_units']
     
     btl_data_prefix = 'data/bottle/'
     btl_data_postfix = '_btl_mean.pkl'
@@ -88,10 +85,6 @@ def process_all_new():
     time_data_postfix = '_time.pkl'
     p_log_file = 'data/logs/ondeck_pressure.csv'
  
-    
-
-    p_column_names = config['pressure_series_output']['column_name'].split(',')
-    p_column_units = config['pressure_series_output']['column_units'].split(',')
 
     
     # Columns from btl and ctd file to be read:
@@ -99,39 +92,37 @@ def process_all_new():
     ctd_cols = settings.ctd_input_array
     
     ssscc = settings.ssscc
-    # Load ssscc from file
-#    ssscc = []
-#    with open(ssscc_file, 'r') as filename:
-#        ssscc = [line.strip() for line in filename]
-#        
-        #check for already converted files to skip later
-    time_start = time.perf_counter()
-    cnv_dir_list = os.listdir('data/converted/')
-    time_dir_list = os.listdir('data/time/')
 
-    for x in ssscc:
-        if '{}.pkl'.format(x) in cnv_dir_list:
+#    time_start = time.perf_counter()
+    cnv_dir_list = os.listdir(converted_directory)
+    time_dir_list = os.listdir(time_directory)
+    btl_dir_list = os.listdir(btl_directory)
+
+    for station in ssscc:
+        if '{}.pkl'.format(station) in cnv_dir_list:
             continue
         #convert hex to ctd
-        subprocess.run(['odf_convert_sbe.py', 'data/raw/' + x + '.hex', 'data/raw/' + x + '.XMLCON', '-o', 'data/converted'], stdout=subprocess.PIPE)
-        print('odf_convert_sbe.py SSSCC: ' + x + ' done')
+        hex_file = hex_prefix + station + hex_postfix
+        xml_file = xml_prefix + station + xml_postfix
+        
+        sbe_convert.convert_sbe(station, hex_file, xml_file, converted_directory)
+        print('Converted_sbe SSSCC: ' + station + ' done')
 
-    time_convert = time.perf_counter()
+#    time_convert = time.perf_counter()
 
-    for x in ssscc:
-        if '{}_time.pkl'.format(x) in time_dir_list:
+    for station in ssscc:
+        if '{}_time.pkl'.format(station) in time_dir_list:
             continue
-        subprocess.run(['odf_sbe_metadata.py', 'data/converted/' + x + '.pkl'], stdout=subprocess.PIPE)
-        print('odf_sbe_metadata.py SSSCC: ' + x + ' done')
+        sbe_convert.sbe_metadata(station)
+        print('sbe_metadata SSSCC: ' + station + ' done')
 
-    btl_dir_list = os.listdir('data/bottle/')
-    for x in ssscc:
-        if '{}_btl_mean.pkl'.format(x) in btl_dir_list:
+    for station in ssscc:
+        if '{}_btl_mean.pkl'.format(station) in btl_dir_list:
             continue
         #process bottle file
-        subprocess.run(['odf_process_bottle.py', 'data/converted/' + x + '.pkl', '-o', 'data/bottle/'], stdout=subprocess.PIPE)
-        print('odf_process_bottle.py SSSCC: ' + x + ' done')
-    time_bottle = time.perf_counter()
+        sbe_convert.process_bottle(station)
+        print('process_bottle SSSCC: ' + station + ' done')
+#    time_bottle = time.perf_counter()
     
     ###########################################################################
     
@@ -300,6 +291,7 @@ def process_all_new():
         print(station, ' Completed')
         
     coef_df = oxy_fitting.create_coef_df(coef_dict)
+    oxy_df = oxy_fitting.flag_oxy_data(oxy_df)
     
     # Merge oxygen fitting DF to btl_data_all
     
@@ -312,7 +304,9 @@ def process_all_new():
 
 
 ################ Clean and export data #######################
-
+    btl_data_all = process_ctd.merge_cond_flags(btl_data_all,qual_flag_cond)
+    btl_data_all = process_ctd.merge_refcond_flags(btl_data_all,qual_flag_cond)
+    btl_data_all = process_ctd.merged_reftemp_flags(btl_data_all,qual_flag_temp)
 ### Export Quality Flags
     
     qual_flag_temp.to_csv('data/logs/qual_flag_temp_new.csv',index=False)
@@ -322,6 +316,14 @@ def process_all_new():
     
     btl_data_all =  btl_data_all.dropna(subset=btl_cols)
 
+### Add DATE and TIME
+    
+    btl_data_all['DATE'] = ''
+    btl_data_all['TIME'] = ''
+    for station in ssscc:
+        df = btl_data_all.loc[btl_data_all['SSSCC'] == station].copy()
+        btl_data_all.loc[btl_data_all['SSSCC'] == station] = process_ctd.get_btl_time(df,'btl_fire_num',time_col)
+
 ### Create CT Files and HY files
     
     
@@ -329,8 +331,6 @@ def process_all_new():
     process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
     
     
-
-
 def main(argv):
     '''Run everything.
     '''
