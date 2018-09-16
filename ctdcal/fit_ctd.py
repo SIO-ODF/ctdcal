@@ -668,6 +668,21 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     cond = cond[(cond['autosalSAMPNO']!='worm')]
     if all(cond['autosalSAMPNO'].values.astype(int) != cond['SAMPNO'].values.astype(int)):
         raise ValueError('Mismatched sample numbers in salt file (check file: '+ saltpath + ')')
+    # Take last instance of repeated values
+    if cond['SAMPNO'].max() != len(cond['SAMPNO']):
+        try:
+            autosal_values, index, counts = np.unique(cond['autosalSAMPNO'].astype(int), return_index=True, return_counts=True)
+            last_instance = counts - 1
+            last_instance_1 = list(last_instance + index)
+        
+            sampno_values, index, counts = np.unique(cond['SAMPNO'].astype(int), return_index=True, return_counts=True)
+            last_instance = counts - 1
+            last_instance_2 = list(last_instance + index)
+            
+            if last_instance_1 == last_instance_2:
+                cond = cond.iloc[last_instance_1]
+        except:
+            raise ValueError('Mismatched sample numbers in salt file (check file: '+ saltpath + ')')
     cond = cond.drop('autosalSAMPNO',axis=1)
     cond = cond.apply(pd.to_numeric) # For some reason doesn't completely work the first time
     #cond = cond[(cond['SAMPNO']!=0) & (cond['SAMPNO']!=99)]
