@@ -50,6 +50,7 @@ def all_plots(df):
     btl_oxy_residuals_station_concentration_plot(df)
     return None
 
+
      #################################################################
      ##### Here lies the temperature plots, long may they rest.  #####
      #################################################################

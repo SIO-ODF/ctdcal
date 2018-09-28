@@ -5,20 +5,20 @@ import pathlib
 
 
 cruise = dict(
-    cruise_title = 'SOCCOM NBP1707',
-    cruise_name = 'nbp1707',
-    cruisedb = 'nbp1707',
-    vessel = 'R/V Palmer',
-    ship_code = '3206',
-    expocode = '320620170820',
-    chief_sci = 'Kevin Speer',
-    sectionid = 'nbp1707',
-    start_date = '2017-08-20 11:00:00',
-    start_port = 'Papeete, French Polynesia',
-    start_latlon = '17.535 S 149.5696 W',
-    end_date = '2017-09-30 10:00:00',
-    end_port = 'Valparaiso, Chile',
-    end_latlon = '33.05 S 71.616 W'
+    cruise_title = '',
+    cruise_name = '',
+    cruisedb = '',
+    vessel = '',
+    ship_code = '',
+    expocode = '',
+    chief_sci = '',
+    sectionid = '',
+    start_date = '',
+    start_port = '',
+    start_latlon = '',
+    end_date = '',
+    end_port = '',
+    end_latlon = ''
 )
 
 ctd_processing_dir = dict(
