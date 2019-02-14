@@ -193,8 +193,8 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
         inMat.to_pickle(printdir+stacast+'_time.pkl')
     except:
         if inMat is None:
-           print("In report_time_series_data: No data")
-           return
+            print("In report_time_series_data: No data")
+            return
         else:
             out_col = []
             now = datetime.datetime.now()

@@ -452,12 +452,12 @@ def residualO2(calib, o2pl, P, K, T, S, V):
 #    return c_arr
 
 def conductivity_polyfit(cond,temp,press,coef):
-#    
-     fitted_cond = cond + (coef[0] * (press**2) + coef[1] * press + coef[2] * (temp**2) \
+
+    fitted_cond = cond + (coef[0] * (press**2) + coef[1] * press + coef[2] * (temp**2) \
                     + coef[3] * temp + coef[4] * (cond**2) + coef[5] * cond + coef[6])
-     fitted_cond = fitted_cond.round(4)
-     fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
-     return fitted_cond, fitted_sal
+    fitted_cond = fitted_cond.round(4)
+     #fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
+    return fitted_cond#, fitted_sal
      
 def cell_therm_mass_corr(temp,cond,sample_int,alpha=alpha,beta=beta):
     
@@ -862,29 +862,35 @@ def array_like_to_series(array):
     
     return series
 
-def apply_pressure_offset(press,p_off):
+def apply_pressure_offset(df, p_col, p_off):
     """
     Applies pressure offset to pressure data
             
     Parameters
     ----------
     
-    press :array_like
-            Array containing pressure values
+    df :Pandas DataFrame
+            DataFrame containing pressure values
+            
+    p_col :string
+            Name of pressure column in DataFrame
            
     p_off :float
             Array containing ending ondeck pressure values
+            
     Returns
     -------
     
-    new_press :array_like
-                Offset pressure data
+    df :Pandas DataFrame
+                DataFrame containing updated pressure values and a new flag column
        
     """
-    
-    new_press = press + p_off
+    df[p_col] = df[p_col] + p_off
+    # Default to good data
+    df['CTDPRS_FLAG_W'] = 2
+    #new_press = press + p_off
 
-    return new_press
+    return df
   
 ##
 #            key = (station, cast, bottle, "o2")
