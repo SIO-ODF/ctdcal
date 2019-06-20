@@ -161,6 +161,7 @@ def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pres
 
     #Bin the data by time, and compute the average rate of descent
     df_blah = df_cast.loc[:,:]
+    df_blah['index'] = df_blah.index
     df_blah['bin'] = pd.cut(df_blah.loc[:,'index'],
                             range(df_blah.iloc[0]['index'],df_blah.iloc[-1]['index'],time_bin*24),
                             labels=False, include_lowest=True)
@@ -631,9 +632,78 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
         outMat = inMat[:tmp]
 
         # Store ending on-deck pressure
+        if log_file != None:
+            report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
+
+    return outMat
+
+def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=20.0, log_file=None):
+    """ondeck_pressure function
+    Function takes pandas Dataframe of filtered ctd raw data the stores, analizes and removes ondeck
+    values from data.
+    Args:
+        param1 (str): stacast, station cast info
+        param1 (str): p_col, pressure data column name
+        param2 (str): c1_col, cond1 data column name
+        param3 (str): c2_col, cond2 data column name
+        param4 (str): time_col, time data column name
+        param5 (ndarray): numpy ndarray with dtype array
+        param6 (float): conductivity_startup, threshold value
+        param7 (str): log_file, log file name
+    Returns:
+        Narray: The return ndarray with ondeck data removed.
+        Also output start/end ondeck pressure.
+    """
+    # Frequency
+    fl = 24
+    fl2 = fl*2
+    # One minute
+    mt = 60
+    # Half minute
+    ms = 30
+    time_delay = fl*ms
+
+    #split dataframe into upcast/downcast
+    
+    down, up = df.split(p_col=p_col)
+    
+
+    # Searches each half of df, uses conductivity
+    # threshold min to capture startup pressure
+    
+    start_df = down.loc[(down[c1_col] < 20) & (down[c2_col] < 20)]
+    end_df = up.loc[(up[c1_col] < 20) & (up[c2_col] < 20)]
+    
+    # Evaluate starting and ending pressures
+    sp = len(start_df)
+
+    if (sp > time_delay):
+        start_p = np.average(start_df.iloc[fl2:sp-(time_delay)][p_col])
+    else:
+        start_p = np.average(start_df[fl2:sp])
+        
+    ep = len(end_df)
+    
+    ep = len(end_df)
+
+    if (ep > time_delay):
+        end_p = np.average(end_df.iloc[(time_delay):])
+    else:
+        try:
+            end_p = np.average(end_df.iloc[(ep):])
+        except ZeroDivisionError:
+            end_p = np.NaN
+
+    # Remove ondeck start and end pressures
+    
+    df.iloc[start_df.index.max():end_df.index.min()][p_col].max().copy()
+        # Store ending on-deck pressure
+    if log_file != None:
         report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
     return outMat
+
+
 
 def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
     #fix/remove try/except once serialization is fixed
@@ -834,7 +904,10 @@ def fill_surface_data(df, **kwargs):
 
 def load_reft_data(reft_file,index_name = 'btl_fire_num'):
     """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
-
+    
+    # loading in REFTMP_FLAG_W here will conflict with the REFTMP_FLAG_W determined during temperature calibration
+    #reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90','REFTMP_FLAG_W'])
+    
     reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90'])
     reft_data.set_index(index_name)
 
@@ -1428,7 +1501,8 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
 
             print('Loading TIME data for station: ' + x + '...')
             file = prefix + x + postfix
-            time_data = load_time_data(file)
+            #time_data = load_time_data(file)
+            time_data = pd.read_pickle(file)
             time_data['SSSCC'] = str(x)
             time_data['dv_dt'] = oxy_fitting.calculate_dVdT(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
             df_data_all = pd.concat([df_data_all,time_data], sort=False)
@@ -1485,8 +1559,9 @@ def merged_reftemp_flags(btl_data, qual_flag_temp):
     try:
         btl_data.loc[btl_data['T90'].isna(),'REFTMP_FLAG_W'] = 9
     except:
-        btl_data[btl_data['REFTMP'].isna()]['REFTMP_FLAG_W'] = 9
-    btl_data['REFTMP_FLAG_W'] = btl_data['REFTMP_FLAG_W'].astype(int)
+        btl_data.loc[btl_data['REFTMP'].isna(),'REFTMP_FLAG_W'] = 9
+        btl_data.loc[btl_data['REFTMP'].isna(),'REFTMP'] = -999
+    #btl_data['REFTMP_FLAG_W'] = btl_data['REFTMP_FLAG_W'].astype(int)
 
     return btl_data
 
@@ -1676,6 +1751,7 @@ def flag_missing_values(df,flag_suffix='_FLAG_W'):
             col_list.remove(column)
     for column in col_list:
         flag_name = column + flag_suffix
+        
         df.loc[df[column].isna(),flag_name] = 9
         df.loc[df[column].astype(int) == -999, flag_name] = 9
     return df
@@ -1684,9 +1760,18 @@ def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='
     df_binned = pd.DataFrame()
     for cast in ssscc:
         time_data = df.loc[df[ssscc_col] == cast].copy()
-        time_data = pressure_sequence(time_data, p_col, bin_size, -1.0, 0.0, direction, sample_rate, search_time)
+        time_orig = time_data.copy()
+        time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
+        if time_data[p_col].hasnans:
+            time_orig['CTDOXY'] = pd.to_numeric(time_orig['CTDOXY'])
+            time_data = binning_df(time_orig, bin_size=2)
+            time_data['interp_bol'] = 0
+            time_data.loc[time_data['CTDPRS'].isnull(),'interp_bol'] = 1
+            time_data['CTDPRS'] = time_data.index.astype('float')
         time_data = flag_backfill_data(time_data)
+        time_data = fill_surface_data(time_data)
         time_data = time_data[p_column_names]
+        time_data = time_data.round(4)
         try:
             time_data = flag_missing_values(time_data)
         except KeyError:
@@ -1700,6 +1785,63 @@ def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='
 
         df_binned = pd.concat([df_binned,time_data])
     return df_binned
+
+def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
+               out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
+               logFile='data/logs/cast_details.csv'):
+    """ Export Time data to pressure directory as well as adding qual_flags and
+    removing unneeded columns"""
+
+
+    df[stacst_col] = df[stacst_col].astype(str).copy()
+
+    cast_details = dataToNDarray(logFile,str,None,',',0)
+    depth_df = pd.read_csv('data/logs/depth_log.csv')
+    depth_df.dropna(inplace=True)
+    manual_depth_df = pd.read_csv('data/logs/manual_depth_log.csv')
+    full_depth_df = pd.concat([depth_df,manual_depth_df])
+    full_depth_df.drop_duplicates(subset='STNNBR', keep='first',inplace=True)
+    
+    for cast in ssscc:
+
+        time_data = df[df['SSSCC'] == cast].copy()
+
+        s_num = cast[-5:-2]
+        c_num = cast[-2:]
+        depth = full_depth_df.loc[full_depth_df['STNNBR'] == int(s_num),'DEPTH']
+        for line in cast_details:
+            if cast in line[0]:
+                for val in line:
+                    if 'at_depth' in val: btime = float(str.split(val, ':')[1])
+                    if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
+                    if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
+                    if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
+                break
+        time_data.drop(columns='SSSCC',inplace=True)
+        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
+        b_date = bdt[0]
+        b_time = bdt[1]
+        now = datetime.datetime.now()
+        file_datetime = now.strftime("%Y%m%d") #%H:%M")
+        file_datetime = file_datetime + 'ODFSIO'
+        outfile = open(out_dir+cast+'_ct1.csv', "w+")
+        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
+        cn = np.asarray(p_column_names)
+        cn.tofile(outfile,sep=',', format='%s')
+        outfile.write('\n')
+        cu = np.asarray(p_column_units)
+        cu.tofile(outfile,sep=',', format='%s')
+        outfile.write('\n')
+        outfile.close()
+
+        file = out_dir+cast+'_ct1.csv'
+        with open(file,'a') as f:
+            time_data.to_csv(f, header=False,index=False)
+        f.close()
+
+        outfile = open(out_dir+cast+'_ct1.csv', "a")
+        outfile.write('END_DATA')
+        outfile.close()
 
 def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
                      t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
@@ -1724,7 +1866,10 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         #time_data = pressure_seq_data.copy()
         #time_data = time_data[pressure_seq_data['SSSCC'] == cast]
         time_data = df[df['SSSCC'] == cast].copy()
-        time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
+        try:
+            time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
+        except:    
+            time_data = binning_df(time_data, bin_size=2.0)
         depth = time_data['DEPTH'].mean()
         time_data = flag_backfill_data(time_data)
         time_data = time_data[p_column_names]
@@ -1756,7 +1901,7 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
         outfile = open(out_dir+cast+'_ct1.csv', "w+")
-        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num[1], b_date, b_time, btm_lat, btm_lon, ctd, depth))
+        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
         cn = np.asarray(p_column_names)
         cn.tofile(outfile,sep=',', format='%s')
         outfile.write('\n')
