@@ -1825,7 +1825,7 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
         outfile = open(out_dir+cast+'_ct1.csv', "w+")
-        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
+        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %.4f\nLONGITUDE = %.4f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
         cn = np.asarray(p_column_names)
         cn.tofile(outfile,sep=',', format='%s')
         outfile.write('\n')
@@ -1846,8 +1846,9 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
 def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
                      t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
                      logFile='data/logs/cast_details.csv'):
+    
     """ Export Time data to pressure directory as well as adding qual_flags and
-    removing unneeded columns"""
+    removing unneeded columns  DEPRECATED USE EXPORT_CT1 INSTEAD"""
 
 
     df[stacst_col] = df[stacst_col].astype(str).copy()
@@ -1922,20 +1923,6 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
 def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir='data/pressure/',org='ODF'):
 
     btl_data = df.copy()
-
-
-#     for stn in np.unique(btl_data.SSSCC.values):
-#         btl_df = btl_data.loc[btl_data['SSSCC'] == stn].copy()
-#         btl_data.loc[btl_data['SSSCC'] == stn,'LATITUDE'] = btl_df.loc[btl_df['CTDPRS'] == btl_df['CTDPRS'].max(),'LATITUDE'].values[0]
-#         btl_data.loc[btl_data['SSSCC'] == stn,'LONGITUDE'] = btl_df.loc[btl_df['CTDPRS'] == btl_df['CTDPRS'].max(),'LONGITUDE'].values[0]
-
-
-#     btl_data = btl_data[btl_columns]
-#     btl_data = btl_data.round(4).astype(Decimal)
-
-#     btl_data = btl_data.round(4).astype(Decimal)
-#     btl_data = btl_data.fillna(value='-999')
-
     now = datetime.datetime.now()
     file_datetime = now.strftime("%Y%m%d")
 

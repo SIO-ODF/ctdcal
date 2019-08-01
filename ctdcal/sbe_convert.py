@@ -17,10 +17,9 @@ import ctdcal.convert as cnv
 import ctdcal.process_bottle as btl
 import ctdcal.sbe_reader as sbe_reader
 import warnings
-import ctd
+#import ctd
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-import ctd
 
 # Get information from settings.py file
 
@@ -195,13 +194,14 @@ def convert_sbe(ssscc, hexFile, xmlFile, outdir=converted_directory):
     ### Test pickle file conversion
     pickle_file_name = ssscc + '.pkl'
     pickle_file_path = os.path.join(outputDir, pickle_file_name)
-    file = 'data/cnv/' + ssscc + '_WE_corr_tri24.cnv'
-    sbe_df = ctd.from_cnv('data/cnv/' + ssscc + '_WE_corr_tri24.cnv')
-    converted_df['CTDTMP1'] = sbe_df['t090C']
-    converted_df['CTDTMP2'] = sbe_df['t190C']
-    converted_df['CTDCOND1'] = sbe_df['c0mS/cm']
-    converted_df['CTDCOND2'] = sbe_df['c1mS/cm']
-    converted_df['CTDPRS'] = sbe_df['Pressure [dbar]']
+    ### Added to handle I06 sensor issues, use this if you are using seabird postprocessing PO values with ODF postprocessing
+#     file = 'data/cnv/' + ssscc + '_WE_corr_tri24.cnv'
+#     sbe_df = ctd.from_cnv('data/cnv/' + ssscc + '_WE_corr_tri24.cnv')
+#     converted_df['CTDTMP1'] = sbe_df['t090C']
+#     converted_df['CTDTMP2'] = sbe_df['t190C']
+#     converted_df['CTDCOND1'] = sbe_df['c0mS/cm']
+#     converted_df['CTDCOND2'] = sbe_df['c1mS/cm']
+#     converted_df['CTDPRS'] = sbe_df['Pressure [dbar]']
     
     converted_df.to_pickle(pickle_file_path) 
     return
