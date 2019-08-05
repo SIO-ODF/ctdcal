@@ -21,7 +21,7 @@ short_lookup = {
     '71':{'short_name': 'CTDXMISS', 'long_name':'CStar', 'units': '0-5VDC', 'type':'float64'},
     '61':{'short_name': 'U_DEF', 'long_name':'user defined', 'units':'0-5VDC', 'type':'float64'},
     '1000':{'short_name': 'CTDSAL', 'long_name':'Salinity (C1 T1)', 'units':'PSU', 'type':'float64'},
-    '20':{'short_name': 'FLUOR', 'long_name':'WetlabECO_AFL_FL_Sensor', 'units':'0-5VDC', 'type':'float64'}, #check short_name later
+    '20':{'short_name': 'CTDFLUOR', 'long_name':'WetlabECO_AFL_FL_Sensor', 'units':'0-5VDC', 'type':'float64'}, #check short_name later
     '42':{'short_name':'PAR', 'long_name':'PAR/Irradiance, Biospherical/Licor', 'units':'0-5VDC', 'type':'float64'},
     '51':{'short_name':'REF_PAR', 'long_name':'Surface PAR/Irradiance, Biospherical/Licor', 'units':'0-5VDC', 'type':'float64'},
     '70':{'short_name': 'CTDBACKSCATTER', 'long_name': 'WetlabECO_BB_Sensor', 'units':'0-5VDC', 'type':'float64'}

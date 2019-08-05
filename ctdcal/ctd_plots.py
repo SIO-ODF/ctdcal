@@ -57,9 +57,9 @@ def all_plots(df):
      #################################################################
 
 def btl_t1_residuals_pressure_plot(reft_vals, t1_vals, press, stnno):
-    
+
     reft_t1 = reft_vals - t1_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(reft_t1, -press, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -76,9 +76,9 @@ def btl_t1_residuals_pressure_plot(reft_vals, t1_vals, press, stnno):
     return None
 
 def btl_t2_residuals_pressure_plot(reft_vals, t2_vals, press, stnno):
-    
+
     reft_t2 = reft_vals - t2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(reft_t2, -press, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -95,9 +95,9 @@ def btl_t2_residuals_pressure_plot(reft_vals, t2_vals, press, stnno):
     return None
 
 def t1_t2_residuals_pressure_plot(t1_vals, t2_vals, press, stnno):
-    
+
     t1_t2 = t1_vals - t2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(t1_t2, -press, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -114,9 +114,9 @@ def t1_t2_residuals_pressure_plot(t1_vals, t2_vals, press, stnno):
     return None
 
 def btl_t1_residuals_station_plot(reft_vals, t1_vals, press, stnno):
-    
+
     reft_t1 = reft_vals - t1_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno, reft_t1, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -133,9 +133,9 @@ def btl_t1_residuals_station_plot(reft_vals, t1_vals, press, stnno):
     return None
 
 def btl_t2_residuals_station_plot(t1_vals, t2_vals, press, stnno):
-    
+
     t1_t2 = t1_vals - t2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno, t1_t2, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -152,9 +152,9 @@ def btl_t2_residuals_station_plot(t1_vals, t2_vals, press, stnno):
     return None
 
 def t1_t2_residuals_station_plot(t1_vals, t2_vals, press, stnno):
-    
+
     t1_t2 = t1_vals - t2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno, t1_t2, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -176,8 +176,8 @@ def btl_t1_residuals_station_deep_plot(reft_vals, t1_vals, press, stnno):
     df['CTDPRS'] = press
     df['REFT_T1'] = reft_vals - t1_vals
     df['STNNBR'] = stnno
-    
-    
+
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -200,7 +200,7 @@ def btl_t2_residuals_station_deep_plot(reft_vals, t2_vals, press, stnno):
     df['CTDPRS'] = press
     df['REFT_T2'] = reft_vals - t2_vals
     df['STNNBR'] = stnno
-    
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -223,8 +223,8 @@ def t1_t2_residuals_station_deep_plot(t1_vals, t2_vals, press, stnno):
     df['CTDPRS'] = press
     df['T1_T2'] = t1_vals - t2_vals
     df['STNNBR'] = stnno
-    
-    
+
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -246,9 +246,9 @@ def t1_t2_residuals_station_deep_plot(t1_vals, t2_vals, press, stnno):
      #################################################################
 
 def btl_c1_residuals_pressure_plot(refc_vals, c1_vals, press, stnno):
-    
+
     refc_c1 = refc_vals - c1_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(refc_c1, -press, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -265,9 +265,9 @@ def btl_c1_residuals_pressure_plot(refc_vals, c1_vals, press, stnno):
     return None
 
 def btl_c2_residuals_pressure_plot(refc_vals, c2_vals, press, stnno):
-    
+
     refc_c2 = refc_vals - c2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(refc_c2, -press, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -283,9 +283,9 @@ def btl_c2_residuals_pressure_plot(refc_vals, c2_vals, press, stnno):
     return None
 
 def c1_c2_residuals_pressure_plot(c1_vals, c2_vals, press, stnno):
-    
+
     c1_c2 = c1_vals - c2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(c1_c2, -press, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -302,9 +302,9 @@ def c1_c2_residuals_pressure_plot(c1_vals, c2_vals, press, stnno):
     return None
 
 def btl_c1_residuals_station_plot(refc_vals, c1_vals, press, stnno):
-    
+
     refc_c1 = refc_vals - c1_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno, refc_c1, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -321,9 +321,9 @@ def btl_c1_residuals_station_plot(refc_vals, c1_vals, press, stnno):
     return None
 
 def btl_c2_residuals_station_plot(refc_vals, c2_vals, press, stnno):
-    
+
     refc_c2 = refc_vals - c2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno, refc_c2, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -340,7 +340,7 @@ def btl_c2_residuals_station_plot(refc_vals, c2_vals, press, stnno):
     return None
 
 def c1_c2_residuals_station_plot(c1_vals, c2_vals, press, stnno):
-    
+
     c1_c2 = c1_vals - c2_vals
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -363,7 +363,7 @@ def btl_c1_residuals_station_deep_plot(refc_vals, c1_vals, press, stnno):
     df['CTDPRS'] = press
     df['REFT_C1'] = refc_vals - c1_vals
     df['STNNBR'] = stnno
-    
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -386,7 +386,7 @@ def btl_c2_residuals_station_deep_plot(refc_vals, c2_vals, press, stnno):
     df['CTDPRS'] = press
     df['REFT_C2'] = refc_vals - c2_vals
     df['STNNBR'] = stnno
-    
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -409,7 +409,7 @@ def c1_c2_residuals_station_deep_plot(c1_vals, c2_vals, press, stnno):
     df['CTDPRS'] = press
     df['C1_C2'] = c1_vals - c2_vals
     df['STNNBR'] = stnno
-    
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -427,10 +427,10 @@ def c1_c2_residuals_station_deep_plot(c1_vals, c2_vals, press, stnno):
     return None
 
 def c_t_coherence_plot(t1_vals, t2_vals, c1_vals, c2_vals, press):
-    
+
     t1_t2 = t1_vals - t2_vals
     c1_c2 = c1_vals - c2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(t1_t2, c1_c2, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -447,9 +447,9 @@ def c_t_coherence_plot(t1_vals, t2_vals, c1_vals, c2_vals, press):
     return None
 
 def btl_c1_residuals_compare_plot(refc_vals, c1_vals, press):
-    
+
     refc_c1 = refc_vals - c1_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(refc_vals, refc_c1, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -466,9 +466,9 @@ def btl_c1_residuals_compare_plot(refc_vals, c1_vals, press):
     return None
 
 def btl_c2_residuals_compare_plot(refc_vals, c2_vals, press):
-    
+
     refc_c2 = refc_vals - c2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(refc_vals, refc_c2, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -504,9 +504,9 @@ def c1_c2_residuals_compare_plot(refc_vals, c1_vals, c2_vals, press):
     return None
 
 def btl_c1_residuals_station_uncorrected_plot(refc_vals, c1_vals, press, stnno):
-    
+
     refc_c1 = refc_vals - c1_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno, refc_c1, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -523,9 +523,9 @@ def btl_c1_residuals_station_uncorrected_plot(refc_vals, c1_vals, press, stnno):
     return None
 
 def btl_c2_residuals_station_uncorrected_plot(refc_vals, c2_vals, press, stnno):
-    
+
     refc_c2 = refc_vals - c2_vals
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno, refc_c2, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -542,9 +542,9 @@ def btl_c2_residuals_station_uncorrected_plot(refc_vals, c2_vals, press, stnno):
     return None
 
 def c1_c2_residuals_station_uncorrected_plot(c1_vals, c2_vals, press, stnno):
-    
+
     c1_c2 = c1_vals - c2_vals
-    
+
 
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -597,12 +597,12 @@ def btl_sal_station_plot(btl_sal, ctd_sal, press, stnno):
 
 def btl_sal_station_deep_plot(btl_sal, ctd_sal, press, stnno):
     sal_res = btl_sal - ctd_sal
-    
+
     df = pd.DataFrame()
     df['CTDPRS'] = press
     df['BTL_SAL'] = sal_res
     df['STNNBR'] = stnno
-    
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -624,9 +624,9 @@ def btl_sal_station_deep_plot(btl_sal, ctd_sal, press, stnno):
      #################################################################
 
 def btl_oxy_residuals_pressure_plot(ref_oxy, ctdoxy, press, stnno):
-    
+
     btl_o = ref_oxy - ctdoxy
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(btl_o, -press, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -643,9 +643,9 @@ def btl_oxy_residuals_pressure_plot(ref_oxy, ctdoxy, press, stnno):
     return None
 
 def btl_oxy_residuals_station_plot(ref_oxy, ctdoxy, press, stnno):
-    
+
     btl_o = ref_oxy - ctdoxy
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno,btl_o, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -667,8 +667,8 @@ def btl_oxy_residuals_station_deep_plot(ref_oxy, ctdoxy, press, stnno):
     df['CTDPRS'] = press
     df['BTL_O'] = ref_oxy - ctdoxy
     df['STNNBR'] = stnno
-    
-    
+
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -686,9 +686,9 @@ def btl_oxy_residuals_station_deep_plot(ref_oxy, ctdoxy, press, stnno):
     return None
 
 def btl_oxy_residuals_temperature_plot(ref_oxy, ctd_oxy, t1_vals, stnno):
-    
+
     btl_o = ref_oxy - ctd_oxy
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(btl_o, t1_vals, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -705,10 +705,10 @@ def btl_oxy_residuals_temperature_plot(ref_oxy, ctd_oxy, t1_vals, stnno):
     return None
 
 def btl_oxy_residuals_station_temperature_plot(ref_oxy, ctd_oxy, t1_vals, stnno):
-    
+
     btl_o = ref_oxy - ctd_oxy
-    
-    
+
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(stnno,btl_o, marker='+', c=t1_vals, cmap=cmocean.cm.thermal)
@@ -731,7 +731,7 @@ def btl_oxy_residuals_station_deep_temperature_plot(ref_oxy, ctdoxy, t1_vals, pr
     df['BTL_O'] = ref_oxy - ctdoxy
     df['STNNBR'] = stnno
     df['CTDPRS'] = press
-    
+
     df_deep = df[df['CTDPRS'] > 2000]
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -749,9 +749,9 @@ def btl_oxy_residuals_station_deep_temperature_plot(ref_oxy, ctdoxy, t1_vals, pr
     return None
 
 def btl_oxy_residuals_pressure_concentration_plot(ref_oxy, ctd_oxy, stnno):
-    
+
     btl_o = ref_oxy - ctd_oxy
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(btl_o, ref_oxy, marker='+', c=stnno, cmap=plt.cm.tab20c_r)
@@ -768,9 +768,9 @@ def btl_oxy_residuals_pressure_concentration_plot(ref_oxy, ctd_oxy, stnno):
     return None
 
 def btl_oxy_residuals_station_concentration_plot(ref_oxy, ctd_oxy, press, stnno):
-    
+
     btl_o = ref_oxy - ctd_oxy
-    
+
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     cm = ax.scatter(btl_o, ref_oxy, marker='+', c=press, cmap=plt.cm.viridis_r)
@@ -785,4 +785,3 @@ def btl_oxy_residuals_station_concentration_plot(ref_oxy, ctd_oxy, press, stnno)
     fig.savefig('./data/images/btl_oxy_stn_concentration.pdf', format='pdf')
     plt.close()
     return None
-

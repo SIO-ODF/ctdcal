@@ -17,9 +17,10 @@ M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
 D = 1.42905481 #  /* density O2 g/l @ 0 C */
 
+# CTM constants
 alpha = 0.03 #0.043 - 1999 Value # Seabird Covered glass inital fluid thermal anomaly
 beta = 1.0 / 7 #1.0 / 4.3 1999 Value # Thermal anomaly time constant
-
+sample_int = 1./24.
 
 def offset(offset, inArr):
     """offset column of data
@@ -459,7 +460,7 @@ def conductivity_polyfit(cond,temp,press,coef):
      #fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
     return fitted_cond#, fitted_sal
      
-def cell_therm_mass_corr(temp,cond,sample_int,alpha=alpha,beta=beta):
+def cell_therm_mass_corr(temp,cond,sample_int=sample_int,alpha=alpha,beta=beta):
     
     a = calculate_a_CTM(alpha, sample_int, beta)
     b = calculate_b_CTM(a, alpha)
@@ -508,12 +509,6 @@ def calculate_dc_dT_CTM(temp):
     dc_dT = 0.1 * (1 + 0.006 * (temp - 20))
     
     return dc_dT
-
-def calculate_mS_from_S(CTM):
-    
-    CTM_ms = 10.0 * CTM
-    
-    return CTM_ms
 
 def S_M_to_mS_cm(CTM_S_M):
     

@@ -17,7 +17,9 @@ import ctdcal.convert as cnv
 import ctdcal.process_bottle as btl
 import ctdcal.sbe_reader as sbe_reader
 import warnings
-warnings.filterwarnings("ignore", category=RuntimeWarning) 
+#import ctd
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
 
 # Get information from settings.py file
 
@@ -93,26 +95,54 @@ btl_data_postfix = '_btl_mean.pkl'
 time_data_prefix = 'data/time/'
 time_data_postfix = '_time.pkl'
 p_log_file = 'data/logs/ondeck_pressure.csv'
-
+cnv_dir = 'data/cnv/'
 def sbe_metadata(ssscc):
     ssscc_file = converted_directory + ssscc + '.pkl'
     raw_data = pd.read_pickle(ssscc_file)
     raw_data = process_ctd.ondeck_pressure(ssscc, p_col, c1_col, c2_col, time_col, raw_data, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
     
     if not c1_col in raw_data.keys():
-      print('c1_col data not found, skipping')
+        print('c1_col data not found, skipping')
     else:
-      raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
+        raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
 
     if not c2_col in raw_data.keys():
-      print('c2_col data not found, skipping')
+        print('c2_col data not found, skipping')
     else:
-      raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
+        raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
 
     if not dopl_col in raw_data.keys():
-      print('do_col data not found, skipping')
+        print('do_col data not found, skipping')
     else:
-      raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
+        raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
+    
+    # Filter data
+    filter_data = process_ctd.raw_ctd_filter(raw_data, 'triangle', 24, input_parameters)
+    
+    stime, etime, btime, startP, maxP, btm_lat, btm_lon, btm_alt, cast_data = process_ctd.cast_details(ssscc, log_directory+'cast_details.csv', p_col, time_col, lat_col, lon_col, alt_col, filter_data)
+    report_ctd.report_time_series_data(ssscc, time_directory, expocode, time_column_names, time_column_units, time_column_data, time_column_format, cast_data)
+    return
+
+def sbe_metadata_2(ssscc):
+    input_parameters = ['CTDOXYVOLTS']
+    ssscc_file = converted_directory + ssscc + '.pkl'
+    raw_data = pd.read_pickle(ssscc_file)
+    raw_data = process_ctd.ondeck_pressure(ssscc, p_col, c1_col, c2_col, time_col, raw_data, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
+    
+    if not c1_col in raw_data.keys():
+        print('c1_col data not found, skipping')
+    else:
+        raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
+
+    if not c2_col in raw_data.keys():
+        print('c2_col data not found, skipping')
+    else:
+        raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
+
+    if not dopl_col in raw_data.keys():
+        print('do_col data not found, skipping')
+    else:
+        raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
     
     # Filter data
     filter_data = process_ctd.raw_ctd_filter(raw_data, 'triangle', 24, input_parameters)
@@ -144,7 +174,7 @@ def process_bottle(ssscc):
     return 
 
 def convert_sbe(ssscc, hexFile, xmlFile, outdir=converted_directory):
-    
+    import ctd
     sbeReader = sbe_reader.SBEReader.from_paths(hexFile, xmlFile)
     # Build Output Directory exists
     if outdir:
@@ -164,5 +194,14 @@ def convert_sbe(ssscc, hexFile, xmlFile, outdir=converted_directory):
     ### Test pickle file conversion
     pickle_file_name = ssscc + '.pkl'
     pickle_file_path = os.path.join(outputDir, pickle_file_name)
+    ### Added to handle I06 sensor issues, use this if you are using seabird postprocessing PO values with ODF postprocessing
+#     file = 'data/cnv/' + ssscc + '_WE_corr_tri24.cnv'
+#     sbe_df = ctd.from_cnv('data/cnv/' + ssscc + '_WE_corr_tri24.cnv')
+#     converted_df['CTDTMP1'] = sbe_df['t090C']
+#     converted_df['CTDTMP2'] = sbe_df['t190C']
+#     converted_df['CTDCOND1'] = sbe_df['c0mS/cm']
+#     converted_df['CTDCOND2'] = sbe_df['c1mS/cm']
+#     converted_df['CTDPRS'] = sbe_df['Pressure [dbar]']
+    
     converted_df.to_pickle(pickle_file_path) 
     return

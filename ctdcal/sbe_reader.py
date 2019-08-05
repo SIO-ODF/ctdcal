@@ -436,7 +436,8 @@ class SBEReader():
             Bit 0 Pump status- 1=pump on, 0=pump off.
         '''
         mask_pump = 1
-
+        if bytes.decode(flag_char).isnumeric() == False:
+            flag_char = b'3'
         if int(flag_char) & mask_pump:
             return True
         else:
