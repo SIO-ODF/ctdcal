@@ -83,7 +83,7 @@ config = dict(
                       'numpy',
                       'matplotlib',
                       'scipy',
-                      'pandas==0.20.3',
+                      'pandas',
                       'gsw>=3.2',
                       ],
     scripts=scripts,
