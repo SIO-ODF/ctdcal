@@ -50,7 +50,7 @@ LICENSE = read('LICENSE')
 long_description = read('README.md')
 
 
-scripts = glob.glob('scripts/*.py')
+scripts = glob.glob('scripts/*.py') + glob.glob('scripts/institutions/*/*.py')
 
 config = dict(
     name='ctdcal',
