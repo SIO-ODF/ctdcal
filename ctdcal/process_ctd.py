@@ -13,10 +13,10 @@ import warnings
 import ctdcal.fit_ctd as fit_ctd
 import datetime
 from decimal import Decimal
-import settings
 
 import sys
 sys.path.append('ctdcal/')
+import settings
 import oxy_fitting
 import gsw
 
@@ -538,14 +538,14 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
             print("In raw_ctd_filter: Empty parameter list.")
         else:
             for p in parameters:
-                if filter_type is 'boxcar':
+                if filter_type == 'boxcar':
                     win = sig.boxcar(win_size)
                     return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/len(win)
-                elif filter_type is 'gaussian':
+                elif filter_type == 'gaussian':
                     sigma = np.std(arr)
                     win = sig.general_gaussian(win_size, 1.0, sigma)
                     return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/(len(win))
-                elif filter_type is 'triangle':
+                elif filter_type == 'triangle':
                     win = sig.triang(win_size)
                     return_array[p] = 2*sig.convolve(input_array[p], win, mode='same')/len(win)
     return return_array
@@ -664,16 +664,16 @@ def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=2
     time_delay = fl*ms
 
     #split dataframe into upcast/downcast
-    
+
     down, up = df.split(p_col=p_col)
-    
+
 
     # Searches each half of df, uses conductivity
     # threshold min to capture startup pressure
-    
+
     start_df = down.loc[(down[c1_col] < 20) & (down[c2_col] < 20)]
     end_df = up.loc[(up[c1_col] < 20) & (up[c2_col] < 20)]
-    
+
     # Evaluate starting and ending pressures
     sp = len(start_df)
 
@@ -681,9 +681,9 @@ def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=2
         start_p = np.average(start_df.iloc[fl2:sp-(time_delay)][p_col])
     else:
         start_p = np.average(start_df[fl2:sp])
-        
+
     ep = len(end_df)
-    
+
     ep = len(end_df)
 
     if (ep > time_delay):
@@ -695,7 +695,7 @@ def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=2
             end_p = np.NaN
 
     # Remove ondeck start and end pressures
-    
+
     df.iloc[start_df.index.max():end_df.index.min()][p_col].max().copy()
         # Store ending on-deck pressure
     if log_file != None:
@@ -765,7 +765,7 @@ def roll_filter(inMat, p_col, up='down', frames_per_sec=24, search_time=15, **kw
         P = inMat[p_col]
         dP = np.diff(P,1)
 
-        if up is 'down':
+        if up == 'down':
             index_to_remove = np.where(dP < 0)[0] # Differential filter
             subMat = np.delete(inMat, index_to_remove, axis=0)
 
@@ -779,7 +779,7 @@ def roll_filter(inMat, p_col, up='down', frames_per_sec=24, search_time=15, **kw
                    tmp = np.arange(i+1,k[0]+1,1)
                remove = np.append(remove,tmp)
                deltaP = 0
-        elif up is 'up':
+        elif up == 'up':
             index_to_remove = np.where(dP > 0)[0] # Differential filter
             subMat = np.delete(inMat, index_to_remove, axis=0)
 
@@ -904,10 +904,10 @@ def fill_surface_data(df, **kwargs):
 
 def load_reft_data(reft_file,index_name = 'btl_fire_num'):
     """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
-    
+
     # loading in REFTMP_FLAG_W here will conflict with the REFTMP_FLAG_W determined during temperature calibration
     #reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90','REFTMP_FLAG_W'])
-    
+
     reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90'])
     reft_data.set_index(index_name)
 
@@ -1060,42 +1060,42 @@ def get_param_coef(calib_param,diff,order,calib):
     if 'T' in calib:
         coef = np.zeros(shape=5)
 
-        if order is 0:
+        if order == 0:
             coef[4] = cf1[0]
 
-        elif (order is 1) and (calib == 'TP'):
+        elif (order == 1) and (calib == 'TP'):
             coef[1] = cf1[0]
             coef[4] = cf1[1]
 
-        elif (order is 2) and (calib == 'TP'):
+        elif (order == 2) and (calib == 'TP'):
             coef[0] = cf1[0]
             coef[1] = cf1[1]
             coef[4] = cf1[2]
 
-        elif (order is 1) and (calib == 'T'):
+        elif (order == 1) and (calib == 'T'):
             coef[3] = cf1[0]
             coef[4] = cf1[1]
 
-        elif (order is 2) and (calib == 'T'):
+        elif (order == 2) and (calib == 'T'):
             coef[2] = cf1[0]
             coef[3] = cf1[1]
             coef[4] = cf1[2]
 
     if 'C' in calib:
         coef = np.zeros(shape=7)
-        if order is 0:
+        if order == 0:
             coef[6] = cf1[0]
-        elif (order is 1) and (calib == 'CP'):
+        elif (order == 1) and (calib == 'CP'):
             coef[1] = cf1[0]
             coef[6] = cf1[1]
-        elif (order is 2) and (calib == 'CP'):
+        elif (order == 2) and (calib == 'CP'):
             coef[0] = cf1[0]
             coef[1] = cf1[1]
             coef[6] = cf1[2]
-        elif (order is 1) and (calib == 'C'):
+        elif (order == 1) and (calib == 'C'):
             coef[5] = cf1[0]
             coef[6] = cf1[1]
-        elif (order is 2) and (calib == 'C'):
+        elif (order == 2) and (calib == 'C'):
             coef[4] = cf1[0]
             coef[5] = cf1[1]
             coef[6] = cf1[2]
@@ -1236,26 +1236,26 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
     sensor = '_c'+str(sensor)
     coef = np.zeros(shape=7)
 
-    if order is 0:
+    if order == 0:
         coef[6] = cf[0]
-    elif (order is 1) and (calib_param == 'P'):
+    elif (order == 1) and (calib_param == 'P'):
         coef[1] = cf[0]
         coef[6] = cf[1]
-    elif (order is 2) and (calib_param == 'P'):
+    elif (order == 2) and (calib_param == 'P'):
         coef[0] = cf[0]
         coef[1] = cf[1]
         coef[6] = cf[2]
-    elif (order is 1) and (calib_param == 'T'):
+    elif (order == 1) and (calib_param == 'T'):
         coef[3] = cf[0]
         coef[6] = cf[1]
-    elif (order is 2) and (calib_param == 'T'):
+    elif (order == 2) and (calib_param == 'T'):
         coef[2] = cf[0]
         coef[3] = cf[1]
         coef[6] = cf[2]
-    elif (order is 1) and (calib_param == 'C'):
+    elif (order == 1) and (calib_param == 'C'):
         coef[5] = cf[0]
         coef[6] = cf[1]
-    elif (order is 2) and (calib_param == 'C'):
+    elif (order == 2) and (calib_param == 'C'):
         coef[4] = cf[0]
         coef[5] = cf[1]
         coef[6] = cf[2]
@@ -1476,8 +1476,8 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             ### Calculate dv/dt for oxygen fitting
             btl_data['dv_dt'] = oxy_fitting.calculate_dVdT(btl_data['CTDOXYVOLTS'],btl_data['scan_datetime'])
             #btl_data = get_btl_time(btl_data,'btl_fire_num','scan_datetime')
-            
-            
+
+
             # Add bottom of cast information (date,time,lat,lon,etc.)
             btl_data = add_btl_bottom_data(btl_data, x, cast_details)
 
@@ -1659,7 +1659,7 @@ def get_btl_time(df,btl_num_col,time_col):
 def add_btl_bottom_data(df, cast, log_file, press_col='CTDPRS', lat_col='LATITUDE', lon_col='LONGITUDE', time_col = 'TIME',prcn=4):
 
     cast_details = dataToNDarray(log_file,str,None,',',0)
-    
+
     for line in cast_details:
         if cast in line[0]:
             for val in line:
@@ -1670,12 +1670,12 @@ def add_btl_bottom_data(df, cast, log_file, press_col='CTDPRS', lat_col='LATITUD
                 if 'at_depth' in val: btm_time = float(str.split(val, ':')[1])
                 if 'max_pressure' in val: btm_press = float(str.split(val, ':')[1])
             break
-    
-    
+
+
     df[lat_col] = np.round(btm_lat,prcn)
     df[lon_col] = np.round(btm_lon,prcn)
-    
-    
+
+
     ts = pd.to_datetime(btm_time,unit='s')
     date = ts.strftime('%Y%m%d')
     hour= ts.strftime('%H%M')
@@ -1712,7 +1712,7 @@ def format_btl_data(df,data_cols, prcn=4):
         missing_list = list(np.setdiff1d(format_columns,df_columns))
         raise KeyError('missing columns: ',missing_list)
         #print('missing columns: ',missing_list)
-    
+
     for i in df.columns:
         if '_FLAG_W' in i:
             df[i] = df[i].astype(int)
@@ -1751,7 +1751,7 @@ def flag_missing_values(df,flag_suffix='_FLAG_W'):
             col_list.remove(column)
     for column in col_list:
         flag_name = column + flag_suffix
-        
+
         df.loc[df[column].isna(),flag_name] = 9
         df.loc[df[column].astype(int) == -999, flag_name] = 9
     return df
@@ -1801,7 +1801,7 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
     manual_depth_df = pd.read_csv('data/logs/manual_depth_log.csv')
     full_depth_df = pd.concat([depth_df,manual_depth_df])
     full_depth_df.drop_duplicates(subset='STNNBR', keep='first',inplace=True)
-    
+
     for cast in ssscc:
 
         time_data = df[df['SSSCC'] == cast].copy()
@@ -1846,7 +1846,7 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
 def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
                      t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
                      logFile='data/logs/cast_details.csv'):
-    
+
     """ Export Time data to pressure directory as well as adding qual_flags and
     removing unneeded columns  DEPRECATED USE EXPORT_CT1 INSTEAD"""
 
@@ -1869,7 +1869,7 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         time_data = df[df['SSSCC'] == cast].copy()
         try:
             time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
-        except:    
+        except:
             time_data = binning_df(time_data, bin_size=2.0)
         depth = time_data['DEPTH'].mean()
         time_data = flag_backfill_data(time_data)
@@ -1928,7 +1928,7 @@ def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir='data/
 
     time_stamp = file_datetime+org
 
-    outfile = open(out_dir+ expocode +'_hy1.csv', "w+")
+    outfile = open(out_dir + expocode + '_hy1.csv', mode='w+')
     outfile.write("BOTTLE, %s\n" % (time_stamp))
     cn = np.asarray(btl_columns)
     cn.tofile(outfile,sep=',', format='%s')
