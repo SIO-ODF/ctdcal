@@ -332,6 +332,8 @@ def process_all_new():
     # process_ctd.export_btl_data(btl_data_all,expocode,sectionID,expocode)
     # process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
 
+    # this is a test comment
+
     ### MK
     # create depth_log.csv
     import pandas as pd
