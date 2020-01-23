@@ -54,7 +54,8 @@ def main(argv):
             df_reft = pd.read_csv(dir_reft + ssscc + reft_postfix, names =['SAMPNO', 'REFTMP'], skiprows = 1, usecols = [2, 5])
             df_reft['REFTMP_FLAG_W'] = 2
             df_incomplete_reft = pd.merge(df_reft, df_merged_btl_ctd_6, on='SAMPNO', how='outer')
-            df_incomplete_reft.groupby('SAMPNO').fillna(inplace=True, method = 'pad')
+            # this line breaks code; seem redundant? MK
+            #df_incomplete_reft.groupby('SAMPNO').fillna(inplace=True, method='pad')
             df_complete_reft = df_incomplete_reft.fillna(value={'REFTMP':-999, 'REFTMP_FLAG_W':5})
         #if there are no SBE35 files for the cast, flag as 5
         except FileNotFoundError:
