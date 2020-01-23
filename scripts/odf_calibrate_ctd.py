@@ -576,19 +576,19 @@ def main(argv):
 
         if args.temperature:
             sensor = '_t'+str(sensor)
-            if order is 0:
+            if order == 0:
                 coef[4] = cf[0]
-            elif (order is 1) and ('P' in args.calib):
+            elif (order == 1) and ('P' in args.calib):
                 coef[1] = cf[0]
                 coef[4] = cf[1]
-            elif (order is 2) and ('P' in args.calib):
+            elif (order == 2) and ('P' in args.calib):
                 coef[0] = cf[0]
                 coef[1] = cf[1]
                 coef[4] = cf[2]
-            elif (order is 1) and ('T' in args.calib):
+            elif (order == 1) and ('T' in args.calib):
                 coef[3] = cf[0]
                 coef[4] = cf[1]
-            elif (order is 2) and ('T' in args.calib):
+            elif (order == 2) and ('T' in args.calib):
                 coef[2] = cf[0]
                 coef[3] = cf[1]
                 coef[4] = cf[2]
@@ -597,26 +597,26 @@ def main(argv):
 
         elif args.conductivity:
             sensor = '_c'+str(sensor)
-            if order is 0:
+            if order == 0:
                 coef[6] = cf[0]
-            elif (order is 1) and ('P' in args.calib):
+            elif (order == 1) and ('P' in args.calib):
                 coef[1] = cf[0]
                 coef[6] = cf[1]
-            elif (order is 2) and ('P' in args.calib):
+            elif (order == 2) and ('P' in args.calib):
                 coef[0] = cf[0]
                 coef[1] = cf[1]
                 coef[6] = cf[2]
-            elif (order is 1) and ('T' in args.calib):
+            elif (order == 1) and ('T' in args.calib):
                 coef[3] = cf[0]
                 coef[6] = cf[1]
-            elif (order is 2) and ('T' in args.calib):
+            elif (order == 2) and ('T' in args.calib):
                 coef[2] = cf[0]
                 coef[3] = cf[1]
                 coef[6] = cf[2]
-            elif (order is 1) and ('C' in args.calib):
+            elif (order == 1) and ('C' in args.calib):
                 coef[5] = cf[0]
                 coef[6] = cf[1]
-            elif (order is 2) and ('C' in args.calib):
+            elif (order == 2) and ('C' in args.calib):
                 coef[4] = cf[0]
                 coef[5] = cf[1]
                 coef[6] = cf[2]
