@@ -142,7 +142,6 @@ def process_all_new():
         salt_path = salt_dir + file
         saltDF = odf_salt_parser.salt_loader(saltpath=salt_path)
         odf_salt_parser.salt_df_parser(saltDF, salt_dir)
-    breakpoint()
 
     # generate reft file here
 
