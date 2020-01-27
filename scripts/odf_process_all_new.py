@@ -128,6 +128,21 @@ def process_all_new():
     time_bottle = time.perf_counter()
 
     # generate salts file here: (salt parser)
+    salt_dir = './data/salt/'
+    import scripts.odf_salt_parser as odf_salt_parser
+
+    file_list = os.listdir(salt_dir)
+    files = []
+    for file in file_list:
+        if '.' not in file:
+            files.append(file)
+
+    for file in files:
+        print(file)
+        salt_path = salt_dir + file
+        saltDF = odf_salt_parser.salt_loader(saltpath=salt_path)
+        odf_salt_parser.salt_df_parser(saltDF, salt_dir)
+    breakpoint()
 
     # generate reft file here
 
