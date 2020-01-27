@@ -38,6 +38,10 @@ def offset(offset, inArr):
     #return inArr
     return inArr + offset
 
+# This references EOS-80, and should be replaced with a call to the publicly maintained "gsw.density.rho" function
+# Transition problems include: gsw rho requires absolute salinity, which requires lat/lon (could fake with 0,0 or pull in aditional data)
+# gsw rho requires conservative temperature, this uses potential temperature
+# This is only used in one spot for converting oxy ml/l to umol/kg in fit_ctd.py, should be abstracted out
 def IESRho(s, t, p):
     bars  = p * 0.1
 #/* pressure in bars */
@@ -107,7 +111,9 @@ def IESRho(s, t, p):
         kstp  = kst0 + bars*(terma + bars*termb)
         rho   = rho/(1.0-bars/kstp)
     return rho
-    
+
+''' 
+# Not used in code   
 def IESRho_df(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
     """
         Calculate the IES density
@@ -188,7 +194,7 @@ def IESRho_df(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
 
     kstp  = kst0 + bars * (terma + bars * termb)
     df['rho']   = rho/(1.0-bars/kstp)
-    return df
+    return df '''
 
 def get_flasks(o2flasks):
     with open(o2flasks, 'r') as f:
@@ -212,9 +218,7 @@ def get_flask_vol(flask, o2flasks, t=20, glass="borosilicate"):
     coef = _coef[glass]
     return fv * (1.0 + coef * (t - _t));
 
-#def stp_rho(rho_func=IESRho):
-#    return rho_func(0, 20, 0)
-#
+#appears to be equivalent to gsw.density.rho_t_exact with (0,t,0)
 def rho_t(t):
     z0       =  9.9983952e2
     z1       =  1.6945176e1
@@ -246,6 +250,7 @@ def titr_20_calc(titr, titr_temp,):
     titr_20c = titr * rho_titr/rho_stp
     return titr_20c
 
+#rho_func should be replaced with gsw_call here
 def mll_to_umolkg(o2ml, s, t, rho_func=IESRho):
     o2kg = o2ml / ((M/D * 0.001) * rho_func(s, t, 0)/1000)
     return o2kg
