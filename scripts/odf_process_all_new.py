@@ -23,6 +23,8 @@ def process_all_new():
     config = configparser.RawConfigParser()
     config.read(iniFile)
 
+    # maybe reformat config file?
+    # fold this code into config module
     p_col = config['analytical_inputs']['p']
     p_btl_col = config['inputs']['p']
     t1_col = config['analytical_inputs']['t1']
@@ -125,6 +127,12 @@ def process_all_new():
         print('odf_process_bottle.py SSSCC: ' + x + ' done')
     time_bottle = time.perf_counter()
 
+    # generate salts file here: (salt parser)
+
+    # generate reft file here
+
+    # generate oxy file here (separate out from calib)
+
     ###########################################################################
 
     ### File I/O
@@ -135,7 +143,8 @@ def process_all_new():
                                                   btl_data_postfix,'bottle',cols)
     time_data_all = process_ctd.load_all_ctd_files(ssscc,time_data_prefix,
                                                    time_data_postfix,'time',None)
-
+                                                   ##
+   # end of data collection, begin calibration
     ################################################################################
 
     ### Pressure Calibration
@@ -143,10 +152,10 @@ def process_all_new():
     # Determine Pressure offset from logs
 
     pressure_log = process_ctd.load_pressure_logs(p_log_file)
-    p_off = process_ctd.get_pressure_offset(pressure_log.ondeck_start_p,pressure_log.ondeck_end_p)
+    p_off = process_ctd.get_pressure_offset(pressure_log.ondeck_start_p,pressure_log.ondeck_end_p) # insert logic to check if good value?
 
-    btl_data_all = fit_ctd.apply_pressure_offset(btl_data_all,p_btl_col, p_off)
-    time_data_all = fit_ctd.apply_pressure_offset(time_data_all,p_col,p_off)
+    btl_data_all = fit_ctd.apply_pressure_offset(btl_data_all,p_btl_col, p_off) # not actually bottle data
+    time_data_all = fit_ctd.apply_pressure_offset(time_data_all,p_col,p_off) # continuous data
     # btl_data_all[p_btl_col] = fit_ctd.apply_pressure_offset(btl_data_all[p_btl_col], p_off)
     # time_data_all[p_col] = fit_ctd.apply_pressure_offset(time_data_all[p_col],p_off)
 
@@ -154,7 +163,7 @@ def process_all_new():
     ###########################################################################
 
     ### Temperature Calibration
-    for x in range(2):
+    for x in range(2): # 2 passes checks for outliers twice (i.e. before/after fit)
 
      # Second order calibration
 
@@ -163,6 +172,9 @@ def process_all_new():
         df_ques_reft = process_ctd.quality_check(df_temp_good[t2_btl_col], df_temp_good[t1_btl_col], df_temp_good[p_btl_col], df_temp_good['SSSCC'], df_temp_good['btl_fire_num'], 'quest')
         df_ques_reft['Parameter'] = 'REF_TEMP'
 
+        # sort out fit parameters, what order P, what order T
+        # only fit `linear' regions, i.e. not mixed/benthic layers
+        # built better way to handle xRange?
         coef_temp_1,df_ques_t1 = process_ctd.calibrate_param(df_temp_good[t1_btl_col], df_temp_good[reft_col], df_temp_good[p_btl_col], 'TP', 2, df_temp_good.SSSCC, df_temp_good.btl_fire_num, xRange='800:6000')
         coef_temp_2,df_ques_t2 = process_ctd.calibrate_param(df_temp_good[t2_btl_col], df_temp_good[reft_col], df_temp_good[p_btl_col], 'TP', 2, df_temp_good.SSSCC, df_temp_good.btl_fire_num, xRange='1500:6000')
 
@@ -219,6 +231,7 @@ def process_all_new():
 
     # Second Order Calibration
 
+        # can probably use same xRange as temp, unless C sensor has some quirk
         coef_cond_1,df_ques_c1 = process_ctd.calibrate_param(df_cond_good.CTDCOND1,df_cond_good.BTLCOND,df_cond_good.CTDPRS,'CP',2,df_cond_good.SSSCC,df_cond_good.btl_fire_num,xRange='800:6000')
         coef_cond_2,df_ques_c2 = process_ctd.calibrate_param(df_cond_good.CTDCOND2,df_cond_good.BTLCOND,df_cond_good.CTDPRS,'CP',2,df_cond_good.SSSCC,df_cond_good.btl_fire_num,xRange='1500:6000')
 
@@ -278,6 +291,7 @@ def process_all_new():
 
     #####
     # Oxygen calibration (MK)
+    # look over this code again, maybe refence matlab scripts from PMEL
 
     import ctdcal.oxy_fitting as oxy_fitting
     import gsw
@@ -308,6 +322,8 @@ def process_all_new():
     time_data_all['OS_ctd'] = oxy_fitting.os_umol_kg(time_data_all['SA'], time_data_all['PT'])
     #####
 
+    #######################
+    # turn correction instantaneous CTD measurements into points @ bottle firings
     # this is working now (MK)
     subprocess.run(['ctd_to_bottle.py'], stdout=subprocess.PIPE)
 
@@ -324,6 +340,7 @@ def process_all_new():
 
 ### Create CT Files(oxygen done by hand)
 
+    # needed to run when there's no data available yet (i.e. at sea)
     # btl_data_all['OXYGEN'] = -999
     # btl_data_all['OXYGEN'] = -999
     # time_data_all['CTDOXY'] = -999
@@ -331,8 +348,6 @@ def process_all_new():
     # depreciated according to process_ctd.py (MK)
     # process_ctd.export_btl_data(btl_data_all,expocode,sectionID,expocode)
     # process_ctd.export_time_data(time_data_all,ssscc,int(sample_rate),int(search_time),expocode,sectionID,ctd,p_column_names,p_column_units)
-
-    # this is a test comment
 
     ### MK
     # create depth_log.csv
@@ -354,7 +369,9 @@ def process_all_new():
     # needs depth_log.csv, manual_depth_log.csv
     process_ctd.export_ct1(btl_data_all,ssscc,expocode,sectionID,ctd,p_column_names,p_column_units)
 
+    # section for making plots/etc.
 
+    # section to output stdev/etc. (maybe in calib to use for flagging data)
 
 
 def main(argv):
