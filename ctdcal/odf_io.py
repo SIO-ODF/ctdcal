@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import datetime as dt
+import gsw
 
 import sys
 
@@ -88,7 +89,7 @@ def autosal_drift_fit(df):
     return df
 
 '''The following extracted from gsw library before conversion to python wrapper of C'''
-
+'''
 def SP_salinometer(Rt, t):
     r"""Calculates Practical Salinity SP from a salinometer, primarily using
     the PSS-78 algorithm.  Note that the PSS-78 algorithm for Practical
@@ -181,9 +182,9 @@ def SP_salinometer(Rt, t):
     # Ensure that SP is non-negative.
     SP = np.maximum(SP, 0)
     return SP
-
+'''
 def compute_salinity(df):
-    df['SALNTY'] = SP_salinometer(df['cr_average_fitted']/2, df['bath_temp'])
+    df['SALNTY'] = gsw.SP_salinometer(df['cr_average_fitted']/2, df['bath_temp'])
     return df
 
 def formatted_salt_file(df):

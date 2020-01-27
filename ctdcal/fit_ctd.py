@@ -689,7 +689,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     # Filter unmeansured bottle data from btl_data
     data = btl_data[btl_data[btl_num_col].isin(cond['SAMPNO'].tolist())]
     
-    salinity = SP_salinometer((cond['CRavg']/2.0),cond['BathTEMP'])
+    salinity = gsw.SP_salinometer((cond['CRavg']/2.0),cond['BathTEMP'])
     try:
         cond['BTLCOND'] = gsw.C_from_SP(salinity,data[btl_tmp_col],data[btl_p_col])
         #cond = cond.drop('SAMPNO',1)
@@ -726,7 +726,7 @@ def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
 #    bath_df.loc[bnans] = 0
     
     
-    salinity = SP_salinometer((cond_ratio / 2.0),bath_temp)
+    salinity = gsw.SP_salinometer((cond_ratio / 2.0),bath_temp)
     cond = gsw.C_from_SP(salinity,btl_temp,btl_press)  
     
     cond[cond<=1] = np.nan
@@ -925,6 +925,7 @@ def apply_pressure_offset(df, p_col, p_off):
 
 ### Taken from python-gsw, aka 48-term version. Needs to be rewritten and added
 ### to GSW-python or this module must be adjusted to deal with generic forms.
+'''
 def SP_salinometer(Rt, t):
     """
     Calculates Practical Salinity SP from a salinometer, primarily using
@@ -1112,3 +1113,4 @@ def Hill_ratio_at_SP2(t):
     part2 = 1 + sqrty * (1 + sqrty * (1 + sqrty))
     SP_Hill_raw_at_SP2 = SP2 - a0 / part1 - b0 * ft68 / part2
     return 2. / SP_Hill_raw_at_SP2
+'''
