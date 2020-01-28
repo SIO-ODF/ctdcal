@@ -129,7 +129,7 @@ def process_all_new():
 
     # generate salts file here: (salt parser)
     salt_dir = './data/salt/'
-    import scripts.odf_salt_parser as odf_salt_parser
+    import scripts.odf_salt_parser as salt_parser
 
     file_list = os.listdir(salt_dir)
     files = []
@@ -140,10 +140,18 @@ def process_all_new():
     for file in files:
         print(file)
         salt_path = salt_dir + file
-        saltDF = odf_salt_parser.salt_loader(saltpath=salt_path)
-        odf_salt_parser.salt_df_parser(saltDF, salt_dir)
+        saltDF = salt_parser.salt_loader(saltpath=salt_path)
+        salt_parser.salt_df_parser(saltDF, salt_dir)
 
     # generate reft file here
+    reft_path = './data/reft/'
+    import scripts.odf_reft_parser as reft_parser
+    for station in ssscc:
+        with open(reft_path + station + '.cap', 'r') as ssscc_reftemp:
+            # create csv files
+            df_part = reft_parser.parse(ssscc_reftemp, station)
+
+        df_part.to_csv(reft_path + station + '_reft.csv',index=False)
 
     # generate oxy file here (separate out from calib)
 
