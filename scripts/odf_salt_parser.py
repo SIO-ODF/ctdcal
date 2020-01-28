@@ -1,6 +1,7 @@
 import csv
 import pandas as pd
 import numpy as np
+import gsw
 import ctdcal.fit_ctd as fit_ctd
 import os
 
@@ -31,7 +32,7 @@ def salt_loader(saltpath):
     saltDF.dropna(axis=1,how='all',inplace=True)
     saltDF = saltDF[saltDF['autosalSAMPNO'] != 'worm']
     saltDF['STNNBR'] = saltDF['STNNBR'].astype(int) # force to int (if loaded as str)
-    saltDF['SALNTY'] = fit_ctd.SP_salinometer((saltDF['CRavg']/2.0),saltDF['BathTEMP'])
+    saltDF['SALNTY'] = gsw.SP_salinometer((saltDF['CRavg']/2.0),saltDF['BathTEMP'])
     return saltDF
 
 def salt_df_parser(saltDF, outdir, stn_col='STNNBR', cast_col='CASTNO'):
