@@ -1805,6 +1805,7 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
     for cast in ssscc:
 
         time_data = df[df['SSSCC'] == cast].copy()
+        time_data = pressure_sequence(time_data)
 
         s_num = cast[-5:-2]
         c_num = cast[-2:]
@@ -1817,7 +1818,7 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
                     if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
                     if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
                 break
-        time_data.drop(columns='SSSCC',inplace=True)
+        # time_data.drop(columns='SSSCC',inplace=True) # pressure_sequence removes SSSCC column already
         bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
         b_date = bdt[0]
         b_time = bdt[1]

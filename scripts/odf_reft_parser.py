@@ -43,3 +43,12 @@ def parse(f, f_out):
     df['STNNBR'] = f_out[0:3]
     df['CASTNO'] = f_out[3:5]
     return df
+
+def process_reft(ssscc, reft_dir):
+    reft_path = reft_dir + ssscc + '.cap'
+    with open(reft_path, 'r') as ssscc_reftemp:
+        # import data
+        df_part = parse(ssscc_reftemp, ssscc)
+
+        # export to .csv
+        df_part.to_csv(reft_dir + ssscc + '_reft.csv',index=False)

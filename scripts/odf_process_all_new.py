@@ -466,16 +466,19 @@ def process_all_new():
         time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDRINKO'] = time_data['CTDRINKO']
         time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDRINKO_FLAG_W'] = 2
         time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDOXY_FLAG_W'] = 2
-        print(station + 'time data done')
+        print(station + ' time data done')
 
     #####
 
     #######################
     # turn correction instantaneous CTD measurements into points @ bottle firings
-    # this is working now (MK)
-    subprocess.run(['ctd_to_bottle.py'], stdout=subprocess.PIPE)
+    # subprocess.run(['ctd_to_bottle.py'], stdout=subprocess.PIPE)
 
 ################ Clean and export data #######################
+    # btl_data_all = process_ctd.merge_cond_flags(btl_data_all,qual_flag_cond, c_btl_col) # make code not require specific column input
+    btl_data_all = process_ctd.merge_refcond_flags(btl_data_all,qual_flag_cond)
+    # btl_data_all = process_ctd.merge_temp_flags(btl_data_all, qual_flag_temp, t_btl_col)
+    btl_data_all = process_ctd.merged_reftemp_flags(btl_data_all,qual_flag_temp)
 
 ### Export Quality Flags
 
@@ -484,6 +487,7 @@ def process_all_new():
 
 ### Clean up Bottle Data by removing rows with no ctd data
 
+    btl_data_all = oxy_fitting.clean_oxygen_df(btl_data_all) # clean up column names
     btl_data_all =  btl_data_all.dropna(subset=cols)
 
 ### Create CT Files(oxygen done by hand)
@@ -514,7 +518,7 @@ def process_all_new():
     depth_df.to_csv('data/logs/depth_log.csv',index=False)
 
     # needs depth_log.csv, manual_depth_log.csv
-    process_ctd.export_ct1(btl_data_all,ssscc,expocode,sectionID,ctd,p_column_names,p_column_units)
+    process_ctd.export_ct1(time_data_all,ssscc,expocode,sectionID,ctd,p_column_names,p_column_units)
 
     # section for making plots/etc.
 

@@ -48,3 +48,12 @@ def salt_df_parser(saltDF, outdir, stn_col='STNNBR', cast_col='CASTNO'):
                 stn_cast_salts.to_csv(outfile,index=False)
             else:
                 print(outfile + ' already exists...skipping')
+
+def process_salts(ssscc, salt_dir):
+    salt_path = salt_dir + ssscc
+    try: 
+        saltDF = salt_loader(salt_path)
+    except FileNotFoundError:
+        print('Salt file for cast ' + ssscc + ' does not exist... skipping')
+        return
+    salt_df_parser(saltDF, salt_dir)
