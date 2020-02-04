@@ -6,13 +6,14 @@ Attempt to write a cleaner processing script from scratch.
 import os
 import time
 import sys
+import subprocess
 import pandas as pd
 import numpy as np
 import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
 import ctdcal.rinko as rinko
-import scripts.odf_salt_parser as salt_parser
-import scripts.odf_reft_parser as reft_parser
+import odf_salt_parser as salt_parser
+import odf_reft_parser as reft_parser
 
 def process_all():
 
@@ -71,31 +72,28 @@ def process_all():
 
     # convert hex to ctd (TODO: convert this to function form)
     for ssscc in ssscc_list:
-        if '{}.pkl'.format(ssscc) in cnv_dir_list:
-            continue
-        subprocess.run(['odf_convert_sbe.py', 'data/raw/' + ssscc + '.hex', 'data/raw/' + ssscc + '.XMLCON', '-o', 'data/converted'], stdout=subprocess.PIPE)
-        print('odf_convert_sbe.py SSSCC: ' + ssscc + ' done')
+        if '{}.pkl'.format(ssscc) not in cnv_dir_list:
+            subprocess.run(['odf_convert_sbe.py', 'data/raw/' + ssscc + '.hex', 'data/raw/' + ssscc + '.XMLCON', '-o', 'data/converted'], stdout=subprocess.PIPE)
+            print('odf_convert_sbe.py SSSCC: ' + ssscc + ' done')
 
     # ??? (TODO: convert this to function form)
     for ssscc in ssscc_list:
-        if '{}_time.pkl'.format(ssscc) in time_dir_list:
-            continue
-        subprocess.run(['odf_sbe_metadata.py', 'data/converted/' + ssscc + '.pkl'], stdout=subprocess.PIPE)
-        print('odf_sbe_metadata.py SSSCC: ' + ssscc + ' done')
+        if '{}_time.pkl'.format(ssscc) not in time_dir_list:
+            subprocess.run(['odf_sbe_metadata.py', 'data/converted/' + ssscc + '.pkl'], stdout=subprocess.PIPE)
+            print('odf_sbe_metadata.py SSSCC: ' + ssscc + ' done')
 
     # process bottle file (TODO: convert this to function form)
     for ssscc in ssscc_list:
-        if '{}_btl_mean.pkl'.format(ssscc) in btl_dir_list:
-            continue
-        subprocess.run(['odf_process_bottle.py', 'data/converted/' + ssscc + '.pkl', '-o', 'data/bottle/'], stdout=subprocess.PIPE)
-        print('odf_process_bottle.py SSSCC: ' + ssscc + ' done')
+        if '{}_btl_mean.pkl'.format(ssscc) not in btl_dir_list:
+            subprocess.run(['odf_process_bottle.py', 'data/converted/' + ssscc + '.pkl', '-o', 'data/bottle/'], stdout=subprocess.PIPE)
+            print('odf_process_bottle.py SSSCC: ' + ssscc + ' done')
 
-    # generate salt files (TODO: compress this into salt_parser, clean up odf_salt_parser.py)
+    # generate salt files
     for ssscc in ssscc_list:
         if '{}_salts.csv'.format(ssscc) not in salt_dir_list:
             salt_parser.process_salts(ssscc,'data/salt/')
 
-    # generate ref temp files (TODO: clean up odf_reft_parser.py to necessary bits)
+    # generate ref temp files
     for ssscc in ssscc_list:
         if '{}_reft.csv'.format(ssscc) not in reft_dir_list:
             reft_parser.process_reft(ssscc,'data/reft/')
