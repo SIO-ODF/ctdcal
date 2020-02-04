@@ -6,20 +6,20 @@ import ctdcal.fit_ctd as fit_ctd
 import os
 
 def salt_loader(saltpath):
-    f = open(saltpath, newline='')
-    saltF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
-    
-    saltArray = []
-    for row in saltF:
-        saltArray.append(row)
-    del saltArray[0]
+    with open(saltpath, newline='') as f:
+        saltF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
+        
+        saltArray = []
+        for row in saltF:
+            saltArray.append(row)
+        del saltArray[0]
          
     header = ['STNNBR','CASTNO','SAMPNO','BathTEMP','CRavg','autosalSAMPNO',\
               'Unknown','StartTime','EndTime','Attempts','Reading1','Reading2',\
               'Reading3', 'Reading4', 'Reading5','Reading6','Reading7','Reading8',\
               'Reading9', 'Reading10','Reading11','Reading12']
-    f.close()
-    # make all rows of Salt files the same length as header   
+
+    # make all rows of salt files the same length as header   
     for row in saltArray:
         if len(row) < len(header):
             row.extend([np.NaN]*(len(header)-len(row)))
