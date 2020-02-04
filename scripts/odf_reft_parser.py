@@ -5,50 +5,51 @@ import sys
 sys.path.append('ctdcal/')
 import settings
 
-def parse(f, f_out):
-    #second half of final output
-    array = []
-    reader = csv.reader(f, delimiter=' ')
+def reft_loader(ssscc, reft_dir):
 
-    #break row down to a standardized size
-    for row in reader:
-        row2 = []
-        for x in row:
-            if x != '':
-                row2.append(x)
+    reft_path = reft_dir + ssscc + '.cap'
+    with open(reft_path, 'r', newline='') as f:
+        reftF = csv.reader(f, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
+        
+        # read in data and convert to dataframe
+        reftArray = []
+        for row in reftF:
+            if len(row) != 17: # skip over 'bad' rows (empty lines, comments, etc.)
+                continue
+            reftArray.append(row)
+        reftArray = np.array(reftArray)
+        reftDF = pd.DataFrame(reftArray)
+        
+        # remove text columns, only need numbers and dates
+        reftDF.replace(to_replace=['bn','diff','val','t90','='], value=np.nan, inplace=True)        
+        reftDF.dropna(axis=1,inplace=True)
 
-        #if not a fixed size, assume it's a comment and to be ignored
-        if len(row2) != 17:
-            continue
+        # combine date/time columns (day/month/year/time are read in separately)
+        reftDF[1] = reftDF[1] + ' ' + reftDF[2] + ' ' + reftDF[3] + ' ' + reftDF[4]
+        reftDF.drop(columns=[2,3,4], inplace=True)
+        
+        # rename columns and recast datatypes
+        col_names = ['index_memory', 'datetime', 'btl_fire_num', 'diff', 'raw_value', 'T90']
+        reftDF.columns = col_names
+        reftDF = reftDF.astype({'index_memory':np.int32, 'datetime':object, \
+                    'btl_fire_num':np.int32, 'diff':np.int32, \
+                    'raw_value':np.float64, 'T90':np.float64})
 
-        #start to build list to be written out
-        row3 = []
-        #hardcoded madness because it probably won't change anytime soon.
-        row3.append(row2[0])
-        #concatenate date/time, convert to ISO8601 later
-        row3.append(row2[1] + ' ' + row2[2] + ' ' + row2[3] + ' ' + row2[4])
-        row3.append(row2[7])
-        row3.append(row2[10])
-        row3.append(row2[13])
-        row3.append(row2[16])
-        array.append(row3)
+        # assign initial qality flags
+        reftDF.loc[:,'REFTMP_FLAG_W'] = 2
+        reftDF.loc[abs(reftDF['diff']) >= 3000, "REFTMP_FLAG_W"] = 3
 
-    nparray = np.array(array)
-    df = pd.DataFrame(nparray, columns=['index_memory', 'datetime', 'btl_fire_num', 'diff', 'raw_value', 'T90'])
-    df = df.astype({'index_memory':np.int32, 'datetime':object, 'btl_fire_num':np.int32, 'diff':np.int32, 'raw_value':np.float64, 'T90':np.float64})
-    # assign initial flags
-    df.loc[:,'REFTMP_FLAG_W'] = 2
-    df.loc[abs(df['diff']) >= 3000, "REFTMP_FLAG_W"] = 3
-    # add in STNNBR, CASTNO columns
-    df['STNNBR'] = f_out[0:3]
-    df['CASTNO'] = f_out[3:5]
-    return df
+        # add in STNNBR, CASTNO columns
+        reftDF['STNNBR'] = ssscc[0:3]
+        reftDF['CASTNO'] = ssscc[3:5]
+
+    return reftDF
 
 def process_reft(ssscc, reft_dir):
-    reft_path = reft_dir + ssscc + '.cap'
-    with open(reft_path, 'r') as ssscc_reftemp:
-        # import data
-        df_part = parse(ssscc_reftemp, ssscc)
 
-        # export to .csv
-        df_part.to_csv(reft_dir + ssscc + '_reft.csv',index=False)
+    try: 
+        reftDF = reft_loader(ssscc, reft_dir)
+        reftDF.to_csv(reft_dir + ssscc + '_reft.csv', index=False)
+    except FileNotFoundError:
+        print('refT file for cast ' + ssscc + ' does not exist... skipping')
+        return
