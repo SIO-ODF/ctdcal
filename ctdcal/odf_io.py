@@ -88,7 +88,7 @@ def autosal_drift_fit(df):
     df = df[df['SAMPNO'] != 'worm']
     return df
 
-'''The following extracted from gsw library before conversion to python wrapper of C'''
+'''code_pruning: The following extracted from gsw library before conversion to python wrapper of C'''
 '''
 def SP_salinometer(Rt, t):
     r"""Calculates Practical Salinity SP from a salinometer, primarily using
@@ -191,6 +191,7 @@ def formatted_salt_file(df):
     df = df[['STNNBR', 'CASTNO', 'SAMPNO', 'SALNTY']]
     return df
 
+'''code_pruning: not used, marked for removal.
 def create_multi_index(df,index=['SSSCC','GPSLAT','GPSLON','CTDPRS']):
     """
     Changes a normal dataframe to a multiindexed dataframe
@@ -212,7 +213,7 @@ def create_multi_index(df,index=['SSSCC','GPSLAT','GPSLON','CTDPRS']):
     
     """
     df = df.set_index(index,drop=True)
-    return df
+    return df'''
 
 def main(argv):
     '''Example script on how to run functions. Not intended for use.'''
