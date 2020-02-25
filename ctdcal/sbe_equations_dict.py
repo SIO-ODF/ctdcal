@@ -9,6 +9,10 @@ not via an official document, and may change according to SBE wishes.
 
 """
 
+'''code_pruning: this module really needs a new name, and all functions inside it as well.'''
+'''code_pruning: Also all functions should be checked to work with vectorized versions and possibly remove single datapoint version.'''
+'''code_pruning: calls to the math library/module should be removed in favor of faster numpy (does that work with xarray/dask, or does code need to be rewritten for that?)'''
+
 import math
 import gsw
 import numpy as np

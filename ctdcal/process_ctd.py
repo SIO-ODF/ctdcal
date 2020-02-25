@@ -164,6 +164,7 @@ def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pres
     if df_cast.iloc[0]['CTDPRS'] > surface_pressure:
         return df_cast
 
+    '''code_pruning: variables should always have relevant names, even if it needs to be changed later with find/replace'''
     #Bin the data by time, and compute the average rate of descent
     df_blah = df_cast.loc[:,:]
     df_blah['index'] = df_blah.index
@@ -201,6 +202,7 @@ def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pres
     df_cast_ret = df_cast.reset_index()
     return df_cast_ret
 
+'''code_pruning: can remove at this point'''
 #End move four functions
 # def cast_details_old(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
 #     """cast_details function
@@ -285,6 +287,9 @@ def ctd_align(inMat=None, col=None, time=0.0):
     and adjusts time of sensor responce and water flow relative to
     the time frame of temperature sensor.
 
+    Originally written by Courtney Schatzman, docstring by Joseph Gum.
+    Need to generate alignment plots in order to properly use ctd_align.
+
     Args:
         param1 (ndarray): inMat, numpy ndarray with dtype array
         param2 (float): col, column to apply time advance to.
@@ -338,7 +343,8 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
 
     return q_df.values  # ndarray format
 
-def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
+#code_pruning: not appears to be used
+'''def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
     """formatTimeEpoc function
 
     Function takes pattern of time input, relative time zone, and
@@ -362,9 +368,10 @@ def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time
         for i in range(0,len(input_time)):
             epoch_time[i] = int(time.mktime(time.strptime(str(input_time[i], "utf-8"), time_pattern)))
 
-    return epoch_time
+    return epoch_time'''
 
-def dataToDataFrame(inFile):
+#code_pruning: no usage, should be removed in favor of the raw call itself
+'''def dataToDataFrame(inFile):
     """dataToDataFrame function
 
     Function takes full file path to csv type data file and returns a
@@ -383,8 +390,9 @@ def dataToDataFrame(inFile):
     """
     #df = pd.read_csv(inFile, header=[0,2])
     df = pd.read_csv(inFile)
-    return df
+    return df'''
 
+#code_pruning: should be looked at to see if we can remove this in favor of raw call
 def dataToNDarray(inFile, dtype=None, names=None, separator=',', skip=None):
     """dataToNDarray function
 
@@ -414,6 +422,7 @@ def dataToNDarray(inFile, dtype=None, names=None, separator=',', skip=None):
 
     return arr
 
+'''code_pruning: do timing exercises to see if this is vectorized or not'''
 def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
     """Hysteresis Correction function
 
@@ -448,8 +457,8 @@ def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
         inMat['o1_mll'][:] = Oxnewconc[:]
     return inMat
 
-
-def data_interpolater(inArr):
+#not used, should use raw call instead
+'''def data_interpolater(inArr):
     """data_interpolater to handle indices and logical indices of NaNs.
 
     Input:
@@ -465,8 +474,9 @@ def data_interpolater(inArr):
     """
     nans, tmp= np.isnan(inArr), lambda z: z.nonzero()[0]
     inArr[nans] = np.interp(tmp(nans), tmp(~nans), inArr[~nans])
-    return inArr
+    return inArr'''
 
+#Courtney version, should be replaced with versions below and check that it works
 def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat):
     """o2pl2pkg convert ml/l dissolved oxygen to umol/kg
 
@@ -497,6 +507,7 @@ def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat
         pkg[i] = inMat[dopl_col][i] * 44660 / (s0[i] + 1000)
     return pkg
 
+#cleaned version of above but not used, should be checked that it works
 def oxy_to_umolkg(df_sal, df_pressure, df_lat, df_lon, df_temp, df_oxy):
     '''Rewritten from Courtney's method to use array-likes (aka use dataframes and ndarrays).
     '''
@@ -554,7 +565,7 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
                     return_array[p] = 2*sig.convolve(input_array[p], win, mode='same')/len(win)
     return return_array
 
-
+#try to depreciate for method below
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function
     Function takes full NUMPY ndarray with predefined dtype array
@@ -642,6 +653,7 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
     return outMat
 
+#try to swap this in instead of function above, maybe. i don't remember anymore
 def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function
     Function takes pandas Dataframe of filtered ctd raw data the stores, analizes and removes ondeck
@@ -708,8 +720,8 @@ def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=2
 
     return outMat
 
-
-
+'''code_pruning: since default pressure_column is set to 'CTDPRS', error handling code is redundant?'''
+#a mix is used between _roll_filter and roll_filter, settle on one
 def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
     #fix/remove try/except once serialization is fixed
     try:
@@ -730,7 +742,7 @@ def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
 
     return df[df[pressure_column] == monotonic_sequence]
 
-
+#this shouldn't be called, rather the pressureoffset.py should be the one called in the code
 def roll_filter(inMat, p_col, up='down', frames_per_sec=24, search_time=15, **kwargs):
     """roll_filter function
     Function takes full NUMPY ndarray with predefined dtype array
@@ -752,7 +764,7 @@ def roll_filter(inMat, p_col, up='down', frames_per_sec=24, search_time=15, **kw
     tmp_df = _roll_filter(tmp_df)
     #return tmp_df.to_records(index=False)
     return tmp_df
-
+    '''code_pruning: the function basically ends here, nothing gets past this point. That means _roll_filter is the roll_filter actually used.'''
     remove = []
     frequency = 24 # Hz of package
 
@@ -864,6 +876,10 @@ def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up=
     binned_df = binned_df.reset_index(drop=True)
     return binned_df
 
+'''code_pruning: error handling code (KeyError) should only be called on the param name, not on the majority of the function. 
+Test and change name if necessary before calling body of code.
+
+It looks like 'CTDPRS' is the value that should be kept, not CTDPRS_DBAR'''
 def binning_df(df, **kwargs):
     '''Bins records according to bin_size, then finds the mean of each bin and returns a df.
     '''
@@ -1010,6 +1026,8 @@ def _load_btl_data(btl_file, cols=None):
     Loads "bottle mean" CTD data from .pkl file. Function will return all data unless
     cols is specified (as a list of column names)
     """
+
+    '''code_pruning: the following three lines are redundant, just go straight to df. should go to netCDF in future'''
     btl_data = dataToNDarray(btl_file,float,True,',',0)
     btl_data = pd.DataFrame.from_records(btl_data)
     if cols != None:
@@ -1070,7 +1088,7 @@ def calibrate_param(param,ref_param,press,ssscc,btl_num,xRange=None,):
 # MK: deprecated 05/12/20
 # use fit_ctd._flag_btl_data() instead
 def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
-
+    '''Jackson code'''
 
     param = fit_ctd.array_like_to_series(param)
     param_2 = fit_ctd.array_like_to_series(param_2)
@@ -1134,7 +1152,7 @@ def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0
     return df
 
 def get_param_coef(calib_param,diff,order,calib):
-
+    '''Jackson code'''
 
     cf1 = np.polyfit(calib_param, diff, order)
 
@@ -1239,7 +1257,7 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
     df['P-S'] = df[cond_col_1] - df[cond_col_2]
 
 
-
+    '''code_pruning: copy pasted code is a bad code smell that should be abstracted to a reusable function'''
     #Greater than 2000 dBar
     lower_lim = 2000
     upper_lim = df[p_col].max()
@@ -1283,6 +1301,7 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
     df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
     df_shal_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
 
+    '''code_pruning: if the dfs made before are simply concat into a bigger ones, why not do it earlier?'''
     #concat dataframes into two main dfs
     df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
     df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])

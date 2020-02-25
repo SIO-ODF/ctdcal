@@ -119,7 +119,7 @@ def IESRho(s, t, p):
     return rho
 
 ''' 
-# Not used in code   
+# code_pruning: Not used in code   
 def IESRho_df(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
     """
         Calculate the IES density
@@ -202,6 +202,7 @@ def IESRho_df(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
     df['rho']   = rho/(1.0-bars/kstp)
     return df '''
 
+'''code_pruning: consider moving out to specialized oxygen section, or move oxygen into here'''
 def get_flasks(o2flasks):
     with open(o2flasks, 'r') as f:
         flasks = {}
@@ -213,6 +214,7 @@ def get_flasks(o2flasks):
                 flasks[int(row[0])] = float(row[1])
     return flasks
 
+'''code_pruning: consider moving out to specialized oxygen section, or move oxygen into here'''
 def get_flask_vol(flask, o2flasks, t=20, glass="borosilicate"):
     _coef = {
             "borosilicate": 0.00001,
@@ -224,7 +226,7 @@ def get_flask_vol(flask, o2flasks, t=20, glass="borosilicate"):
     coef = _coef[glass]
     return fv * (1.0 + coef * (t - _t));
 
-#appears to be equivalent to gsw.density.rho_t_exact with (0,t,0)
+#code_pruning: appears to be equivalent to gsw.density.rho_t_exact with (0,t,0)
 def rho_t(t):
     z0       =  9.9983952e2
     z1       =  1.6945176e1
@@ -310,7 +312,7 @@ def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, lat_btl_col,
         #print('Pres: '+str(time_data[p_col][indx+p_indx]))
         #print('Temp: '+str(time_data[t_col][indx+p_indx]))
         #print('Salt: '+str(time_data[sal_col][indx+p_indx]))
-
+        '''code_pruning: code is identical except for input passed, could be turned to function (but not necessary)'''
         if indx+p_indx > len(time_sigma):
             btl_data[t_btl_col][i] = time_data[t_col][len(time_data)-1]
             btl_data[sal_btl_col][i] = time_data[sal_col][len(time_data)-1]
@@ -332,14 +334,14 @@ def find_nearest(yarr, val):
     indx = (np.abs(yarr-val)).argmin()
     return indx
 
-
+'''code_pruning: looks like not used. marked for removal
 # Residual calculation
 def calibration(independent_arr, dependent_diff_arr, order):
     """calibration
 
     """
     return np.polyfit(independent_arr, dependent_diff_arr, order)
-
+'''
 
 # Oxygen Coef
 def find_oxy_coef(o2pl, p, t, salt, dov, hexfilePath, xmlfilePath):
@@ -366,6 +368,7 @@ def find_oxy_coef(o2pl, p, t, salt, dov, hexfilePath, xmlfilePath):
 
     return coefs
 
+'''code_pruning: this should be removed and called from sbe_equations_dict, not copy pasted here'''
 def oxy_dict(calib, P, K, T, S, V):
     """SBE equation for converting engineering units to oxygen (ml/l).
     SensorID: 38
@@ -475,9 +478,12 @@ def _conductivity_polyfit(cond,temp,press,coef):
         + coef[6]
     )
     fitted_cond = fitted_cond.round(4)
-    # fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
-    return fitted_cond  # , fitted_sal
-     
+     #fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
+    return fitted_cond#, fitted_sal
+
+'''code_pruning: while this follows what a high level algorithm should look like, as this is at the lowest level of code it's not really needed.
+Rather, better comments should be applied if all/most functions are one use inside the function.
+'''     
 def cell_therm_mass_corr(temp,cond,sample_int=sample_int,alpha=alpha,beta=beta):
     
     a = calculate_a_CTM(alpha, sample_int, beta)
@@ -499,13 +505,15 @@ def apply_CTM(cond, CTM):
     
     return c_corr
 
+'''code_pruning: this function is the only one that should be kept as the only one reused.
+See ctdcal.process_ctd.find_last_soak_period().poop() as a way of minimizing scope of function'''
 def calculate_CTM(b, CTM_0, a, dC_dT, dT):
     
     CTM = -1.0 * b * CTM_0 + a * (dC_dT) * dT
     
     return CTM
 
-
+'''code_pruning: try not to use temp as it's harder to tell difference between temporary and temperature'''
 def calculate_dT_CTM(temp):
     """
     Seabird eq: dT = temperature - previous temperature
@@ -1235,6 +1243,8 @@ def o2_calc(o2flasks, o2path, btl_num): #, salt
 #        rho_stp = rho_t(20)
 
         btl_counter = 0
+        '''code_pruning: a possible faster way for this for loop is to load the file in first en masse,
+        then append flask_vol in a second loop rather than the slow manual insertions'''
         #try:
         for l in f:
             row = l.split()
@@ -1372,6 +1382,7 @@ def CR_to_cond(cr,bath_t,ref_t,btl_p):
     return cond
 
 
+'''code_pruning: looks like not used. marked for removal
 def write_calib_coef(ssscc,coef,param):
     """ Write coef to csv
     
@@ -1401,39 +1412,41 @@ def write_calib_coef(ssscc,coef,param):
 
     return df
 
-#
+'''
+
 # MK: depreciated 04/23/20
 # use calibrate_temp/calibrate_cond
-# def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
-#                    cond_col = 'CTDCOND'):
-#     """ Applies Coef to time and bottle Data
+'''code_pruning: looks like not used. marked for removal
+def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
+                   cond_col = 'CTDCOND'):
+    """ Applies Coef to time and bottle Data
     
     
-#     """
+    """
     
-#     coef = coef_frame.loc[coef_frame['SSSCC']== ssscc]
+    coef = coef_frame.loc[coef_frame['SSSCC']== ssscc]
     
-#     if sensor == 1:
-#         t_col = t_col+'1'
-#         cond_col = cond_col+'1'
+    if sensor == 1:
+        t_col = t_col+'1'
+        cond_col = cond_col+'1'
         
-#     elif sensor == 2:
-#         t_col = t_col+'2'
-#         cond_col = cond_col+'2'
+    elif sensor == 2:
+        t_col = t_col+'2'
+        cond_col = cond_col+'2'
            
     
-#     if param == 'T':
+    if param == 'T':
         
-#         df[t_col] = temperature_polyfit(coef,df[p_col],df[t_col])
+        df[t_col] = temperature_polyfit(coef,df[p_col],df[t_col])
         
     
-#     elif param == 'C':
+    elif param == 'C':
     
-#         df[cond_col] = conductivity_polyfit(coef,df[p_col],df[t_col],
-#                                               df[cond_col])
+        df[cond_col] = conductivity_polyfit(coef,df[p_col],df[t_col],
+                                              df[cond_col])
        
-#     return df
-    
+    return df
+'''    
 def array_like_to_series(array):
     
     series = pd.Series(array)
