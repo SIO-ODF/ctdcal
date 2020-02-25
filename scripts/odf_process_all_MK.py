@@ -113,6 +113,11 @@ def process_all():
 
     # process pressure offset
     pressure_log = process_ctd.load_pressure_logs('data/logs/ondeck_pressure.csv')
+    p_offset = process_ctd.get_pressure_offset(pressure_log.ondeck_start_p, 
+                                                pressure_log.ondeck_end_p)
+
+    btl_data_all = fit_ctd.apply_pressure_offset(btl_data_all, 'CTDPRS', p_offset)
+    time_data_all = fit_ctd.apply_pressure_offset(time_data_all, 'CTDPRS', p_offset)
 
 
 def main(argv):
