@@ -1392,10 +1392,7 @@ def load_hy_file(path_to_hyfile):
     df = df[df['EXPOCODE'] != 'END_DATA']
     return df
 
-def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/',reft_postfix='_reft.csv',
-                       refc_prefix='data/salt/',refc_postfix='_salts.csv',press_file='data/logs/ondeck_pressure.csv', cast_details = 'data/logs/cast_details.csv',
-                       oxy_prefix='data/oxygen/', oxy_postfix='',index_col='btl_fire_num',t_col='CTDTMP1',
-                       p_col='CTDPRS',ssscc_col='SSSCC'):
+def load_all_ctd_files(ssscc,series,cols):
     """
     LOAD ALL CTD FILES was changed (commented out)
     Lines 1324-1328,1335,1337, 1338,345
@@ -1405,54 +1402,43 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
     if series == 'bottle':
         for x in ssscc:
             print('Loading BTL data for station: ' + x + '...')
-            btl_file = prefix + x + postfix
+            btl_file = 'data/bottle/' + x + '_btl_mean.pkl'
             btl_data = load_btl_data(btl_file,cols)
 
-
-            reft_file = reft_prefix + x + reft_postfix
+            ### load REFT data
+            reft_file = 'data/reft/' + x + '_reft.csv'
             try:
                 reft_data = load_reft_data(reft_file)
             except FileNotFoundError:
                 print('Missing (or misnamed) REFT Data Station: ' + x + '...filling with NaNs')
                 reft_data = pd.DataFrame()
-                reft_data[index_col] = pd.Series(btl_data[index_col].values.astype(int))
+                reft_data['btl_fire_num'] = pd.Series(btl_data['btl_fire_num'].values.astype(int))
                 reft_data['T90'] = pd.Series([np.nan]*len(btl_data))
-                ref_ssscc = ssscc_col + '_TEMP'
+                ref_ssscc = 'SSSCC' + '_TEMP'
                 reft_data[ref_ssscc] = x
                 reft_data.index = btl_data.index
 
-
-            #refc_file = refc_prefix + x + refc_postfix
-            refc_file = refc_prefix + x + refc_postfix
+            ### load REFC data
+            refc_file = 'data/salt/' + x + '_salts.csv'
             try:
-                #refc_data = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
-                refc_data = load_salt_data(refc_file, index_name= 'SAMPNO')
-
-
+                refc_data = load_salt_data(refc_file, index_name='SAMPNO')
             except FileNotFoundError:
                 print('Missing (or misnamed) REFC Data Station: ' + x + '...filling with NaNs')
                 refc_data = pd.DataFrame()
-                refc_data['SAMPNO_SALT'] = pd.Series(btl_data[index_col].values.astype(int))
+                refc_data['SAMPNO_SALT'] = pd.Series(btl_data['btl_fire_num'].values.astype(int))
                 refc_data['CRavg'] = pd.Series([np.nan]*len(btl_data))
                 refc_data['BathTEMP'] = pd.Series([np.nan]*len(btl_data))
                 refc_data['BTLCOND'] = pd.Series([np.nan]*len(btl_data))
                 refc_data.index = btl_data.index
 
-
-            #Fix Index for each parameter to bottle number
-
-#            btl_data[index_col] = btl_data[index_col].astype(int)
-#            btl_data=btl_data.set_index(btl_data[index_col].values)
-#
-#            reft_data = reft_data.set_index(reft_data[index_col].values)
-
-            oxy_file = oxy_prefix + x + oxy_postfix
+            ### load OXY data
+            oxy_file = 'data/oxygen/' + x 
             try:
                 oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
             except FileNotFoundError:
                 print('Missing (or misnamed) REFO Data Station: ' + x + '...filling with NaNs')
                 oxy_data = pd.DataFrame()
-                oxy_data['BOTTLENO_OXY'] = pd.Series(btl_data[index_col].values.astype(int))
+                oxy_data['BOTTLENO_OXY'] = pd.Series(btl_data['btl_fire_num'].values.astype(int))
                 oxy_data['STNNO_OXY'] = pd.Series([np.nan]*len(btl_data))
                 oxy_data['CASTNO_OXY'] = pd.Series([np.nan]*len(btl_data))
                 oxy_data['FLASKNO'] = pd.Series([np.nan]*len(btl_data))
@@ -1463,9 +1449,8 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
                 oxy_data['END_VOLTS'] = pd.Series([np.nan]*len(btl_data))
                 oxy_data.index = btl_data.index
 
-#            #Horizontally concat DFs to have all data in one DF
-#            btl_data_full = pd.concat([btl_data,reft_data,refc_data,oxy_data],axis=1)
-
+            ### clean up dataframe
+            # Horizontally concat DFs to have all data in one DF
             btl_data = pd.merge(btl_data,reft_data,on='btl_fire_num',how='outer')
             btl_data = pd.merge(btl_data,refc_data,left_on='btl_fire_num',right_on='SAMPNO_SALT',how='outer')
             btl_data = pd.merge(btl_data,oxy_data,left_on='btl_fire_num',right_on='BOTTLENO_OXY',how='outer')
@@ -1473,36 +1458,27 @@ def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/'
             if len(btl_data) > 36:
                 print("***** Len of btl data for station: ",x,' is > 36, check for multiple stations/casts in reference parameter files *****')
 
-            ### Calculate dv/dt for oxygen fitting
+            # Calculate dv/dt for oxygen fitting
             btl_data['dv_dt'] = oxy_fitting.calculate_dVdT(btl_data['CTDOXYVOLTS'],btl_data['scan_datetime'])
-            #btl_data = get_btl_time(btl_data,'btl_fire_num','scan_datetime')
-
 
             # Add bottom of cast information (date,time,lat,lon,etc.)
-            btl_data = add_btl_bottom_data(btl_data, x, cast_details)
+            btl_data = add_btl_bottom_data(btl_data, x, 'data/logs/cast_details.csv')
 
-#            #Drop columns that have no CTD data
-#            btl_data_full = btl_data_full.dropna(subset=cols)
-            #btl_data = btl_data.set_index(['SSSCC','GPSLAT','GPSLON','CTDPRS'],drop=True)
+            # Merge cast into df_data_all
             try:
                 df_data_all = pd.concat([df_data_all,btl_data],sort=False)
             except AssertionError:
-                raise AssertionError('Colums of ' + x + ' do not match those of previous columns')
+                raise AssertionError('Columns of ' + x + ' do not match those of previous columns')
             print('* Finished BTL data station: ' + x + ' *')
 
-        #Drops duplicated columns generated by concatenation
+        # Drop duplicated columns generated by concatenation
         df_data_all = df_data_all.loc[:,~df_data_all.columns.duplicated()]
-        #if 'GPSLAT' in df_data_all.keys():
-         #   df_data_all['LATITUDE'] = df_data_all['GPSLAT']
-        #if 'GPSLON' in df_data_all.keys():
-        #    df_data_all['LONGITUDE'] = df_data_all['GPSLON']
+        
     elif series == 'time':
         for x in ssscc:
-
             print('Loading TIME data for station: ' + x + '...')
-            file = prefix + x + postfix
-            #time_data = load_time_data(file)
-            time_data = pd.read_pickle(file)
+            time_file = 'data/time/' + x + '_time.pkl'
+            time_data = pd.read_pickle(time_file)
             time_data['SSSCC'] = str(x)
             time_data['dv_dt'] = oxy_fitting.calculate_dVdT(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
             df_data_all = pd.concat([df_data_all,time_data], sort=False)

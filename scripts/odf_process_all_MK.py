@@ -83,6 +83,7 @@ def process_all():
             print('odf_sbe_metadata.py SSSCC: ' + ssscc + ' done')
 
     # process bottle file (TODO: convert this to function form)
+    # does this generate "ondeck_pressure.csv"?
     for ssscc in ssscc_list:
         if '{}_btl_mean.pkl'.format(ssscc) not in btl_dir_list:
             subprocess.run(['odf_process_bottle.py', 'data/converted/' + ssscc + '.pkl', '-o', 'data/bottle/'], stdout=subprocess.PIPE)
@@ -97,7 +98,22 @@ def process_all():
     for ssscc in ssscc_list:
         if '{}_reft.csv'.format(ssscc) not in reft_dir_list:
             reft_parser.process_reft(ssscc,'data/reft/')
-    
+
+    #####
+    # Step 2: calibrate pressure, temperature, conductivity, and oxygen
+    #####
+
+    # load in all bottle and time data into DataFrame
+    btl_cols = ['index', 'CTDTMP1', 'CTDTMP2', 'CTDPRS', 'CTDCOND1', 'CTDCOND2',
+       'CTDSAL', 'CTDOXY1', 'CTDOXYVOLTS', 'CTDXMISS', 'ALT', 'REF_PAR',
+       'GPSLAT', 'GPSLON','new_fix', 'pressure_temp_int', 'pump_on', 'btl_fire', 
+       'scan_datetime', 'btl_fire_num']
+    btl_data_all = process_ctd.load_all_ctd_files(ssscc_list, 'bottle', btl_cols)
+    time_data_all = process_ctd.load_all_ctd_files(ssscc_list, 'time', None)
+
+    # process pressure offset
+    pressure_log = process_ctd.load_pressure_logs('data/logs/ondeck_pressure.csv')
+
 
 def main(argv):
     '''Run everything.
