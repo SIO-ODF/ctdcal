@@ -119,18 +119,22 @@ def process_all():
         df_temp_good = process_ctd.prepare_fit_data(btl_data_all[btl_data_all['SSSCC'].isin(ssscc_list_t)], config.column['reft'])
 
         # 2 & 3) calculate fit params 
-        coef_temp_prim,df_ques_t1 = process_ctd.calibrate_param(df_temp_good[config.column['t1']], df_temp_good[config.column['reft']],
-                                                                df_temp_good[config.column['p']], 'T', 1, df_temp_good['SSSCC'],
+        coef_temp_prim,df_ques_t1 = process_ctd.calibrate_param(df_temp_good[config.column['t1_btl']], df_temp_good[config.column['reft']],
+                                                                df_temp_good[config.column['p_btl']], 'T', 1, df_temp_good['SSSCC'],
                                                                 df_temp_good['btl_fire_num'], xRange='1000:5000')
-        coef_temp_sec,df_ques_t2 = process_ctd.calibrate_param(df_temp_good[config.column['t2']], df_temp_good[config.column['reft']],
-                                                                df_temp_good[config.column['p']], 'T', 1, df_temp_good['SSSCC'],
+        coef_temp_sec,df_ques_t2 = process_ctd.calibrate_param(df_temp_good[config.column['t2_btl']], df_temp_good[config.column['reft']],
+                                                                df_temp_good[config.column['p_btl']], 'T', 1, df_temp_good['SSSCC'],
                                                                 df_temp_good['btl_fire_num'], xRange='1000:5000')
                                                                 
         # 4) apply fit
-        btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t).values][config.column['t1']] = fit_ctd.temperature_polyfit(btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['t1']],
-                                                                                                                    btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['p']], coef_temp_prim)
-        btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t).values][config.column['t2']] = fit_ctd.temperature_polyfit(btl_data_all[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['t2']],
-                                                                                                                    btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['p']], coef_temp_sec)
+        btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t).values][config.column['t1_btl']] = fit_ctd.temperature_polyfit(btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['t1_btl']],
+                                                                                                                    btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['p_btl']], coef_temp_prim)
+        btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t).values][config.column['t2_btl']] = fit_ctd.temperature_polyfit(btl_data_all[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['t2_btl']],
+                                                                                                                    btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['p_btl']], coef_temp_sec)
+        time_data_all.loc[time_data_all['SSSCC'].isin(ssscc_list_t).values][config.column['t1']] = fit_ctd.temperature_polyfit(time_data_all.loc[time_data_all['SSSCC'].isin(ssscc_list_t)][config.column['t1']],
+                                                                                                                    time_data_all.loc[time_data_all['SSSCC'].isin(ssscc_list_t)][config.column['p']], coef_temp_prim)
+        time_data_all.loc[time_data_all['SSSCC'].isin(ssscc_list_t).values][config.column['t2']] = fit_ctd.temperature_polyfit(time_data_all[time_data_all['SSSCC'].isin(ssscc_list_t)][config.column['t2']],
+                                                                                                                    time_data_all.loc[time_data_all['SSSCC'].isin(ssscc_list_t)][config.column['p']], coef_temp_sec)                                                                                                            
 
         # 5) handle quality flags
         qual_flag_t1 = pd.concat([qual_flag_t1,df_ques_t1])
