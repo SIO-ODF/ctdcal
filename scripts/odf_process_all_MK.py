@@ -109,6 +109,29 @@ def process_all():
     btl_data_all = fit_ctd.apply_pressure_offset(btl_data_all, config.column['p'], p_offset)
     time_data_all = fit_ctd.apply_pressure_offset(time_data_all, config.column['p'], p_offset)
 
+    # temperature calibration
+    # steps: 1) remove non-finite data
+    #        2) flag points w/ large deviations
+    #        3) calculate fit parameters (on data w/ flag 2) -> save them too!
+    #        4) apply fit
+    #        5) qualify flag file
+    
+    # 1) remove non-finite data
+    df_temp_good = process_ctd.prepare_fit_data(btl_data_all, config.column['reft'])
+
+    # 2 & 3) calculate fit params 
+    coef_temp_prim,df_ques_t1 = process_ctd.calibrate_param(df_temp_good[config.column['t1']], df_temp_good[config.column['reft']],
+                                                            df_temp_good[config.column['p']], 'T', 1, df_temp_good['SSSCC'],
+                                                            df_temp_good['btl_fire_num'])
+
+    coef_temp_sec,df_ques_t2 = process_ctd.calibrate_param(df_temp_good[config.column['t2']], df_temp_good[config.column['reft']],
+                                                            df_temp_good[config.column['p']], 'T', 1, df_temp_good['SSSCC'],
+                                                            df_temp_good['btl_fire_num'])
+
+    # 4) apply fit
+    btl_data_all[config.column['t1']] = fit_ctd.temperature_polyfit(btl_data_all[config.column['t1']], btl_data_all[config.column['p']], coef_temp_prim)
+    btl_data_all[config.column['t2']] = fit_ctd.temperature_polyfit(btl_data_all[config.column['t1']], btl_data_all[config.column['p']], coef_temp_sec)
+
 
 def main(argv):
     '''Run everything.
