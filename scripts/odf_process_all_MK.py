@@ -4,6 +4,7 @@ Attempt to write a cleaner processing script from scratch.
 
 # import necessary packages
 import os
+import glob
 import time
 import sys
 import subprocess
@@ -33,16 +34,6 @@ def process_all():
     fit_t2 = 'fitting_t2'
     fit_c1 = 'fitting_c1'
     fit_c2 = 'fitting_c2'
-
-    # segmented station/cast files
-    ssscc_t1 = f'data/ssscc/ssscc_t1.csv'
-    ssscc_t2 = f'data/ssscc/ssscc_t2.csv'
-    ssscc_c1 = f'data/ssscc/ssscc_c1.csv'
-    ssscc_c2 = f'data/ssscc/ssscc_c2.csv'
-    ssscc_c3 = f'data/ssscc/ssscc_c3.csv'
-    ssscc_c4 = f'data/ssscc/ssscc_c4.csv'
-    ssscc_c5 = f'data/ssscc/ssscc_c5.csv'
-    ssscc_c6 = f'data/ssscc/ssscc_c6.csv'
 
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
@@ -115,22 +106,39 @@ def process_all():
     #        3) calculate fit parameters (on data w/ flag 2) -> save them too!
     #        4) apply fit
     #        5) qualify flag file
-    
-    # 1) remove non-finite data
-    df_temp_good = process_ctd.prepare_fit_data(btl_data_all, config.column['reft'])
 
-    # 2 & 3) calculate fit params 
-    coef_temp_prim,df_ques_t1 = process_ctd.calibrate_param(df_temp_good[config.column['t1']], df_temp_good[config.column['reft']],
-                                                            df_temp_good[config.column['p']], 'T', 1, df_temp_good['SSSCC'],
-                                                            df_temp_good['btl_fire_num'])
+    ssscc_files_t = sorted(glob.glob('data/ssscc/ssscc_*t*.csv'))
+    qual_flag_t1 = pd.DataFrame()
+    qual_flag_t2 = pd.DataFrame()
 
-    coef_temp_sec,df_ques_t2 = process_ctd.calibrate_param(df_temp_good[config.column['t2']], df_temp_good[config.column['reft']],
-                                                            df_temp_good[config.column['p']], 'T', 1, df_temp_good['SSSCC'],
-                                                            df_temp_good['btl_fire_num'])
+    for f in ssscc_files_t:
+        # 0) grab ssscc chunk to fit
+        ssscc_list_t = pd.read_csv(f, header=None, dtype='str', squeeze=True).to_list()
 
-    # 4) apply fit
-    btl_data_all[config.column['t1']] = fit_ctd.temperature_polyfit(btl_data_all[config.column['t1']], btl_data_all[config.column['p']], coef_temp_prim)
-    btl_data_all[config.column['t2']] = fit_ctd.temperature_polyfit(btl_data_all[config.column['t1']], btl_data_all[config.column['p']], coef_temp_sec)
+        # 1) remove non-finite data
+        df_temp_good = process_ctd.prepare_fit_data(btl_data_all[btl_data_all['SSSCC'].isin(ssscc_list_t)], config.column['reft'])
+
+        # 2 & 3) calculate fit params 
+        coef_temp_prim,df_ques_t1 = process_ctd.calibrate_param(df_temp_good[config.column['t1']], df_temp_good[config.column['reft']],
+                                                                df_temp_good[config.column['p']], 'T', 1, df_temp_good['SSSCC'],
+                                                                df_temp_good['btl_fire_num'], xRange='1000:5000')
+        coef_temp_sec,df_ques_t2 = process_ctd.calibrate_param(df_temp_good[config.column['t2']], df_temp_good[config.column['reft']],
+                                                                df_temp_good[config.column['p']], 'T', 1, df_temp_good['SSSCC'],
+                                                                df_temp_good['btl_fire_num'], xRange='1000:5000')
+                                                                
+        # 4) apply fit
+        btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t).values][config.column['t1']] = fit_ctd.temperature_polyfit(btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['t1']],
+                                                                                                                    btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['p']], coef_temp_prim)
+        btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t).values][config.column['t2']] = fit_ctd.temperature_polyfit(btl_data_all[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['t2']],
+                                                                                                                    btl_data_all.loc[btl_data_all['SSSCC'].isin(ssscc_list_t)][config.column['p']], coef_temp_sec)
+
+        # 5) handle quality flags
+        qual_flag_t1 = pd.concat([qual_flag_t1,df_ques_t1])
+        qual_flag_t2 = pd.concat([qual_flag_t2,df_ques_t2])
+
+    # export temp quality flags
+    qual_flag_t1.to_csv(config.directory['logs'] + 'qual_flag_t1.csv', index=False)
+    qual_flag_t2.to_csv(config.directory['logs'] + 'qual_flag_t2.csv', index=False)
 
 
 def main(argv):
