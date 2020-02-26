@@ -18,25 +18,15 @@ import odf_reft_parser as reft_parser
 def process_all():
 
     #####
-    # Step 0: Define necessary variables
+    # Step 0: Load and define necessary variables
     #####
+
+    import config
 
     # define cruise and file information/extensions
     prefix = 'nbp1802_'
-    btl = '.btl'
-    ros = '.ros'
-    cnv = '.cnv'
-    ext_hex = '.hex'
-    xmlcon = '.XMLCON'
-    csv = '.csv'
 
     # directories and index files
-    ssscc_file = 'data/ssscc.csv'
-    dir_logs = 'data/logs/'
-    qual_dir_temp_primary = 'quality_code/temp_primary/'
-    qual_dir_temp_secondary = 'quality_code/temp_secondary/'
-    qual_dir_cond_primary = 'quality_code/cond_primary/'
-    qual_dir_cond_secondary = 'quality_code/cond_secondary/'
     qual_flag_temp = 'quality_flag_temp'
     qual_flag_cond = 'quality_flag_cond'
     fit_t1 = 'fitting_t1'
@@ -60,7 +50,7 @@ def process_all():
 
     # load station/cast list from file
     ssscc_list = []
-    with open(ssscc_file, 'r') as filename:
+    with open(config.directory['ssscc_file'], 'r') as filename:
         ssscc_list = [line.strip() for line in filename]
 
     # make list of already converted files to skip later
@@ -116,8 +106,8 @@ def process_all():
     p_offset = process_ctd.get_pressure_offset(pressure_log.ondeck_start_p, 
                                                 pressure_log.ondeck_end_p)
 
-    btl_data_all = fit_ctd.apply_pressure_offset(btl_data_all, 'CTDPRS', p_offset)
-    time_data_all = fit_ctd.apply_pressure_offset(time_data_all, 'CTDPRS', p_offset)
+    btl_data_all = fit_ctd.apply_pressure_offset(btl_data_all, config.column['p'], p_offset)
+    time_data_all = fit_ctd.apply_pressure_offset(time_data_all, config.column['p'], p_offset)
 
 
 def main(argv):
