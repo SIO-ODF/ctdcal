@@ -23,7 +23,7 @@ def process_all():
     # Step 0: Load and define necessary variables
     #####
 
-    import config
+    import config as cfg
 
     # define cruise and file information/extensions
     prefix = "nbp1802_"
@@ -34,7 +34,7 @@ def process_all():
 
     # load station/cast list from file
     ssscc_list = []
-    with open(config.directory["ssscc_file"], "r") as filename:
+    with open(cfg.directory["ssscc_file"], "r") as filename:
         ssscc_list = [line.strip() for line in filename]
 
     # make list of already converted files to skip later
@@ -98,29 +98,7 @@ def process_all():
     #####
 
     # load in all bottle and time data into DataFrame
-    btl_cols = [
-        "index",
-        "CTDTMP1",
-        "CTDTMP2",
-        "CTDPRS",
-        "CTDCOND1",
-        "CTDCOND2",
-        "CTDSAL",
-        "CTDOXY1",
-        "CTDOXYVOLTS",
-        "CTDXMISS",
-        "ALT",
-        "REF_PAR",
-        "GPSLAT",
-        "GPSLON",
-        "new_fix",
-        "pressure_temp_int",
-        "pump_on",
-        "btl_fire",
-        "scan_datetime",
-        "btl_fire_num",
-    ]
-    btl_data_all = process_ctd.load_all_ctd_files(ssscc_list, "bottle", btl_cols)
+    btl_data_all = process_ctd.load_all_ctd_files(ssscc_list, "bottle", cfg.btl_cols)
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list, "time", None)
 
     # process pressure offset
@@ -130,10 +108,10 @@ def process_all():
     )
 
     btl_data_all = fit_ctd.apply_pressure_offset(
-        btl_data_all, config.column["p"], p_offset
+        btl_data_all, cfg.column["p"], p_offset
     )
     time_data_all = fit_ctd.apply_pressure_offset(
-        time_data_all, config.column["p"], p_offset
+        time_data_all, cfg.column["p"], p_offset
     )
 
     # temperature calibration
@@ -155,14 +133,14 @@ def process_all():
 
         # 1) remove non-finite data
         df_temp_good = process_ctd.prepare_fit_data(
-            btl_data_all[btl_rows], config.column["reft"],
+            btl_data_all[btl_rows], cfg.column["reft"],
         )
 
         # 2 & 3) calculate fit params
         coef_temp_prim, df_ques_t1 = process_ctd.calibrate_param(
-            df_temp_good[config.column["t1_btl"]],
-            df_temp_good[config.column["reft"]],
-            df_temp_good[config.column["p_btl"]],
+            df_temp_good[cfg.column["t1_btl"]],
+            df_temp_good[cfg.column["reft"]],
+            df_temp_good[cfg.column["p_btl"]],
             "T",
             1,
             df_temp_good["SSSCC"],
@@ -170,9 +148,9 @@ def process_all():
             xRange="1000:5000",
         )
         coef_temp_sec, df_ques_t2 = process_ctd.calibrate_param(
-            df_temp_good[config.column["t2_btl"]],
-            df_temp_good[config.column["reft"]],
-            df_temp_good[config.column["p_btl"]],
+            df_temp_good[cfg.column["t2_btl"]],
+            df_temp_good[cfg.column["reft"]],
+            df_temp_good[cfg.column["p_btl"]],
             "T",
             1,
             df_temp_good["SSSCC"],
@@ -181,28 +159,24 @@ def process_all():
         )
 
         # 4) apply fit
-        btl_data_all.loc[
-            btl_rows, config.column["t1_btl"]
-        ] = fit_ctd.temperature_polyfit(
-            btl_data_all.loc[btl_rows, config.column["t1_btl"]],
-            btl_data_all.loc[btl_rows, config.column["p_btl"]],
+        btl_data_all.loc[btl_rows, cfg.column["t1_btl"]] = fit_ctd.temperature_polyfit(
+            btl_data_all.loc[btl_rows, cfg.column["t1_btl"]],
+            btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
             coef_temp_prim,
         )
-        btl_data_all.loc[
-            btl_rows, config.column["t2_btl"]
-        ] = fit_ctd.temperature_polyfit(
-            btl_data_all.loc[btl_rows, config.column["t2_btl"]],
-            btl_data_all.loc[btl_rows, config.column["p_btl"]],
+        btl_data_all.loc[btl_rows, cfg.column["t2_btl"]] = fit_ctd.temperature_polyfit(
+            btl_data_all.loc[btl_rows, cfg.column["t2_btl"]],
+            btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
             coef_temp_sec,
         )
-        time_data_all.loc[time_rows, config.column["t1"]] = fit_ctd.temperature_polyfit(
-            time_data_all.loc[time_rows, config.column["t1"]],
-            time_data_all.loc[time_rows, config.column["p"]],
+        time_data_all.loc[time_rows, cfg.column["t1"]] = fit_ctd.temperature_polyfit(
+            time_data_all.loc[time_rows, cfg.column["t1"]],
+            time_data_all.loc[time_rows, cfg.column["p"]],
             coef_temp_prim,
         )
-        time_data_all.loc[time_rows, config.column["t2"]] = fit_ctd.temperature_polyfit(
-            time_data_all.loc[time_rows, config.column["t2"]],
-            time_data_all.loc[time_rows, config.column["p"]],
+        time_data_all.loc[time_rows, cfg.column["t2"]] = fit_ctd.temperature_polyfit(
+            time_data_all.loc[time_rows, cfg.column["t2"]],
+            time_data_all.loc[time_rows, cfg.column["p"]],
             coef_temp_sec,
         )
 
@@ -211,8 +185,8 @@ def process_all():
         qual_flag_t2 = pd.concat([qual_flag_t2, df_ques_t2])
 
     # export temp quality flags
-    qual_flag_t1.to_csv(config.directory["logs"] + "qual_flag_t1.csv", index=False)
-    qual_flag_t2.to_csv(config.directory["logs"] + "qual_flag_t2.csv", index=False)
+    qual_flag_t1.to_csv(cfg.directory["logs"] + "qual_flag_t1.csv", index=False)
+    qual_flag_t2.to_csv(cfg.directory["logs"] + "qual_flag_t2.csv", index=False)
 
     # conductivity calibration
 
@@ -221,9 +195,9 @@ def process_all():
     qual_flag_c2 = pd.DataFrame()
 
     # calculate BTLCOND values from autosal data
-    # TODO: what temp sensor to use? should config.py have a var for which sensor is used in final data?
+    # TODO: what temp sensor to use? should cfg.py have a var for which sensor is used in final data?
     # TODO: clean up fit_ctd.CR_to_cond
-    btl_data_all[config.column["refc"]] = fit_ctd.CR_to_cond(
+    btl_data_all[cfg.column["refc"]] = fit_ctd.CR_to_cond(
         btl_data_all["CRavg"],
         btl_data_all["BathTEMP"],
         btl_data_all["CTDTMP1"],
@@ -238,14 +212,14 @@ def process_all():
 
         # 1) remove non-finite data
         df_cond_good = process_ctd.prepare_fit_data(
-            btl_data_all[btl_rows], config.column["refc"],
+            btl_data_all[btl_rows], cfg.column["refc"],
         )
 
         # 2 & 3) calculate fit params
         coef_cond_prim, df_ques_c1 = process_ctd.calibrate_param(
-            df_cond_good[config.column["c1_btl"]],
-            df_cond_good[config.column["refc"]],
-            df_cond_good[config.column["p_btl"]],
+            df_cond_good[cfg.column["c1_btl"]],
+            df_cond_good[cfg.column["refc"]],
+            df_cond_good[cfg.column["p_btl"]],
             "C",
             1,
             df_cond_good["SSSCC"],
@@ -253,9 +227,9 @@ def process_all():
             xRange="1000:5000",
         )
         coef_cond_sec, df_ques_c2 = process_ctd.calibrate_param(
-            df_cond_good[config.column["c2_btl"]],
-            df_cond_good[config.column["refc"]],
-            df_cond_good[config.column["p_btl"]],
+            df_cond_good[cfg.column["c2_btl"]],
+            df_cond_good[cfg.column["refc"]],
+            df_cond_good[cfg.column["p_btl"]],
             "C",
             1,
             df_cond_good["SSSCC"],
@@ -264,36 +238,28 @@ def process_all():
         )
 
         # 4) apply fit
-        btl_data_all.loc[
-            btl_rows, config.column["c1_btl"]
-        ] = fit_ctd.conductivity_polyfit(
-            btl_data_all.loc[btl_rows, config.column["c1_btl"]],
-            btl_data_all.loc[btl_rows, config.column["t1_btl"]],
-            btl_data_all.loc[btl_rows, config.column["p_btl"]],
+        btl_data_all.loc[btl_rows, cfg.column["c1_btl"]] = fit_ctd.conductivity_polyfit(
+            btl_data_all.loc[btl_rows, cfg.column["c1_btl"]],
+            btl_data_all.loc[btl_rows, cfg.column["t1_btl"]],
+            btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
             coef_cond_prim,
         )
-        btl_data_all.loc[
-            btl_rows, config.column["c2_btl"]
-        ] = fit_ctd.conductivity_polyfit(
-            btl_data_all.loc[btl_rows, config.column["c2_btl"]],
-            btl_data_all.loc[btl_rows, config.column["t2_btl"]],
-            btl_data_all.loc[btl_rows, config.column["p_btl"]],
+        btl_data_all.loc[btl_rows, cfg.column["c2_btl"]] = fit_ctd.conductivity_polyfit(
+            btl_data_all.loc[btl_rows, cfg.column["c2_btl"]],
+            btl_data_all.loc[btl_rows, cfg.column["t2_btl"]],
+            btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
             coef_cond_sec,
         )
-        time_data_all.loc[
-            time_rows, config.column["c1"]
-        ] = fit_ctd.conductivity_polyfit(
-            time_data_all.loc[time_rows, config.column["c1"]],
-            time_data_all.loc[time_rows, config.column["t1"]],
-            time_data_all.loc[time_rows, config.column["p"]],
+        time_data_all.loc[time_rows, cfg.column["c1"]] = fit_ctd.conductivity_polyfit(
+            time_data_all.loc[time_rows, cfg.column["c1"]],
+            time_data_all.loc[time_rows, cfg.column["t1"]],
+            time_data_all.loc[time_rows, cfg.column["p"]],
             coef_cond_prim,
         )
-        time_data_all.loc[
-            time_rows, config.column["c2"]
-        ] = fit_ctd.conductivity_polyfit(
-            time_data_all.loc[time_rows, config.column["c2"]],
-            time_data_all.loc[time_rows, config.column["t2"]],
-            time_data_all.loc[time_rows, config.column["p"]],
+        time_data_all.loc[time_rows, cfg.column["c2"]] = fit_ctd.conductivity_polyfit(
+            time_data_all.loc[time_rows, cfg.column["c2"]],
+            time_data_all.loc[time_rows, cfg.column["t2"]],
+            time_data_all.loc[time_rows, cfg.column["p"]],
             coef_cond_sec,
         )
 
@@ -302,8 +268,8 @@ def process_all():
         qual_flag_c2 = pd.concat([qual_flag_c2, df_ques_c2])
 
     # export temp quality flags
-    qual_flag_c1.to_csv(config.directory["logs"] + "qual_flag_c1.csv", index=False)
-    qual_flag_c2.to_csv(config.directory["logs"] + "qual_flag_c2.csv", index=False)
+    qual_flag_c1.to_csv(cfg.directory["logs"] + "qual_flag_c1.csv", index=False)
+    qual_flag_c2.to_csv(cfg.directory["logs"] + "qual_flag_c2.csv", index=False)
 
     breakpoint()
 
