@@ -1475,14 +1475,16 @@ def load_all_ctd_files(ssscc,series,cols):
         df_data_all = df_data_all.loc[:,~df_data_all.columns.duplicated()]
         
     elif series == 'time':
+        df_data_all = []
         for x in ssscc:
             print('Loading TIME data for station: ' + x + '...')
             time_file = 'data/time/' + x + '_time.pkl'
             time_data = pd.read_pickle(time_file)
             time_data['SSSCC'] = str(x)
             time_data['dv_dt'] = oxy_fitting.calculate_dVdT(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
-            df_data_all = pd.concat([df_data_all,time_data], sort=False)
+            df_data_all.append(time_data)
             print('** Finished TIME data station: ' + x + ' **')
+        df_data_all = pd.concat(df_data_all, axis=0, sort=False)
 
     df_data_all['master_index'] = range(len(df_data_all))
 
