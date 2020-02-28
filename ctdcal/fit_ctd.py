@@ -787,15 +787,15 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
 def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
 
     ### Clean up to avoid runtimewarning ###
-    cond_ratio = array_like_to_series(cond_ratio)
-    bath_temp = array_like_to_series(bath_temp)
-    btl_temp = array_like_to_series(btl_temp)
-    btl_press = array_like_to_series(btl_press)
+    # cond_ratio = array_like_to_series(cond_ratio)
+    # bath_temp = array_like_to_series(bath_temp)
+    # btl_temp = array_like_to_series(btl_temp)
+    # btl_press = array_like_to_series(btl_press)
     
-    nans = np.isnan(cond_ratio)
-    bnans = np.isnan(bath_temp)
-    cond_ratio.loc[nans] = 0
-    bath_temp.loc[bnans] = 0    
+    # nans = np.isnan(cond_ratio)
+    # bnans = np.isnan(bath_temp)
+    # cond_ratio.loc[nans] = 0
+    # bath_temp.loc[bnans] = 0    
     
 #    cond_df = cond_ratio.copy()
 #    bath_df = bath_temp.copy()
@@ -808,7 +808,9 @@ def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
     salinity = gsw.SP_salinometer((cond_ratio / 2.0),bath_temp)
     cond = gsw.C_from_SP(salinity,btl_temp,btl_press)  
     
-    cond[cond<=1] = np.nan
+    # ignore RunTimeWarning from (np.nan<=1)
+    with np.errstate(invalid='ignore'):
+        cond[cond<=1] = np.nan
     
     #cond = pd.series(cond)
     
