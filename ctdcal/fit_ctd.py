@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
+import ctdcal.process_ctd as process_ctd
 from scipy.optimize import leastsq
 import gsw
 import csv
@@ -556,6 +557,84 @@ def temperature_polyfit(temp,press,coef):
     fitted_temp = fitted_temp.round(4)
     
     return fitted_temp
+
+def get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num, 
+                P_order=2, T_order=2, xRange=None):
+
+    df_good, df_ques = process_ctd.calibrate_param(df_T, df_refT, df_prs, ssscc_list, btl_num, xRange)
+
+    # Toggle columns based on desired polyfit order
+    # (i.e. don't calculate 2nd order term if only doing 1st order fit)
+    order_list = [[0,0],[0,1],[1,1]]
+    P_fit = order_list[P_order]
+    T_fit = order_list[T_order]
+
+    # Calculate coefficients using linear algebra.
+    #
+    # Columns are [P^2, P, T^2, T, 1] and give associated coefs for:
+    # T_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4
+    fit_matrix = np.vstack(
+        [
+        P_fit[0]*df_good[df_prs.name]**2,
+        P_fit[1]*df_good[df_prs.name],
+        T_fit[0]*df_good[df_T.name]**2,
+        T_fit[1]*df_good[df_T.name],
+        np.ones(len(df_good[df_T.name]))
+        ]
+        )
+    coefs = np.linalg.lstsq(
+        fit_matrix.T,
+        df_good['Diff'],
+        rcond=None)[0]
+
+    # Column of zeros can sometimes return a non-zero value (machine precision),
+    # so force uncalculated fit terms to be truly zero
+    coefs = coefs*np.concatenate((P_fit,T_fit,[1]))
+
+    return coefs, df_ques
+
+def get_C_coefs(df_C, df_refC, df_T, df_prs, ssscc_list, btl_num,
+                P_order=2, T_order=2, C_order=2, xRange=None):
+
+    df_good, df_ques = process_ctd.calibrate_param(df_C, df_refC, df_prs, ssscc_list, btl_num, xRange)
+
+    # add CTDTMP column
+    # reindex df_T then resample using inds from df_good
+    df_T.reset_index(drop=True, inplace=True)
+    df_good[df_T.name] = df_T.iloc[df_good.index]
+
+    # Toggle columns based on desired polyfit order
+    # (i.e. don't calculate 2nd order term if only doing 1st order fit)
+    order_list = [[0,0],[0,1],[1,1]]
+    P_fit = order_list[P_order]
+    T_fit = order_list[T_order]
+    C_fit = order_list[C_order]
+
+    # Calculate coefficients using linear algebra.
+    #
+    # Columns are [P^2, P, T^2, T, C^2, C, 1] and give associated coefs for:
+    # C_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4*C^2 + c5*C + c6
+    fit_matrix = np.vstack(
+        [
+        P_fit[0]*df_good[df_prs.name]**2,
+        P_fit[1]*df_good[df_prs.name],
+        T_fit[0]*df_good[df_T.name]**2,
+        T_fit[1]*df_good[df_T.name],
+        C_fit[0]*df_good[df_C.name]**2,
+        C_fit[1]*df_good[df_C.name],
+        np.ones(len(df_good[df_C.name]))
+        ]
+        )
+    coefs = np.linalg.lstsq(
+        fit_matrix.T,
+        df_good['Diff'],
+        rcond=None)[0]
+
+    # Column of zeros can sometimes return a non-zero value (machine precision),
+    # so force uncalculated fit terms to be truly zero
+    coefs = coefs*np.concatenate((P_fit,T_fit,C_fit,[1]))
+
+    return coefs, df_ques
 
 #def load_qual(path):
 #    comment_dict = {}

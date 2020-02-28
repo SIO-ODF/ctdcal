@@ -19,6 +19,8 @@ import odf_reft_parser as reft_parser
 
 def process_all():
 
+    start_time = timeit.default_timer()
+
     #####
     # Step 0: Load and define necessary variables
     #####
@@ -137,24 +139,24 @@ def process_all():
         )
 
         # 2 & 3) calculate fit params
-        coef_temp_prim, df_ques_t1 = process_ctd.calibrate_param(
+        coef_temp_prim, df_ques_t1 = fit_ctd.get_T_coefs(
             df_temp_good[cfg.column["t1_btl"]],
             df_temp_good[cfg.column["reft"]],
             df_temp_good[cfg.column["p_btl"]],
-            "T",
-            1,
             df_temp_good["SSSCC"],
             df_temp_good["btl_fire_num"],
+            T_order=2,
+            P_order=2,
             xRange="1000:5000",
         )
-        coef_temp_sec, df_ques_t2 = process_ctd.calibrate_param(
+        coef_temp_sec, df_ques_t2 = fit_ctd.get_T_coefs(
             df_temp_good[cfg.column["t2_btl"]],
             df_temp_good[cfg.column["reft"]],
             df_temp_good[cfg.column["p_btl"]],
-            "T",
-            1,
             df_temp_good["SSSCC"],
             df_temp_good["btl_fire_num"],
+            T_order=2,
+            P_order=2,
             xRange="1000:5000",
         )
 
@@ -216,24 +218,28 @@ def process_all():
         )
 
         # 2 & 3) calculate fit params
-        coef_cond_prim, df_ques_c1 = process_ctd.calibrate_param(
+        coef_cond_prim, df_ques_c1 = fit_ctd.get_C_coefs(
             df_cond_good[cfg.column["c1_btl"]],
             df_cond_good[cfg.column["refc"]],
+            df_cond_good[cfg.column["t1_btl"]],
             df_cond_good[cfg.column["p_btl"]],
-            "C",
-            1,
             df_cond_good["SSSCC"],
             df_cond_good["btl_fire_num"],
+            P_order=2,
+            T_order=2,
+            C_order=2,
             xRange="1000:5000",
         )
-        coef_cond_sec, df_ques_c2 = process_ctd.calibrate_param(
+        coef_cond_sec, df_ques_c2 = fit_ctd.get_C_coefs(
             df_cond_good[cfg.column["c2_btl"]],
             df_cond_good[cfg.column["refc"]],
+            df_cond_good[cfg.column["t1_btl"]],
             df_cond_good[cfg.column["p_btl"]],
-            "C",
-            1,
             df_cond_good["SSSCC"],
             df_cond_good["btl_fire_num"],
+            P_order=2,
+            T_order=0,
+            C_order=2,
             xRange="1000:5000",
         )
 
@@ -271,6 +277,7 @@ def process_all():
     qual_flag_c1.to_csv(cfg.directory["logs"] + "qual_flag_c1.csv", index=False)
     qual_flag_c2.to_csv(cfg.directory["logs"] + "qual_flag_c2.csv", index=False)
 
+    print(timeit.default_timer() - start_time)
     breakpoint()
 
 

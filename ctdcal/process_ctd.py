@@ -950,7 +950,8 @@ def load_time_data(time_file):
     return time_data
 
 
-def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
+# def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
+def calibrate_param(param,ref_param,press,ssscc,btl_num,xRange=None,):
 ### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION
 
 
@@ -978,14 +979,15 @@ def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,
 
         df_good_cons = df_good[(df_good[param.name] >= x0) & (df_good[param.name] <= x1)]
 
-    if 'P' in calib:
-        coef = get_param_coef(df_good_cons[press.name],df_good_cons['Diff'],order,calib)
-    elif 'T' or 'C' in calib:
-        coef = get_param_coef(df_good_cons[param.name],df_good_cons['Diff'],order,calib)
-    else:
-        print('calib argument not valid, use CP TP T or C')
+    return df_good_cons,df_ques
+    # if 'P' in calib:
+    #     coef = get_param_coef(df_good_cons[press.name],df_good_cons['Diff'],order,calib)
+    # elif 'T' or 'C' in calib:
+    #     coef = get_param_coef(df_good_cons[param.name],df_good_cons['Diff'],order,calib)
+    # else:
+    #     print('calib argument not valid, use CP TP T or C')
 
-    return coef,df_ques
+    # return coef,df_ques
 
 def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
 
