@@ -126,6 +126,8 @@ def process_all():
     ssscc_files_t = sorted(glob.glob("data/ssscc/ssscc_*t*.csv"))
     qual_flag_t1 = pd.DataFrame()
     qual_flag_t2 = pd.DataFrame()
+    coef_t1_all = pd.DataFrame()
+    coef_t2_all = pd.DataFrame()
 
     for f in ssscc_files_t:
         # 0) grab ssscc chunk to fit
@@ -139,7 +141,7 @@ def process_all():
         )
 
         # 2 & 3) calculate fit params
-        coef_temp_prim, df_ques_t1 = fit_ctd.get_T_coefs(
+        coef_t1, df_ques_t1 = fit_ctd.get_T_coefs(
             df_temp_good[cfg.column["t1_btl"]],
             df_temp_good[cfg.column["reft"]],
             df_temp_good[cfg.column["p_btl"]],
@@ -149,7 +151,7 @@ def process_all():
             P_order=2,
             xRange="1000:5000",
         )
-        coef_temp_sec, df_ques_t2 = fit_ctd.get_T_coefs(
+        coef_t2, df_ques_t2 = fit_ctd.get_T_coefs(
             df_temp_good[cfg.column["t2_btl"]],
             df_temp_good[cfg.column["reft"]],
             df_temp_good[cfg.column["p_btl"]],
@@ -164,37 +166,55 @@ def process_all():
         btl_data_all.loc[btl_rows, cfg.column["t1_btl"]] = fit_ctd.temperature_polyfit(
             btl_data_all.loc[btl_rows, cfg.column["t1_btl"]],
             btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
-            coef_temp_prim,
+            coef_t1,
         )
         btl_data_all.loc[btl_rows, cfg.column["t2_btl"]] = fit_ctd.temperature_polyfit(
             btl_data_all.loc[btl_rows, cfg.column["t2_btl"]],
             btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
-            coef_temp_sec,
+            coef_t2,
         )
         time_data_all.loc[time_rows, cfg.column["t1"]] = fit_ctd.temperature_polyfit(
             time_data_all.loc[time_rows, cfg.column["t1"]],
             time_data_all.loc[time_rows, cfg.column["p"]],
-            coef_temp_prim,
+            coef_t1,
         )
         time_data_all.loc[time_rows, cfg.column["t2"]] = fit_ctd.temperature_polyfit(
             time_data_all.loc[time_rows, cfg.column["t2"]],
             time_data_all.loc[time_rows, cfg.column["p"]],
-            coef_temp_sec,
+            coef_t2,
         )
 
         # 5) handle quality flags
         qual_flag_t1 = pd.concat([qual_flag_t1, df_ques_t1])
         qual_flag_t2 = pd.concat([qual_flag_t2, df_ques_t2])
 
+        # 6) handle fit params
+        coef_t1_df = pd.DataFrame()
+        coef_t1_df["SSSCC"] = ssscc_list_t
+        coef_t2_df = coef_t1_df.copy()
+
+        for idx, val in enumerate(coef_t1):
+            coef_t1_df["c" + str(idx)] = coef_t1[idx]
+            coef_t2_df["c" + str(idx)] = coef_t2[idx]
+
+        coef_t1_all = pd.concat([coef_t1_all, coef_t1_df])
+        coef_t2_all = pd.concat([coef_t2_all, coef_t2_df])
+
     # export temp quality flags
     qual_flag_t1.to_csv(cfg.directory["logs"] + "qual_flag_t1.csv", index=False)
     qual_flag_t2.to_csv(cfg.directory["logs"] + "qual_flag_t2.csv", index=False)
+
+    # export temp fit params
+    coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
+    coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
 
     # conductivity calibration
 
     ssscc_files_c = sorted(glob.glob("data/ssscc/ssscc_*c*.csv"))
     qual_flag_c1 = pd.DataFrame()
     qual_flag_c2 = pd.DataFrame()
+    coef_c1_all = pd.DataFrame()
+    coef_c2_all = pd.DataFrame()
 
     # calculate BTLCOND values from autosal data
     # TODO: what temp sensor to use? should cfg.py have a var for which sensor is used in final data?
@@ -218,7 +238,7 @@ def process_all():
         )
 
         # 2 & 3) calculate fit params
-        coef_cond_prim, df_ques_c1 = fit_ctd.get_C_coefs(
+        coef_c1, df_ques_c1 = fit_ctd.get_C_coefs(
             df_cond_good[cfg.column["c1_btl"]],
             df_cond_good[cfg.column["refc"]],
             df_cond_good[cfg.column["t1_btl"]],
@@ -226,11 +246,11 @@ def process_all():
             df_cond_good["SSSCC"],
             df_cond_good["btl_fire_num"],
             P_order=2,
-            T_order=2,
+            T_order=0,
             C_order=2,
             xRange="1000:5000",
         )
-        coef_cond_sec, df_ques_c2 = fit_ctd.get_C_coefs(
+        coef_c2, df_ques_c2 = fit_ctd.get_C_coefs(
             df_cond_good[cfg.column["c2_btl"]],
             df_cond_good[cfg.column["refc"]],
             df_cond_good[cfg.column["t1_btl"]],
@@ -248,34 +268,50 @@ def process_all():
             btl_data_all.loc[btl_rows, cfg.column["c1_btl"]],
             btl_data_all.loc[btl_rows, cfg.column["t1_btl"]],
             btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
-            coef_cond_prim,
+            coef_c1,
         )
         btl_data_all.loc[btl_rows, cfg.column["c2_btl"]] = fit_ctd.conductivity_polyfit(
             btl_data_all.loc[btl_rows, cfg.column["c2_btl"]],
             btl_data_all.loc[btl_rows, cfg.column["t2_btl"]],
             btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
-            coef_cond_sec,
+            coef_c2,
         )
         time_data_all.loc[time_rows, cfg.column["c1"]] = fit_ctd.conductivity_polyfit(
             time_data_all.loc[time_rows, cfg.column["c1"]],
             time_data_all.loc[time_rows, cfg.column["t1"]],
             time_data_all.loc[time_rows, cfg.column["p"]],
-            coef_cond_prim,
+            coef_c1,
         )
         time_data_all.loc[time_rows, cfg.column["c2"]] = fit_ctd.conductivity_polyfit(
             time_data_all.loc[time_rows, cfg.column["c2"]],
             time_data_all.loc[time_rows, cfg.column["t2"]],
             time_data_all.loc[time_rows, cfg.column["p"]],
-            coef_cond_sec,
+            coef_c2,
         )
 
         # 5) handle quality flags
         qual_flag_c1 = pd.concat([qual_flag_c1, df_ques_c1])
         qual_flag_c2 = pd.concat([qual_flag_c2, df_ques_c2])
 
-    # export temp quality flags
+        # 6) handle fit params
+        coef_c1_df = pd.DataFrame()
+        coef_c1_df["SSSCC"] = ssscc_list_c
+        coef_c2_df = coef_c1_df.copy()
+
+        for idx, val in enumerate(coef_c1):
+            coef_c1_df["c" + str(idx)] = coef_c1[idx]
+            coef_c2_df["c" + str(idx)] = coef_c2[idx]
+
+        coef_c1_all = pd.concat([coef_c1_all, coef_c1_df])
+        coef_c2_all = pd.concat([coef_c2_all, coef_c2_df])
+
+    # export cond quality flags
     qual_flag_c1.to_csv(cfg.directory["logs"] + "qual_flag_c1.csv", index=False)
     qual_flag_c2.to_csv(cfg.directory["logs"] + "qual_flag_c2.csv", index=False)
+
+    # export cond fit params
+    coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
+    coef_c2_all.to_csv(cfg.directory["logs"] + "fit_coef_c2.csv", index=False)
 
     print(timeit.default_timer() - start_time)
     breakpoint()
