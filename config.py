@@ -25,6 +25,14 @@ column = {
     "reft": "T90",
     "refc": "BTLCOND",
     "sal": "CTDSAL",
+    "sal_btl": "SALNTY",
+    "rinko_oxy": "FREE1",
+    "oxy_btl": "OXYGEN",
+    "oxyvolts": "CTDOXYVOLTS",
+    "lat": "GPSLAT",
+    "lon": "GPSLON",
+    "lat_btl": "GPSLAT",
+    "lon_btl": "GPSLON",
 }
 
 # List of bottle columns to be read during calibration
