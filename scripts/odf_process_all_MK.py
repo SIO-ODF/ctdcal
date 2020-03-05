@@ -345,7 +345,7 @@ def process_all():
         btl_data_all[cfg.column["lon_btl"]],
         btl_data_all[cfg.column["lat_btl"]],
     )
-    btl_data_all["PT"] = gsw.pt0_from_t(
+    btl_data_all["CT"] = gsw.CT_from_t(
         btl_data_all["SA"],
         btl_data_all[cfg.column["t1_btl"]],  # oxygen sensor is on primary line (ie t1)
         btl_data_all[cfg.column["p_btl"]],
@@ -356,18 +356,26 @@ def process_all():
         time_data_all[cfg.column["lon_btl"]],
         time_data_all[cfg.column["lat_btl"]],
     )
-    time_data_all["PT"] = gsw.pt0_from_t(
+    time_data_all["CT"] = gsw.CT_from_t(
         time_data_all["SA"],
         time_data_all[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
         time_data_all[cfg.column["p"]],
     )
 
     # Calculate oxygen solubility in µmol/kg
-    btl_data_all["OS_btl"] = oxy_fitting.os_umol_kg(  # any reason to label as OS_btl?
-        btl_data_all["SA"], btl_data_all["PT"]
+    btl_data_all["OS_btl"] = gsw.O2sol(  # any reason to label as OS_btl?
+        btl_data_all["SA"],
+        btl_data_all["CT"],
+        btl_data_all[cfg.column["p_btl"]],
+        btl_data_all[cfg.column["lon_btl"]],
+        btl_data_all[cfg.column["lon_btl"]],
     )
-    time_data_all["OS_ctd"] = oxy_fitting.os_umol_kg(  # any reason to label as OS_ctd?
-        time_data_all["SA"], time_data_all["PT"]
+    time_data_all["OS_btl"] = gsw.O2sol(  # any reason to label as OS_ctd?
+        time_data_all["SA"],
+        time_data_all["CT"],
+        time_data_all[cfg.column["p"]],
+        time_data_all[cfg.column["lon"]],
+        time_data_all[cfg.column["lon"]],
     )
 
     # Calculate bottle oxygen
@@ -410,7 +418,7 @@ def process_all():
             time_data["sigma_ctd"],
             time_data["OS_ctd"],
             time_data[cfg.column["p"]],
-            time_data[cfg.column["t1"]],  # which T to use?
+            time_data[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
             time_data[cfg.column["rinko_oxy"]],
             rinko_coef0,
             btl_data["SSSCC"],
@@ -440,7 +448,7 @@ def process_all():
         print(ssscc + " Done!")
 
     sbe43_coef_df = oxy_fitting.create_coef_df(sbe43_dict)
-    rinko_coef_df = oxy_fitting.create_coef_df(rinko_dict)
+    rinko_coef_df = oxy_fitting.create_coef_df(rinko_dict)  # output to csv?
 
     btl_data_all = btl_data_all.merge(
         all_rinko_df,
