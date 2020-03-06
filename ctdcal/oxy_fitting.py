@@ -37,7 +37,7 @@ def oxy_loader(oxyfile):
 
     del oxy_Array[0]
 
-    header = ['STNNO_OXY','CASTNO_OXY','BOTTLENO_OXY','FLASKNO','TITR_VOL','TITR_TEMP','DRAW_TEMP','TITER_TIME','END_VOLTS']
+    header = ['STNNO_OXY','CASTNO_OXY','BOTTLENO_OXY','FLASKNO','TITR_VOL','TITR_TEMP','DRAW_TEMP','TITR_TIME','END_VOLTS']
 
     O2 = np.array(oxy_Array)
     df = pd.DataFrame(O2,columns=header)
@@ -492,6 +492,7 @@ def sigma_from_CTD(sal, temp, press, lon, lat, ref=0):
 
     return sigma
 
+# this function now exists as gsw.O2sol()
 def os_umol_kg( sal, PT):
     """
     Calculates oxygen solubility in umol/kg as found in Gordon and Garcia 1992

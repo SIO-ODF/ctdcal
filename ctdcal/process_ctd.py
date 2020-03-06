@@ -1447,7 +1447,7 @@ def load_all_ctd_files(ssscc,series,cols):
                 oxy_data['TITR_VOL'] = pd.Series([np.nan]*len(btl_data))
                 oxy_data['TITR_TEMP'] = pd.Series([np.nan]*len(btl_data))
                 oxy_data['DRAW_TEMP'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['TITER_TIME'] = pd.Series([np.nan]*len(btl_data))
+                oxy_data['TITR_TIME'] = pd.Series([np.nan]*len(btl_data))
                 oxy_data['END_VOLTS'] = pd.Series([np.nan]*len(btl_data))
                 oxy_data.index = btl_data.index
 

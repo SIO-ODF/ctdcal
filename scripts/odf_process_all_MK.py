@@ -338,7 +338,7 @@ def process_all():
         time_data_all[cfg.column["lat_btl"]],
     )
 
-    # Calculate SA and PT
+    # Calculate SA and CT
     btl_data_all["SA"] = gsw.SA_from_SP(
         btl_data_all[cfg.column["sal_btl"]],
         btl_data_all[cfg.column["p_btl"]],
@@ -368,14 +368,14 @@ def process_all():
         btl_data_all["CT"],
         btl_data_all[cfg.column["p_btl"]],
         btl_data_all[cfg.column["lon_btl"]],
-        btl_data_all[cfg.column["lon_btl"]],
+        btl_data_all[cfg.column["lat_btl"]],
     )
     time_data_all["OS_btl"] = gsw.O2sol(  # any reason to label as OS_ctd?
         time_data_all["SA"],
         time_data_all["CT"],
         time_data_all[cfg.column["p"]],
         time_data_all[cfg.column["lon"]],
-        time_data_all[cfg.column["lon"]],
+        time_data_all[cfg.column["lat"]],
     )
 
     # Calculate bottle oxygen
