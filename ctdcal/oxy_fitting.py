@@ -610,8 +610,10 @@ def merge_parameters(btl_df,time_df,l_param='sigma0_btl',r_param='sigma0_ctd'):
 
     return merge_df
 
-def get_sbe_coef(hexfile, xmlfile):
+def get_sbe_coef(station='00101'):
 
+    hexfile = "data/raw/" + station + ".hex"
+    xmlfile = "data/raw/" + station + ".XMLCON"
 
     sbeReader = sbe_rd.SBEReader.from_paths(hexfile, xmlfile)
     rawConfig = sbeReader.parsed_config()
@@ -633,18 +635,6 @@ def get_sbe_coef(hexfile, xmlfile):
     C = oxy_meta['sensor_info']['C'] # Compensation Coef for temp effect on mem perm
     D = [oxy_meta['sensor_info']['D0'],oxy_meta['sensor_info']['D1'],oxy_meta['sensor_info']['D2']] # Press effect on time constant Usually not fitted for.
 
-    #coef = {'Soc':Soc,'Voff':Voff,'Tau20':Tau20,'Tcorr':Tcorr,'E':E,'A':A,'B':B,'C':C,'D':D}
-
-    # Make into an array in order to do keast squares fitting easier
-#        coef0s:
-#    coef[0] = Soc
-#    coef[1] = Voffset
-#    coef[2] = Tau20
-#    coef[3] = Tcorr
-#    coef[4] = E
-#
-#    cc[0] = D1
-#    cc[1] = D2
     coef = [Soc,Voff,Tau20,Tcorr,E]#,A,B,C,D]
 
     return coef
@@ -723,7 +713,7 @@ def interpolate_param(param):
     return ex_param
 
 def oxy_equation(X, Soc, Voffset, A, B, C, E, Tau20):
-
+    # eq (3) in Uchida CTD manual
     cc=[1.92634e-4,-4.64803e-2]
     oxyvolts, pressure, temp, dvdt, os = X
 
@@ -735,19 +725,33 @@ def oxy_equation(X, Soc, Voffset, A, B, C, E, Tau20):
     return oxygen
 
 
-def sbe43_oxy_fit(btl_prs, btl_oxy, btl_sigma, ctd_sigma, ctd_os, ctd_prs, ctd_tmp, ctd_oxyvolts, ctd_time, coef0,btl_ssscc=None):
+def PMEL_oxy_eq(coefs,inputs,cc=[1.92634e-4,-4.64803e-2]):
+    """
+    Modified oxygen equation for SBE 43 used by NOAA/PMEL
+    coef[0] = Soc
+    coef[1] = Voffset
+    coef[2] = Tau20
+    coef[3] = Tcorr
+    coef[4] = E
+    """
+    Soc, Voff, Tau20, Tcorr, E = coefs
+    oxyvolts, pressure, temp, dvdt, os = inputs
+    o2 = Soc * (oxyvolts + Voff + Tau20 * np.exp(cc[0] * pressure + cc[1] * (temp - 20)) * dvdt) * os \
+            * np.exp(Tcorr * temp) \
+            * np.exp((E * pressure) / (temp + 273.15))
 
+    return o2
 
-    # Create DF for good and questionable values
+def PMEL_oxy_weighted_residual(coefs,weights,inputs,refoxy):
+    return np.sum((weights*(refoxy-PMEL_oxy_eq(coefs, inputs))**2))/np.sum(weights**2)
 
-    bad_df = pd.DataFrame()
-    good_df = pd.DataFrame()
+def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_fire_num, ctd_sigma, ctd_os, ctd_prs, ctd_tmp, ctd_oxyvolts, ctd_time, btl_ssscc=None):
 
     # Construct Dataframe from bottle and ctd values for merging
     if 'btl_ssscc' in  locals():
-        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma, 'SSSCC_sbe43':btl_ssscc}
+        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma, 'btl_fire_num':btl_fire_num, 'SSSCC_sbe43':btl_ssscc}
     else:
-        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma}
+        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma, 'btl_fire_num':btl_fire_num}
     btl_data = pd.DataFrame(btl_dict)
     time_dict = {'CTDPRS_sbe43_ctd':ctd_prs, 'sigma_sbe43_ctd':ctd_sigma, 'OS_sbe43_ctd':ctd_os, 'CTDTMP_sbe43_ctd':ctd_tmp, 'CTDOXYVOLTS':ctd_oxyvolts, 'CTDTIME':ctd_time}
     time_data = pd.DataFrame(time_dict)
@@ -763,87 +767,130 @@ def sbe43_oxy_fit(btl_prs, btl_oxy, btl_sigma, ctd_sigma, ctd_os, ctd_prs, ctd_t
     merged_df['dv_dt'] = calculate_dVdT(merged_df['CTDOXYVOLTS'], merged_df['CTDTIME'])
 
     # Apply coef and calculate CTDOXY
-    merged_df['CTDOXY'] = SB_oxy_eq(coef0, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
-    #merged_df.dropna(subset=['REFOXY_sbe43'], inplace=True)
+    sbe_coef0 = get_sbe_coef(station='00101') # initial coefficient guess
+    merged_df['CTDOXY'] = PMEL_oxy_eq(sbe_coef0, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))
+
+    return merged_df
 
 
+def sbe43_oxy_fit(merged_df, sbe_coef0=None):
+
+    # Create DF for good and questionable values
+    bad_df = pd.DataFrame()
+    good_df = pd.DataFrame()
+
+    if sbe_coef0 is None:
+        # Load initial coefficient guess
+        sbe_coef0 = get_sbe_coef(station='00101')
+
+    p0 = sbe_coef0[0], sbe_coef0[1], sbe_coef0[2], sbe_coef0[3], sbe_coef0[4]
+    
     # Curve fit (weighted)
-    p0 = coef0[0], coef0[1], coef0[2], coef0[3], coef0[4], coef0[5], coef0[6]
-    weights = 1/(np.sqrt(merged_df['CTDPRS_sbe43_ctd']))
+    weights = calculate_weights(merged_df['CTDPRS_sbe43_ctd'])
+    cfw_coefs = scipy.optimize.fmin(PMEL_oxy_weighted_residual,x0=p0,args=(weights, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43']), disp=False)
+    merged_df['CTDOXY'] = PMEL_oxy_eq(cfw_coefs, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))        
+    
+    merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
+    stdres = np.std(merged_df['res_sbe43'])
+    cutoff = stdres * 2.8
 
-    try:
-        cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0, sigma=weights, absolute_sigma=False)
-        merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
+    thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    bad_df = pd.concat([bad_df, thrown_values])
+    merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
+
+    while not thrown_values.empty: # runs as long as there are thrown_values
+
+        p0 = cfw_coefs[0], cfw_coefs[1], cfw_coefs[2], cfw_coefs[3], cfw_coefs[4]
+        weights = calculate_weights(merged_df['CTDPRS_sbe43_ctd'])
+        cfw_coefs = scipy.optimize.fmin(PMEL_oxy_weighted_residual,x0=p0,args=(weights, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43']), disp=False)
+        merged_df['CTDOXY'] = PMEL_oxy_eq(cfw_coefs, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))
 
         merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
         stdres = np.std(merged_df['res_sbe43'])
         cutoff = stdres * 2.8
-
         thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-        bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-        bad_df = pd.concat([bad_df, bad_values])
+        print(len(thrown_values))
+        print(p0)
+        bad_df = pd.concat([bad_df, thrown_values])
         merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
 
-        while not thrown_values.empty:
+    # try:
+    #     cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0, sigma=weights, absolute_sigma=False, maxfev=50000)
+    #     merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
 
-            p0 = cfw_coef[0], cfw_coef[1], cfw_coef[2], cfw_coef[3], cfw_coef[4], cfw_coef[5], cfw_coef[6]
-            weights = 1/((merged_df['CTDPRS_sbe43_ctd']))
-            cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0, sigma=weights, absolute_sigma=False)
-            merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
-            merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
-            stdres = np.std(merged_df['res_sbe43'])
-            cutoff = stdres * 2.8
-            thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
+    #     merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
+    #     stdres = np.std(merged_df['res_sbe43'])
+    #     cutoff = stdres * 2.8
 
-    except RuntimeError:
+    #     thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #     bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #     bad_df = pd.concat([bad_df, bad_values])
+    #     merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
 
-        try:#Nested try/except could be better
-            print('Weighted Curve fitting failed...using Unweighted Fitting')
-            cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0)
-            merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
+    #     while not thrown_values.empty:
 
-            merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
-            stdres = np.std(merged_df['res_sbe43'])
-            cutoff = stdres * 2.8
+    #         p0 = cfw_coef[0], cfw_coef[1], cfw_coef[2], cfw_coef[3], cfw_coef[4], cfw_coef[5], cfw_coef[6]
+    #         # weights = 1/((merged_df['CTDPRS_sbe43_ctd']))
+    #         weights = 1/(calculate_weights(merged_df['CTDPRS_sbe43_ctd']))
+    #         cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0, sigma=weights, absolute_sigma=False, maxfev=50000)
+    #         merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
+    #         merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
+    #         stdres = np.std(merged_df['res_sbe43'])
+    #         cutoff = stdres * 2.8
+    #         thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #         bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #         merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
 
-            thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            bad_df = pd.concat([bad_df, bad_values])
-            merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
+    # except RuntimeError:
 
-            while not thrown_values.empty:
+    #     try:#Nested try/except could be better
+    #         print('Weighted curve fitting failed for SBE43...using Unweighted Fitting')
+    #         cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0)
+    #         merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
 
-                p0 = cfw_coef[0], cfw_coef[1], cfw_coef[2], cfw_coef[3], cfw_coef[4], cfw_coef[5], cfw_coef[6]
-                cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0)
-                merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
-                merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
-                stdres = np.std(merged_df['res_sbe43'])
-                cutoff = stdres * 2.8
-                thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-                bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-                merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
+    #         merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
+    #         stdres = np.std(merged_df['res_sbe43'])
+    #         cutoff = stdres * 2.8
 
-        except:
-            print('Curve fitting failed...using SBE coef')
-            cfw_coef = coef0
-            merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
-            stdres = np.std(merged_df['res_sbe43'])
-            cutoff = stdres * 2.8
-            thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
+    #         thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #         bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #         bad_df = pd.concat([bad_df, bad_values])
+    #         merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
+
+    #         while not thrown_values.empty:
+
+    #             p0 = cfw_coef[0], cfw_coef[1], cfw_coef[2], cfw_coef[3], cfw_coef[4], cfw_coef[5], cfw_coef[6]
+    #             cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0)
+    #             merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
+    #             merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
+    #             stdres = np.std(merged_df['res_sbe43'])
+    #             cutoff = stdres * 2.8
+    #             thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #             bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #             merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
+
+    #     except:
+    #         print('Curve fitting failed...using SBE coef')
+    #         cfw_coef = coef0
+    #         merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
+    #         stdres = np.std(merged_df['res_sbe43'])
+    #         cutoff = stdres * 2.8
+    #         thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #         bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    #         merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
 
 
-    good_df = pd.concat([good_df, merged_df])
-    good_df['CTDOXY_FLAG_W'] = 2
-    bad_df = pd.concat([bad_df, bad_values])
+    # good_df = pd.concat([good_df, merged_df])
+    merged_df['CTDOXY_FLAG_W'] = 2
+    # bad_df = pd.concat([bad_df, bad_values])
     bad_df['CTDOXY_FLAG_W'] = 3
-    df = pd.concat([good_df,bad_df])
-    df.sort_values(by='CTDPRS_sbe43_btl',ascending=False,inplace=True)
+    df = pd.concat([merged_df,bad_df])
 
-    return cfw_coef, df
+    # df['SSSCC_int'] = df['SSSCC_sbe43'].astype(int)
+    # df.sort_values(by=['SSSCC_int','btl_fire_num'],ascending=[True,True],inplace=True)
+    # df.drop('SSSCC_int', axis=1, inplace=True)
+
+    return cfw_coefs, df
 
 def apply_oxygen_coef_ctd(df, coef_df, ssscc, ssscc_col='SSSCC',oxyvo_col='CTDOXYVOLTS',
                           time_col='scan_datetime',prs_col='CTDPRS',tmp_col='CTDTMP1',
