@@ -397,9 +397,10 @@ def process_all():
     rinko_coef0 = rinko.rinko_o2_cal_parameters()
     all_rinko_df = pd.DataFrame()
     all_sbe43_df = pd.DataFrame()
+    all_sbe43_merged = pd.DataFrame()
     rinko_dict = {}
     sbe43_dict = {}
-    sbe43_flag = pd.DataFrame()
+    all_sbe43_fit = pd.DataFrame()
     rinko_flag = pd.DataFrame()
 
     # Density match time/btl oxy dataframes
@@ -414,7 +415,7 @@ def process_all():
             print(ssscc + " skipped, all oxy data is NaN")
             continue
 
-        sbe43_merged_df = oxy_fitting.match_sigmas(
+        sbe43_merged = oxy_fitting.match_sigmas(
             btl_data[cfg.column["p_btl"]],
             btl_data[cfg.column["oxy_btl"]],
             btl_data["sigma_btl"],
@@ -428,11 +429,11 @@ def process_all():
             time_data["SSSCC"],
         )
 
-        all_sbe43_df = pd.concat([all_sbe43_df, sbe43_merged_df])
+        all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
         print(ssscc + " density matching done")
 
     # Fit ALL oxygen stations together to get initial coefficient guess
-    (sbe_coef0, _) = oxy_fitting.sbe43_oxy_fit(all_sbe43_df)
+    (sbe_coef0, _) = oxy_fitting.sbe43_oxy_fit(all_sbe43_merged)
 
     # Fit oxygen stations using SSSCC chunks to refine coefficients
     ssscc_files_ox = sorted(glob.glob("data/ssscc/ssscc_*ox*.csv"))
@@ -440,8 +441,9 @@ def process_all():
         ssscc_list_ox = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
 
         sbe_coef, sbe_df = oxy_fitting.sbe43_oxy_fit(
-            all_sbe43_df.loc[all_sbe43_df["SSSCC_sbe43"].isin(ssscc_list_ox)],
+            all_sbe43_merged.loc[all_sbe43_merged["SSSCC_sbe43"].isin(ssscc_list_ox)],
             sbe_coef0=sbe_coef0,
+            f_out=f,
         )
 
         # build coef dictionary
@@ -450,9 +452,24 @@ def process_all():
                 sbe43_dict[ssscc] = sbe_coef
 
         # all non-NaN oxygen data with flags
-        sbe43_flag = pd.concat([sbe43_flag, sbe_df])
+        all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
 
-    # apply coefs to time data
+    # TODO: save outlier data from fits?
+    # # TODO: abstract to oxy_fitting.py
+    # breakpoint()
+    # all_sbe43_fit["SSSCC_int"] = all_sbe43_fit["SSSCC_sbe43"].astype(int)
+    # all_sbe43_fit = all_sbe43_fit.sort_values(
+    #     by=["SSSCC_int", "btl_fire_num"], ascending=[True, True]
+    # )
+    # all_sbe43_fit["STNNBR"] = all_sbe43_fit["SSSCC_sbe43"].str[0:3]  # SSS from SSSCC
+    # all_sbe43_fit["CASTNO"] = all_sbe43_fit["SSSCC_sbe43"].str[3:]  # CC from SSSCC
+    # all_sbe43_fit = all_sbe43_fit.rename(columns={"btl_fire_num": "SAMPNO"})
+    # all_sbe43_fit = all_sbe43_fit[
+    #     ["STNNBR", "CASTNO", "SAMPNO", "CTDOXY", "CTDOXY_FLAG_W"]
+    # ]
+    # all_sbe43_fit.to_csv(cfg.directory["logs"] + "quality_flag_sbe43.csv", index=False)
+
+    # apply coefs
     time_data_all["CTDOXY"] = "-999"
     time_data_all["RINKO"] = "-999"
     for ssscc in ssscc_list:
@@ -463,8 +480,20 @@ def process_all():
             time_data_all.loc[time_data_all["SSSCC"] == ssscc, "RINKO_FLAG_W"] = 9
             continue
 
+        btl_rows = (btl_data_all["SSSCC"] == ssscc).values
         time_rows = (time_data_all["SSSCC"] == ssscc).values
 
+        btl_data_all.loc[btl_rows, "CTDOXY"] = oxy_fitting.PMEL_oxy_eq(
+            sbe43_dict[ssscc],
+            (
+                btl_data_all.loc[btl_rows, cfg.column["oxyvolts"]],
+                btl_data_all.loc[btl_rows, cfg.column["p_btl"]],
+                btl_data_all.loc[btl_rows, cfg.column["t1_btl"]],
+                btl_data_all.loc[btl_rows, "dv_dt"],
+                btl_data_all.loc[btl_rows, "OS_btl"],
+            ),
+        )
+        print(ssscc + " btl data fitting done")
         time_data_all.loc[time_rows, "CTDOXY"] = oxy_fitting.PMEL_oxy_eq(
             sbe43_dict[ssscc],
             (
@@ -475,16 +504,15 @@ def process_all():
                 time_data_all.loc[time_rows, "OS_ctd"],
             ),
         )
-
         print(ssscc + " time data fitting done")
-
-    # TODO: export quality flags
 
     # export fitting coefs
     sbe43_coefs = pd.DataFrame.from_dict(
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
     )
     sbe43_coefs.to_csv(cfg.directory["logs"] + "sbe43_coefs.csv")
+
+    breakpoint()
 
     # for ssscc in ssscc_list:
 
