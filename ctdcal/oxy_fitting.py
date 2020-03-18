@@ -773,7 +773,7 @@ def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_fire_num, ctd_sigma, ctd_os, c
     return merged_df
 
 
-def sbe43_oxy_fit(merged_df, sbe_coef0=None):
+def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_out=None):
 
     # Create DF for good and questionable values
     bad_df = pd.DataFrame()
@@ -879,6 +879,22 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None):
     #         bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
     #         merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
 
+    if f_out is not None:
+        # grab _ox# from ssscc_ox1.csv
+        f_ext = f_out[f_out.find('_'):f_out.find('.csv')] + '.png'
+        import matplotlib.pyplot as plt
+        import config as cfg
+        plt.figure(figsize=(5,6))
+        plt.scatter(
+            merged_df['res_sbe43'], 
+            merged_df['CTDPRS_sbe43_ctd'], 
+            c=merged_df['SSSCC_sbe43'].astype(int),
+            marker="+"
+            )
+        plt.xlim([-10,10])
+        plt.ylim([5000,0])
+        plt.grid()
+        plt.savefig(cfg.directory['logs'] + 'oxy_residual' + f_ext)
 
     # good_df = pd.concat([good_df, merged_df])
     merged_df['CTDOXY_FLAG_W'] = 2
