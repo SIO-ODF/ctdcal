@@ -394,14 +394,12 @@ def process_all():
     )
 
     # Prep vars, dfs, etc.
-    rinko_coef0 = rinko.rinko_o2_cal_parameters()
-    all_rinko_df = pd.DataFrame()
-    all_sbe43_df = pd.DataFrame()
     all_sbe43_merged = pd.DataFrame()
-    rinko_dict = {}
+    # all_rinko_merged = pd.DataFrame()
+    # rinko_dict = {}
     sbe43_dict = {}
     all_sbe43_fit = pd.DataFrame()
-    rinko_flag = pd.DataFrame()
+    # rinko_flag = pd.DataFrame()
 
     # Density match time/btl oxy dataframes
     for ssscc in ssscc_list:
@@ -410,7 +408,7 @@ def process_all():
         btl_data = btl_data_all[btl_data_all["SSSCC"] == ssscc].copy()
 
         if (btl_data["OXYGEN_FLAG_W"] == 9).all():
-            rinko_dict[ssscc] = np.full(8, np.nan)
+            # rinko_dict[ssscc] = np.full(8, np.nan)
             sbe43_dict[ssscc] = np.full(5, np.nan)
             print(ssscc + " skipped, all oxy data is NaN")
             continue
@@ -429,11 +427,25 @@ def process_all():
             time_data["SSSCC"],
         )
 
+        # rinko_merged = rinko.match_sigmas(
+        #     btl_data[cfg.column["p_btl"]],
+        #     btl_data[cfg.column["oxy_btl"]],
+        #     btl_data["sigma_btl"],
+        #     time_data["sigma_ctd"],
+        #     time_data["OS_ctd"],
+        #     time_data[cfg.column["p"]],
+        #     time_data[cfg.column["t1"]],
+        #     time_data[cfg.column["rinko_oxy"]],
+        #     btl_data["SSSCC"],
+        # )
+
         all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
+        # all_rinko_merged = pd.concat([all_rinko_merged, rinko_merged])
         print(ssscc + " density matching done")
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     (sbe_coef0, _) = oxy_fitting.sbe43_oxy_fit(all_sbe43_merged)
+    # (rinko_coef0, _) = rinko.rinko_oxygen_fit(all_rinko_merged)
 
     # Fit oxygen stations using SSSCC chunks to refine coefficients
     ssscc_files_ox = sorted(glob.glob("data/ssscc/ssscc_*ox*.csv"))
@@ -445,6 +457,8 @@ def process_all():
             sbe_coef0=sbe_coef0,
             f_out=f,
         )
+
+        # TODO: calculate RINKO coefs
 
         # build coef dictionary
         for ssscc in ssscc_list_ox:
@@ -512,46 +526,38 @@ def process_all():
     )
     sbe43_coefs.to_csv(cfg.directory["logs"] + "sbe43_coefs.csv")
 
+    # create depth_log.csv
+    depth_dict = {}
+    for ssscc in ssscc_list:
+        print(ssscc)
+        time_rows = time_data_all["SSSCC"] == ssscc
+        max_depth = process_ctd.find_cast_depth(
+            time_data_all.loc[time_rows, "CTDPRS"],
+            time_data_all.loc[time_rows, "GPSLAT"],
+            time_data_all.loc[time_rows, "ALT"],
+        )
+        depth_dict[ssscc] = max_depth
+
+    depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
+    depth_df.reset_index(inplace=True)
+    depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
+    depth_df.to_csv("data/logs/depth_log.csv", index=False)
+
+    # needs depth_log.csv, manual_depth_log.csv
+    ctd_outputs = cfg.ctd_outputs
+    p_column_names = [x[0] for x in ctd_outputs.values()]
+    p_column_units = [x[2] for x in ctd_outputs.values()]
     breakpoint()
-
-    # for ssscc in ssscc_list:
-
-    #     time_data = time_data_all[time_data_all["SSSCC"] == ssscc].copy()
-    #     btl_data = btl_data_all[btl_data_all["SSSCC"] == ssscc].copy()
-
-    #     if (btl_data["OXYGEN_FLAG_W"] == 9).all():
-    #         rinko_dict[ssscc] = np.full(8, np.nan)
-    #         print(ssscc + " skipped, all oxy data is NaN")
-    #         continue
-
-    #     rinko_coef, rinko_oxy_df = rinko.rinko_oxygen_fit(
-    #         btl_data[cfg.column["p_btl"]],
-    #         btl_data[cfg.column["oxy_btl"]],
-    #         btl_data["sigma_btl"],
-    #         time_data["sigma_ctd"],
-    #         time_data["OS_ctd"],
-    #         time_data[cfg.column["p"]],
-    #         time_data[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
-    #         time_data[cfg.column["rinko_oxy"]],
-    #         rinko_coef0,
-    #         btl_data["SSSCC"],
-    #     )
-
-    #     rinko_dict[ssscc] = rinko_coef
-    #     all_rinko_df = pd.concat([all_rinko_df, rinko_oxy_df])
-    #     print(ssscc + " Done!")
-
-    # rinko_coef_df = oxy_fitting.create_coef_df(rinko_dict)
-
-    # btl_data_all = btl_data_all.merge(
-    #     all_rinko_df,
-    #     left_on=["SSSCC", cfg.column["p_btl"]],
-    #     right_on=["SSSCC_rinko", "CTDPRS_rinko_btl"],
-    #     how="left",
-    # )
-
-    # btl_data_all.drop(list(btl_data_all.filter(regex="rinko")), axis=1, inplace=True)
-    # btl_data_all.drop(list(btl_data_all.filter(regex="sbe43")), axis=1, inplace=True)
+    # have to bin this to 2db before saving
+    process_ctd.export_ct1(
+        time_data_all,
+        ssscc_list,
+        cfg.cruise["expocode"],
+        cfg.cruise["sectionid"],
+        cfg.ctd_serial,
+        p_column_names,
+        p_column_units,
+    )
 
 
 def main(argv):

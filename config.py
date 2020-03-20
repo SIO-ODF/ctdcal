@@ -1,4 +1,37 @@
 ### configuration file for odf_process_all_MK.py
+# TODO: organize these by editable/fixed variables
+
+# Cruise specifics
+cruise = dict(
+    cruise_title="GO-SHIP NBP1802",
+    cruise_name="nbp1802",
+    cruisedb="nbp1802",
+    vessel="R/V Palmer",
+    ship_code="3206",
+    expocode="320620180309",
+    chief_sci="Alison Macdonald",
+    sectionid="S04P",
+    start_date="2018-03-09 14:00:00",
+    start_port="Hobart, Tasmania, Australia",
+    start_latlon="42.8821 S 147.3272 W",
+    end_date="2018-05-14 10:00:00",
+    end_port="Punta Arenas, Chile",
+    end_latlon="53.1638 S 70.9171 W",
+)
+
+ctd_serial = 1281
+
+# CTD variables/flags/units
+ctd_outputs = dict(
+    press=["CTDPRS", "CTDPRS_FLAG_W", "DBAR", ""],
+    temp=["CTDTMP", "CTDTMP_FLAG_W", "ITS-90", ""],
+    salt=["CTDSAL", "CTDSAL_FLAG_W", "PSS-78", ""],
+    doxy=["CTDOXY", "CTDOXY_FLAG_W", "UMOL/KG", ""],
+    rinko=["CTDRINKO", "CTDRINKO_FLAG_W", "0-5VDC", ""],
+    xmiss=["CTDXMISS", "CTDXMISS_FLAG_W", "0-5VDC", ""],
+    fluor=["CTDFLUOR", "CTDFLUOR_FLAG_W", "0-5VDC", ""],
+    # bbp = ['CTDBBP700RAW', 'CTDBBP700RAW_FLAG_W', '0-5VDC', ''],
+)
 
 # List of directories for I/O purposes
 directory = {
