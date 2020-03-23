@@ -33,6 +33,20 @@ ctd_outputs = dict(
     # bbp = ['CTDBBP700RAW', 'CTDBBP700RAW_FLAG_W', '0-5VDC', ''],
 )
 
+ctd_col_names = []
+ctd_col_units = []
+for i in range(len(ctd_outputs)):
+    param = list(ctd_outputs.keys())[i]
+    param_list = ctd_outputs[param]
+    ctd_col_names.append(param_list[0])
+    ctd_col_names.append(param_list[1])
+    ctd_col_units.append(param_list[2])
+    ctd_col_units.append(param_list[3])
+
+ctd_time_output = dict(
+    col_names=ctd_col_names, col_units=ctd_col_units
+)
+
 # List of directories for I/O purposes
 directory = {
     "ssscc_file": "data/ssscc.csv",
