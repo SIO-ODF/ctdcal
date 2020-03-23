@@ -1786,6 +1786,10 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
 
         time_data = df[df['SSSCC'] == cast].copy()
         time_data = pressure_sequence(time_data)
+        time_data = flag_backfill_data(time_data)
+        time_data = fill_surface_data(time_data)
+        time_data = time_data[p_column_names]
+        time_data = time_data.round(4)
 
         s_num = cast[-5:-2]
         c_num = cast[-2:]

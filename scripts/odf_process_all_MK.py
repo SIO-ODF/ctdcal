@@ -543,20 +543,35 @@ def process_all():
     depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
     depth_df.to_csv("data/logs/depth_log.csv", index=False)
 
-    # needs depth_log.csv, manual_depth_log.csv
-    ctd_outputs = cfg.ctd_outputs
-    p_column_names = [x[0] for x in ctd_outputs.values()]
-    p_column_units = [x[2] for x in ctd_outputs.values()]
     breakpoint()
-    # have to bin this to 2db before saving
+    # clean up columns
+    p_column_names = cfg.ctd_time_output["col_names"]
+    try:
+        df = time_data_all[p_column_names].copy()
+    except KeyError:
+        print("Column names not configured properly... attempting to correct")
+        df = pd.DataFrame()
+        df["SSSCC"] = time_data_all["SSSCC"].copy()
+        for col in p_column_names:
+            try:
+                df[col] = time_data_all[col]
+            except KeyError:
+                if col.endswith("FLAG_W"):
+                    print(col + " missing, flagging with 9s")
+                    df[col] = 9
+                else:
+                    print(col + " missing, filling with -999s")
+                    df[col] = -999
+
+    # needs depth_log.csv, manual_depth_log.csv
     process_ctd.export_ct1(
-        time_data_all,
-        ssscc_list,
+        df,
+        ssscc_list[1:],
         cfg.cruise["expocode"],
         cfg.cruise["sectionid"],
         cfg.ctd_serial,
-        p_column_names,
-        p_column_units,
+        cfg.ctd_time_output["col_names"],
+        cfg.ctd_time_output["col_units"],
     )
 
 
