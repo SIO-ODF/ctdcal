@@ -21,7 +21,10 @@ df = pd.read_csv("../all_rinko_merged.csv")
 df["Residual"] = df["REFOXY_rinko"] - df["CTDRINKO"]
 df["Flag"] = 1
 df_edited = df.copy()
+df_edited["Flag New"] = df["Flag"]
 ssscc_list = df["SSSCC_rinko"].unique()
+
+# TODO: include bottle numbers
 
 ### intialize widgets
 button = Button(label="Save flagged data", button_type="success")
@@ -46,6 +49,7 @@ flag_list = MultiSelect(
 # returns list of select options, e.g., ['2'] or ['1','2']
 
 source_table = ColumnDataSource(data=dict())
+source_table_changes = ColumnDataSource(data=dict())
 source_plot_ssscc = ColumnDataSource(data=dict(x=[], y=[]))
 source_plot_all = ColumnDataSource(data=dict(x=[], y=[]))
 
@@ -96,10 +100,11 @@ def update():
 
     table_rows = df_edited["SSSCC_rinko"] == int(station.value)
     plot_rows = (df_edited["SSSCC_rinko"] == int(station.value)) & (
-        df_edited["Flag"].isin(flag_list.value)
+        df_edited["Flag New"].isin(flag_list.value)
     )
 
-    current_table = df_edited[table_rows]
+    # breakpoint()
+    current_table = df_edited[table_rows].reset_index()
     current_plot = df_edited[plot_rows]
 
     # can this be split off into separate updates? might improve speed
@@ -114,7 +119,7 @@ def update():
         "REFOXY": current_table["REFOXY_rinko"],
         "CTDRINKO": current_table["CTDRINKO"],
         "diff": current_table["Residual"],
-        "flag": current_table["Flag"],
+        "flag": current_table["Flag New"],
     }
     source_plot_ssscc.data = {
         "x": current_plot["REFOXY_rinko"],
@@ -138,9 +143,31 @@ def update_flag():
 
     print("exec update_flag()")
 
+    # breakpoint()
+
     df_edited.loc[
-        df_edited["SSSCC_rinko"] == source_table.data["SSSCC"][0], "Flag",
-    ] = source_table.data["flag"]
+        df_edited["SSSCC_rinko"] == source_table.data["SSSCC"].values[0], "Flag New",
+    ] = source_table.data["flag"].values
+
+    edited_rows = (df_edited["Flag"] - df_edited["Flag New"]) != 0
+
+    source_table_changes.data = {
+        "SSSCC": df_edited.loc[edited_rows, "SSSCC_rinko"],
+        "CTDPRS": df_edited.loc[edited_rows, "CTDPRS_rinko_ctd"],
+        "REFOXY": df_edited.loc[edited_rows, "REFOXY_rinko"],
+        "CTDRINKO": df_edited.loc[edited_rows, "CTDRINKO"],
+        "diff": df_edited.loc[edited_rows, "Residual"],
+        "flag_old": df_edited.loc[edited_rows, "Flag"],
+        "flag_new": df_edited.loc[edited_rows, "Flag New"],
+    }
+
+
+def save_data():
+
+    print("Button clicked...")
+
+
+button.on_click(save_data)
 
 
 columns = [
@@ -181,19 +208,70 @@ columns = [
         formatter=StringFormatter(text_align="center", font_style="bold"),
     ),
 ]
-
+columns_changed = [
+    TableColumn(
+        field="SSSCC",
+        title="SSSCC",
+        width=40,
+        formatter=StringFormatter(text_align="right"),
+    ),
+    TableColumn(
+        field="CTDPRS",
+        title="CTDPRS",
+        width=80,
+        formatter=StringFormatter(text_align="right"),
+    ),
+    TableColumn(
+        field="REFOXY",
+        title="REFOXY",
+        width=80,
+        formatter=StringFormatter(text_align="right"),
+    ),
+    TableColumn(
+        field="CTDRINKO",
+        title="CTDRINKO",
+        width=80,
+        formatter=StringFormatter(text_align="right"),
+    ),
+    TableColumn(
+        field="diff",
+        title="Residual",
+        width=80,
+        formatter=StringFormatter(text_align="right"),
+    ),
+    TableColumn(
+        field="flag_old",
+        title="Old Flag",
+        width=20,
+        formatter=StringFormatter(text_align="center", font_style="bold"),
+    ),
+    TableColumn(
+        field="flag_new",
+        title="New Flag",
+        width=20,
+        formatter=StringFormatter(text_align="center", font_style="bold"),
+    ),
+]
 data_table = DataTable(
     source=source_table,
     columns=columns,
     index_width=20,
     width=380 + 20,  # sum of col widths + idx width
-    height=800,
+    height=600,
     editable=True,
     fit_columns=True,
     sortable=False,
 )
-
-# TODO: build a second DataTable for points that have changed flag value
+data_table_changed = DataTable(
+    source=source_table_changes,
+    columns=columns_changed,
+    index_width=20,
+    width=380 + 20,  # sum of col widths + idx width
+    height=200,
+    editable=False,
+    fit_columns=True,
+    sortable=False,
+)
 
 # run update() when user selects new column (may indicate new flag value)
 # source_table.selected.on_change("indices", lambda attr, old, new: update_flag())
@@ -204,8 +282,9 @@ source_table.on_change("data", lambda attr, old, new: update_flag())
 # source_table.selected.indices -> could likely be used to highlight point
 
 controls = column(parameter, station, flag_list, button, width=170)
+tables = column(data_table, data_table_changed)
 
-curdoc().add_root(row(controls, data_table, plot_ssscc, plot_all))
+curdoc().add_root(row(controls, tables, plot_ssscc, plot_all))
 curdoc().title = "CTDO Data Flagging Tool"
 
 update()
