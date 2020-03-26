@@ -315,6 +315,8 @@ def process_all():
     coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
     coef_c2_all.to_csv(cfg.directory["logs"] + "fit_coef_c2.csv", index=False)
 
+    # TODO: recalculate CTDSAL here
+
     # print(timeit.default_timer() - start_time)
     # breakpoint()
 
@@ -543,9 +545,28 @@ def process_all():
     depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
     depth_df.to_csv("data/logs/depth_log.csv", index=False)
 
-    breakpoint()
     # clean up columns
     p_column_names = cfg.ctd_time_output["col_names"]
+
+    # this should probably be moved up near C calibration
+    time_data_all["CTDSAL"] = gsw.SP_from_C(
+        time_data_all["CTDCOND1"], time_data_all["CTDTMP1"], time_data_all["CTDPRS"]
+    )
+
+    # initial flagging (some of this should be moved)
+    # TODO: CTDOXY flags
+    time_data_all["CTDOXY_FLAG_W"] = 2
+    time_data_all["CTDSAL_FLAG_W"] = 2
+    time_data_all["CTDTMP_FLAG_W"] = 2
+    time_data_all["CTDFLUOR_FLAG_W"] = 1
+    time_data_all["CTDXMISS_FLAG_W"] = 1
+
+    # renames
+    time_data_all = time_data_all.rename(
+        columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"}
+    )
+
+    # TODO: see process_ctd.format_time_data()
     try:
         df = time_data_all[p_column_names].copy()
     except KeyError:
@@ -564,6 +585,7 @@ def process_all():
                     df[col] = -999
 
     # needs depth_log.csv, manual_depth_log.csv
+    print('Exporting *_ct1.csv files')
     process_ctd.export_ct1(
         df,
         ssscc_list[1:],
