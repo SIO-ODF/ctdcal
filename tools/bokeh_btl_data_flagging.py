@@ -13,6 +13,7 @@ from bokeh.models import (
     Select,
     MultiSelect,
     StringFormatter,  # https://docs.bokeh.org/en/latest/_modules/bokeh/models/widgets/tables.html#DataTable
+    Div,
 )
 
 
@@ -22,6 +23,7 @@ df["Residual"] = df["REFOXY_rinko"] - df["CTDRINKO"]
 df["Flag"] = 1
 df_edited = df.copy()
 df_edited["Flag New"] = df["Flag"]
+df_edited["Comments"] = ""
 ssscc_list = df["SSSCC_rinko"].unique()
 
 # TODO: include bottle numbers
@@ -120,6 +122,7 @@ def update():
         "CTDRINKO": current_table["CTDRINKO"],
         "diff": current_table["Residual"],
         "flag": current_table["Flag New"],
+        "comments": current_table["Comments"],
     }
     source_plot_ssscc.data = {
         "x": current_plot["REFOXY_rinko"],
@@ -148,23 +151,27 @@ def update_flag():
     df_edited.loc[
         df_edited["SSSCC_rinko"] == source_table.data["SSSCC"].values[0], "Flag New",
     ] = source_table.data["flag"].values
+    df_edited.loc[
+        df_edited["SSSCC_rinko"] == source_table.data["SSSCC"].values[0], "Comments",
+    ] = source_table.data["comments"].values
 
     edited_rows = (df_edited["Flag"] - df_edited["Flag New"]) != 0
 
     source_table_changes.data = {
         "SSSCC": df_edited.loc[edited_rows, "SSSCC_rinko"],
         "CTDPRS": df_edited.loc[edited_rows, "CTDPRS_rinko_ctd"],
-        "REFOXY": df_edited.loc[edited_rows, "REFOXY_rinko"],
-        "CTDRINKO": df_edited.loc[edited_rows, "CTDRINKO"],
         "diff": df_edited.loc[edited_rows, "Residual"],
         "flag_old": df_edited.loc[edited_rows, "Flag"],
         "flag_new": df_edited.loc[edited_rows, "Flag New"],
+        "comments": df_edited.loc[edited_rows, "Comments"],
     }
 
 
 def save_data():
 
-    print("Button clicked...")
+    print("Save button clicked...")
+
+    # df_out =
 
 
 button.on_click(save_data)
@@ -207,6 +214,12 @@ columns = [
         width=20,
         formatter=StringFormatter(text_align="center", font_style="bold"),
     ),
+    TableColumn(
+        field="comments",
+        title="Comments",
+        width=100,
+        formatter=StringFormatter(text_align="left"),
+    ),
 ]
 columns_changed = [
     TableColumn(
@@ -222,18 +235,6 @@ columns_changed = [
         formatter=StringFormatter(text_align="right"),
     ),
     TableColumn(
-        field="REFOXY",
-        title="REFOXY",
-        width=80,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="CTDRINKO",
-        title="CTDRINKO",
-        width=80,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
         field="diff",
         title="Residual",
         width=80,
@@ -241,22 +242,30 @@ columns_changed = [
     ),
     TableColumn(
         field="flag_old",
-        title="Old Flag",
+        title="Old",
         width=20,
         formatter=StringFormatter(text_align="center", font_style="bold"),
     ),
     TableColumn(
         field="flag_new",
-        title="New Flag",
+        title="New",
         width=20,
-        formatter=StringFormatter(text_align="center", font_style="bold"),
+        formatter=StringFormatter(
+            text_align="center", font_style="bold", text_color="red"
+        ),
+    ),
+    TableColumn(
+        field="comments",
+        title="Comments",
+        width=100,
+        formatter=StringFormatter(text_align="left"),
     ),
 ]
 data_table = DataTable(
     source=source_table,
     columns=columns,
     index_width=20,
-    width=380 + 20,  # sum of col widths + idx width
+    width=480 + 20,  # sum of col widths + idx width
     height=600,
     editable=True,
     fit_columns=True,
@@ -266,12 +275,14 @@ data_table_changed = DataTable(
     source=source_table_changes,
     columns=columns_changed,
     index_width=20,
-    width=380 + 20,  # sum of col widths + idx width
+    width=480 + 20,  # sum of col widths + idx width
     height=200,
     editable=False,
     fit_columns=True,
     sortable=False,
 )
+data_table_title = Div(text="""<b>All Station Data:</b>""", width=200, height=15)
+data_table_changed_title = Div(text="""<b>Edited Data:</b>""", width=200, height=15)
 
 # run update() when user selects new column (may indicate new flag value)
 # source_table.selected.on_change("indices", lambda attr, old, new: update_flag())
@@ -282,7 +293,9 @@ source_table.on_change("data", lambda attr, old, new: update_flag())
 # source_table.selected.indices -> could likely be used to highlight point
 
 controls = column(parameter, station, flag_list, button, width=170)
-tables = column(data_table, data_table_changed)
+tables = column(
+    data_table_title, data_table, data_table_changed_title, data_table_changed
+)
 
 curdoc().add_root(row(controls, tables, plot_ssscc, plot_all))
 curdoc().title = "CTDO Data Flagging Tool"
