@@ -255,7 +255,7 @@ def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_l
         h_num = 11
         now = datetime.datetime.now()
         file_datetime = now.strftime("%Y%m%d %H:%M")
-        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
+        bdt = datetime.datetime.fromtimestamp(btime, tz=datetime.timezone.utc).strftime('%Y%m%d %H%M').split(" ")
         b_date = bdt[0]
         b_time = bdt[1]
 

@@ -1737,6 +1737,7 @@ def flag_missing_values(df,flag_suffix='_FLAG_W'):
     return df
 
 def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='CTDPRS', ssscc_col='SSSCC', bin_size=2, direction='down'):
+    # remove
     df_binned = pd.DataFrame()
     for cast in ssscc:
         time_data = df.loc[df[ssscc_col] == cast].copy()
@@ -1803,13 +1804,14 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
                     if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
                 break
         # time_data.drop(columns='SSSCC',inplace=True) # pressure_sequence removes SSSCC column already
-        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
+        bdt = datetime.datetime.fromtimestamp(btime, tz=datetime.timezone.utc).strftime('%Y%m%d %H%M').split(" ")
         b_date = bdt[0]
         b_time = bdt[1]
         now = datetime.datetime.now()
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
         outfile = open(out_dir+cast+'_ct1.csv', "w+")
+        # put in logic to check columns?
         outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %.4f\nLONGITUDE = %.4f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
         cn = np.asarray(p_column_names)
         cn.tofile(outfile,sep=',', format='%s')
@@ -1879,7 +1881,7 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
                     if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
                 break
 
-        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
+        bdt = datetime.datetime.fromtimestamp(btime, tz=datetime.timezone.utc).strftime('%Y%m%d %H%M').split(" ")
         b_date = bdt[0]
         b_time = bdt[1]
         #depth = -99
