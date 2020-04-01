@@ -545,6 +545,8 @@ def process_all():
     depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
     depth_df.to_csv("data/logs/depth_log.csv", index=False)
 
+    breakpoint()
+
     # clean up columns
     p_column_names = cfg.ctd_time_output["col_names"]
 
@@ -560,6 +562,7 @@ def process_all():
     time_data_all["CTDTMP_FLAG_W"] = 2
     time_data_all["CTDFLUOR_FLAG_W"] = 1
     time_data_all["CTDXMISS_FLAG_W"] = 1
+    time_data_all["CTDBACKSCATTER_FLAG_W"] = 1
 
     # renames
     time_data_all = time_data_all.rename(
@@ -595,6 +598,8 @@ def process_all():
         cfg.ctd_time_output["col_names"],
         cfg.ctd_time_output["col_units"],
     )
+
+    # run: ctd_to_bottle.py
 
     breakpoint()
 

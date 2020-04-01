@@ -30,6 +30,7 @@ ctd_outputs = dict(
     rinko=["CTDRINKO", "CTDRINKO_FLAG_W", "0-5VDC", ""],
     xmiss=["CTDXMISS", "CTDXMISS_FLAG_W", "0-5VDC", ""],
     fluor=["CTDFLUOR", "CTDFLUOR_FLAG_W", "0-5VDC", ""],
+    backscatter=["CTDBACKSCATTER", "CTDBACKSCATTER_FLAG_W", "0-5VDC", ""],
     # bbp = ['CTDBBP700RAW', 'CTDBBP700RAW_FLAG_W', '0-5VDC', ''],
 )
 
@@ -43,9 +44,7 @@ for i in range(len(ctd_outputs)):
     ctd_col_units.append(param_list[2])
     ctd_col_units.append(param_list[3])
 
-ctd_time_output = dict(
-    col_names=ctd_col_names, col_units=ctd_col_units
-)
+ctd_time_output = dict(col_names=ctd_col_names, col_units=ctd_col_units)
 
 # List of directories for I/O purposes
 directory = {
