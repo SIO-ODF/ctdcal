@@ -17,24 +17,63 @@ from bokeh.models import (
     Div,
 )
 
-# create list of stations
+# load continuous CTD data and make into a dict (only ~20MB)
 file_list = sorted(glob.glob("../data/pressure/*.csv"))
 ssscc_list = [ssscc.strip("../data/pressure/")[:5] for ssscc in file_list]
-ssscc_dict = dict(zip(ssscc_list, file_list))
+ctd_data = []
+for f in file_list:
+    df = pd.read_csv(f, header=12, skiprows=[13], skipfooter=1, engine="python")
+    ctd_data.append(df)
+ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
-### intialize data
-df = pd.read_csv(
-    file_list[0], header=12, skiprows=[13, 13], skipfooter=1, engine="python"
+
+# adapted from compare_salinities.ipynb
+# load salt file
+file_list = sorted(glob.glob("../data/salt/*.csv"))
+ssscc_list = [ssscc.strip("../data/salt/")[:5] for ssscc in file_list]
+salt_data = []
+for f in file_list:
+    df = pd.read_csv(f, usecols=["STNNBR", "CASTNO", "SAMPNO", "SALNTY"])
+    df["SSSCC"] = f.strip("../data/salt/")[:5]
+    salt_data.append(df)
+salt_data = pd.concat(salt_data, axis=0, sort=False)
+if "SALNTY_FLAG_W" not in salt_data.columns:
+    salt_data["SALNTY_FLAG_W"] = 2
+
+breakpoint()
+
+# load ctd btl data
+df_ctd_btl = pd.read_csv(
+    "../data/scratch_folder/ctd_to_bottle.csv",
+    skiprows=[1],
+    skipfooter=1,
+    engine="python",
 )
-df_edited = df.copy()
-df_edited["Comments"] = ""
+df_btl_all = pd.merge(df_ctd_btl, salt_data, on=["STNNBR", "CASTNO", "SAMPNO"])
+btl_data = df_btl_all.loc[
+    :,
+    [
+        "STNNBR",
+        "CASTNO",
+        "SAMPNO",
+        "CTDPRS",
+        "CTDTMP",
+        "REFTMP",
+        "CTDSAL",
+        "SALNTY",
+        "SALNTY_FLAG_W",
+    ],
+]
 
-### intialize widgets
+### TODO: pick up from here
+
+
+# intialize widgets
 button = Button(label="Save flagged data", button_type="success")
 parameter = Select(
     title="Parameter",
     options=["CTDTMP", "CTDSAL", "CTDOXY", "CTDRINKO"],
-    value="CTDTMP",
+    value="CTDSAL",
 )
 station = Select(title="Station", options=ssscc_list, value="00101")
 # explanation of flags:
@@ -72,57 +111,34 @@ plot_all = figure(
 )
 plot_ssscc.y_range.flipped = True  # invert y-axis
 plot_all.y_range.flipped = True  # invert y-axis
-plot_ssscc.scatter(
-    "x",
-    "y",
-    fill_color="#999999",
-    line_color="#000000",
-    size=10,
-    line_width=2,
-    source=source_plot_ssscc,
+plot_ssscc.line(
+    "x", "y", line_color="#000000", line_width=2, source=source_plot_ssscc,
 )
-plot_all.scatter(
-    "x",
-    "y",
-    fill_color="#999999",
-    line_color="#000000",
-    size=10,
-    line_width=2,
-    source=source_plot_all,
+plot_all.line(
+    "x", "y", line_color="#000000", line_width=2, source=source_plot_all,
 )
 
-parameter.on_change("value", lambda attr, old, new: update_parameter())
-station.on_change("value", lambda attr, old, new: load_new_data())
-station.on_change("value", lambda attr, old, new: update_parameter())
-# flag_list.on_change("value", lambda attr, old, new: update())
+parameter.on_change("value", lambda attr, old, new: update_selectors())
+station.on_change("value", lambda attr, old, new: update_selectors())
+flag_list.on_change("value", lambda attr, old, new: update_selectors())
 
 
-def load_new_data():
+def update_selectors():
 
-    print("exec load_new_data()")
+    print("exec update_selectors()")
 
-    df = pd.read_csv(
-        ssscc_dict[station.value],
-        header=12,
-        skiprows=[13, 13],  # row with parameter's units
-        skipfooter=1,
-        engine="python",
-    )
-    df_edited = df.copy()
-    df_edited["Comments"] = ""
+    df_edited = ctd_dict[station.value]
 
-
-def update_parameter():
-
-    print("exec update_parameter()")
-
+    # breakpoint()
+    flag_col = parameter.value + "_FLAG_W"
+    rows = df_edited[flag_col].isin(flag_list.value)
     source_plot_ssscc.data = {
-        "x": df_edited[parameter.value],
-        "y": df_edited["CTDPRS"],
+        "x": df_edited.loc[rows, parameter.value],
+        "y": df_edited.loc[rows, "CTDPRS"],
     }
     source_plot_all.data = {
-        "x": df_edited[parameter.value],
-        "y": df_edited["CTDPRS"],
+        "x": df_edited.loc[rows, parameter.value],
+        "y": df_edited.loc[rows, "CTDPRS"],
     }
     plot_ssscc.title.text = "{} vs CTDPRS [Station {}]".format(
         parameter.value, station.value
@@ -294,4 +310,4 @@ tables = column(
 curdoc().add_root(row(controls, tables, plot_ssscc, plot_all))
 curdoc().title = "CTDO Data Flagging Tool"
 
-load_new_data()
+update_selectors()
