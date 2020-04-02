@@ -15,6 +15,8 @@ from bokeh.models import (
     MultiSelect,
     StringFormatter,  # https://docs.bokeh.org/en/latest/_modules/bokeh/models/widgets/tables.html#DataTable
     Div,
+    TextInput,
+    BoxSelectTool,
 )
 
 # TODO: load in existing handcoded salts if it exists
@@ -72,7 +74,7 @@ btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
 
 
 # intialize widgets
-button = Button(label="Save flagged data", button_type="success")
+save_button = Button(label="Save flagged data", button_type="success")
 parameter = Select(title="Parameter", options=["CTDSAL", "CTDTMP"], value="CTDSAL")
 ref_param = Select(title="Reference", options=["SALNTY"], value="SALNTY")
 # ref_param.options = ["foo","bar"]  # can dynamically change dropdowns
@@ -90,28 +92,50 @@ flag_list = MultiSelect(
     ],
 )
 # returns list of select options, e.g., ['2'] or ['1','2']
+flag_input = Select(
+    title="Flag:",
+    options=[
+        ("1", "1 [Uncalibrated]"),
+        ("2", "2 [Acceptable]"),
+        ("3", "3 [Questionable]"),
+        ("4", "4 [Bad]"),
+    ],
+    value="3",
+)
+comment_box = TextInput(value="", title="Comment:")
+
+# button_type: default, primary, success, warning or danger
+flag_button = Button(label="Apply to selected", button_type="primary")
+comment_button = Button(label="Apply to selected", button_type="warning")
+
+vspace = Div(text=""" """, width=200, height=95)
 
 # set up datasources
 src_table = ColumnDataSource(data=dict())
 src_table_changes = ColumnDataSource(data=dict())
+src_plot_trace = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_ctd = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
-plot_ssscc = figure(
+fig = figure(
     plot_height=800,
     plot_width=400,
     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
-    tools="crosshair,pan,reset,box_zoom",
+    tools="pan,box_zoom,wheel_zoom,box_select,reset",
     y_axis_label="Pressure (dbar)",
 )
-plot_ssscc.y_range.flipped = True  # invert y-axis
-plot_ssscc.line(
-    "x", "y", line_color="#000000", line_width=2, source=src_plot_ctd,
+fig.select(BoxSelectTool).select_every_mousemove = False
+fig.y_range.flipped = True  # invert y-axis
+fig.line(
+    "x", "y", line_color="#000000", line_width=2, source=src_plot_trace,
 )
-plot_ssscc.cross(
-    "x", "y", size=10, source=src_plot_btl,
+btl_sal = fig.asterisk(
+    "x", "y", size=10, line_width=1.5, color="#0033CC", source=src_plot_btl
 )
+ctd_sal = fig.circle("x", "y", size=7, color="#BB0000", source=src_plot_ctd)
+btl_sal.nonselection_glyph.line_alpha = 0.2
+ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL change on select
 
 parameter.on_change("value", lambda attr, old, new: update_selectors())
 station.on_change("value", lambda attr, old, new: update_selectors())
@@ -123,7 +147,7 @@ def update_selectors():
     print("exec update_selectors()")
     ctd_rows = ctd_data["SSSCC"] == station.value
     table_rows = btl_data["SSSCC"] == station.value
-    btl_rows = (btl_data["SALNTY_FLAG_W"].isin(flag_list.value)) & (
+    btl_rows = (btl_data["New Flag"].isin(flag_list.value)) & (
         btl_data["SSSCC"] == station.value
     )
 
@@ -131,6 +155,7 @@ def update_selectors():
     current_table = btl_data[table_rows].reset_index()
     src_table.data = {  # this causes update_flag() to execute
         "SSSCC": current_table["SSSCC"],
+        "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
         "CTDSAL": current_table["CTDSAL"],
         "SALNTY": current_table["SALNTY"],
@@ -140,23 +165,29 @@ def update_selectors():
     }
 
     # update plot data
-    src_plot_btl.data = {
-        "x": btl_data.loc[btl_rows, parameter.value],
-        "y": btl_data.loc[btl_rows, "CTDPRS"],
-    }
-    src_plot_ctd.data = {
+    src_plot_trace.data = {
         "x": ctd_data.loc[ctd_rows, parameter.value],
         "y": ctd_data.loc[ctd_rows, "CTDPRS"],
     }
+    src_plot_ctd.data = {
+        "x": btl_data.loc[table_rows, parameter.value],
+        "y": btl_data.loc[table_rows, "CTDPRS"],
+    }
+    src_plot_btl.data = {
+        "x": btl_data.loc[btl_rows, "SALNTY"],
+        "y": btl_data.loc[btl_rows, "CTDPRS"],
+    }
 
     # update plot labels/axlims
-    plot_ssscc.title.text = "{} vs CTDPRS [Station {}]".format(
-        parameter.value, station.value
-    )
-    plot_ssscc.xaxis.axis_label = parameter.value
+    fig.title.text = "{} vs CTDPRS [Station {}]".format(parameter.value, station.value)
+    fig.xaxis.axis_label = parameter.value
+
+    # deselect all datapoints
+    # breakpoint()
+    btl_sal.data_source.selected.indices = []
+    src_table.selected.indices = []
 
 
-# TODO: add bulk flag/comment updates
 def update_flag():
 
     print("exec update_flag()")
@@ -182,6 +213,56 @@ def update_flag():
     }
 
 
+def apply_flag():
+
+    print("Applying flags")
+
+    table_rows = btl_data["SSSCC"] == station.value
+    selected_rows = src_table.selected.indices
+
+    # update table data
+    current_table = btl_data[table_rows].reset_index()
+    current_table.loc[selected_rows, "New Flag"] = int(flag_input.value)
+    src_table.data = {  # this causes update_flag() to execute
+        "SSSCC": current_table["SSSCC"],
+        "SAMPNO": current_table["SAMPNO"],
+        "CTDPRS": current_table["CTDPRS"],
+        "CTDSAL": current_table["CTDSAL"],
+        "SALNTY": current_table["SALNTY"],
+        "diff": current_table["Residual"],
+        "flag": current_table["New Flag"],
+        "comments": current_table["Comments"],
+    }
+
+
+flag_button.on_click(apply_flag)
+
+
+def apply_comment():
+
+    print("Applying comments")
+
+    table_rows = btl_data["SSSCC"] == station.value
+    selected_rows = src_table.selected.indices
+
+    # update table data
+    current_table = btl_data[table_rows].reset_index()
+    current_table.loc[selected_rows, "Comments"] = comment_box.value
+    src_table.data = {  # this causes update_flag() to execute
+        "SSSCC": current_table["SSSCC"],
+        "SAMPNO": current_table["SAMPNO"],
+        "CTDPRS": current_table["CTDPRS"],
+        "CTDSAL": current_table["CTDSAL"],
+        "SALNTY": current_table["SALNTY"],
+        "diff": current_table["Residual"],
+        "flag": current_table["New Flag"],
+        "comments": current_table["Comments"],
+    }
+
+
+comment_button.on_click(apply_comment)
+
+
 def save_data():
 
     print("Saving flagged data...")
@@ -198,7 +279,7 @@ def save_data():
     df_out.to_csv("salt_flags_handcoded.csv", index=None)
 
 
-button.on_click(save_data)
+save_button.on_click(save_data)
 
 
 columns = [
@@ -209,39 +290,45 @@ columns = [
         formatter=StringFormatter(text_align="right"),
     ),
     TableColumn(
+        field="SAMPNO",
+        title="Bottle",
+        width=20,
+        formatter=StringFormatter(text_align="right"),
+    ),
+    TableColumn(
         field="CTDPRS",
         title="CTDPRS",
-        width=80,
+        width=75,
         formatter=StringFormatter(text_align="right"),
     ),
     TableColumn(
         field="CTDSAL",
         title="CTDSAL",
-        width=80,
+        width=65,
         formatter=StringFormatter(text_align="right"),
     ),
     TableColumn(
         field="SALNTY",
         title="SALNTY",
-        width=80,
+        width=65,
         formatter=StringFormatter(text_align="right"),
     ),
     TableColumn(
         field="diff",
         title="Residual",
-        width=80,
+        width=65,
         formatter=StringFormatter(text_align="right"),
     ),
     TableColumn(
         field="flag",
         title="Flag",
-        width=20,
+        width=15,
         formatter=StringFormatter(text_align="center", font_style="bold"),
     ),
     TableColumn(
         field="comments",
         title="Comments",
-        width=100,
+        width=135,
         formatter=StringFormatter(text_align="left"),
     ),
 ]
@@ -255,13 +342,13 @@ columns_changed = [
     TableColumn(
         field="SAMPNO",
         title="Bottle",
-        width=40,
+        width=20,
         formatter=StringFormatter(text_align="right"),
     ),
     TableColumn(
         field="diff",
         title="Residual",
-        width=80,
+        width=40,
         formatter=StringFormatter(text_align="right"),
     ),
     TableColumn(
@@ -281,7 +368,7 @@ columns_changed = [
     TableColumn(
         field="comments",
         title="Comments",
-        width=140,
+        width=200,
         formatter=StringFormatter(text_align="left"),
     ),
 ]
@@ -309,19 +396,41 @@ data_table_title = Div(text="""<b>All Station Data:</b>""", width=200, height=15
 data_table_changed_title = Div(text="""<b>Edited Data:</b>""", width=200, height=15)
 
 # run update() when user selects new column (may indicate new flag value)
-# source_table.selected.on_change("indices", lambda attr, old, new: update_flag())
 src_table.on_change("data", lambda attr, old, new: update_flag())
 
-# TODO: highlight scatterpoint based on selected row
-# source_table.selected.on_change("indices", lambda attr, old, new: update_highlight())
-# source_table.selected.indices -> could likely be used to highlight point
 
-controls = column(parameter, ref_param, station, flag_list, button, width=170)
+def selected_from_plot(attr, old, new):
+
+    src_table.selected.indices = new
+
+
+def selected_from_table(attr, old, new):
+
+    btl_sal.data_source.selected.indices = new
+
+
+src_table.selected.on_change("indices", selected_from_table)
+btl_sal.data_source.selected.on_change("indices", selected_from_plot)
+
+controls = column(
+    parameter,
+    ref_param,
+    station,
+    flag_list,
+    vspace,
+    flag_input,
+    flag_button,
+    comment_box,
+    comment_button,
+    vspace,
+    save_button,
+    width=170,
+)
 tables = column(
     data_table_title, data_table, data_table_changed_title, data_table_changed
 )
 
-curdoc().add_root(row(controls, tables, plot_ssscc))
+curdoc().add_root(row(controls, tables, fig))
 curdoc().title = "CTDO Data Flagging Tool"
 
 update_selectors()
