@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import glob
 
 from bokeh.io import curdoc
@@ -8,7 +7,6 @@ from bokeh.plotting import figure
 from bokeh.models import (
     Button,
     ColumnDataSource,
-    # CustomJS,
     DataTable,
     TableColumn,
     Select,
@@ -19,7 +17,8 @@ from bokeh.models import (
     BoxSelectTool,
 )
 
-# TODO: load in existing handcoded salts if it exists
+# TODO: abstract parts of this to a separate file
+# TODO: following above, make parts reusable?
 
 # load continuous CTD data and make into a dict (only ~20MB)
 file_list = sorted(glob.glob("../data/pressure/*.csv"))
@@ -31,9 +30,7 @@ for f in file_list:
     ctd_data.append(df)
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
-
-# adapted from compare_salinities.ipynb
-# load salt file
+# load salt file (adapted from compare_salinities.ipynb)
 file_list = sorted(glob.glob("../data/salt/*.csv"))
 ssscc_list = [ssscc.strip("../data/salt/")[:5] for ssscc in file_list]
 salt_data = []
@@ -72,13 +69,28 @@ btl_data[["CTDPRS", "Residual"]] = btl_data[["CTDPRS", "Residual"]].round(4)
 btl_data["Comments"] = ""
 btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
 
+# update with old handcoded flags if file exists
+handcoded_file = "salt_flags_handcoded.csv"
+if glob.glob(handcoded_file):
+    handcodes = pd.read_csv(handcoded_file, dtype={"SSSCC": str}, keep_default_na=False)
+    handcodes = handcodes.rename(columns={"salinity_flag": "New Flag"}).drop(
+        columns="diff"
+    )
+    # there's gotta be a better way... but this is good enough for now
+    btl_data = btl_data.merge(handcodes, on=["SSSCC", "SAMPNO"], how="left")
+    merge_rows = ~btl_data["New Flag_y"].isnull() | ~btl_data["Comments_y"].isnull()
+    btl_data.loc[merge_rows, "New Flag_x"] = btl_data.loc[merge_rows, "New Flag_y"]
+    btl_data.loc[merge_rows, "Comments_x"] = btl_data.loc[merge_rows, "Comments_y"]
+    btl_data = btl_data.rename(
+        columns={"New Flag_x": "New Flag", "Comments_x": "Comments"}
+    ).drop(columns=["New Flag_y", "Comments_y"])
 
 # intialize widgets
 save_button = Button(label="Save flagged data", button_type="success")
 parameter = Select(title="Parameter", options=["CTDSAL", "CTDTMP"], value="CTDSAL")
 ref_param = Select(title="Reference", options=["SALNTY"], value="SALNTY")
 # ref_param.options = ["foo","bar"]  # can dynamically change dropdowns
-station = Select(title="Station", options=ssscc_list, value="00101")
+station = Select(title="Station", options=ssscc_list, value=ssscc_list[0])
 # explanation of flags:
 # https://cchdo.github.io/hdo-assets/documentation/manuals/pdf/90_1/chap4.pdf
 flag_list = MultiSelect(
@@ -128,18 +140,37 @@ fig = figure(
 fig.select(BoxSelectTool).select_every_mousemove = False
 fig.y_range.flipped = True  # invert y-axis
 fig.line(
-    "x", "y", line_color="#000000", line_width=2, source=src_plot_trace,
+    "x",
+    "y",
+    line_color="#000000",
+    line_width=2,
+    source=src_plot_trace,
+    legend_label="CTD Trace",
 )
 btl_sal = fig.asterisk(
-    "x", "y", size=10, line_width=1.5, color="#0033CC", source=src_plot_btl
+    "x",
+    "y",
+    size=10,
+    line_width=1.5,
+    color="#0033CC",
+    source=src_plot_btl,
+    legend_label="Bottle sample",
 )
-ctd_sal = fig.circle("x", "y", size=7, color="#BB0000", source=src_plot_ctd)
+ctd_sal = fig.circle(
+    "x",
+    "y",
+    size=7,
+    color="#BB0000",
+    source=src_plot_ctd,
+    legend_label="Downcast CTD sample",
+)
+fig.legend.location = "bottom_left"
+fig.legend.border_line_width = 3
+fig.legend.border_line_alpha = 1
 btl_sal.nonselection_glyph.line_alpha = 0.2
 ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL change on select
 
-parameter.on_change("value", lambda attr, old, new: update_selectors())
-station.on_change("value", lambda attr, old, new: update_selectors())
-flag_list.on_change("value", lambda attr, old, new: update_selectors())
+# define callback functions
 
 
 def update_selectors():
@@ -153,7 +184,7 @@ def update_selectors():
 
     # update table data
     current_table = btl_data[table_rows].reset_index()
-    src_table.data = {  # this causes update_flag() to execute
+    src_table.data = {  # this causes edit_flag() to execute
         "SSSCC": current_table["SSSCC"],
         "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
@@ -161,7 +192,7 @@ def update_selectors():
         "SALNTY": current_table["SALNTY"],
         "diff": current_table["Residual"],
         "flag": current_table["New Flag"],
-        "comments": current_table["Comments"],
+        "Comments": current_table["Comments"],
     }
 
     # update plot data
@@ -183,23 +214,20 @@ def update_selectors():
     fig.xaxis.axis_label = parameter.value
 
     # deselect all datapoints
-    # breakpoint()
     btl_sal.data_source.selected.indices = []
     src_table.selected.indices = []
 
 
-def update_flag():
+def edit_flag():
 
-    print("exec update_flag()")
-
-    # breakpoint()
+    print("exec edit_flag()")
 
     btl_data.loc[
         btl_data["SSSCC"] == src_table.data["SSSCC"].values[0], "New Flag",
     ] = src_table.data["flag"].values
     btl_data.loc[
         btl_data["SSSCC"] == src_table.data["SSSCC"].values[0], "Comments",
-    ] = src_table.data["comments"].values
+    ] = src_table.data["Comments"].values
 
     edited_rows = (btl_data["New Flag"].isin([3, 4])) | (btl_data["Comments"] != "")
 
@@ -209,7 +237,7 @@ def update_flag():
         "diff": btl_data.loc[edited_rows, "Residual"],
         "flag_old": btl_data.loc[edited_rows, "SALNTY_FLAG_W"],
         "flag_new": btl_data.loc[edited_rows, "New Flag"],
-        "comments": btl_data.loc[edited_rows, "Comments"],
+        "Comments": btl_data.loc[edited_rows, "Comments"],
     }
 
 
@@ -223,7 +251,7 @@ def apply_flag():
     # update table data
     current_table = btl_data[table_rows].reset_index()
     current_table.loc[selected_rows, "New Flag"] = int(flag_input.value)
-    src_table.data = {  # this causes update_flag() to execute
+    src_table.data = {  # this causes edit_flag() to execute
         "SSSCC": current_table["SSSCC"],
         "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
@@ -231,16 +259,13 @@ def apply_flag():
         "SALNTY": current_table["SALNTY"],
         "diff": current_table["Residual"],
         "flag": current_table["New Flag"],
-        "comments": current_table["Comments"],
+        "Comments": current_table["Comments"],
     }
-
-
-flag_button.on_click(apply_flag)
 
 
 def apply_comment():
 
-    print("Applying comments")
+    print("Applying Comments")
 
     table_rows = btl_data["SSSCC"] == station.value
     selected_rows = src_table.selected.indices
@@ -248,7 +273,7 @@ def apply_comment():
     # update table data
     current_table = btl_data[table_rows].reset_index()
     current_table.loc[selected_rows, "Comments"] = comment_box.value
-    src_table.data = {  # this causes update_flag() to execute
+    src_table.data = {  # this causes edit_flag() to execute
         "SSSCC": current_table["SSSCC"],
         "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
@@ -256,11 +281,8 @@ def apply_comment():
         "SALNTY": current_table["SALNTY"],
         "diff": current_table["Residual"],
         "flag": current_table["New Flag"],
-        "comments": current_table["Comments"],
+        "Comments": current_table["Comments"],
     }
-
-
-comment_button.on_click(apply_comment)
 
 
 def save_data():
@@ -279,7 +301,26 @@ def save_data():
     df_out.to_csv("salt_flags_handcoded.csv", index=None)
 
 
+def selected_from_plot(attr, old, new):
+
+    src_table.selected.indices = new
+
+
+def selected_from_table(attr, old, new):
+
+    btl_sal.data_source.selected.indices = new
+
+
+# set up change callbacks
+parameter.on_change("value", lambda attr, old, new: update_selectors())
+station.on_change("value", lambda attr, old, new: update_selectors())
+flag_list.on_change("value", lambda attr, old, new: update_selectors())
+flag_button.on_click(apply_flag)
+comment_button.on_click(apply_comment)
 save_button.on_click(save_data)
+src_table.on_change("data", lambda attr, old, new: edit_flag())
+src_table.selected.on_change("indices", selected_from_table)
+btl_sal.data_source.selected.on_change("indices", selected_from_plot)
 
 
 columns = [
@@ -326,7 +367,7 @@ columns = [
         formatter=StringFormatter(text_align="center", font_style="bold"),
     ),
     TableColumn(
-        field="comments",
+        field="Comments",
         title="Comments",
         width=135,
         formatter=StringFormatter(text_align="left"),
@@ -366,7 +407,7 @@ columns_changed = [
         ),
     ),
     TableColumn(
-        field="comments",
+        field="Comments",
         title="Comments",
         width=200,
         formatter=StringFormatter(text_align="left"),
@@ -393,24 +434,7 @@ data_table_changed = DataTable(
     sortable=False,
 )
 data_table_title = Div(text="""<b>All Station Data:</b>""", width=200, height=15)
-data_table_changed_title = Div(text="""<b>Edited Data:</b>""", width=200, height=15)
-
-# run update() when user selects new column (may indicate new flag value)
-src_table.on_change("data", lambda attr, old, new: update_flag())
-
-
-def selected_from_plot(attr, old, new):
-
-    src_table.selected.indices = new
-
-
-def selected_from_table(attr, old, new):
-
-    btl_sal.data_source.selected.indices = new
-
-
-src_table.selected.on_change("indices", selected_from_table)
-btl_sal.data_source.selected.on_change("indices", selected_from_plot)
+data_table_changed_title = Div(text="""<b>Flagged Data:</b>""", width=200, height=15)
 
 controls = column(
     parameter,
