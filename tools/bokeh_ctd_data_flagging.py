@@ -1,5 +1,7 @@
 import pandas as pd
 import glob
+import pickle
+import gsw
 
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
@@ -29,6 +31,21 @@ for f in file_list:
     df["SSSCC"] = f.strip("../data/pressure/")[:5]
     ctd_data.append(df)
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
+
+# load bottle trip file
+file_list = sorted(glob.glob("../data/bottle/*.pkl"))
+ssscc_list = [ssscc.strip("../data/bottle/")[:5] for ssscc in file_list]
+upcast_data = []
+for f in file_list:
+    with open(f, "rb") as x:
+        df = pickle.load(x)
+        df["SSSCC"] = f.strip("../data/bottle/")[:5]
+        # change to secondary if that is what's used
+        upcast_data.append(df[["SSSCC", "CTDCOND1", "CTDTMP1", "CTDPRS"]])
+upcast_data = pd.concat(upcast_data, axis=0, sort=False)
+upcast_data["CTDSAL"] = gsw.SP_from_C(
+    upcast_data["CTDCOND1"], upcast_data["CTDTMP1"], upcast_data["CTDPRS"]
+)
 
 # load salt file (adapted from compare_salinities.ipynb)
 file_list = sorted(glob.glob("../data/salt/*.csv"))
@@ -120,13 +137,22 @@ comment_box = TextInput(value="", title="Comment:")
 flag_button = Button(label="Apply to selected", button_type="primary")
 comment_button = Button(label="Apply to selected", button_type="warning")
 
-vspace = Div(text=""" """, width=200, height=95)
+vspace = Div(text=""" """, width=200, height=65)
+bulk_flag_text = Div(
+    text="""<br><br>
+    <b>Bulk Bottle Flagging:</b><br>
+    Select multiple bottles using the table
+    (with shift/control) or the 'Box Select' tool on the plot.""",
+    width=150,
+    height=135,
+)
 
 # set up datasources
 src_table = ColumnDataSource(data=dict())
 src_table_changes = ColumnDataSource(data=dict())
 src_plot_trace = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_ctd = ColumnDataSource(data=dict(x=[], y=[]))
+src_plot_upcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
@@ -150,7 +176,7 @@ fig.line(
 btl_sal = fig.asterisk(
     "x",
     "y",
-    size=10,
+    size=12,
     line_width=1.5,
     color="#0033CC",
     source=src_plot_btl,
@@ -164,11 +190,20 @@ ctd_sal = fig.circle(
     source=src_plot_ctd,
     legend_label="Downcast CTD sample",
 )
+upcast_sal = fig.triangle(
+    "x",
+    "y",
+    size=7,
+    color="#00BB00",
+    source=src_plot_upcast,
+    legend_label="Upcast CTD sample",
+)
 fig.legend.location = "bottom_left"
 fig.legend.border_line_width = 3
 fig.legend.border_line_alpha = 1
 btl_sal.nonselection_glyph.line_alpha = 0.2
-ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL change on select
+ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
+upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 
 # define callback functions
 
@@ -203,6 +238,10 @@ def update_selectors():
     src_plot_ctd.data = {
         "x": btl_data.loc[table_rows, parameter.value],
         "y": btl_data.loc[table_rows, "CTDPRS"],
+    }
+    src_plot_upcast.data = {
+        "x": upcast_data.loc[upcast_data["SSSCC"] == station.value, "CTDSAL"],
+        "y": upcast_data.loc[upcast_data["SSSCC"] == station.value, "CTDPRS"],
     }
     src_plot_btl.data = {
         "x": btl_data.loc[btl_rows, "SALNTY"],
@@ -441,7 +480,7 @@ controls = column(
     ref_param,
     station,
     flag_list,
-    vspace,
+    bulk_flag_text,
     flag_input,
     flag_button,
     comment_box,
