@@ -228,10 +228,29 @@ def process_all():
         btl_data_all["CTDPRS"],
     )
 
+    # TODO: make salt flagger move .csv somewhere else? or just always have it
+    # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
+    handcoded_salts = pd.read_csv(
+        "tools/salt_flags_handcoded.csv", dtype={"SSSCC": str, "salinity_flag": int}
+    )
+    handcoded_salts = handcoded_salts.rename(
+        columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
+    ).drop(columns=["diff", "Comments"])
+    btl_data_all = btl_data_all.merge(
+        handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left"
+    )
+    btl_data_all.loc[btl_data_all["BTLCOND"].isnull(), "SALNTY_FLAG_W"] = 9
+    btl_data_all["SALNTY_FLAG_W"] = btl_data_all["SALNTY_FLAG_W"].fillna(
+        2, downcast="infer"  # fill remaining NaNs with 2s and cast to dtype int
+    )
+
     for f in ssscc_files_c:
+        breakpoint()
         # 0) grab ssscc chunk to fit
         ssscc_list_c = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
-        btl_rows = btl_data_all["SSSCC"].isin(ssscc_list_c).values
+        btl_rows = (btl_data_all["SSSCC"].isin(ssscc_list_c).values) & (
+            btl_data_all["SALNTY_FLAG_W"] == 2  # only use salts flagged good (e.g. 2)
+        )
         time_rows = time_data_all["SSSCC"].isin(ssscc_list_c).values
 
         # 1) remove non-finite data
