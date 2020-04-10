@@ -5,7 +5,6 @@ Attempt to write a cleaner processing script from scratch.
 # import necessary packages
 import os
 import glob
-import timeit
 import sys
 import subprocess
 import pandas as pd
@@ -21,16 +20,11 @@ import odf_reft_parser as reft_parser
 
 def process_all():
 
-    # start_time = timeit.default_timer()
-
     #####
     # Step 0: Load and define necessary variables
     #####
 
     import config as cfg
-
-    # define cruise and file information/extensions
-    prefix = "nbp1802_"
 
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
@@ -118,12 +112,26 @@ def process_all():
         time_data_all, cfg.column["p"], p_offset
     )
 
+    # create depth_log.csv
+    depth_dict = {}
+    for ssscc in ssscc_list:
+        print(ssscc)
+        time_rows = time_data_all["SSSCC"] == ssscc
+        max_depth = process_ctd.find_cast_depth(
+            time_data_all.loc[time_rows, "CTDPRS"],
+            time_data_all.loc[time_rows, "GPSLAT"],
+            time_data_all.loc[time_rows, "ALT"],
+        )
+        depth_dict[ssscc] = max_depth
+
+    depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
+    depth_df.reset_index(inplace=True)
+    depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
+    depth_df.to_csv("data/logs/depth_log.csv", index=False)
+
+    #########################
     # temperature calibration
-    # steps: 1) remove non-finite data
-    #        2) flag points w/ large deviations
-    #        3) calculate fit parameters (on data w/ flag 2) -> save them too!
-    #        4) apply fit
-    #        5) qualify flag file
+    #########################
 
     ssscc_files_t = sorted(glob.glob("data/ssscc/ssscc_*t*.csv"))
     qual_flag_t1 = pd.DataFrame()
@@ -210,7 +218,9 @@ def process_all():
     coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
     coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
 
+    ##########################
     # conductivity calibration
+    ##########################
 
     ssscc_files_c = sorted(glob.glob("data/ssscc/ssscc_*c*.csv"))
     qual_flag_c1 = pd.DataFrame()
@@ -224,28 +234,32 @@ def process_all():
     btl_data_all[cfg.column["refc"]] = fit_ctd.CR_to_cond(
         btl_data_all["CRavg"],
         btl_data_all["BathTEMP"],
-        btl_data_all["CTDTMP1"],  # could use REFTMP; testing this is a good project
-        btl_data_all["CTDPRS"],
+        btl_data_all[cfg.column["t1_btl"]],
+        btl_data_all[cfg.column["p_btl"]],
     )
+    # could use REFTMP instead of T1; testing this is a good project
 
     # TODO: make salt flagger move .csv somewhere else? or just always have it
     # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
-    handcoded_salts = pd.read_csv(
-        "tools/salt_flags_handcoded.csv", dtype={"SSSCC": str, "salinity_flag": int}
-    )
-    handcoded_salts = handcoded_salts.rename(
-        columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
-    ).drop(columns=["diff", "Comments"])
-    btl_data_all = btl_data_all.merge(
-        handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left"
-    )
-    btl_data_all.loc[btl_data_all["BTLCOND"].isnull(), "SALNTY_FLAG_W"] = 9
-    btl_data_all["SALNTY_FLAG_W"] = btl_data_all["SALNTY_FLAG_W"].fillna(
-        2, downcast="infer"  # fill remaining NaNs with 2s and cast to dtype int
-    )
+    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
+    if glob.glob(salt_file):
+        handcoded_salts = pd.read_csv(
+            salt_file, dtype={"SSSCC": str, "salinity_flag": int}
+        )
+        handcoded_salts = handcoded_salts.rename(
+            columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
+        ).drop(columns=["diff", "Comments"])
+        btl_data_all = btl_data_all.merge(
+            handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left"
+        )
+        btl_data_all.loc[btl_data_all["BTLCOND"].isnull(), "SALNTY_FLAG_W"] = 9
+        btl_data_all["SALNTY_FLAG_W"] = btl_data_all["SALNTY_FLAG_W"].fillna(
+            2, downcast="infer"  # fill remaining NaNs with 2s and cast to dtype int
+        )
+    else:
+        btl_data_all["SALNTY_FLAG_W"] = 2
 
     for f in ssscc_files_c:
-        breakpoint()
         # 0) grab ssscc chunk to fit
         ssscc_list_c = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         btl_rows = (btl_data_all["SSSCC"].isin(ssscc_list_c).values) & (
@@ -334,10 +348,12 @@ def process_all():
     coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
     coef_c2_all.to_csv(cfg.directory["logs"] + "fit_coef_c2.csv", index=False)
 
-    # TODO: recalculate CTDSAL here
-
-    # print(timeit.default_timer() - start_time)
-    # breakpoint()
+    # recalculate salinity with calibrated C/T
+    time_data_all[cfg.column["sal"]] = gsw.SP_from_C(
+        time_data_all[cfg.column["c1"]],
+        time_data_all[cfg.column["t1"]],
+        time_data_all[cfg.column["p"]],
+    )
 
     ####################
     # oxygen calibration
@@ -505,8 +521,8 @@ def process_all():
     # all_sbe43_fit.to_csv(cfg.directory["logs"] + "quality_flag_sbe43.csv", index=False)
 
     # apply coefs
-    time_data_all["CTDOXY"] = "-999"
-    time_data_all["RINKO"] = "-999"
+    time_data_all["CTDOXY"] = -999
+    time_data_all["RINKO"] = -999
     for ssscc in ssscc_list:
 
         if np.isnan(sbe43_dict[ssscc]).all():
@@ -547,32 +563,12 @@ def process_all():
     )
     sbe43_coefs.to_csv(cfg.directory["logs"] + "sbe43_coefs.csv")
 
-    # create depth_log.csv
-    depth_dict = {}
-    for ssscc in ssscc_list:
-        print(ssscc)
-        time_rows = time_data_all["SSSCC"] == ssscc
-        max_depth = process_ctd.find_cast_depth(
-            time_data_all.loc[time_rows, "CTDPRS"],
-            time_data_all.loc[time_rows, "GPSLAT"],
-            time_data_all.loc[time_rows, "ALT"],
-        )
-        depth_dict[ssscc] = max_depth
-
-    depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
-    depth_df.reset_index(inplace=True)
-    depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
-    depth_df.to_csv("data/logs/depth_log.csv", index=False)
-
-    breakpoint()
+    ###############################
+    # final cleanup/prep for export
+    ###############################
 
     # clean up columns
     p_column_names = cfg.ctd_time_output["col_names"]
-
-    # this should probably be moved up near C calibration
-    time_data_all["CTDSAL"] = gsw.SP_from_C(
-        time_data_all["CTDCOND1"], time_data_all["CTDTMP1"], time_data_all["CTDPRS"]
-    )
 
     # initial flagging (some of this should be moved)
     # TODO: CTDOXY flags
@@ -610,7 +606,7 @@ def process_all():
     print("Exporting *_ct1.csv files")
     process_ctd.export_ct1(
         df,
-        ssscc_list[1:],
+        ssscc_list,
         cfg.cruise["expocode"],
         cfg.cruise["sectionid"],
         cfg.ctd_serial,
