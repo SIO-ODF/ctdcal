@@ -763,10 +763,12 @@ def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_fire_num, ctd_sigma, ctd_os, c
     # Merge DF
     merged_df = pd.merge_asof(btl_data, time_data, left_on='sigma_sbe43_btl', right_on='sigma_sbe43_ctd', direction='nearest', suffixes=['_btl','_ctd'])
 
+    # TODO: this shouldn't be recalculated... see PMEL code: match_sgn_3419p.m
     #Calculate dv_dt
     merged_df['dv_dt'] = calculate_dVdT(merged_df['CTDOXYVOLTS'], merged_df['CTDTIME'])
 
     # Apply coef and calculate CTDOXY
+    # TODO: station shouldn't be hardcoded (in case it doesn't exist)
     sbe_coef0 = get_sbe_coef(station='00101') # initial coefficient guess
     merged_df['CTDOXY'] = PMEL_oxy_eq(sbe_coef0, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))
 

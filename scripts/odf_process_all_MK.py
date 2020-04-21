@@ -35,14 +35,8 @@ def process_all():
     with open(cfg.directory["ssscc_file"], "r") as filename:
         ssscc_list = [line.strip() for line in filename]
 
-    # make list of already converted files to skip later
-    cnv_dir_list = os.listdir("data/converted/")
-    time_dir_list = os.listdir("data/time/")
-    btl_dir_list = os.listdir("data/bottle/")
-    salt_dir_list = os.listdir("data/salt/")
-    reft_dir_list = os.listdir("data/reft/")
-
     # convert hex to ctd (TODO: convert this to function form)
+    cnv_dir_list = os.listdir("data/converted/")
     for ssscc in ssscc_list:
         if "{}.pkl".format(ssscc) not in cnv_dir_list:
             subprocess.run(
@@ -58,6 +52,7 @@ def process_all():
             print("odf_convert_sbe.py SSSCC: " + ssscc + " done")
 
     # ??? (TODO: convert this to function form)
+    time_dir_list = os.listdir("data/time/")
     for ssscc in ssscc_list:
         if "{}_time.pkl".format(ssscc) not in time_dir_list:
             subprocess.run(
@@ -68,6 +63,7 @@ def process_all():
 
     # process bottle file (TODO: convert this to function form)
     # does this generate "ondeck_pressure.csv"?
+    btl_dir_list = os.listdir("data/bottle/")
     for ssscc in ssscc_list:
         if "{}_btl_mean.pkl".format(ssscc) not in btl_dir_list:
             subprocess.run(
@@ -82,11 +78,13 @@ def process_all():
             print("odf_process_bottle.py SSSCC: " + ssscc + " done")
 
     # generate salt files
+    salt_dir_list = os.listdir("data/salt/")
     for ssscc in ssscc_list:
         if "{}_salts.csv".format(ssscc) not in salt_dir_list:
             salt_parser.process_salts(ssscc, "data/salt/")
 
     # generate ref temp files
+    reft_dir_list = os.listdir("data/reft/")
     for ssscc in ssscc_list:
         if "{}_reft.csv".format(ssscc) not in reft_dir_list:
             reft_parser.process_reft(ssscc, "data/reft/")
@@ -133,7 +131,7 @@ def process_all():
     # temperature calibration
     #########################
 
-    ssscc_files_t = sorted(glob.glob("data/ssscc/ssscc_*t*.csv"))
+    ssscc_files_t = sorted(glob.glob("data/ssscc/ssscc_t*.csv"))
     qual_flag_t1 = pd.DataFrame()
     qual_flag_t2 = pd.DataFrame()
     coef_t1_all = pd.DataFrame()
@@ -150,7 +148,8 @@ def process_all():
             btl_data_all[btl_rows], cfg.column["reft"],
         )
 
-        # 2 & 3) calculate fit params
+        # TODO: allow for cast-by-cast T_order/P_order/xRange
+        # 2 & 3) flag outliers and calculate fit params on flag 2s
         coef_t1, df_ques_t1 = fit_ctd.get_T_coefs(
             df_temp_good[cfg.column["t1_btl"]],
             df_temp_good[cfg.column["reft"]],
@@ -204,6 +203,7 @@ def process_all():
         coef_t2_df = coef_t1_df.copy()
 
         for idx, val in enumerate(coef_t1):
+            # build df w/ columns c0, c1, c2, etc.
             coef_t1_df["c" + str(idx)] = coef_t1[idx]
             coef_t2_df["c" + str(idx)] = coef_t2[idx]
 
@@ -230,7 +230,6 @@ def process_all():
 
     # calculate BTLCOND values from autosal data
     # TODO: what temp sensor to use? should cfg.py have a var for which sensor is used in final data?
-    # TODO: clean up fit_ctd.CR_to_cond
     btl_data_all[cfg.column["refc"]] = fit_ctd.CR_to_cond(
         btl_data_all["CRavg"],
         btl_data_all["BathTEMP"],

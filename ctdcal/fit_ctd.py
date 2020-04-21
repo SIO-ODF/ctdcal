@@ -561,6 +561,7 @@ def temperature_polyfit(temp,press,coef):
 def get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num, 
                 P_order=2, T_order=2, xRange=None):
 
+    # Flag questionable data points
     df_good, df_ques = process_ctd.calibrate_param(df_T, df_refT, df_prs, ssscc_list, btl_num, xRange)
 
     # Toggle columns based on desired polyfit order
@@ -784,97 +785,39 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     
     return cond#DF
     
-def CR_to_cond(cond_ratio,bath_temp,btl_temp,btl_press):
+def CR_to_cond(cr,bath_t,btl_t,btl_p):
 
-    ### Clean up to avoid runtimewarning ###
-    # cond_ratio = array_like_to_series(cond_ratio)
-    # bath_temp = array_like_to_series(bath_temp)
-    # btl_temp = array_like_to_series(btl_temp)
-    # btl_press = array_like_to_series(btl_press)
+    """
+    Convert AutoSal double conductivity ratio (CR) to conductivity using
+    GSW conversion routines.
+
+    Parameters
+    ----------
+    cr : array-like
+        Double conductivity ratio from AutoSal, unitless
+    bath_t : array-like
+        AutoSal water bath temperature, degrees C
+    btl_t : array-like
+        CTD temperature at bottle stop, degrees C
+    btl_p : array-like
+        CTD pressure at bottle stop, dbar
+
+    Returns
+    -------
+    cond : array-like
+        Converted reference conductivity, mS/cm
+
+    """
     
-    # nans = np.isnan(cond_ratio)
-    # bnans = np.isnan(bath_temp)
-    # cond_ratio.loc[nans] = 0
-    # bath_temp.loc[bnans] = 0    
+    salinity = gsw.SP_salinometer((cr / 2.0),bath_t)
+    cond = gsw.C_from_SP(salinity,btl_t,btl_p)  
     
-#    cond_df = cond_ratio.copy()
-#    bath_df = bath_temp.copy()
-#    nans = np.isnan(cond_df)
-#    bnans = np.isnan(bath_df)
-#    cond_df.loc[nans] = 0
-#    bath_df.loc[bnans] = 0
-    
-    
-    salinity = gsw.SP_salinometer((cond_ratio / 2.0),bath_temp)
-    cond = gsw.C_from_SP(salinity,btl_temp,btl_press)  
-    
-    # ignore RunTimeWarning from (np.nan<=1)
-    with np.errstate(invalid='ignore'):
-        cond[cond<=1] = np.nan
-    
-    #cond = pd.series(cond)
-    
+    # ignore RunTimeWarning from (np.nan <= 1)
+    with np.errstate(invalid="ignore"):
+        cond[cond <= 1] = np.nan
     
     return cond
 
-
-    
-##    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
-#
-#    salt_file_name = os.path.basename(saltpath)
-#    salt_sta = int(salt_file_name[0:3])
-#    salt_cst = int(salt_file_name[3:5])
-#
-#    btl_num = btl_data[btl_num_col].astype(int)
-#
-#    psu = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('SALNTY',np.float)])
-#    mspcm = np.zeros(shape=(len(btl_num),), dtype=[(btl_num_col, np.int),('BTLCOND',np.float)])
-#    tmp_tmp = np.zeros(len(btl_num), dtype=np.float)
-#    tmp_p = np.zeros(len(btl_num), dtype=np.float)
-#    bath_tmp = np.zeros(len(btl_num), dtype=np.float) #patched in - JIG 2017-07-15
-#
-#    with open(saltpath, 'r') as f:
-#        params = next(f).strip().split()
-#        #std   = float(params[8])
-#
-#        params = next(f).strip().split()
-#        worm1   = float(params[4])
-#
-#        #btl_counter = 0
-#        for l in f:
-#            row = l.split()
-#            station = int(row[0])
-#            cast = int(row[1])
-#            if (station == salt_sta) and (cast == salt_cst):
-#                if (row[5] == 'worm'):
-#                    worm2 = float(row[4])
-#                else:
-#                   bottle = int(row[5])
-#                   cond = float(row[4])
-#                   bath = int(row[3]) #patched in - JIG 2017-07-15
-#                   bath_tmp = np.full_like(bath_tmp, bath)
-#
-#                if bottle in btl_num:
-#                    i = int(np.where(btl_num == bottle)[0][0])
-#                    j = int(np.where(btl_data[btl_num_col] == bottle)[0][0])
-#                    tmp_tmp[j] = btl_data[btl_tmp_col][j]
-#                    tmp_p[j] = btl_data[btl_p_col][j]
-#                    psu[btl_num_col][i] = int(bottle)
-#                    mspcm[btl_num_col][i] = int(bottle)
-#                    psu['SALNTY'][i] = cond / 2.0
-#                    #import pdb; pdb.set_trace()
-#
-#
-#        psu['SALNTY'] = SP_salinometer(psu['SALNTY'], bath_tmp)
-#        mspcm['BTLCOND'] = gsw.C_from_SP(psu['SALNTY'], tmp_tmp, tmp_p)
-#        
-#        mspcm = pd.DataFrame(mspcm)
-#        psu = pd.DataFrame(psu)
-##           row_dict = {"station": str(station), "cast": str(cast),"bottle": str(bottle), "o2": o2kg}
-    
-    
-    
-#    return mspcm, psu
 
 def write_calib_coef(ssscc,coef,param):
     """ Write coef to csv
