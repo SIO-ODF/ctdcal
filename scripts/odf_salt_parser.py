@@ -1,12 +1,12 @@
 import csv
 import pandas as pd
-import numpy as np
 import gsw
-import ctdcal.fit_ctd as fit_ctd
 import os
+from collections import OrderedDict
 
 
-def salt_loader(saltpath):
+def salt_loader(ssscc, salt_dir):
+    saltpath = salt_dir + ssscc  # salt files have no extension
     with open(saltpath, newline="") as f:
         saltF = csv.reader(
             f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
@@ -16,40 +16,20 @@ def salt_loader(saltpath):
             saltArray.append(row)
         del saltArray[0]  # remove header
 
-    # TODO: does this need to be OrderedDict?
-    header = {  # having this as a dict streamlines next step
-        "STNNBR": int,
-        "CASTNO": int,
-        "SAMPNO": int,
-        "BathTEMP": int,
-        "CRavg": float,
-        "autosalSAMPNO": int,
-        "Unknown": int,
-        "StartTime": object,
-        "EndTime": object,
-        "Attempts": int,
-    }
-
-    # depreciated: 04/20/20
-    # confirm functionality before deleting
-    #
-    # header = ['STNNBR','CASTNO','SAMPNO','BathTEMP','CRavg','autosalSAMPNO',\
-    #         'Unknown','StartTime','EndTime','Attempts','Reading1','Reading2',\
-    #         'Reading3', 'Reading4', 'Reading5','Reading6','Reading7','Reading8',\
-    #         'Reading9', 'Reading10','Reading11','Reading12']
-    # # make all rows of salt files the same length as header
-    # for row in saltArray:
-    #     if len(row) < len(header):
-    #         row.extend([np.NaN] * (len(header) - len(row)))
-    # saltArray = np.array(saltArray)  # change to np array
-    # saltDF = pd.DataFrame(saltArray,columns=header) # change to DataFrame
-    # saltDF = saltDF.apply(pd.to_numeric, errors='ignore')
-    # saltDF.replace(to_replace='nan', value=np.NaN,inplace=True)
-    # saltDF.dropna(axis=1,how='all',inplace=True)
-    # saltDF = saltDF[saltDF['autosalSAMPNO'] != 'worm']
-    # saltDF['STNNBR'] = saltDF['STNNBR'].astype(int) # force to int (if loaded as str)
-    # saltDF['SALNTY'] = gsw.SP_salinometer((saltDF['CRavg']/2.0),saltDF['BathTEMP'])
-
+    header = OrderedDict(  # having this as a dict streamlines next steps
+        [
+            ("STNNBR", int),
+            ("CASTNO", int),
+            ("SAMPNO", int),
+            ("BathTEMP", int),
+            ("CRavg", float),
+            ("autosalSAMPNO", int),
+            ("Unknown", int),
+            ("StartTime", object),
+            ("EndTime", object),
+            ("Attempts", int),
+        ]
+    )
     saltDF = pd.DataFrame.from_records(saltArray)
     # add as many "Reading#"s as needed
     for ii in range(0, len(saltDF.columns) - len(header)):
@@ -57,7 +37,9 @@ def salt_loader(saltpath):
     saltDF.columns = list(header.keys())  # name columns
     saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"]
     saltDF = saltDF.astype(header)  # force dtypes
-    saltDF["SALNTY"] = gsw.SP_salinometer((saltDF["CRavg"] / 2.0), saltDF["BathTEMP"])
+    saltDF["SALNTY"] = gsw.SP_salinometer(
+        (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
+    ).round(4)
     return saltDF
 
 
@@ -79,9 +61,8 @@ def salt_df_parser(saltDF, outdir, stn_col="STNNBR", cast_col="CASTNO"):
 
 
 def process_salts(ssscc, salt_dir):
-    salt_path = salt_dir + ssscc
     try:
-        saltDF = salt_loader(salt_path)
+        saltDF = salt_loader(ssscc, salt_dir)
     except FileNotFoundError:
         print("Salt file for cast " + ssscc + " does not exist... skipping")
         return
