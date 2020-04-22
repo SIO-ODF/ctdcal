@@ -2,6 +2,7 @@
 # TODO: organize these by editable/fixed variables
 
 # Cruise specifics
+# not really needed for processing, move elsewhere
 cruise = dict(
     cruise_title="GO-SHIP NBP1802",
     cruise_name="nbp1802",
@@ -22,6 +23,7 @@ cruise = dict(
 ctd_serial = 1281
 
 # CTD variables/flags/units
+# move elsewhere when xarray is implemented
 ctd_outputs = dict(
     press=["CTDPRS", "CTDPRS_FLAG_W", "DBAR", ""],
     temp=["CTDTMP", "CTDTMP_FLAG_W", "ITS-90", ""],
@@ -56,6 +58,7 @@ directory = {
     "qual_cond_secondary": "quality_code/cond_secondary/",
 }
 
+# remnant of old system, will be pushed into xarray metadata/attrs
 # Labels for CTD columns
 column = {
     "p": "CTDPRS",

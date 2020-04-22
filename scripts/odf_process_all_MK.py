@@ -4,8 +4,9 @@ Attempt to write a cleaner processing script from scratch.
 
 # import necessary packages
 import os
-import glob
+import glob  # replace with pathlib everywhere
 import sys
+import pathlib
 import subprocess
 import pandas as pd
 import numpy as np
@@ -14,8 +15,8 @@ import ctdcal.fit_ctd as fit_ctd
 import ctdcal.oxy_fitting as oxy_fitting
 import gsw
 import ctdcal.rinko as rinko
-import odf_salt_parser as salt_parser
-import odf_reft_parser as reft_parser
+import odf_salt_parser as salt_parser  # abstract to odf_io or something
+import odf_reft_parser as reft_parser  # abstract to process_ctd (SBE35 is standardized)
 
 
 def process_all():
@@ -51,7 +52,9 @@ def process_all():
             )
             print("odf_convert_sbe.py SSSCC: " + ssscc + " done")
 
-    # ??? (TODO: convert this to function form)
+    # first half of CTD data processing
+    # this generates "ondeck_pressure.csv"
+    # TODO: clean up and document better
     time_dir_list = os.listdir("data/time/")
     for ssscc in ssscc_list:
         if "{}_time.pkl".format(ssscc) not in time_dir_list:
@@ -59,10 +62,11 @@ def process_all():
                 ["odf_sbe_metadata.py", "data/converted/" + ssscc + ".pkl"],
                 stdout=subprocess.PIPE,
             )
+            # potential way of writing it without editing:
+            # odf_sbe_metadata.main("data/converted/" + ssscc + ".pkl")
             print("odf_sbe_metadata.py SSSCC: " + ssscc + " done")
 
     # process bottle file (TODO: convert this to function form)
-    # does this generate "ondeck_pressure.csv"?
     btl_dir_list = os.listdir("data/bottle/")
     for ssscc in ssscc_list:
         if "{}_btl_mean.pkl".format(ssscc) not in btl_dir_list:
@@ -77,6 +81,7 @@ def process_all():
             )
             print("odf_process_bottle.py SSSCC: " + ssscc + " done")
 
+    # turn into process_all_salts() or other one liner
     # generate salt files
     salt_dir_list = os.listdir("data/salt/")
     for ssscc in ssscc_list:
@@ -110,7 +115,27 @@ def process_all():
         time_data_all, cfg.column["p"], p_offset
     )
 
+    # example of abstracting functions elsewhere
+    # TODO: clean this up and make functional
+    # def pressure_offset_master(df1, df2):
+    #
+    #     pressure_log = process_ctd.load_pressure_logs("data/logs/ondeck_pressure.csv")
+    #     p_offset = process_ctd.get_pressure_offset(
+    #         pressure_log.ondeck_start_p, pressure_log.ondeck_end_p
+    #     )
+
+    #     btl_data_all = fit_ctd.apply_pressure_offset(
+    #         btl_data_all, cfg.column["p"], p_offset
+    #     )
+    #     time_data_all = fit_ctd.apply_pressure_offset(
+    #         time_data_all, cfg.column["p"], p_offset
+    #     )
+    #     return True  # useful to return True (instead of none) for flask
+
+    # pressure_offset_master()
+
     # create depth_log.csv
+    # TODO: turn into single line function
     depth_dict = {}
     for ssscc in ssscc_list:
         print(ssscc)
@@ -131,6 +156,7 @@ def process_all():
     # temperature calibration
     #########################
 
+    # TODO: build into single line function (e.g. fit_temp?)
     ssscc_files_t = sorted(glob.glob("data/ssscc/ssscc_t*.csv"))
     qual_flag_t1 = pd.DataFrame()
     qual_flag_t2 = pd.DataFrame()
@@ -149,6 +175,7 @@ def process_all():
         )
 
         # TODO: allow for cast-by-cast T_order/P_order/xRange
+        # TODO: truncate coefs (10 digits? look at historical data)
         # 2 & 3) flag outliers and calculate fit params on flag 2s
         coef_t1, df_ques_t1 = fit_ctd.get_T_coefs(
             df_temp_good[cfg.column["t1_btl"]],
@@ -158,7 +185,7 @@ def process_all():
             df_temp_good["btl_fire_num"],
             T_order=2,
             P_order=2,
-            xRange="1000:5000",
+            xRange="1000:5000",  # change to zRange or depth...
         )
         coef_t2, df_ques_t2 = fit_ctd.get_T_coefs(
             df_temp_good[cfg.column["t2_btl"]],
@@ -221,20 +248,19 @@ def process_all():
     ##########################
     # conductivity calibration
     ##########################
-
-    ssscc_files_c = sorted(glob.glob("data/ssscc/ssscc_*c*.csv"))
+    # TODO: abstract to single line function
+    ssscc_files_c = sorted(glob.glob("data/ssscc/ssscc_c*.csv"))
     qual_flag_c1 = pd.DataFrame()
     qual_flag_c2 = pd.DataFrame()
     coef_c1_all = pd.DataFrame()
     coef_c2_all = pd.DataFrame()
 
     # calculate BTLCOND values from autosal data
-    # TODO: what temp sensor to use? should cfg.py have a var for which sensor is used in final data?
     btl_data_all[cfg.column["refc"]] = fit_ctd.CR_to_cond(
         btl_data_all["CRavg"],
         btl_data_all["BathTEMP"],
-        btl_data_all[cfg.column["t1_btl"]],
-        btl_data_all[cfg.column["p_btl"]],
+        btl_data_all[cfg.column["t1_btl"]],  # change this to REFT (unless there's
+        btl_data_all[cfg.column["p_btl"]],  # reason to believe it's wrong)
     )
     # could use REFTMP instead of T1; testing this is a good project
 
@@ -357,7 +383,7 @@ def process_all():
     ####################
     # oxygen calibration
     ####################
-
+    # TODO: export to single line function
     # calculate sigma
     btl_data_all["sigma_btl"] = oxy_fitting.sigma_from_CTD(
         btl_data_all[cfg.column["sal_btl"]],
@@ -399,7 +425,7 @@ def process_all():
     )
 
     # Calculate oxygen solubility in µmol/kg
-    btl_data_all["OS_btl"] = gsw.O2sol(  # any reason to label as OS_btl?
+    btl_data_all["OS_btl"] = gsw.O2sol(  # any reason to label as OS_btl? not really..
         btl_data_all["SA"],
         btl_data_all["CT"],
         btl_data_all[cfg.column["p_btl"]],
@@ -484,7 +510,7 @@ def process_all():
     # (rinko_coef0, _) = rinko.rinko_oxygen_fit(all_rinko_merged)
 
     # Fit oxygen stations using SSSCC chunks to refine coefficients
-    ssscc_files_ox = sorted(glob.glob("data/ssscc/ssscc_*ox*.csv"))
+    ssscc_files_ox = sorted(glob.glob("data/ssscc/ssscc_ox*.csv"))
     for f in ssscc_files_ox:
         ssscc_list_ox = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
 
@@ -504,8 +530,10 @@ def process_all():
         # all non-NaN oxygen data with flags
         all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
 
+    # TODO: secondary oxygen flagging step (instead of just taking outliers from fit routine)
     # TODO: save outlier data from fits?
     # # TODO: abstract to oxy_fitting.py
+    # TODO: figure out what this code is/was
     # breakpoint()
     # all_sbe43_fit["SSSCC_int"] = all_sbe43_fit["SSSCC_sbe43"].astype(int)
     # all_sbe43_fit = all_sbe43_fit.sort_values(
@@ -556,6 +584,8 @@ def process_all():
         )
         print(ssscc + " time data fitting done")
 
+    # TODO: flag oxy data here? compare w/ T/C routines
+
     # export fitting coefs
     sbe43_coefs = pd.DataFrame.from_dict(
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
@@ -572,8 +602,11 @@ def process_all():
     # initial flagging (some of this should be moved)
     # TODO: CTDOXY flags
     time_data_all["CTDOXY_FLAG_W"] = 2
+    # TODO: flag bad based on cond/temp and handcoded salt
     time_data_all["CTDSAL_FLAG_W"] = 2
     time_data_all["CTDTMP_FLAG_W"] = 2
+    # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
+    # maybe not always have these channels so don't hardcode them in
     time_data_all["CTDFLUOR_FLAG_W"] = 1
     time_data_all["CTDXMISS_FLAG_W"] = 1
     time_data_all["CTDBACKSCATTER_FLAG_W"] = 1

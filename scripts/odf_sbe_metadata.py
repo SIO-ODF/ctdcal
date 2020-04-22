@@ -29,7 +29,7 @@ CONVERTED_SUFFIX = '_cnv'
 PKL_EXT = 'pkl'
 
 
-
+# these two can be removed
 def debugPrint(*args, **kwargs):
     if DEBUG:
         errPrint(*args, **kwargs)
@@ -115,6 +115,7 @@ def main(argv):
     else:
       time_col = scan_time_col
 
+    #this gets the ondeck pressure for future pressure calibration
     raw_data = process_ctd.ondeck_pressure(filename_base, p_col, c1_col, c2_col, time_col, raw_data, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
 
     if not c1_col in raw_data.dtype.names:
@@ -159,4 +160,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  main(sys.argv[1:])
+    main(sys.argv[1:])

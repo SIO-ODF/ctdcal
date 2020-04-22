@@ -41,7 +41,8 @@ def reft_loader(ssscc, reft_dir):
     reftDF.loc[:, "REFTMP_FLAG_W"] = 2
     reftDF.loc[abs(reftDF["diff"]) >= 3000, "REFTMP_FLAG_W"] = 3
     # add in STNNBR, CASTNO columns
-    # TODO: should these be objects or ints? be consistent!
+    # TODO: should these be objects or floats? be consistent!
+    # string prob better for other sta/cast formats (names, letters, etc.)
     reftDF["STNNBR"] = ssscc[0:3]
     reftDF["CASTNO"] = ssscc[3:5]
     return reftDF

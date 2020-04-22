@@ -764,6 +764,7 @@ def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_fire_num, ctd_sigma, ctd_os, c
     merged_df = pd.merge_asof(btl_data, time_data, left_on='sigma_sbe43_btl', right_on='sigma_sbe43_ctd', direction='nearest', suffixes=['_btl','_ctd'])
 
     # TODO: this shouldn't be recalculated... see PMEL code: match_sgn_3419p.m
+    # bin average vs. lp filter vs. ?
     #Calculate dv_dt
     merged_df['dv_dt'] = calculate_dVdT(merged_df['CTDOXYVOLTS'], merged_df['CTDTIME'])
 
@@ -881,6 +882,9 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_out=None):
     #         bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
     #         merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
 
+    # implement into bokeh/flask dashboard
+    # intermediate plots to diagnose data chunks goodness
+    # TODO: for all parameters (T/C/O)
     if f_out is not None:
         # grab _ox# from ssscc_ox1.csv
         f_ext = f_out[f_out.find('_'):f_out.find('.csv')] + '.png'

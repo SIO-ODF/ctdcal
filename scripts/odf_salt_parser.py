@@ -43,6 +43,7 @@ def salt_loader(ssscc, salt_dir):
     return saltDF
 
 
+# TODO: cleanup and improve
 def salt_df_parser(saltDF, outdir, stn_col="STNNBR", cast_col="CASTNO"):
     stations = saltDF[stn_col].unique()
     for station in stations:
