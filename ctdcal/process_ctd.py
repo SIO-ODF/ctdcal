@@ -334,8 +334,7 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
             else:
                 q_df[pq] = q_df[pq].fillna(2)
 
-        q_nd = q_df.as_matrix(columns=q_df.columns)
-    return q_nd
+    return q_df.values  # ndarray format
 
 def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
     """formatTimeEpoc function
@@ -613,11 +612,10 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
         tmp = len(inMat);
         # Searches last half of NDarray for conductivity threshold
-
         if len(inMat) % 2 == 0:
             inMat_2 = inMat.copy()
         else:
-            inMat_2 = inMat.iloc[1:].copy()
+            inMat_2 = inMat[1:].copy()
 
         inMat_half1, inMat_half2 = np.split(inMat_2,2)
         ep = inMat_half2[(inMat_half2[c1_col] < conductivity_startup) & (inMat_half2[c2_col] < conductivity_startup)][p_col]
