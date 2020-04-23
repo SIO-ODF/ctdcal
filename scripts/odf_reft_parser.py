@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from collections import OrderedDict
 
+# MK: depreciated 04/22/20
+# functions have been exported to ctdcal.process_ctd
 
 def reft_loader(ssscc, reft_dir):
     reft_path = reft_dir + ssscc + ".cap"

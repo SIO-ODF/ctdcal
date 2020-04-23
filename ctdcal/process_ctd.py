@@ -19,6 +19,9 @@ sys.path.append('ctdcal/')
 import settings
 import oxy_fitting
 import gsw
+import csv
+from collections import OrderedDict
+from pathlib import Path
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
 
@@ -902,6 +905,73 @@ def fill_surface_data(df, **kwargs):
 
     return df_merged.fillna(method='bfill')
 
+
+def _reft_loader(ssscc, reft_dir):
+    reft_path = reft_dir + ssscc + ".cap"
+    # this works better than pd.read_csv as format is semi-inconsistent (cf .cap files)
+    with open(reft_path, "r", newline="") as f:
+        reftF = csv.reader(
+            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
+        )
+        reftArray = []
+        for row in reftF:
+            if len(row) != 17:  # skip over 'bad' rows (empty lines, comments, etc.)
+                continue
+            reftArray.append(row)
+
+    reftDF = pd.DataFrame.from_records(reftArray)
+    reftDF = reftDF.replace(  # remove text columns, only need numbers and dates
+        to_replace=["bn", "diff", "val", "t90", "="], value=np.nan
+    )
+    reftDF = reftDF.dropna(axis=1)
+    reftDF[1] = reftDF[[1, 2, 3, 4]].agg(" ".join, axis=1)  # dd/mm/yy/time cols are
+    reftDF.drop(columns=[2, 3, 4], inplace=True)  # read separately; combine into one 
+    columns = OrderedDict(  # having this as a dict streamlines next steps
+        [
+            ("index_memory", int),
+            ("datetime", object),
+            ("btl_fire_num", int),
+            ("diff", int),
+            ("raw_value", float),
+            ("T90", float),
+        ]
+    )
+    reftDF.columns = list(columns.keys())  # name columns
+    reftDF = reftDF.astype(columns)  # force dtypes
+    # assign initial qality flags
+    reftDF.loc[:, "REFTMP_FLAG_W"] = 2
+    reftDF.loc[abs(reftDF["diff"]) >= 3000, "REFTMP_FLAG_W"] = 3
+    # add in STNNBR, CASTNO columns
+    # TODO: should these be objects or floats? be consistent!
+    # string prob better for other sta/cast formats (names, letters, etc.)
+    reftDF["STNNBR"] = ssscc[0:3]
+    reftDF["CASTNO"] = ssscc[3:5]
+    return reftDF
+
+
+def process_reft(ssscc_list, reft_dir="data/reft/"):
+    # TODO: import reft_dir from a config file
+    """
+    SBE35 reference thermometer processing function. Load in .cap files for given
+    station/cast list, perform basic flagging, and export to .csv files.
+
+    Inputs
+    ------
+    ssscc_list : list of str
+        List of stations to process
+    reft_dir : str, optional
+        Path to folder containing raw salt files (defaults to data/reft/)
+
+    """
+    for ssscc in ssscc_list:
+        if not Path(reft_dir + ssscc + "_reft.csv").exists():
+            try:
+                reftDF = _reft_loader(ssscc, reft_dir)
+                reftDF.to_csv(reft_dir + ssscc + "_reft.csv", index=False)
+            except FileNotFoundError:
+                print("refT file for cast " + ssscc + " does not exist... skipping")
+                return
+
 def load_reft_data(reft_file,index_name = 'btl_fire_num'):
     """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
 
@@ -1301,22 +1371,20 @@ def prepare_all_fit_data(ssscc,df,ref_data,param):
     return data_concat
 
 
-def get_pressure_offset(start_vals,end_vals):
+def _get_pressure_offset(start_vals, end_vals):
     """
-    Finds unique values and calclates mean for pressure offset
+    Finds unique values and calculate mean for pressure offset
 
     Parameters
     ----------
+    start_vals : array_like
+        Array of initial ondeck pressure values
 
-    start_vals :array_like
-                Array containing initial ondeck pressure values
-
-    end_vals :array_like
-              Array containing ending ondeck pressure values
+    end_vals : array_like
+        Array of ending ondeck pressure values
     Returns
     -------
-
-    p_off :float
+    p_off : float
          Average pressure offset
 
     """
@@ -1339,25 +1407,24 @@ def get_pressure_offset(start_vals,end_vals):
 
     return p_off
 
-def load_pressure_logs(file):
+def _load_pressure_logs():
+    # TODO: update report_ctd.report_pressure_details to DataFrame,
+    # will make all this code disappear...
     """
-        Loads pressure offset file from logs.
+    Loads pressure offset file from logs.
 
     Parameters
     ----------
-
-    file : string
-           Path to ondeck_pressure log
+    None
 
     Returns
     -------
-
     df : DataFrame
-         Pandas DataFrame containing ondeck start and end pressure values
+        DataFrame containing on deck start and end pressure values
 
     """
-
-    df = pd.read_csv(file,names=['SSSCC','ondeck_start_p','ondeck_end_p'])
+    file = "data/logs/ondeck_pressure.csv"  # TODO: load file/path from config file
+    df = pd.read_csv(file, names=['SSSCC', 'ondeck_start_p', 'ondeck_end_p'])
 
     # Change vaules in each row by removing non-number parts
     df['SSSCC'] = df['SSSCC'].str[-5:]
@@ -1367,27 +1434,65 @@ def load_pressure_logs(file):
     df['ondeck_start_p'] = df['ondeck_start_p'].astype(float)
     df['ondeck_end_p'] = df['ondeck_end_p'].astype(float)
 
+    return df
+
+
+def apply_pressure_offset(df, p_col="CTDPRS"):
+    # TODO: import p_col from config file
+    """
+    Calculate pressure offset using deck pressure log and apply it to the data.
+    Pressure flag column is added with value 2, indicating the data are calibrated.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing column with pressure values
+    p_col : str, optional
+        Pressure column name in DataFrame (defaults to CTDPRS)
+
+    Returns
+    -------
+    df : DataFrame
+        DataFrame containing updated pressure values and a new flag column
+
+    """
+    p_log = _load_pressure_logs()
+    p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p)
+    df[p_col] += p_offset
+    df[p_col + "_FLAG_W"] = 2
 
     return df
 
-def write_offset_file(df,p_off,write_file='data/logs/poffset_test.csv'):
+
+def make_depth_log(time_df):
+    # TODO: get column names from config file
     """
+    Create depth log file from maximum depth of each station/cast in time DataFrame.
+
+    Parameters
+    ----------
+    time_df : DataFrame
+        DataFrame containing continuous CTD data
 
     """
-    df_out = pd.DataFrame()
-    df_out['SSSCC'] = df['SSSCC']
-    df_out['offset'] = p_off
+    ssscc_list = time_df["SSSCC"].unique()
+    depth_dict = {}
+    for ssscc in ssscc_list:
+        time_rows = time_df["SSSCC"] == ssscc
+        # TODO: improve error handling s.t. SSSCC is reported with error message for
+        # stations with altimeter readings below threshold (in_find_cast_depth)
+        max_depth = _find_cast_depth(
+            time_df.loc[time_rows, "CTDPRS"],
+            time_df.loc[time_rows, "GPSLAT"],
+            time_df.loc[time_rows, "ALT"],
+        )
+        depth_dict[ssscc] = max_depth
 
-    df_out.to_csv(write_file,index=False)
-
-    return
-
-def pressure_calibrate(file):
-
-    pressure_log = load_pressure_logs(file)
-    p_off = get_pressure_offset(pressure_log)
-
-    return p_off
+    depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
+    depth_df.reset_index(inplace=True)
+    depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
+    depth_df.to_csv("data/logs/depth_log.csv", index=False)
+    return True
 
 def load_hy_file(path_to_hyfile):
     df = pd.read_csv(path_to_hyfile, comment='#', skiprows=[0])
@@ -1408,6 +1513,7 @@ def load_all_ctd_files(ssscc,series,cols):
             btl_data = load_btl_data(btl_file,cols)
 
             ### load REFT data
+            # TODO: clean this up
             reft_file = 'data/reft/' + x + '_reft.csv'
             try:
                 reft_data = load_reft_data(reft_file)
@@ -1421,6 +1527,7 @@ def load_all_ctd_files(ssscc,series,cols):
                 reft_data.index = btl_data.index
 
             ### load REFC data
+            # TODO: clean this up
             refc_file = 'data/salt/' + x + '_salts.csv'
             try:
                 refc_data = load_salt_data(refc_file, index_name='SAMPNO')
@@ -1563,7 +1670,7 @@ def merge_oxy_flags(btl_data):
     mask = (btl_data['OXYGEN'].isna())
     btl_data.loc[mask,'OXYGEN_FLAG_W'] = 9
 
-def find_cast_depth(press,lat,alt,threshold=80):
+def _find_cast_depth(press,lat,alt,threshold=80):
     # Create Dataframe containing args
     df = pd.DataFrame()
     df['CTDPRS'] = press
@@ -1780,7 +1887,7 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
     depth_df = pd.read_csv('data/logs/depth_log.csv')
     depth_df.dropna(inplace=True)
     manual_depth_df = pd.read_csv('data/logs/manual_depth_log.csv')
-    full_depth_df = pd.concat([depth_df,manual_depth_df])
+    full_depth_df = pd.concat([depth_df,manual_depth_df])  # TODO: update from STNNBR to SSSCC
     full_depth_df.drop_duplicates(subset='STNNBR', keep='first',inplace=True)
 
     for cast in ssscc:

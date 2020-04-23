@@ -885,36 +885,6 @@ def array_like_to_series(array):
     series.reset_index(drop=True,inplace=True)
     
     return series
-
-def apply_pressure_offset(df, p_col, p_off):
-    """
-    Applies pressure offset to pressure data
-            
-    Parameters
-    ----------
-    
-    df :Pandas DataFrame
-            DataFrame containing pressure values
-            
-    p_col :string
-            Name of pressure column in DataFrame
-           
-    p_off :float
-            Array containing ending ondeck pressure values
-            
-    Returns
-    -------
-    
-    df :Pandas DataFrame
-                DataFrame containing updated pressure values and a new flag column
-       
-    """
-    df[p_col] = df[p_col] + p_off
-    # Default to good data
-    df['CTDPRS_FLAG_W'] = 2
-    #new_press = press + p_off
-
-    return df
   
 ##
 #            key = (station, cast, bottle, "o2")

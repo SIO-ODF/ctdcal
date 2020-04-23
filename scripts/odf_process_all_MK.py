@@ -15,6 +15,7 @@ import ctdcal.fit_ctd as fit_ctd
 import ctdcal.oxy_fitting as oxy_fitting
 import gsw
 import ctdcal.rinko as rinko
+import ctdcal.odf_io as odf_io
 import odf_salt_parser as salt_parser  # abstract to odf_io or something
 import odf_reft_parser as reft_parser  # abstract to process_ctd (SBE35 is standardized)
 
@@ -81,76 +82,27 @@ def process_all():
             )
             print("odf_process_bottle.py SSSCC: " + ssscc + " done")
 
-    # turn into process_all_salts() or other one liner
-    # generate salt files
-    salt_dir_list = os.listdir("data/salt/")
-    for ssscc in ssscc_list:
-        if "{}_salts.csv".format(ssscc) not in salt_dir_list:
-            salt_parser.process_salts(ssscc, "data/salt/")
+    # generate salt .csv files
+    odf_io.process_salts(ssscc_list)
 
-    # generate ref temp files
-    reft_dir_list = os.listdir("data/reft/")
-    for ssscc in ssscc_list:
-        if "{}_reft.csv".format(ssscc) not in reft_dir_list:
-            reft_parser.process_reft(ssscc, "data/reft/")
+    # generate reftemp .csv files
+    process_ctd.process_reft(ssscc_list)
 
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
     #####
 
     # load in all bottle and time data into DataFrame
+    # TODO: clean up process_ctd.load_all_ctd_files
     btl_data_all = process_ctd.load_all_ctd_files(ssscc_list, "bottle", cfg.btl_cols)
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list, "time", None)
 
     # process pressure offset
-    pressure_log = process_ctd.load_pressure_logs("data/logs/ondeck_pressure.csv")
-    p_offset = process_ctd.get_pressure_offset(
-        pressure_log.ondeck_start_p, pressure_log.ondeck_end_p
-    )
+    process_ctd.apply_pressure_offset(btl_data_all)
+    process_ctd.apply_pressure_offset(time_data_all)
 
-    btl_data_all = fit_ctd.apply_pressure_offset(
-        btl_data_all, cfg.column["p"], p_offset
-    )
-    time_data_all = fit_ctd.apply_pressure_offset(
-        time_data_all, cfg.column["p"], p_offset
-    )
-
-    # example of abstracting functions elsewhere
-    # TODO: clean this up and make functional
-    # def pressure_offset_master(df1, df2):
-    #
-    #     pressure_log = process_ctd.load_pressure_logs("data/logs/ondeck_pressure.csv")
-    #     p_offset = process_ctd.get_pressure_offset(
-    #         pressure_log.ondeck_start_p, pressure_log.ondeck_end_p
-    #     )
-
-    #     btl_data_all = fit_ctd.apply_pressure_offset(
-    #         btl_data_all, cfg.column["p"], p_offset
-    #     )
-    #     time_data_all = fit_ctd.apply_pressure_offset(
-    #         time_data_all, cfg.column["p"], p_offset
-    #     )
-    #     return True  # useful to return True (instead of none) for flask
-
-    # pressure_offset_master()
-
-    # create depth_log.csv
-    # TODO: turn into single line function
-    depth_dict = {}
-    for ssscc in ssscc_list:
-        print(ssscc)
-        time_rows = time_data_all["SSSCC"] == ssscc
-        max_depth = process_ctd.find_cast_depth(
-            time_data_all.loc[time_rows, "CTDPRS"],
-            time_data_all.loc[time_rows, "GPSLAT"],
-            time_data_all.loc[time_rows, "ALT"],
-        )
-        depth_dict[ssscc] = max_depth
-
-    depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
-    depth_df.reset_index(inplace=True)
-    depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
-    depth_df.to_csv("data/logs/depth_log.csv", index=False)
+    # create cast depth log file
+    process_ctd.make_depth_log(time_data_all)
 
     #########################
     # temperature calibration

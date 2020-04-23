@@ -4,6 +4,9 @@ import gsw
 import os
 from collections import OrderedDict
 
+# MK: depreciated 04/22/20
+# functions have been exported to ctdcal.odf_io
+
 
 def salt_loader(ssscc, salt_dir):
     saltpath = salt_dir + ssscc  # salt files have no extension
