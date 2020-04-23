@@ -16,11 +16,12 @@ import ctdcal.oxy_fitting as oxy_fitting
 import gsw
 import ctdcal.rinko as rinko
 import ctdcal.odf_io as odf_io
-import odf_salt_parser as salt_parser  # abstract to odf_io or something
-import odf_reft_parser as reft_parser  # abstract to process_ctd (SBE35 is standardized)
+import scripts.odf_sbe_metadata as odf_sbe_metadata
 
 
 def process_all():
+
+    # TODO: document which functions/scripts produce which files
 
     #####
     # Step 0: Load and define necessary variables
@@ -54,17 +55,13 @@ def process_all():
             print("odf_convert_sbe.py SSSCC: " + ssscc + " done")
 
     # first half of CTD data processing
-    # this generates "ondeck_pressure.csv"
     # TODO: clean up and document better
+    # TODO: export to odf_io instead of standalone script?
+    # this produces #_ct1.csv (preliminary), #_time.pkl, and "ondeck_pressure.csv"
     time_dir_list = os.listdir("data/time/")
     for ssscc in ssscc_list:
         if "{}_time.pkl".format(ssscc) not in time_dir_list:
-            subprocess.run(
-                ["odf_sbe_metadata.py", "data/converted/" + ssscc + ".pkl"],
-                stdout=subprocess.PIPE,
-            )
-            # potential way of writing it without editing:
-            # odf_sbe_metadata.main("data/converted/" + ssscc + ".pkl")
+            odf_sbe_metadata.main("data/converted/" + ssscc + ".pkl")
             print("odf_sbe_metadata.py SSSCC: " + ssscc + " done")
 
     # process bottle file (TODO: convert this to function form)

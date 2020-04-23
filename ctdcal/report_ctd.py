@@ -5,6 +5,7 @@ import scipy.stats as st
 import datetime
 import pandas as pd
 import math
+from pathlib import Path
 
 def report_pressure_details(stacast, log_file, start, end):
     """report_cast_details function
@@ -23,9 +24,14 @@ def report_pressure_details(stacast, log_file, start, end):
     Returns:
         No return
     """
-    outfile = open(log_file, 'a')
-    outfile.write("stacast:%s, ondeck_start_p:%s, ondeck_end_p:%s\n" % (stacast, start, end))
-    return
+    df = pd.DataFrame(
+        {"SSSCC": stacast, "ondeck_start_p": start, "ondeck_end_p": end}, index=[0]
+    )
+    add_header = not Path(log_file).exists()  # add header iff file doesn't exist
+    with open(log_file, "a") as f:
+        df.to_csv(f, mode='a', header=add_header, index=False)
+
+    return True
 
 
 def report_polyfit(coef, stacast_list, fitfile):
@@ -188,8 +194,10 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
         No return
     """
     try:
-        inMat = pd.DataFrame.from_records(inMat)
-        #inMat = inMat.iloc[:, 1:]
+        # inMat is already a DataFrame
+        # inMat = pd.DataFrame.from_records(inMat)
+        # remove duplicate index column and reset to count from 0
+        inMat = inMat.drop(labels='index', axis=1).reset_index(drop=True)
         inMat.to_pickle(printdir+stacast+'_time.pkl')
     except:
         if inMat is None:

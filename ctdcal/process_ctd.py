@@ -626,8 +626,12 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 #                if (tmp > j): tmp = j
 
         # Evaluate ending pressures
-        if (len(ep) > (time_delay)): end_p = np.average(ep[(time_delay):])
-        else: end_p = np.average(ep[(len(ep)):])
+        if (len(ep) > (time_delay)):
+            end_p = np.average(ep[(time_delay):])
+        else:
+            with warnings.catch_warnings():  # ignore mean of empty slice error
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                end_p = np.average(ep[(len(ep)):])
 
         # Remove on-deck ending
         outMat = inMat[:tmp]
