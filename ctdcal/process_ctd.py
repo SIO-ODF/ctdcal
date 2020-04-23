@@ -1409,35 +1409,6 @@ def _get_pressure_offset(start_vals, end_vals):
 
     return p_off
 
-def _load_pressure_logs():
-    # TODO: update report_ctd.report_pressure_details to DataFrame,
-    # will make all this code disappear...
-    """
-    Loads pressure offset file from logs.
-
-    Parameters
-    ----------
-    None
-
-    Returns
-    -------
-    df : DataFrame
-        DataFrame containing on deck start and end pressure values
-
-    """
-    file = "data/logs/ondeck_pressure.csv"  # TODO: load file/path from config file
-    df = pd.read_csv(file, names=['SSSCC', 'ondeck_start_p', 'ondeck_end_p'])
-
-    # Change vaules in each row by removing non-number parts
-    df['SSSCC'] = df['SSSCC'].str[-5:]
-    df['ondeck_start_p'] = df['ondeck_start_p'].str[16:]
-    df['ondeck_end_p'] = df['ondeck_end_p'].str[14:]
-    df.loc[df['ondeck_start_p'].str[-5:] == 'Water','ondeck_start_p'] = np.NaN
-    df['ondeck_start_p'] = df['ondeck_start_p'].astype(float)
-    df['ondeck_end_p'] = df['ondeck_end_p'].astype(float)
-
-    return df
-
 
 def apply_pressure_offset(df, p_col="CTDPRS"):
     # TODO: import p_col from config file
@@ -1458,7 +1429,7 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
         DataFrame containing updated pressure values and a new flag column
 
     """
-    p_log = _load_pressure_logs()
+    p_log = pd.read_csv("data/logs/ondeck_pressure.csv", dtype={"SSSCC":str})
     p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p)
     df[p_col] += p_offset
     df[p_col + "_FLAG_W"] = 2
@@ -1484,6 +1455,7 @@ def make_depth_log(time_df):
         # TODO: improve error handling s.t. SSSCC is reported with error message for
         # stations with altimeter readings below threshold (in_find_cast_depth)
         max_depth = _find_cast_depth(
+            ssscc,
             time_df.loc[time_rows, "CTDPRS"],
             time_df.loc[time_rows, "GPSLAT"],
             time_df.loc[time_rows, "ALT"],
@@ -1672,13 +1644,32 @@ def merge_oxy_flags(btl_data):
     mask = (btl_data['OXYGEN'].isna())
     btl_data.loc[mask,'OXYGEN_FLAG_W'] = 9
 
-def _find_cast_depth(press,lat,alt,threshold=80):
-    # Create Dataframe containing args
-    df = pd.DataFrame()
-    df['CTDPRS'] = press
-    df['LAT'] = lat
-    df['ALT'] = alt
+def _find_cast_depth(ssscc,press,lat,alt,threshold=80):
+    """
+    Calculate the depth of a given cast. If rosette does not get within the threshold
+    distance of the bottom, returns NaN.
 
+    Parameters
+    -----------
+    ssscc : str
+        Current station/cast name
+    press : array-like
+        CTD pressure
+    lat : array-like
+        Ship latitude
+    alt : array-like
+        CTD altimeter reading
+    threshold : int, optional
+        Maximum altimeter reading to consider cast "at the bottom" (defaults to 80)
+
+    Returns
+    --------
+    max_depth : int
+        Maximum depth from the cast
+
+    """
+    # Create Dataframe containing args
+    df = pd.DataFrame({"CTDPRS": press, "LAT": lat, "ALT": alt})
     # Calculate DEPTH using gsw
     df['DEPTH'] = np.abs(gsw.z_from_p(df['CTDPRS'],df['LAT']))
 
@@ -1688,7 +1679,12 @@ def _find_cast_depth(press,lat,alt,threshold=80):
         max_depth = bottom_alt + df['CTDPRS'].max()
         max_depth = int(max_depth.values[0])
     else:
-        print('Altimeter reading is not reporting values below the threshold ',threshold,' setting max depth to NaN')
+        print(
+            ssscc,
+            "- minimum altimeter reading above",
+            threshold,
+            "m threshold, setting max depth to NaN",
+        )
         max_depth = np.NaN
 
     return max_depth

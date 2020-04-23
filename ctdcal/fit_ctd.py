@@ -13,6 +13,8 @@ from scipy.ndimage.interpolation import shift
 #import requests
 import os
 import json
+from pathlib import Path
+import config as cfg
 
 M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
@@ -458,13 +460,20 @@ def residualO2(calib, o2pl, P, K, T, S, V):
 #
 #    return c_arr
 
-def conductivity_polyfit(cond,temp,press,coef):
+def _conductivity_polyfit(cond,temp,press,coef):
 
-    fitted_cond = cond + (coef[0] * (press**2) + coef[1] * press + coef[2] * (temp**2) \
-                    + coef[3] * temp + coef[4] * (cond**2) + coef[5] * cond + coef[6])
+    fitted_cond = cond + (
+        coef[0] * (press ** 2)
+        + coef[1] * press
+        + coef[2] * (temp ** 2)
+        + coef[3] * temp
+        + coef[4] * (cond ** 2)
+        + coef[5] * cond
+        + coef[6]
+    )
     fitted_cond = fitted_cond.round(4)
-     #fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
-    return fitted_cond#, fitted_sal
+    # fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
+    return fitted_cond  # , fitted_sal
      
 def cell_therm_mass_corr(temp,cond,sample_int=sample_int,alpha=alpha,beta=beta):
     
@@ -551,18 +560,25 @@ def calculate_b_CTM(a, alpha):
     return b
 
 
-def temperature_polyfit(temp,press,coef):
+def _temperature_polyfit(temp,press,coef):
     
-    fitted_temp = temp + coef[0] * (press**2) + coef[1] * press + coef[2] * (temp**2) + coef[3] * temp + coef[4]
-    fitted_temp = fitted_temp.round(4)
+    fitted_temp = (
+        temp
+        + coef[0] * (press ** 2)
+        + coef[1] * press
+        + coef[2] * (temp ** 2)
+        + coef[3] * temp
+        + coef[4]
+    )
     
-    return fitted_temp
+    return fitted_temp.round(4)
 
-def get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num, 
-                P_order=2, T_order=2, xRange=None):
+def _get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num, 
+                P_order=2, T_order=2, zRange=None):
 
     # Flag questionable data points
-    df_good, df_ques = process_ctd.calibrate_param(df_T, df_refT, df_prs, ssscc_list, btl_num, xRange)
+    # TODO: clean calibrate_param and move to fit_ctd
+    df_good, df_ques = process_ctd.calibrate_param(df_T, df_refT, df_prs, ssscc_list, btl_num, zRange)
 
     # Toggle columns based on desired polyfit order
     # (i.e. don't calculate 2nd order term if only doing 1st order fit)
@@ -594,10 +610,117 @@ def get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num,
 
     return coefs, df_ques
 
-def get_C_coefs(df_C, df_refC, df_T, df_prs, ssscc_list, btl_num,
-                P_order=2, T_order=2, C_order=2, xRange=None):
 
-    df_good, df_ques = process_ctd.calibrate_param(df_C, df_refC, df_prs, ssscc_list, btl_num, xRange)
+def fit_temp(btl_df, time_df):
+    # TODO: break off parts of this to useful functions for all vars (C/T/O)
+    """
+    Least-squares fit CTD temperature data against reference data.
+
+    Parameters
+    -----------
+    btl_df : DataFrame
+        CTD data at bottle stops
+    time_df : DataFrame
+        Continuous CTD data
+
+    Returns
+    --------
+
+    """
+    ssscc_subsets = list(Path('data/ssscc/').glob('ssscc_t*.csv'))
+    qual_flag_t1 = pd.DataFrame()
+    qual_flag_t2 = pd.DataFrame()
+    coef_t1_all = pd.DataFrame()
+    coef_t2_all = pd.DataFrame()
+
+    for f in ssscc_subsets:
+        # 0) load ssscc subset to be fit together
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+        btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
+        time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
+
+        # 1) remove non-finite data
+        # TODO: move prepare_fit_data to fit_ctd module?
+        df_good = process_ctd.prepare_fit_data(btl_df[btl_rows], cfg.column["reft"])
+
+        # TODO: allow for cast-by-cast T_order/P_order/zRange
+        # TODO: truncate coefs (10 digits? look at historical data)
+        # 2 & 3) flag outliers and calculate fit params on flag 2s
+        coef_t1, df_ques_t1 = _get_T_coefs(
+            df_good[cfg.column["t1_btl"]],
+            df_good[cfg.column["reft"]],
+            df_good[cfg.column["p_btl"]],
+            df_good["SSSCC"],
+            df_good["btl_fire_num"],
+            T_order=2,
+            P_order=2,
+            zRange="1000:5000",
+        )
+        coef_t2, df_ques_t2 = _get_T_coefs(
+            df_good[cfg.column["t2_btl"]],
+            df_good[cfg.column["reft"]],
+            df_good[cfg.column["p_btl"]],
+            df_good["SSSCC"],
+            df_good["btl_fire_num"],
+            T_order=2,
+            P_order=2,
+            zRange="1000:5000",
+        )
+
+        # 4) apply fit
+        btl_df.loc[btl_rows, cfg.column["t1_btl"]] = _temperature_polyfit(
+            btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            coef_t1,
+        )
+        btl_df.loc[btl_rows, cfg.column["t2_btl"]] = _temperature_polyfit(
+            btl_df.loc[btl_rows, cfg.column["t2_btl"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            coef_t2,
+        )
+        time_df.loc[time_rows, cfg.column["t1"]] = _temperature_polyfit(
+            time_df.loc[time_rows, cfg.column["t1"]],
+            time_df.loc[time_rows, cfg.column["p"]],
+            coef_t1,
+        )
+        time_df.loc[time_rows, cfg.column["t2"]] = _temperature_polyfit(
+            time_df.loc[time_rows, cfg.column["t2"]],
+            time_df.loc[time_rows, cfg.column["p"]],
+            coef_t2,
+        )
+
+        # 5) handle quality flags
+        qual_flag_t1 = pd.concat([qual_flag_t1, df_ques_t1])
+        qual_flag_t2 = pd.concat([qual_flag_t2, df_ques_t2])
+
+        # 6) handle fit params
+        coef_t1_df = pd.DataFrame()
+        coef_t1_df["SSSCC"] = ssscc_sublist
+        coef_t2_df = coef_t1_df.copy()
+        for idx, val in enumerate(coef_t1):
+            # build df w/ columns c0, c1, c2, etc.
+            coef_t1_df["c" + str(idx)] = coef_t1[idx]
+            coef_t2_df["c" + str(idx)] = coef_t2[idx]
+
+        coef_t1_all = pd.concat([coef_t1_all, coef_t1_df])
+        coef_t2_all = pd.concat([coef_t2_all, coef_t2_df])
+
+    # export temp quality flags
+    qual_flag_t1.to_csv(cfg.directory["logs"] + "qual_flag_t1.csv", index=False)
+    qual_flag_t2.to_csv(cfg.directory["logs"] + "qual_flag_t2.csv", index=False)
+
+    # export temp fit params
+    coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
+    coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
+
+    return True
+
+
+def _get_C_coefs(df_C, df_refC, df_T, df_prs, ssscc_list, btl_num,
+                P_order=2, T_order=2, C_order=2, zRange=None):
+
+    # TODO: clean calibrate_param and move to fit_ctd
+    df_good, df_ques = process_ctd.calibrate_param(df_C, df_refC, df_prs, ssscc_list, btl_num, zRange)
 
     # add CTDTMP column
     # reindex df_T then resample using inds from df_good
@@ -636,6 +759,159 @@ def get_C_coefs(df_C, df_refC, df_T, df_prs, ssscc_list, btl_num,
     coefs = coefs*np.concatenate((P_fit,T_fit,C_fit,[1]))
 
     return coefs, df_ques
+
+
+def fit_cond(btl_df, time_df):
+    # TODO: break off parts of this to useful functions for all vars (C/T/O)
+    # TODO: salt subset lists aren't loading in increasing order:
+    # (still functions properly but the fit_coef_c#.csv is confusing as a result)
+    """
+    Least-squares fit CTD conductivity data against bottle salts.
+
+    Parameters
+    -----------
+    btl_df : DataFrame
+        CTD data at bottle stops
+    time_df : DataFrame
+        Continuous CTD data
+
+    Returns
+    --------
+
+    """
+    # calculate BTLCOND values from autosal data
+    btl_df[cfg.column["refc"]] = CR_to_cond(
+        btl_df["CRavg"],
+        btl_df["BathTEMP"],
+        btl_df[cfg.column["reft"]],
+        btl_df[cfg.column["p_btl"]],
+    )
+
+    # merge in handcoded salt flags
+    # TODO: make salt flagger move .csv somewhere else? or just always have it
+    # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
+    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
+    if Path(salt_file).exists():
+        handcoded_salts = pd.read_csv(
+            salt_file, dtype={"SSSCC": str, "salinity_flag": int}
+        )
+        handcoded_salts = handcoded_salts.rename(
+            columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
+        ).drop(columns=["diff", "Comments"])
+        btl_df = btl_df.merge(
+            handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left"
+        )
+        btl_df.loc[btl_df["BTLCOND"].isnull(), "SALNTY_FLAG_W"] = 9
+        btl_df["SALNTY_FLAG_W"] = btl_df["SALNTY_FLAG_W"].fillna(
+            2, downcast="infer"  # fill remaining NaNs with 2s and cast to dtype int
+        )
+    else:
+        btl_df["SALNTY_FLAG_W"] = 2
+
+    ssscc_subsets = list(Path('data/ssscc/').glob('ssscc_c*.csv'))
+    qual_flag_c1 = pd.DataFrame()
+    qual_flag_c2 = pd.DataFrame()
+    coef_c1_all = pd.DataFrame()
+    coef_c2_all = pd.DataFrame()
+
+    for f in ssscc_subsets:
+        # 0) grab ssscc chunk to fit
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+        btl_rows = (btl_df["SSSCC"].isin(ssscc_sublist).values) & (
+            btl_df["SALNTY_FLAG_W"] == 2  # only use salts flagged good (e.g. 2)
+        )
+        time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
+
+        # 1) remove non-finite data
+        df_good = process_ctd.prepare_fit_data(btl_df[btl_rows], cfg.column["refc"])
+
+        # TODO: allow for cast-by-cast T_order/P_order/zRange
+        # TODO: truncate coefs (10 digits? look at historical data)
+        # 2 & 3) calculate fit params
+        coef_c1, df_ques_c1 = _get_C_coefs(
+            df_good[cfg.column["c1_btl"]],
+            df_good[cfg.column["refc"]],
+            df_good[cfg.column["t1_btl"]],
+            df_good[cfg.column["p_btl"]],
+            df_good["SSSCC"],
+            df_good["btl_fire_num"],
+            P_order=2,
+            T_order=0,
+            C_order=1,
+            zRange="1000:5000",
+        )
+        coef_c2, df_ques_c2 = _get_C_coefs(
+            df_good[cfg.column["c2_btl"]],
+            df_good[cfg.column["refc"]],
+            df_good[cfg.column["t1_btl"]],
+            df_good[cfg.column["p_btl"]],
+            df_good["SSSCC"],
+            df_good["btl_fire_num"],
+            P_order=2,
+            T_order=0,
+            C_order=1,
+            zRange="1000:5000",
+        )
+
+        # 4) apply fit
+        btl_df.loc[btl_rows, cfg.column["c1_btl"]] = _conductivity_polyfit(
+            btl_df.loc[btl_rows, cfg.column["c1_btl"]],
+            btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            coef_c1,
+        )
+        btl_df.loc[btl_rows, cfg.column["c2_btl"]] = _conductivity_polyfit(
+            btl_df.loc[btl_rows, cfg.column["c2_btl"]],
+            btl_df.loc[btl_rows, cfg.column["t2_btl"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            coef_c2,
+        )
+        time_df.loc[time_rows, cfg.column["c1"]] = _conductivity_polyfit(
+            time_df.loc[time_rows, cfg.column["c1"]],
+            time_df.loc[time_rows, cfg.column["t1"]],
+            time_df.loc[time_rows, cfg.column["p"]],
+            coef_c1,
+        )
+        time_df.loc[time_rows, cfg.column["c2"]] = _conductivity_polyfit(
+            time_df.loc[time_rows, cfg.column["c2"]],
+            time_df.loc[time_rows, cfg.column["t2"]],
+            time_df.loc[time_rows, cfg.column["p"]],
+            coef_c2,
+        )
+
+        # 5) handle quality flags
+        qual_flag_c1 = pd.concat([qual_flag_c1, df_ques_c1])
+        qual_flag_c2 = pd.concat([qual_flag_c2, df_ques_c2])
+
+        # 6) handle fit params
+        coef_c1_df = pd.DataFrame()
+        coef_c1_df["SSSCC"] = ssscc_sublist
+        coef_c2_df = coef_c1_df.copy()
+        for idx, val in enumerate(coef_c1):
+            # TODO: can constant names be more meaningful? (e.g. cp2,cp1,ct1,etc.)
+            coef_c1_df["c" + str(idx)] = coef_c1[idx]
+            coef_c2_df["c" + str(idx)] = coef_c2[idx]
+
+        coef_c1_all = pd.concat([coef_c1_all, coef_c1_df])
+        coef_c2_all = pd.concat([coef_c2_all, coef_c2_df])
+
+    # export cond quality flags
+    qual_flag_c1.to_csv(cfg.directory["logs"] + "qual_flag_c1.csv", index=False)
+    qual_flag_c2.to_csv(cfg.directory["logs"] + "qual_flag_c2.csv", index=False)
+
+    # export cond fit params
+    coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
+    coef_c2_all.to_csv(cfg.directory["logs"] + "fit_coef_c2.csv", index=False)
+
+    # recalculate salinity with calibrated C/T
+    time_df[cfg.column["sal"]] = gsw.SP_from_C(
+        time_df[cfg.column["c1"]],
+        time_df[cfg.column["t1"]],
+        time_df[cfg.column["p"]],
+    )
+
+    return True
+        
 
 #def load_qual(path):
 #    comment_dict = {}
@@ -785,7 +1061,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     
     return cond#DF
     
-def CR_to_cond(cr,bath_t,btl_t,btl_p):
+def CR_to_cond(cr,bath_t,ref_t,btl_p):
 
     """
     Convert AutoSal double conductivity ratio (CR) to conductivity using
@@ -797,7 +1073,7 @@ def CR_to_cond(cr,bath_t,btl_t,btl_p):
         Double conductivity ratio from AutoSal, unitless
     bath_t : array-like
         AutoSal water bath temperature, degrees C
-    btl_t : array-like
+    ref_t : array-like
         CTD temperature at bottle stop, degrees C
     btl_p : array-like
         CTD pressure at bottle stop, dbar
@@ -810,7 +1086,7 @@ def CR_to_cond(cr,bath_t,btl_t,btl_p):
     """
     
     salinity = gsw.SP_salinometer((cr / 2.0),bath_t)
-    cond = gsw.C_from_SP(salinity,btl_t,btl_p)  
+    cond = gsw.C_from_SP(salinity,ref_t,btl_p)  
     
     # ignore RunTimeWarning from (np.nan <= 1)
     with np.errstate(invalid="ignore"):
@@ -849,35 +1125,37 @@ def write_calib_coef(ssscc,coef,param):
     return df
 
 #
-def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
-                   cond_col = 'CTDCOND'):
-    """ Applies Coef to time and bottle Data
+# MK: depreciated 04/23/20
+# use fit_temp/fit_cond
+# def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
+#                    cond_col = 'CTDCOND'):
+#     """ Applies Coef to time and bottle Data
     
     
-    """
+#     """
     
-    coef = coef_frame.loc[coef_frame['SSSCC']== ssscc]
+#     coef = coef_frame.loc[coef_frame['SSSCC']== ssscc]
     
-    if sensor == 1:
-        t_col = t_col+'1'
-        cond_col = cond_col+'1'
+#     if sensor == 1:
+#         t_col = t_col+'1'
+#         cond_col = cond_col+'1'
         
-    elif sensor == 2:
-        t_col = t_col+'2'
-        cond_col = cond_col+'2'
+#     elif sensor == 2:
+#         t_col = t_col+'2'
+#         cond_col = cond_col+'2'
            
     
-    if param == 'T':
+#     if param == 'T':
         
-        df[t_col] = temperature_polyfit(coef,df[p_col],df[t_col])
+#         df[t_col] = temperature_polyfit(coef,df[p_col],df[t_col])
         
     
-    elif param == 'C':
+#     elif param == 'C':
     
-        df[cond_col] = conductivity_polyfit(coef,df[p_col],df[t_col],
-                                              df[cond_col])
+#         df[cond_col] = conductivity_polyfit(coef,df[p_col],df[t_col],
+#                                               df[cond_col])
        
-    return df
+#     return df
     
 def array_like_to_series(array):
     
