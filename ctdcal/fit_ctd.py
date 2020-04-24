@@ -611,7 +611,7 @@ def _get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num,
     return coefs, df_ques
 
 
-def fit_temp(btl_df, time_df):
+def calibrate_temp(btl_df, time_df):
     # TODO: break off parts of this to useful functions for all vars (C/T/O)
     """
     Least-squares fit CTD temperature data against reference data.
@@ -761,7 +761,7 @@ def _get_C_coefs(df_C, df_refC, df_T, df_prs, ssscc_list, btl_num,
     return coefs, df_ques
 
 
-def fit_cond(btl_df, time_df):
+def calibrate_cond(btl_df, time_df):
     # TODO: break off parts of this to useful functions for all vars (C/T/O)
     # TODO: salt subset lists aren't loading in increasing order:
     # (still functions properly but the fit_coef_c#.csv is confusing as a result)
