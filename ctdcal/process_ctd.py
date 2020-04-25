@@ -13,6 +13,7 @@ import warnings
 import ctdcal.fit_ctd as fit_ctd
 import datetime
 from decimal import Decimal
+import config as cfg
 
 import sys
 sys.path.append('ctdcal/')
@@ -1872,12 +1873,67 @@ def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='
         df_binned = pd.concat([df_binned,time_data])
     return df_binned
 
-def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
-               out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
-               logFile='data/logs/cast_details.csv'):
-    """ Export Time data to pressure directory as well as adding qual_flags and
-    removing unneeded columns"""
+def export_ct1(df, ssscc):
+    """ 
+    Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
+    adding quality flags and removing unneeded columns.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Continuous CTD data
 
+    Returns
+    -------
+
+    Notes
+    -----
+    Needs depth_log.csv and manual_depth_log.csv to run successfully
+
+    """
+    print("Exporting *_ct1.csv files")
+    # clean up columns
+    p_column_names = cfg.ctd_time_output["col_names"]
+    p_column_units = cfg.ctd_time_output["col_units"]
+    # initial flagging (some of this should be moved)
+    # TODO: actual CTDOXY flagging (oxy_fitting.calibrate_oxy)
+    df["CTDOXY_FLAG_W"] = 2
+    # TODO: flag bad based on cond/temp and handcoded salt
+    df["CTDSAL_FLAG_W"] = 2
+    df["CTDTMP_FLAG_W"] = 2
+    # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
+    # TODO: may not always have these channels so don't hardcode them in!
+    df["CTDFLUOR_FLAG_W"] = 1
+    df["CTDXMISS_FLAG_W"] = 1
+    df["CTDBACKSCATTER_FLAG_W"] = 1
+    # renames
+    df = df.rename(columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"})
+    # check that all columns are there
+    # TODO: make this better... (see process_ctd.format_time_data())
+    try:
+        df[p_column_names];  # this is lazy, do better
+    except KeyError:
+        print("Column names not configured properly... attempting to correct")
+        for col in p_column_names:
+            try:
+                df[col];
+            except KeyError:
+                if col.endswith("FLAG_W"):
+                    print(col + " missing, flagging with 9s")
+                    df[col] = 9
+                else:
+                    print(col + " missing, filling with -999s")
+                    df[col] = -999
+
+    # load other necessary params
+    # TODO: this will change when config.py improves, find different method
+    expocode = cfg.cruise["expocode"]
+    section_id = cfg.cruise["sectionid"]
+    ctd = cfg.ctd_serial
+    out_dir = 'data/pressure/'
+    p_col = 'CTDPRS'
+    stacst_col = 'SSSCC'
+    logFile = 'data/logs/cast_details.csv'
 
     df[stacst_col] = df[stacst_col].astype(str).copy()
 
@@ -1935,82 +1991,6 @@ def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
         outfile.write('END_DATA')
         outfile.close()
 
-def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
-                     t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
-                     logFile='data/logs/cast_details.csv'):
-
-    """ Export Time data to pressure directory as well as adding qual_flags and
-    removing unneeded columns  DEPRECATED USE EXPORT_CT1 INSTEAD"""
-
-
-    df[stacst_col] = df[stacst_col].astype(str).copy()
-
-
-    # Round to 4 decimal places
-
-    df = df.round(4)
-
-
-    cast_details = dataToNDarray(logFile,str,None,',',0)
-    #df = flag_backfill_data(df)
-    #df = flag_missing_values(df)
-
-    for cast in ssscc:
-        #time_data = pressure_seq_data.copy()
-        #time_data = time_data[pressure_seq_data['SSSCC'] == cast]
-        time_data = df[df['SSSCC'] == cast].copy()
-        try:
-            time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
-        except:
-            time_data = binning_df(time_data, bin_size=2.0)
-        depth = time_data['DEPTH'].mean()
-        time_data = flag_backfill_data(time_data)
-        time_data = time_data[p_column_names]
-        time_data = flag_missing_values(time_data)
-        time_data=time_data.round(4)
-
-        for i in time_data.columns:
-            if '_FLAG_W' in i:
-                time_data[i] = time_data[i].astype(int)
-
-
-        s_num = cast[-5:-2]
-        c_num = cast[-2:]
-
-        for line in cast_details:
-            if cast in line[0]:
-                for val in line:
-                    if 'at_depth' in val: btime = float(str.split(val, ':')[1])
-                    if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
-                    if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
-                    if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
-                break
-
-        bdt = datetime.datetime.fromtimestamp(btime, tz=datetime.timezone.utc).strftime('%Y%m%d %H%M').split(" ")
-        b_date = bdt[0]
-        b_time = bdt[1]
-        #depth = -99
-        now = datetime.datetime.now()
-        file_datetime = now.strftime("%Y%m%d") #%H:%M")
-        file_datetime = file_datetime + 'ODFSIO'
-        outfile = open(out_dir+cast+'_ct1.csv', "w+")
-        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
-        cn = np.asarray(p_column_names)
-        cn.tofile(outfile,sep=',', format='%s')
-        outfile.write('\n')
-        cu = np.asarray(p_column_units)
-        cu.tofile(outfile,sep=',', format='%s')
-        outfile.write('\n')
-        outfile.close()
-
-        file = out_dir+cast+'_ct1.csv'
-        with open(file,'a') as f:
-            time_data.to_csv(f, header=False,index=False)
-        f.close()
-
-        outfile = open(out_dir+cast+'_ct1.csv', "a")
-        outfile.write('END_DATA')
-        outfile.close()
 
 def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir='data/pressure/',org='ODF'):
 

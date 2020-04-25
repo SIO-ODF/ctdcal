@@ -108,64 +108,17 @@ def process_all():
 
     # calibrate oxygen against reference
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
-    breakpoint()
 
     # TODO: calibrate rinko against reference, similar to oxy_fitting.calibrate_oxy()
     # rinko.calibrate_oxy()  # or something
 
-    ###############################
-    # final cleanup/prep for export
-    ###############################
+    #####
+    # Step 3: export data
+    #####
 
-    # clean up columns
-    p_column_names = cfg.ctd_time_output["col_names"]
-
-    # initial flagging (some of this should be moved)
-    # TODO: CTDOXY flags
-    time_data_all["CTDOXY_FLAG_W"] = 2
-    # TODO: flag bad based on cond/temp and handcoded salt
-    time_data_all["CTDSAL_FLAG_W"] = 2
-    time_data_all["CTDTMP_FLAG_W"] = 2
-    # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
-    # maybe not always have these channels so don't hardcode them in
-    time_data_all["CTDFLUOR_FLAG_W"] = 1
-    time_data_all["CTDXMISS_FLAG_W"] = 1
-    time_data_all["CTDBACKSCATTER_FLAG_W"] = 1
-
-    # renames
-    time_data_all = time_data_all.rename(
-        columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"}
-    )
-
-    # TODO: see process_ctd.format_time_data()
-    try:
-        df = time_data_all[p_column_names].copy()
-    except KeyError:
-        print("Column names not configured properly... attempting to correct")
-        df = pd.DataFrame()
-        df["SSSCC"] = time_data_all["SSSCC"].copy()
-        for col in p_column_names:
-            try:
-                df[col] = time_data_all[col]
-            except KeyError:
-                if col.endswith("FLAG_W"):
-                    print(col + " missing, flagging with 9s")
-                    df[col] = 9
-                else:
-                    print(col + " missing, filling with -999s")
-                    df[col] = -999
-
-    # needs depth_log.csv, manual_depth_log.csv
-    print("Exporting *_ct1.csv files")
-    process_ctd.export_ct1(
-        df,
-        ssscc_list,
-        cfg.cruise["expocode"],
-        cfg.cruise["sectionid"],
-        cfg.ctd_serial,
-        cfg.ctd_time_output["col_names"],
-        cfg.ctd_time_output["col_units"],
-    )
+    # export time data to _ct1.csv format
+    # TODO: clean this up more
+    process_ctd.export_ct1(time_data_all, ssscc_list)
 
     # run: ctd_to_bottle.py
 
@@ -177,47 +130,47 @@ def process_all():
     # experiment with xarray
     # import xarray  # not needed apparently? at least as currently coded
 
-    da_out = df.to_xarray()  # xarray calls them DataArrays instead of DataFrames
+    # da_out = df.to_xarray()  # xarray calls them DataArrays instead of DataFrames
 
-    # set attributes
-    da_out["CTDTMP"].attrs["long_name"] = "Temperature"
-    da_out["CTDTMP"].attrs["units"] = "ITS-90"
-    da_out["CTDTMP"].attrs["description"] = "Continuous temperature from CTD downcast"
+    # # set attributes
+    # da_out["CTDTMP"].attrs["long_name"] = "Temperature"
+    # da_out["CTDTMP"].attrs["units"] = "ITS-90"
+    # da_out["CTDTMP"].attrs["description"] = "Continuous temperature from CTD downcast"
 
-    # can set attrs from dict
-    prs_attrs = dict(
-        long_name="Pressure", units="dbar", description="Continuous pressure"
-    )
-    tmp_attrs = dict(
-        long_name="Temperature", units="ITS-90", description="Continuous temperature"
-    )
-    sal_attrs = dict(
-        long_name="Salinity", units="PSS-78", description="Continuous salinity",
-    )
+    # # can set attrs from dict
+    # prs_attrs = dict(
+    #     long_name="Pressure", units="dbar", description="Continuous pressure"
+    # )
+    # tmp_attrs = dict(
+    #     long_name="Temperature", units="ITS-90", description="Continuous temperature"
+    # )
+    # sal_attrs = dict(
+    #     long_name="Salinity", units="PSS-78", description="Continuous salinity",
+    # )
 
-    # can do one at at time
-    da_out["CTDSAL"].attrs = sal_attrs
+    # # can do one at at time
+    # da_out["CTDSAL"].attrs = sal_attrs
 
-    # maybe do nested dicts in config.py and loop? e.g.:
-    ctd_attrs = dict(
-        CTDPRS=prs_attrs,
-        CTDTMP=tmp_attrs,
-        CTDSAL=sal_attrs,
-        # CTDOXY=oxy_attrs,
-        # CTDRINKO=rinko_attrs,
-        # CTDXMISS=xmiss_attrs,
-        # CTDFLUOR=fluor_attrs,
-    )
+    # # maybe do nested dicts in config.py and loop? e.g.:
+    # ctd_attrs = dict(
+    #     CTDPRS=prs_attrs,
+    #     CTDTMP=tmp_attrs,
+    #     CTDSAL=sal_attrs,
+    #     # CTDOXY=oxy_attrs,
+    #     # CTDRINKO=rinko_attrs,
+    #     # CTDXMISS=xmiss_attrs,
+    #     # CTDFLUOR=fluor_attrs,
+    # )
 
-    for var in da_out.keys():
-        if var == "SSSCC":
-            continue
-        if not var.endswith("_FLAG_W"):
-            da_out[var].attrs = ctd_attrs[var]
+    # for var in da_out.keys():
+    #     if var == "SSSCC":
+    #         continue
+    #     if not var.endswith("_FLAG_W"):
+    #         da_out[var].attrs = ctd_attrs[var]
 
-    # output files
-    # don't actually run bc this is 24Hz data...
-    # da_out.to_netcdf('example.nc')
+    # # output files
+    # # don't actually run bc this is 24Hz data...
+    # # da_out.to_netcdf('example.nc')
 
 
 def main(argv):
