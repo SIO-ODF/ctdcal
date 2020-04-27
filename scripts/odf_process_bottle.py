@@ -34,6 +34,7 @@ def errPrint(*args, **kwargs):
 # Main function of the script should it be run as a stand-alone utility.
 # -------------------------------------------------------------------------------------
 def main(argv):
+    # MK: depreciated 04/27/20, use ctdcal.convert.make_btl_mean instead
 
     parser = argparse.ArgumentParser(description='Process bottle fire data from a converted, csv-formatted text file')
     parser.add_argument('cnv_file', metavar='cnv_file', help='the converted data file to process')

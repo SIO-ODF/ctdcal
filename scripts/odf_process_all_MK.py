@@ -47,20 +47,8 @@ def process_all():
             odf_sbe_metadata.main("data/converted/" + ssscc + ".pkl")
             print("odf_sbe_metadata.py SSSCC: " + ssscc + " done")
 
-    # process bottle file (TODO: convert this to function form)
-    btl_dir_list = os.listdir("data/bottle/")
-    for ssscc in ssscc_list:
-        if "{}_btl_mean.pkl".format(ssscc) not in btl_dir_list:
-            subprocess.run(
-                [
-                    "odf_process_bottle.py",
-                    "data/converted/" + ssscc + ".pkl",
-                    "-o",
-                    "data/bottle/",
-                ],
-                stdout=subprocess.PIPE,
-            )
-            print("odf_process_bottle.py SSSCC: " + ssscc + " done")
+    # process bottle file
+    convert.make_btl_mean(ssscc_list)
 
     # generate salt .csv files
     odf_io.process_salts(ssscc_list)

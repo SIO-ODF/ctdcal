@@ -5,6 +5,7 @@ import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 from pathlib import Path
+import ctdcal.process_bottle as btl
 
 DEBUG = False
 
@@ -53,6 +54,7 @@ def convertFromFiles(hex_file, xmlcon_file, debug=False):
 
 
 def hex_to_ctd(ssscc_list, debug=False):
+    # TODO: add (some) error handling from odf_convert_sbe.py
     """
     Convert raw CTD data and export to .pkl files.
 
@@ -69,15 +71,42 @@ def hex_to_ctd(ssscc_list, debug=False):
     """
     print('Converting .hex files')
     for ssscc in ssscc_list:
-        if Path("data/converted/" + ssscc + ".pkl").exists():
-            continue  # don't re-convert, it's VERY slow
-        hexFile = "data/raw/" + ssscc + ".hex"
-        xmlconFile = "data/raw/" + ssscc + ".XMLCON"
-        sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
-        converted_df = convertFromSBEReader(sbeReader, debug=False)
-        converted_df.to_pickle("data/converted/" + ssscc + ".pkl")
+        if not Path("data/converted/" + ssscc + ".pkl").exists():
+            hexFile = "data/raw/" + ssscc + ".hex"
+            xmlconFile = "data/raw/" + ssscc + ".XMLCON"
+            sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
+            converted_df = convertFromSBEReader(sbeReader, debug=debug)
+            converted_df.to_pickle("data/converted/" + ssscc + ".pkl")
 
     return True
+
+
+def make_btl_mean(ssscc_list, debug=False):
+    # TODO: add (some) error handling from odf_process_bottle.py
+    """
+    Create "bottle mean" files from continuous CTD data averaged at the bottle stops.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to convert
+    debug : bool, optional
+        Display verbose messages
+
+    Returns
+    -------
+
+    """
+    print('Generating btl_mean.pkl files')
+    for ssscc in ssscc_list:
+        if not Path("data/bottle/" + ssscc + "_btl_mean.pkl").exists():
+            imported_df = importConvertedFile("data/converted/" + ssscc + ".pkl", False)
+            bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
+            mean_df = btl.bottle_mean(bottle_df)
+            saveConvertedDataToFile(mean_df, "data/bottle/" + ssscc + "_btl_mean.pkl")
+
+    return True
+
 
 
 def convertFromSBEReader(sbeReader, debug=False):
