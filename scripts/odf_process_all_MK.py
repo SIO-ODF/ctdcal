@@ -6,12 +6,12 @@ Attempt to write a cleaner processing script from scratch.
 import os
 import sys
 import subprocess
-import pandas as pd
 import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
 import ctdcal.oxy_fitting as oxy_fitting
 import ctdcal.rinko as rinko
 import ctdcal.odf_io as odf_io
+import ctdcal.convert as convert
 import scripts.odf_sbe_metadata as odf_sbe_metadata
 
 
@@ -34,21 +34,8 @@ def process_all():
     with open(cfg.directory["ssscc_file"], "r") as filename:
         ssscc_list = [line.strip() for line in filename]
 
-    # convert hex to ctd (TODO: convert this to function form)
-    cnv_dir_list = os.listdir("data/converted/")
-    for ssscc in ssscc_list:
-        if "{}.pkl".format(ssscc) not in cnv_dir_list:
-            subprocess.run(
-                [
-                    "odf_convert_sbe.py",
-                    "data/raw/" + ssscc + ".hex",
-                    "data/raw/" + ssscc + ".XMLCON",
-                    "-o",
-                    "data/converted",
-                ],
-                stdout=subprocess.PIPE,
-            )
-            print("odf_convert_sbe.py SSSCC: " + ssscc + " done")
+    # convert raw .hex files
+    convert.hex_to_ctd(ssscc_list)
 
     # first half of CTD data processing
     # TODO: clean up and document better
