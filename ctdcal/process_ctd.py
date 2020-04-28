@@ -11,7 +11,7 @@ import math
 import ctdcal.report_ctd as report_ctd
 import warnings
 import ctdcal.fit_ctd as fit_ctd
-import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 import config as cfg
 
@@ -1742,27 +1742,13 @@ def get_btl_time(df,btl_num_col,time_col):
 
     return df
 
-def add_btl_bottom_data(df, cast, log_file, press_col='CTDPRS', lat_col='LATITUDE', lon_col='LONGITUDE', time_col = 'TIME',prcn=4):
+def add_btl_bottom_data(df, cast, log_file, press_col='CTDPRS', lat_col='LATITUDE', lon_col='LONGITUDE', time_col = 'TIME',decimals=4):
+    cast_details = pd.read_csv("data/logs/cast_details.csv", dtype={"SSSCC": str})
+    cast_details = cast_details[cast_details["SSSCC"] == cast]
+    df[lat_col] = np.round(cast_details['latitude'].iat[0], decimals)
+    df[lon_col] = np.round(cast_details['longitude'].iat[0], decimals)
 
-    cast_details = dataToNDarray(log_file,str,None,',',0)
-
-    for line in cast_details:
-        if cast in line[0]:
-            for val in line:
-                if 'at_depth' in val: btime = float(str.split(val, ':')[1])
-                if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
-                if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
-                if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
-                if 'at_depth' in val: btm_time = float(str.split(val, ':')[1])
-                if 'max_pressure' in val: btm_press = float(str.split(val, ':')[1])
-            break
-
-
-    df[lat_col] = np.round(btm_lat,prcn)
-    df[lon_col] = np.round(btm_lon,prcn)
-
-
-    ts = pd.to_datetime(btm_time,unit='s')
+    ts = pd.to_datetime(cast_details['bottom_time'].iat[0], unit="s")
     date = ts.strftime('%Y%m%d')
     hour= ts.strftime('%H%M')
     df['DATE'] = date
@@ -1873,7 +1859,7 @@ def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='
         df_binned = pd.concat([df_binned,time_data])
     return df_binned
 
-def export_ct1(df, ssscc):
+def export_ct1(df, ssscc_list):
     """ 
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -1882,6 +1868,8 @@ def export_ct1(df, ssscc):
     ----------
     df : DataFrame
         Continuous CTD data
+    ssscc_list : list of str
+        List of stations to export
 
     Returns
     -------
@@ -1937,41 +1925,37 @@ def export_ct1(df, ssscc):
 
     df[stacst_col] = df[stacst_col].astype(str).copy()
 
-    cast_details = dataToNDarray(logFile,str,None,',',0)
-    depth_df = pd.read_csv('data/logs/depth_log.csv')
-    depth_df.dropna(inplace=True)
+    cast_details = pd.read_csv("data/logs/cast_details.csv", dtype={"SSSCC": str})
+    depth_df = pd.read_csv('data/logs/depth_log.csv').dropna()
     manual_depth_df = pd.read_csv('data/logs/manual_depth_log.csv')
     full_depth_df = pd.concat([depth_df,manual_depth_df])  # TODO: update from STNNBR to SSSCC
     full_depth_df.drop_duplicates(subset='STNNBR', keep='first',inplace=True)
 
-    for cast in ssscc:
+    for ssscc in ssscc_list:
 
-        time_data = df[df['SSSCC'] == cast].copy()
+        time_data = df[df['SSSCC'] == ssscc].copy()
         time_data = pressure_sequence(time_data)
         time_data = flag_backfill_data(time_data)
         time_data = fill_surface_data(time_data)
         time_data = time_data[p_column_names]
         time_data = time_data.round(4)
 
-        s_num = cast[-5:-2]
-        c_num = cast[-2:]
+        s_num = ssscc[-5:-2]
+        c_num = ssscc[-2:]
         depth = full_depth_df.loc[full_depth_df['STNNBR'] == int(s_num),'DEPTH']
-        for line in cast_details:
-            if cast in line[0]:
-                for val in line:
-                    if 'at_depth' in val: btime = float(str.split(val, ':')[1])
-                    if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
-                    if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
-                    if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
-                break
-        # time_data.drop(columns='SSSCC',inplace=True) # pressure_sequence removes SSSCC column already
-        bdt = datetime.datetime.fromtimestamp(btime, tz=datetime.timezone.utc).strftime('%Y%m%d %H%M').split(" ")
-        b_date = bdt[0]
-        b_time = bdt[1]
-        now = datetime.datetime.now()
+        # get cast_details for current SSSCC
+        cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("r")[0]
+        b_datetime = datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc).strftime('%Y%m%d %H%M').split(" ")
+        b_date = b_datetime[0]
+        b_time = b_datetime[1]
+        btm_lat = cast_dict["latitude"]
+        btm_lon = cast_dict["longitude"]
+        btm_alt = cast_dict["altimeter_bottom"]
+
+        now = datetime.now()
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
-        outfile = open(out_dir+cast+'_ct1.csv', "w+")
+        outfile = open(out_dir+ssscc+'_ct1.csv', "w+")
         # put in logic to check columns?
         outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %.4f\nLONGITUDE = %.4f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
         cn = np.asarray(p_column_names)
@@ -1982,12 +1966,12 @@ def export_ct1(df, ssscc):
         outfile.write('\n')
         outfile.close()
 
-        file = out_dir+cast+'_ct1.csv'
+        file = out_dir+ssscc+'_ct1.csv'
         with open(file,'a') as f:
             time_data.to_csv(f, header=False,index=False)
         f.close()
 
-        outfile = open(out_dir+cast+'_ct1.csv', "a")
+        outfile = open(out_dir+ssscc+'_ct1.csv', "a")
         outfile.write('END_DATA')
         outfile.close()
 
@@ -1995,7 +1979,7 @@ def export_ct1(df, ssscc):
 def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir='data/pressure/',org='ODF'):
 
     btl_data = df.copy()
-    now = datetime.datetime.now()
+    now = datetime.now()
     file_datetime = now.strftime("%Y%m%d")
 
     time_stamp = file_datetime+org
