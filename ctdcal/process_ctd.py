@@ -975,52 +975,56 @@ def process_reft(ssscc_list, reft_dir="data/reft/"):
                 print("refT file for cast " + ssscc + " does not exist... skipping")
                 return
 
-def load_reft_data(reft_file,index_name = 'btl_fire_num'):
-    """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
+def _load_reft_data(reft_file, index_name="btl_fire_num"):
+    """
+    Loads reft_file to dataframe and reindexes to match bottle data dataframe
 
-    # loading in REFTMP_FLAG_W here will conflict with the REFTMP_FLAG_W determined during temperature calibration
-    #reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90','REFTMP_FLAG_W'])
-
-    reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90'])
+    Note: loading in REFTMP_FLAG_W here will conflict with the REFTMP_FLAG_W
+    determined during temperature calibration.
+    """
+    reft_data = pd.read_csv(reft_file, usecols=["btl_fire_num","T90"])
     reft_data.set_index(index_name)
-
-    reft_data['SSSCC_TEMP'] = reft_file[-14:-9]
+    reft_data['SSSCC_TEMP'] = Path(reft_file).stem.split("_")[0]
     reft_data['REFTMP'] = reft_data['T90']
 
     return reft_data
 
-def load_salt_data(salt_file, index_name= 'SAMPNO'):
-    salt_data = pd.read_csv(salt_file,usecols = ['SAMPNO','SALNTY','BathTEMP','CRavg'])
+def _load_salt_data(salt_file, index_name="SAMPNO"):
+    """
+    Loads salt_file to dataframe and reindexes to match bottle data dataframe
+    """
+    salt_data = pd.read_csv(
+        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"]
+    )
     salt_data.set_index(index_name)
-    salt_data['SSSCC_SALT'] = salt_file[-15:-10]
-    salt_data.rename(columns={'SAMPNO':'SAMPNO_SALT'}, inplace=True)
+    salt_data["SSSCC_SALT"] = Path(salt_file).stem.split("_")[0]
+    salt_data.rename(columns={"SAMPNO": "SAMPNO_SALT"}, inplace=True)
+
     return salt_data
 
 
 
-def load_btl_data(btl_file,cols=None):
-
-    """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.pkl'"""
-
+def _load_btl_data(btl_file, cols=None):
+    """
+    Loads "bottle mean" CTD data from .pkl file. Function will return all data unless
+    cols is specified (as a list of column names)
+    """
     btl_data = dataToNDarray(btl_file,float,True,',',0)
-
     btl_data = pd.DataFrame.from_records(btl_data)
     if cols != None:
         btl_data = btl_data[cols]
-
-    ssscc = btl_file[-18:-13]
-
-    btl_data['SSSCC'] = ssscc
+    btl_data["SSSCC"] = Path(btl_file).stem.split("_")[0]
 
     return btl_data
 
 
-def load_time_data(time_file):
+# MK: deprecated 04/28/20, use load_all_ctd_files
+# def load_time_data(time_file):
 
-    time_data = dataToNDarray(time_file,float,True,',',1)
-    time_data = pd.DataFrame.from_records(time_data)
+#     time_data = dataToNDarray(time_file,float,True,',',1)
+#     time_data = pd.DataFrame.from_records(time_data)
 
-    return time_data
+#     return time_data
 
 
 # def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
@@ -1474,64 +1478,76 @@ def load_hy_file(path_to_hyfile):
     df = df[df['EXPOCODE'] != 'END_DATA']
     return df
 
-def load_all_ctd_files(ssscc,series,cols):
+def load_all_ctd_files(ssscc_list, series, cols=None):
     """
-    LOAD ALL CTD FILES was changed (commented out)
-    Lines 1324-1328,1335,1337, 1338,345
+    Load CTD and secondary (e.g. reference temperature, bottle salts, bottle oxygen)
+    files for station/cast list and merge into a dataframe.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to load
+    series : str
+        Data series to load ("bottle" or "time")
+    cols : list of str, optional
+        Subset of columns to load, defaults to loading all
+
+    Returns
+    -------
+    df_data_all : DataFrame
+        Merged dataframe containing all loaded data
+    
     """
     df_data_all = pd.DataFrame()
 
     if series == 'bottle':
-        for x in ssscc:
-            print('Loading BTL data for station: ' + x + '...')
-            btl_file = 'data/bottle/' + x + '_btl_mean.pkl'
-            btl_data = load_btl_data(btl_file,cols)
+        for ssscc in ssscc_list:
+            print('Loading BTL data for station: ' + ssscc + '...')
+            btl_file = 'data/bottle/' + ssscc + '_btl_mean.pkl'
+            btl_data = _load_btl_data(btl_file,cols)
 
             ### load REFT data
-            # TODO: clean this up
-            reft_file = 'data/reft/' + x + '_reft.csv'
+            reft_file = 'data/reft/' + ssscc + '_reft.csv'
             try:
-                reft_data = load_reft_data(reft_file)
+                reft_data = _load_reft_data(reft_file)
             except FileNotFoundError:
-                print('Missing (or misnamed) REFT Data Station: ' + x + '...filling with NaNs')
-                reft_data = pd.DataFrame()
-                reft_data['btl_fire_num'] = pd.Series(btl_data['btl_fire_num'].values.astype(int))
-                reft_data['T90'] = pd.Series([np.nan]*len(btl_data))
-                ref_ssscc = 'SSSCC' + '_TEMP'
-                reft_data[ref_ssscc] = x
-                reft_data.index = btl_data.index
+                print('Missing (or misnamed) REFT Data Station: ' + ssscc + '...filling with NaNs')
+                reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"])
+                reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
+                reft_data["SSSCC_TEMP"] = ssscc
 
             ### load REFC data
-            # TODO: clean this up
-            refc_file = 'data/salt/' + x + '_salts.csv'
+            refc_file = 'data/salt/' + ssscc + '_salts.csv'
             try:
-                refc_data = load_salt_data(refc_file, index_name='SAMPNO')
+                refc_data = _load_salt_data(refc_file, index_name='SAMPNO')
             except FileNotFoundError:
-                print('Missing (or misnamed) REFC Data Station: ' + x + '...filling with NaNs')
-                refc_data = pd.DataFrame()
-                refc_data['SAMPNO_SALT'] = pd.Series(btl_data['btl_fire_num'].values.astype(int))
-                refc_data['CRavg'] = pd.Series([np.nan]*len(btl_data))
-                refc_data['BathTEMP'] = pd.Series([np.nan]*len(btl_data))
-                refc_data['BTLCOND'] = pd.Series([np.nan]*len(btl_data))
-                refc_data.index = btl_data.index
+                print('Missing (or misnamed) REFC Data Station: ' + ssscc + '...filling with NaNs')
+                refc_data = pd.DataFrame(
+                    index=btl_data.index,
+                    columns=["CRavg", "BathTEMP", "BTLCOND"],
+                )
+                refc_data['SAMPNO_SALT'] = btl_data['btl_fire_num'].astype(int)
 
             ### load OXY data
-            oxy_file = 'data/oxygen/' + x 
+            oxy_file = 'data/oxygen/' + ssscc 
             try:
                 oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
             except FileNotFoundError:
-                print('Missing (or misnamed) REFO Data Station: ' + x + '...filling with NaNs')
-                oxy_data = pd.DataFrame()
-                oxy_data['BOTTLENO_OXY'] = pd.Series(btl_data['btl_fire_num'].values.astype(int))
-                oxy_data['STNNO_OXY'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['CASTNO_OXY'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['FLASKNO'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['TITR_VOL'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['TITR_TEMP'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['DRAW_TEMP'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['TITR_TIME'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['END_VOLTS'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data.index = btl_data.index
+                print('Missing (or misnamed) REFO Data Station: ' + ssscc + '...filling with NaNs')
+                oxy_data = pd.DataFrame(
+                    index=btl_data.index,
+                    columns=[
+                        "STNNO_OXY",
+                        "CASTNO_OXY",
+                        "FLASKNO",
+                        "TITR_VOL",
+                        "TITR_TEMP",
+                        "DRAW_TEMP",
+                        "TITR_TIME",
+                        "END_VOLTS",
+                    ],
+                )
+                oxy_data['BOTTLENO_OXY'] = btl_data['btl_fire_num'].astype(int)
 
             ### clean up dataframe
             # Horizontally concat DFs to have all data in one DF
@@ -1540,34 +1556,34 @@ def load_all_ctd_files(ssscc,series,cols):
             btl_data = pd.merge(btl_data,oxy_data,left_on='btl_fire_num',right_on='BOTTLENO_OXY',how='outer')
 
             if len(btl_data) > 36:
-                print("***** Len of btl data for station: ",x,' is > 36, check for multiple stations/casts in reference parameter files *****')
+                print("***** Len of btl data for station: ",ssscc,' is > 36, check for multiple stations/casts in reference parameter files *****')
 
             # Calculate dv/dt for oxygen fitting
             btl_data['dv_dt'] = oxy_fitting.calculate_dVdT(btl_data['CTDOXYVOLTS'],btl_data['scan_datetime'])
 
             # Add bottom of cast information (date,time,lat,lon,etc.)
-            btl_data = add_btl_bottom_data(btl_data, x, 'data/logs/cast_details.csv')
+            btl_data = _add_btl_bottom_data(btl_data, ssscc, 'data/logs/cast_details.csv')
 
             # Merge cast into df_data_all
             try:
                 df_data_all = pd.concat([df_data_all,btl_data],sort=False)
             except AssertionError:
-                raise AssertionError('Columns of ' + x + ' do not match those of previous columns')
-            print('* Finished BTL data station: ' + x + ' *')
+                raise AssertionError('Columns of ' + ssscc + ' do not match those of previous columns')
+            print('* Finished BTL data station: ' + ssscc + ' *')
 
         # Drop duplicated columns generated by concatenation
         df_data_all = df_data_all.loc[:,~df_data_all.columns.duplicated()]
         
     elif series == 'time':
         df_data_all = []
-        for x in ssscc:
-            print('Loading TIME data for station: ' + x + '...')
-            time_file = 'data/time/' + x + '_time.pkl'
+        for ssscc in ssscc_list:
+            print('Loading TIME data for station: ' + ssscc + '...')
+            time_file = 'data/time/' + ssscc + '_time.pkl'
             time_data = pd.read_pickle(time_file)
-            time_data['SSSCC'] = str(x)
+            time_data['SSSCC'] = str(ssscc)
             time_data['dv_dt'] = oxy_fitting.calculate_dVdT(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
             df_data_all.append(time_data)
-            print('** Finished TIME data station: ' + x + ' **')
+            print('** Finished TIME data station: ' + ssscc + ' **')
         df_data_all = pd.concat(df_data_all, axis=0, sort=False)
 
     df_data_all['master_index'] = range(len(df_data_all))
@@ -1742,7 +1758,7 @@ def get_btl_time(df,btl_num_col,time_col):
 
     return df
 
-def add_btl_bottom_data(df, cast, log_file, press_col='CTDPRS', lat_col='LATITUDE', lon_col='LONGITUDE', time_col = 'TIME',decimals=4):
+def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', decimals=4):
     cast_details = pd.read_csv("data/logs/cast_details.csv", dtype={"SSSCC": str})
     cast_details = cast_details[cast_details["SSSCC"] == cast]
     df[lat_col] = np.round(cast_details['latitude'].iat[0], decimals)

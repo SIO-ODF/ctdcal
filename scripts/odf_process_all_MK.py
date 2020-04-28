@@ -61,10 +61,8 @@ def process_all():
     #####
 
     # load in all bottle and time data into DataFrame
-    # TODO: clean up process_ctd.load_all_ctd_files
     btl_data_all = process_ctd.load_all_ctd_files(ssscc_list, "bottle", cfg.btl_cols)
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list, "time", None)
-    breakpoint()
 
     # process pressure offset
     process_ctd.apply_pressure_offset(btl_data_all)
