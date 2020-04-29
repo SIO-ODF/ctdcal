@@ -1968,7 +1968,7 @@ def export_ct1(df, ssscc_list):
         btm_lon = cast_dict["longitude"]
         btm_alt = cast_dict["altimeter_bottom"]
 
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
         outfile = open(out_dir+ssscc+'_ct1.csv', "w+")
