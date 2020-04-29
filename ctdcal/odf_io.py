@@ -273,10 +273,10 @@ def _salt_exporter(saltDF, outdir="data/salt/", stn_col="STNNBR", cast_col="CAST
             outfile = (  # format to SSSCC_salts.csv
                 outdir + "{0:03}".format(station) + "{0:02}".format(cast) + "_salts.csv"
             )
-            if not Path(outfile).exists():
-                stn_cast_salts.to_csv(outfile, index=False)
-            else:
+            if Path(outfile).exists():
                 print(outfile + " already exists...skipping")
+                continue
+            stn_cast_salts.to_csv(outfile, index=False)
 
 
 def process_salts(ssscc_list, salt_dir="data/salt/"):
