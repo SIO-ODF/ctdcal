@@ -95,7 +95,8 @@ def make_btl_mean(ssscc_list, debug=False):
 
     Returns
     -------
-
+    boolean
+        bottle averaging of mean has finished successfully
     """
     print('Generating btl_mean.pkl files')
     for ssscc in ssscc_list:
