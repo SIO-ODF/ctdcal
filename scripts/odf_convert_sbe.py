@@ -40,6 +40,7 @@ def errPrint(*args, **kwargs):
 # Main function of the script should it be run as a stand-alone utility.
 # -------------------------------------------------------------------------------------
 def main(argv):
+    # MK: depreciated 04/27/20, use ctdcal.convert.hex_to_ctd instead
 
     parser = argparse.ArgumentParser(description='Convert SBE raw data to a converted, csv-formatted text file')
     parser.add_argument('hexFile', metavar='hex_file', help='the .hex data file to process')

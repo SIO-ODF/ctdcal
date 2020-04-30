@@ -9,6 +9,7 @@ import ctdcal.convert as cnv
 import ctdcal.process_ctd as process_ctd
 import ctdcal.report_ctd as report_ctd
 import pickle
+from pathlib import PurePosixPath
 
 #remove and streamline imports below later
 import argparse
@@ -29,7 +30,7 @@ CONVERTED_SUFFIX = '_cnv'
 PKL_EXT = 'pkl'
 
 
-
+# these two can be removed in favor of logger
 def debugPrint(*args, **kwargs):
     if DEBUG:
         errPrint(*args, **kwargs)
@@ -37,11 +38,12 @@ def debugPrint(*args, **kwargs):
 def errPrint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-def main(argv):
-    parser = argparse.ArgumentParser(description='Convert SBE raw data to a converted, csv-formatted text file')
-    parser.add_argument('cnv_pkl', metavar='pkl_file', help='the converted .pkl data file to process')
+# def main(argv):
+def main(pkl_path):
+    # parser = argparse.ArgumentParser(description='Convert SBE raw data to a converted, csv-formatted text file')
+    # parser.add_argument('cnv_pkl', metavar='pkl_file', help='the converted .pkl data file to process')
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
 
     #Import Cruise Configuration File
     iniFile = 'data/ini-files/configuration.ini'
@@ -101,10 +103,16 @@ def main(argv):
     p_column_one = list(config['pressure_series_output']['q1_columns'].split(','))
 
     #
-    filename_ext = os.path.basename(args.cnv_pkl) # original filename with ext
-    filename_base = os.path.splitext(filename_ext)[0] # original filename w/o ext
+    # filename_ext = os.path.basename(args.cnv_pkl) # original filename with ext
+    # filename_base = os.path.splitext(filename_ext)[0] # original filename w/o ext
 
-    converted_df = pd.read_pickle(args.cnv_pkl)
+    # converted_df = pd.read_pickle(args.cnv_pkl)
+
+    filename_ext = PurePosixPath(pkl_path).name  # returns ssscc.pkl
+    filename_base = PurePosixPath(pkl_path).stem  # returns ssscc
+
+    converted_df = pd.read_pickle(pkl_path)
+
     # Construct NDarray - fix this serialization asap
     #raw_data = process_ctd.dataToNDarray(convertedfilePath,None,list(converted_df.columns.insert(0,'index')),',',2)
     raw_data = converted_df.to_records()
@@ -115,6 +123,7 @@ def main(argv):
     else:
       time_col = scan_time_col
 
+    #this gets the ondeck pressure for future pressure calibration
     raw_data = process_ctd.ondeck_pressure(filename_base, p_col, c1_col, c2_col, time_col, raw_data, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
 
     if not c1_col in raw_data.dtype.names:
@@ -158,5 +167,5 @@ def main(argv):
     debugPrint('Done!')
 
 
-if __name__ == '__main__':
-  main(sys.argv[1:])
+# if __name__ == '__main__':
+#     main(sys.argv[1:])

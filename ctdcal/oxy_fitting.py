@@ -19,6 +19,8 @@ import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 import pandas as pd
 import csv
+from pathlib import Path
+import config as cfg
 
 #Line 342 module isopycnals
 
@@ -37,7 +39,7 @@ def oxy_loader(oxyfile):
 
     del oxy_Array[0]
 
-    header = ['STNNO_OXY','CASTNO_OXY','BOTTLENO_OXY','FLASKNO','TITR_VOL','TITR_TEMP','DRAW_TEMP','TITER_TIME','END_VOLTS']
+    header = ['STNNO_OXY','CASTNO_OXY','BOTTLENO_OXY','FLASKNO','TITR_VOL','TITR_TEMP','DRAW_TEMP','TITR_TIME','END_VOLTS']
 
     O2 = np.array(oxy_Array)
     df = pd.DataFrame(O2,columns=header)
@@ -67,7 +69,7 @@ def oxy_loader(oxyfile):
 
     return df ,params #DF
 
-def flask_load(flaskfile='data/oxygen/o2flasks.vol',skip_rows=12):
+def flask_load(flaskfile=cfg.directory["oxy"] + 'o2flasks.vol', skip_rows=12):
     """Load information from flask.vol file
 
     """
@@ -186,7 +188,7 @@ def gather_oxy_params(oxyfile):
 
     return df
 
-def gather_all_oxy_params(ssscc,oxyfile_prefix='data/oxygen/',oxyfile_postfix=''):
+def gather_all_oxy_params(ssscc,oxyfile_prefix=cfg.directory["oxy"],oxyfile_postfix=''):
     """
     Collects all oxygen parameters for a given SSSCC (multiple stations)
 
@@ -492,6 +494,7 @@ def sigma_from_CTD(sal, temp, press, lon, lat, ref=0):
 
     return sigma
 
+# this function now exists as gsw.O2sol()
 def os_umol_kg( sal, PT):
     """
     Calculates oxygen solubility in umol/kg as found in Gordon and Garcia 1992
@@ -609,8 +612,10 @@ def merge_parameters(btl_df,time_df,l_param='sigma0_btl',r_param='sigma0_ctd'):
 
     return merge_df
 
-def get_sbe_coef(hexfile, xmlfile):
+def get_sbe_coef(station='00101'):
 
+    hexfile = cfg.directory["raw"] + station + ".hex"
+    xmlfile = cfg.directory["raw"] + station + ".XMLCON"
 
     sbeReader = sbe_rd.SBEReader.from_paths(hexfile, xmlfile)
     rawConfig = sbeReader.parsed_config()
@@ -632,18 +637,6 @@ def get_sbe_coef(hexfile, xmlfile):
     C = oxy_meta['sensor_info']['C'] # Compensation Coef for temp effect on mem perm
     D = [oxy_meta['sensor_info']['D0'],oxy_meta['sensor_info']['D1'],oxy_meta['sensor_info']['D2']] # Press effect on time constant Usually not fitted for.
 
-    #coef = {'Soc':Soc,'Voff':Voff,'Tau20':Tau20,'Tcorr':Tcorr,'E':E,'A':A,'B':B,'C':C,'D':D}
-
-    # Make into an array in order to do keast squares fitting easier
-#        coef0s:
-#    coef[0] = Soc
-#    coef[1] = Voffset
-#    coef[2] = Tau20
-#    coef[3] = Tcorr
-#    coef[4] = E
-#
-#    cc[0] = D1
-#    cc[1] = D2
     coef = [Soc,Voff,Tau20,Tcorr,E]#,A,B,C,D]
 
     return coef
@@ -722,7 +715,7 @@ def interpolate_param(param):
     return ex_param
 
 def oxy_equation(X, Soc, Voffset, A, B, C, E, Tau20):
-
+    # eq (3) in Uchida CTD manual
     cc=[1.92634e-4,-4.64803e-2]
     oxyvolts, pressure, temp, dvdt, os = X
 
@@ -734,19 +727,33 @@ def oxy_equation(X, Soc, Voffset, A, B, C, E, Tau20):
     return oxygen
 
 
-def sbe43_oxy_fit(btl_prs, btl_oxy, btl_sigma, ctd_sigma, ctd_os, ctd_prs, ctd_tmp, ctd_oxyvolts, ctd_time, coef0,btl_ssscc=None):
+def _PMEL_oxy_eq(coefs,inputs,cc=[1.92634e-4,-4.64803e-2]):
+    """
+    Modified oxygen equation for SBE 43 used by NOAA/PMEL
+    coef[0] = Soc
+    coef[1] = Voffset
+    coef[2] = Tau20
+    coef[3] = Tcorr
+    coef[4] = E
+    """
+    Soc, Voff, Tau20, Tcorr, E = coefs
+    oxyvolts, pressure, temp, dvdt, os = inputs
+    o2 = Soc * (oxyvolts + Voff + Tau20 * np.exp(cc[0] * pressure + cc[1] * (temp - 20)) * dvdt) * os \
+            * np.exp(Tcorr * temp) \
+            * np.exp((E * pressure) / (temp + 273.15))
 
+    return o2
 
-    # Create DF for good and questionable values
+def PMEL_oxy_weighted_residual(coefs,weights,inputs,refoxy):
+    return np.sum((weights*(refoxy-_PMEL_oxy_eq(coefs, inputs))**2))/np.sum(weights**2)
 
-    bad_df = pd.DataFrame()
-    good_df = pd.DataFrame()
+def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_fire_num, ctd_sigma, ctd_os, ctd_prs, ctd_tmp, ctd_oxyvolts, ctd_time, btl_ssscc=None):
 
     # Construct Dataframe from bottle and ctd values for merging
     if 'btl_ssscc' in  locals():
-        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma, 'SSSCC_sbe43':btl_ssscc}
+        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma, 'btl_fire_num':btl_fire_num, 'SSSCC_sbe43':btl_ssscc}
     else:
-        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma}
+        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma, 'btl_fire_num':btl_fire_num}
     btl_data = pd.DataFrame(btl_dict)
     time_dict = {'CTDPRS_sbe43_ctd':ctd_prs, 'sigma_sbe43_ctd':ctd_sigma, 'OS_sbe43_ctd':ctd_os, 'CTDTMP_sbe43_ctd':ctd_tmp, 'CTDOXYVOLTS':ctd_oxyvolts, 'CTDTIME':ctd_time}
     time_data = pd.DataFrame(time_dict)
@@ -758,91 +765,292 @@ def sbe43_oxy_fit(btl_prs, btl_oxy, btl_sigma, ctd_sigma, ctd_os, ctd_prs, ctd_t
     # Merge DF
     merged_df = pd.merge_asof(btl_data, time_data, left_on='sigma_sbe43_btl', right_on='sigma_sbe43_ctd', direction='nearest', suffixes=['_btl','_ctd'])
 
+    # TODO: this shouldn't be recalculated... see PMEL code: match_sgn_3419p.m
+    # bin average vs. lp filter vs. ?
     #Calculate dv_dt
     merged_df['dv_dt'] = calculate_dVdT(merged_df['CTDOXYVOLTS'], merged_df['CTDTIME'])
 
     # Apply coef and calculate CTDOXY
-    merged_df['CTDOXY'] = SB_oxy_eq(coef0, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
-    #merged_df.dropna(subset=['REFOXY_sbe43'], inplace=True)
+    # TODO: station shouldn't be hardcoded (in case it doesn't exist)
+    sbe_coef0 = get_sbe_coef(station='00101') # initial coefficient guess
+    merged_df['CTDOXY'] = _PMEL_oxy_eq(sbe_coef0, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))
+
+    return merged_df
 
 
+def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_out=None):
+
+    # Create DF for good and questionable values
+    bad_df = pd.DataFrame()
+    good_df = pd.DataFrame()
+
+    if sbe_coef0 is None:
+        # Load initial coefficient guess
+        sbe_coef0 = get_sbe_coef(station='00101')
+
+    p0 = sbe_coef0[0], sbe_coef0[1], sbe_coef0[2], sbe_coef0[3], sbe_coef0[4]
+    
     # Curve fit (weighted)
-    p0 = coef0[0], coef0[1], coef0[2], coef0[3], coef0[4], coef0[5], coef0[6]
-    weights = 1/(np.sqrt(merged_df['CTDPRS_sbe43_ctd']))
+    weights = calculate_weights(merged_df['CTDPRS_sbe43_ctd'])
+    cfw_coefs = scipy.optimize.fmin(PMEL_oxy_weighted_residual,x0=p0,args=(weights, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43']), disp=False)
+    merged_df['CTDOXY'] = _PMEL_oxy_eq(cfw_coefs, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))        
+    
+    merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
+    stdres = np.std(merged_df['res_sbe43'])
+    cutoff = stdres * 2.8
 
-    try:
-        cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0, sigma=weights, absolute_sigma=False)
-        merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
+    thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
+    bad_df = pd.concat([bad_df, thrown_values])
+    merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
+
+    while not thrown_values.empty: # runs as long as there are thrown_values
+
+        p0 = cfw_coefs[0], cfw_coefs[1], cfw_coefs[2], cfw_coefs[3], cfw_coefs[4]
+        weights = calculate_weights(merged_df['CTDPRS_sbe43_ctd'])
+        cfw_coefs = scipy.optimize.fmin(PMEL_oxy_weighted_residual,x0=p0,args=(weights, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43']), disp=False)
+        merged_df['CTDOXY'] = _PMEL_oxy_eq(cfw_coefs, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))
 
         merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
         stdres = np.std(merged_df['res_sbe43'])
         cutoff = stdres * 2.8
-
         thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-        bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-        bad_df = pd.concat([bad_df, bad_values])
+        print(len(thrown_values))
+        print(p0)
+        bad_df = pd.concat([bad_df, thrown_values])
         merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
 
-        while not thrown_values.empty:
+    # implement into bokeh/flask dashboard
+    # intermediate plots to diagnose data chunks goodness
+    # TODO: for all parameters (T/C/O)
+    if f_out is not None:
+        # grab _ox# from ssscc_ox1.csv
+        f_suffix = f_out.stem.split('ssscc')[1]
+        import matplotlib.pyplot as plt
+        import config as cfg
+        plt.figure(figsize=(5,6))
+        plt.scatter(
+            merged_df['res_sbe43'], 
+            merged_df['CTDPRS_sbe43_ctd'], 
+            c=merged_df['SSSCC_sbe43'].astype(int),
+            marker="+"
+            )
+        plt.xlim([-10,10])
+        plt.ylim([5000,0])
+        plt.grid()
+        plt.savefig(cfg.directory['logs'] + 'oxy_residual' + f_suffix + '.png')
 
-            p0 = cfw_coef[0], cfw_coef[1], cfw_coef[2], cfw_coef[3], cfw_coef[4], cfw_coef[5], cfw_coef[6]
-            weights = 1/((merged_df['CTDPRS_sbe43_ctd']))
-            cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0, sigma=weights, absolute_sigma=False)
-            merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
-            merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
-            stdres = np.std(merged_df['res_sbe43'])
-            cutoff = stdres * 2.8
-            thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
-
-    except RuntimeError:
-
-        try:#Nested try/except could be better
-            print('Weighted Curve fitting failed...using Unweighted Fitting')
-            cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0)
-            merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
-
-            merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
-            stdres = np.std(merged_df['res_sbe43'])
-            cutoff = stdres * 2.8
-
-            thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            bad_df = pd.concat([bad_df, bad_values])
-            merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
-
-            while not thrown_values.empty:
-
-                p0 = cfw_coef[0], cfw_coef[1], cfw_coef[2], cfw_coef[3], cfw_coef[4], cfw_coef[5], cfw_coef[6]
-                cfw_coef , cov = scipy.optimize.curve_fit(oxy_equation, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']), merged_df['REFOXY_sbe43'], p0)
-                merged_df['CTDOXY'] = SB_oxy_eq(cfw_coef, merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd'])
-                merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
-                stdres = np.std(merged_df['res_sbe43'])
-                cutoff = stdres * 2.8
-                thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-                bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-                merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
-
-        except:
-            print('Curve fitting failed...using SBE coef')
-            cfw_coef = coef0
-            merged_df['res_sbe43'] = merged_df['REFOXY_sbe43'] - merged_df['CTDOXY']
-            stdres = np.std(merged_df['res_sbe43'])
-            cutoff = stdres * 2.8
-            thrown_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            bad_values = merged_df[np.abs(merged_df['res_sbe43']) > cutoff]
-            merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
-
-
-    good_df = pd.concat([good_df, merged_df])
-    good_df['CTDOXY_FLAG_W'] = 2
-    bad_df = pd.concat([bad_df, bad_values])
+    # good_df = pd.concat([good_df, merged_df])
+    merged_df['CTDOXY_FLAG_W'] = 2
+    # bad_df = pd.concat([bad_df, bad_values])
     bad_df['CTDOXY_FLAG_W'] = 3
-    df = pd.concat([good_df,bad_df])
-    df.sort_values(by='CTDPRS_sbe43_btl',ascending=False,inplace=True)
+    df = pd.concat([merged_df,bad_df])
 
-    return cfw_coef, df
+    # df['SSSCC_int'] = df['SSSCC_sbe43'].astype(int)
+    # df.sort_values(by=['SSSCC_int','btl_fire_num'],ascending=[True,True],inplace=True)
+    # df.drop('SSSCC_int', axis=1, inplace=True)
+
+    return cfw_coefs, df
+
+def prepare_oxy(btl_df, time_df, ssscc_list):
+    """
+    Calculate oxygen-related variables needed for calibration:
+    sigma, oxygen solubility (OS), and bottle oxygen
+
+    Parameters
+    ----------
+    btl_df : DataFrame
+        CTD data at bottle stops
+    time_df : DataFrame
+        Continuous CTD data
+    ssscc_list : list of str
+        List of stations to process
+
+    Returns
+    -------
+
+    """
+    # calculate sigma
+    btl_df["sigma_btl"] = sigma_from_CTD(
+        btl_df[cfg.column["sal_btl"]],
+        btl_df[cfg.column["t1_btl"]],  # oxygen sensor is on primary line (ie t1)
+        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["lon_btl"]],
+        btl_df[cfg.column["lat_btl"]],
+    )
+    time_df["sigma_ctd"] = sigma_from_CTD(
+        time_df[cfg.column["sal"]],
+        time_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
+        time_df[cfg.column["p"]],
+        time_df[cfg.column["lon_btl"]],
+        time_df[cfg.column["lat_btl"]],
+    )
+    # Calculate SA and CT
+    btl_df["SA"] = gsw.SA_from_SP(
+        btl_df[cfg.column["sal_btl"]],
+        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["lon_btl"]],
+        btl_df[cfg.column["lat_btl"]],
+    )
+    btl_df["CT"] = gsw.CT_from_t(
+        btl_df["SA"],
+        btl_df[cfg.column["t1_btl"]],  # oxygen sensor is on primary line (ie t1)
+        btl_df[cfg.column["p_btl"]],
+    )
+    time_df["SA"] = gsw.SA_from_SP(
+        time_df[cfg.column["sal"]],
+        time_df[cfg.column["p"]],
+        time_df[cfg.column["lon_btl"]],
+        time_df[cfg.column["lat_btl"]],
+    )
+    time_df["CT"] = gsw.CT_from_t(
+        time_df["SA"],
+        time_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
+        time_df[cfg.column["p"]],
+    )
+    # Calculate oxygen solubility in µmol/kg
+    btl_df["OS_btl"] = gsw.O2sol(  # any reason to label as OS_btl? not really..
+        btl_df["SA"],
+        btl_df["CT"],
+        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["lon_btl"]],
+        btl_df[cfg.column["lat_btl"]],
+    )
+    time_df["OS_ctd"] = gsw.O2sol(  # any reason to label as OS_ctd?
+        time_df["SA"],
+        time_df["CT"],
+        time_df[cfg.column["p"]],
+        time_df[cfg.column["lon"]],
+        time_df[cfg.column["lat"]],
+    )
+    # Calculate bottle oxygen
+    btl_df[cfg.column["oxy_btl"]] = calculate_bottle_oxygen(
+        ssscc_list,
+        btl_df["SSSCC"],
+        btl_df["TITR_VOL"],
+        btl_df["TITR_TEMP"],
+        btl_df["FLASKNO"],
+    )
+    btl_df[cfg.column["oxy_btl"]] = oxy_ml_to_umolkg(
+        btl_df[cfg.column["oxy_btl"]], btl_df["sigma_btl"]
+    )
+    btl_df["OXYGEN_FLAG_W"] = flag_winkler_oxygen(
+        btl_df[cfg.column["oxy_btl"]]
+    )
+
+    return True
+
+
+def calibrate_oxy(btl_df, time_df, ssscc_list):
+    """
+    Non-linear least squares fit chemical sensor oxygen against bottle oxygen.
+
+    Parameters
+    ----------
+    btl_df : DataFrame
+        CTD data at bottle stops
+    time_df : DataFrame
+        Continuous CTD data
+    ssscc_list : list of str
+        List of stations to process
+
+    Returns
+    -------
+
+    """
+    # Prep vars, dfs, etc.
+    all_sbe43_merged = pd.DataFrame()
+    sbe43_dict = {}
+    all_sbe43_fit = pd.DataFrame()
+
+    # Density match time/btl oxy dataframes
+    for ssscc in ssscc_list:
+        time_data = time_df[time_df["SSSCC"] == ssscc].copy()
+        btl_data = btl_df[btl_df["SSSCC"] == ssscc].copy()
+        # can't calibrate without bottle oxygen ("OXYGEN")
+        if (btl_data["OXYGEN_FLAG_W"] == 9).all():
+            sbe43_dict[ssscc] = np.full(5, np.nan)
+            print(ssscc + " skipped, all oxy data is NaN")
+            continue
+        sbe43_merged = match_sigmas(
+            btl_data[cfg.column["p_btl"]],
+            btl_data[cfg.column["oxy_btl"]],
+            btl_data["sigma_btl"],
+            btl_data["btl_fire_num"],  # used for sorting later
+            time_data["sigma_ctd"],
+            time_data["OS_ctd"],
+            time_data[cfg.column["p"]],
+            time_data[cfg.column["t1"]],
+            time_data[cfg.column["oxyvolts"]],
+            time_data["scan_datetime"],
+            time_data["SSSCC"],
+        )
+        all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
+        print(ssscc + " density matching done")
+
+    # Fit ALL oxygen stations together to get initial coefficient guess
+    (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged)
+
+    # Fit oxygen stations using SSSCC chunks to refine coefficients
+    ssscc_files = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_ox*.csv"))
+    for f in ssscc_files:
+        ssscc_list_ox = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+        sbe_coef, sbe_df = sbe43_oxy_fit(
+            all_sbe43_merged.loc[all_sbe43_merged["SSSCC_sbe43"].isin(ssscc_list_ox)],
+            sbe_coef0=sbe_coef0,
+            f_out=f,
+        )
+        # build coef dictionary
+        for ssscc in ssscc_list_ox:
+            if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
+                sbe43_dict[ssscc] = sbe_coef
+        # all non-NaN oxygen data with flags
+        all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
+
+    # TODO: save outlier data from fits?
+    # TODO: secondary oxygen flagging step (instead of just taking outliers from fit routine)
+
+    # apply coefs
+    time_df["CTDOXY"] = -999
+    for ssscc in ssscc_list:
+        if np.isnan(sbe43_dict[ssscc]).all():
+            print(ssscc + " missing oxy data, leaving -999 values and flagging as 9")
+            time_df.loc[time_df["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
+            time_df.loc[time_df["SSSCC"] == ssscc, "RINKO_FLAG_W"] = 9
+            continue
+        btl_rows = (btl_df["SSSCC"] == ssscc).values
+        time_rows = (time_df["SSSCC"] == ssscc).values
+        btl_df.loc[btl_rows, "CTDOXY"] = _PMEL_oxy_eq(
+            sbe43_dict[ssscc],
+            (
+                btl_df.loc[btl_rows, cfg.column["oxyvolts"]],
+                btl_df.loc[btl_rows, cfg.column["p_btl"]],
+                btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                btl_df.loc[btl_rows, "dv_dt"],
+                btl_df.loc[btl_rows, "OS_btl"],
+            ),
+        )
+        print(ssscc + " btl data fitting done")
+        time_df.loc[time_rows, "CTDOXY"] = _PMEL_oxy_eq(
+            sbe43_dict[ssscc],
+            (
+                time_df.loc[time_rows, cfg.column["oxyvolts"]],
+                time_df.loc[time_rows, cfg.column["p"]],
+                time_df.loc[time_rows, cfg.column["t1"]],
+                time_df.loc[time_rows, "dv_dt"],
+                time_df.loc[time_rows, "OS_ctd"],
+            ),
+        )
+        print(ssscc + " time data fitting done")
+
+    # TODO: flag oxy data here? compare w/ T/C routines
+
+    # export fitting coefs
+    sbe43_coefs = pd.DataFrame.from_dict(
+        sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
+    )
+    sbe43_coefs.to_csv(cfg.directory["logs"] + "sbe43_coefs.csv")
+    
+    return True
 
 def apply_oxygen_coef_ctd(df, coef_df, ssscc, ssscc_col='SSSCC',oxyvo_col='CTDOXYVOLTS',
                           time_col='scan_datetime',prs_col='CTDPRS',tmp_col='CTDTMP1',

@@ -158,10 +158,10 @@ def group_scans(array, header):
     scan = 0
     group_start = 0
     for counter, line in enumerate(array):
-        if scan is 0:
+        if scan == 0:
             scan = line[0]
             group_start = counter
-        elif scan is not 0:
+        elif scan != 0:
             if line[0] - scan > 1:
                 #debugPrint(group_start, counter-1)
                 output += bottle_avg(array[group_start:counter-1], header) +'\n'

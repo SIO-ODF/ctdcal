@@ -11,14 +11,18 @@ import math
 import ctdcal.report_ctd as report_ctd
 import warnings
 import ctdcal.fit_ctd as fit_ctd
-import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
+import config as cfg
 
 import sys
 sys.path.append('ctdcal/')
 import settings
 import oxy_fitting
 import gsw
+import csv
+from collections import OrderedDict
+from pathlib import Path
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
 
@@ -331,8 +335,7 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
             else:
                 q_df[pq] = q_df[pq].fillna(2)
 
-        q_nd = q_df.as_matrix(columns=q_df.columns)
-    return q_nd
+    return q_df.values  # ndarray format
 
 def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
     """formatTimeEpoc function
@@ -610,11 +613,10 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
         tmp = len(inMat);
         # Searches last half of NDarray for conductivity threshold
-
         if len(inMat) % 2 == 0:
             inMat_2 = inMat.copy()
         else:
-            inMat_2 = inMat.iloc[1:].copy()
+            inMat_2 = inMat[1:].copy()
 
         inMat_half1, inMat_half2 = np.split(inMat_2,2)
         ep = inMat_half2[(inMat_half2[c1_col] < conductivity_startup) & (inMat_half2[c2_col] < conductivity_startup)][p_col]
@@ -625,8 +627,10 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 #                if (tmp > j): tmp = j
 
         # Evaluate ending pressures
-        if (len(ep) > (time_delay)): end_p = np.average(ep[(time_delay):])
-        else: end_p = np.average(ep[(len(ep)):])
+        if (len(ep) > (time_delay)):
+            end_p = np.average(ep[(time_delay):])
+        else:
+            end_p = np.average(ep[(len(ep)):])
 
         # Remove on-deck ending
         outMat = inMat[:tmp]
@@ -902,55 +906,127 @@ def fill_surface_data(df, **kwargs):
 
     return df_merged.fillna(method='bfill')
 
-def load_reft_data(reft_file,index_name = 'btl_fire_num'):
-    """ Loads reft_file to dataframe and reindexes to match bottle data dataframe"""
 
-    # loading in REFTMP_FLAG_W here will conflict with the REFTMP_FLAG_W determined during temperature calibration
-    #reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90','REFTMP_FLAG_W'])
+def _reft_loader(ssscc, reft_dir):
+    reft_path = reft_dir + ssscc + ".cap"
+    # this works better than pd.read_csv as format is semi-inconsistent (cf .cap files)
+    with open(reft_path, "r", newline="") as f:
+        reftF = csv.reader(
+            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
+        )
+        reftArray = []
+        for row in reftF:
+            if len(row) != 17:  # skip over 'bad' rows (empty lines, comments, etc.)
+                continue
+            reftArray.append(row)
 
-    reft_data = pd.read_csv(reft_file,usecols=['btl_fire_num','T90'])
+    reftDF = pd.DataFrame.from_records(reftArray)
+    reftDF = reftDF.replace(  # remove text columns, only need numbers and dates
+        to_replace=["bn", "diff", "val", "t90", "="], value=np.nan
+    )
+    reftDF = reftDF.dropna(axis=1)
+    reftDF[1] = reftDF[[1, 2, 3, 4]].agg(" ".join, axis=1)  # dd/mm/yy/time cols are
+    reftDF.drop(columns=[2, 3, 4], inplace=True)  # read separately; combine into one 
+    columns = OrderedDict(  # having this as a dict streamlines next steps
+        [
+            ("index_memory", int),
+            ("datetime", object),
+            ("btl_fire_num", int),
+            ("diff", int),
+            ("raw_value", float),
+            ("T90", float),
+        ]
+    )
+    reftDF.columns = list(columns.keys())  # name columns
+    reftDF = reftDF.astype(columns)  # force dtypes
+    # assign initial qality flags
+    reftDF.loc[:, "REFTMP_FLAG_W"] = 2
+    reftDF.loc[abs(reftDF["diff"]) >= 3000, "REFTMP_FLAG_W"] = 3
+    # add in STNNBR, CASTNO columns
+    # TODO: should these be objects or floats? be consistent!
+    # string prob better for other sta/cast formats (names, letters, etc.)
+    reftDF["STNNBR"] = ssscc[0:3]
+    reftDF["CASTNO"] = ssscc[3:5]
+    return reftDF
+
+
+def process_reft(ssscc_list, reft_dir=cfg.directory["reft"]):
+    # TODO: import reft_dir from a config file
+    """
+    SBE35 reference thermometer processing function. Load in .cap files for given
+    station/cast list, perform basic flagging, and export to .csv files.
+
+    Inputs
+    ------
+    ssscc_list : list of str
+        List of stations to process
+    reft_dir : str, optional
+        Path to folder containing raw salt files (defaults to data/reft/)
+
+    """
+    for ssscc in ssscc_list:
+        if not Path(reft_dir + ssscc + "_reft.csv").exists():
+            try:
+                reftDF = _reft_loader(ssscc, reft_dir)
+                reftDF.to_csv(reft_dir + ssscc + "_reft.csv", index=False)
+            except FileNotFoundError:
+                print("refT file for cast " + ssscc + " does not exist... skipping")
+                return
+
+def _load_reft_data(reft_file, index_name="btl_fire_num"):
+    """
+    Loads reft_file to dataframe and reindexes to match bottle data dataframe
+
+    Note: loading in REFTMP_FLAG_W here will conflict with the REFTMP_FLAG_W
+    determined during temperature calibration.
+    """
+    reft_data = pd.read_csv(reft_file, usecols=["btl_fire_num","T90"])
     reft_data.set_index(index_name)
-
-    reft_data['SSSCC_TEMP'] = reft_file[-14:-9]
+    reft_data['SSSCC_TEMP'] = Path(reft_file).stem.split("_")[0]
     reft_data['REFTMP'] = reft_data['T90']
 
     return reft_data
 
-def load_salt_data(salt_file, index_name= 'SAMPNO'):
-    salt_data = pd.read_csv(salt_file,usecols = ['SAMPNO','SALNTY','BathTEMP','CRavg'])
+def _load_salt_data(salt_file, index_name="SAMPNO"):
+    """
+    Loads salt_file to dataframe and reindexes to match bottle data dataframe
+    """
+    salt_data = pd.read_csv(
+        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"]
+    )
     salt_data.set_index(index_name)
-    salt_data['SSSCC_SALT'] = salt_file[-15:-10]
-    salt_data.rename(columns={'SAMPNO':'SAMPNO_SALT'}, inplace=True)
+    salt_data["SSSCC_SALT"] = Path(salt_file).stem.split("_")[0]
+    salt_data.rename(columns={"SAMPNO": "SAMPNO_SALT"}, inplace=True)
+
     return salt_data
 
 
 
-def load_btl_data(btl_file,cols=None):
-
-    """ex. '/Users/k3jackson/p06e/data/bottle/00201_btl_mean.pkl'"""
-
+def _load_btl_data(btl_file, cols=None):
+    """
+    Loads "bottle mean" CTD data from .pkl file. Function will return all data unless
+    cols is specified (as a list of column names)
+    """
     btl_data = dataToNDarray(btl_file,float,True,',',0)
-
     btl_data = pd.DataFrame.from_records(btl_data)
     if cols != None:
         btl_data = btl_data[cols]
-
-    ssscc = btl_file[-18:-13]
-
-    btl_data['SSSCC'] = ssscc
+    btl_data["SSSCC"] = Path(btl_file).stem.split("_")[0]
 
     return btl_data
 
 
-def load_time_data(time_file):
+# MK: deprecated 04/28/20, use load_all_ctd_files
+# def load_time_data(time_file):
 
-    time_data = dataToNDarray(time_file,float,True,',',1)
-    time_data = pd.DataFrame.from_records(time_data)
+#     time_data = dataToNDarray(time_file,float,True,',',1)
+#     time_data = pd.DataFrame.from_records(time_data)
 
-    return time_data
+#     return time_data
 
 
-def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
+# def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
+def calibrate_param(param,ref_param,press,ssscc,btl_num,xRange=None,):
 ### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION
 
 
@@ -978,14 +1054,15 @@ def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,
 
         df_good_cons = df_good[(df_good[param.name] >= x0) & (df_good[param.name] <= x1)]
 
-    if 'P' in calib:
-        coef = get_param_coef(df_good_cons[press.name],df_good_cons['Diff'],order,calib)
-    elif 'T' or 'C' in calib:
-        coef = get_param_coef(df_good_cons[param.name],df_good_cons['Diff'],order,calib)
-    else:
-        print('calib argument not valid, use CP TP T or C')
+    return df_good_cons,df_ques
+    # if 'P' in calib:
+    #     coef = get_param_coef(df_good_cons[press.name],df_good_cons['Diff'],order,calib)
+    # elif 'T' or 'C' in calib:
+    #     coef = get_param_coef(df_good_cons[param.name],df_good_cons['Diff'],order,calib)
+    # else:
+    #     print('calib argument not valid, use CP TP T or C')
 
-    return coef,df_ques
+    # return coef,df_ques
 
 def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
 
@@ -1299,22 +1376,20 @@ def prepare_all_fit_data(ssscc,df,ref_data,param):
     return data_concat
 
 
-def get_pressure_offset(start_vals,end_vals):
+def _get_pressure_offset(start_vals, end_vals):
     """
-    Finds unique values and calclates mean for pressure offset
+    Finds unique values and calculate mean for pressure offset
 
     Parameters
     ----------
+    start_vals : array_like
+        Array of initial ondeck pressure values
 
-    start_vals :array_like
-                Array containing initial ondeck pressure values
-
-    end_vals :array_like
-              Array containing ending ondeck pressure values
+    end_vals : array_like
+        Array of ending ondeck pressure values
     Returns
     -------
-
-    p_off :float
+    p_off : float
          Average pressure offset
 
     """
@@ -1337,176 +1412,187 @@ def get_pressure_offset(start_vals,end_vals):
 
     return p_off
 
-def load_pressure_logs(file):
+
+def apply_pressure_offset(df, p_col="CTDPRS"):
+    # TODO: import p_col from config file
     """
-        Loads pressure offset file from logs.
+    Calculate pressure offset using deck pressure log and apply it to the data.
+    Pressure flag column is added with value 2, indicating the data are calibrated.
 
     Parameters
     ----------
-
-    file : string
-           Path to ondeck_pressure log
+    df : DataFrame
+        DataFrame containing column with pressure values
+    p_col : str, optional
+        Pressure column name in DataFrame (defaults to CTDPRS)
 
     Returns
     -------
-
     df : DataFrame
-         Pandas DataFrame containing ondeck start and end pressure values
+        DataFrame containing updated pressure values and a new flag column
 
     """
-
-    df = pd.read_csv(file,names=['SSSCC','ondeck_start_p','ondeck_end_p'])
-
-    # Change vaules in each row by removing non-number parts
-    df['SSSCC'] = df['SSSCC'].str[-5:]
-    df['ondeck_start_p'] = df['ondeck_start_p'].str[16:]
-    df['ondeck_end_p'] = df['ondeck_end_p'].str[14:]
-    df.loc[df['ondeck_start_p'].str[-5:] == 'Water','ondeck_start_p'] = np.NaN
-    df['ondeck_start_p'] = df['ondeck_start_p'].astype(float)
-    df['ondeck_end_p'] = df['ondeck_end_p'].astype(float)
-
+    p_log = pd.read_csv(cfg.directory["logs"] + "ondeck_pressure.csv", dtype={"SSSCC":str})
+    p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p)
+    df[p_col] += p_offset
+    df[p_col + "_FLAG_W"] = 2
 
     return df
 
-def write_offset_file(df,p_off,write_file='data/logs/poffset_test.csv'):
+
+def make_depth_log(time_df):
+    # TODO: get column names from config file
     """
+    Create depth log file from maximum depth of each station/cast in time DataFrame.
+
+    Parameters
+    ----------
+    time_df : DataFrame
+        DataFrame containing continuous CTD data
 
     """
-    df_out = pd.DataFrame()
-    df_out['SSSCC'] = df['SSSCC']
-    df_out['offset'] = p_off
+    ssscc_list = time_df["SSSCC"].unique()
+    depth_dict = {}
+    for ssscc in ssscc_list:
+        time_rows = time_df["SSSCC"] == ssscc
+        # TODO: improve error handling s.t. SSSCC is reported with error message for
+        # stations with altimeter readings below threshold (in_find_cast_depth)
+        max_depth = _find_cast_depth(
+            ssscc,
+            time_df.loc[time_rows, "CTDPRS"],
+            time_df.loc[time_rows, "GPSLAT"],
+            time_df.loc[time_rows, "ALT"],
+        )
+        depth_dict[ssscc] = max_depth
 
-    df_out.to_csv(write_file,index=False)
+    depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
+    depth_df.reset_index(inplace=True)
+    depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
+    depth_df.to_csv(cfg.directory["logs"] + "depth_log.csv", index=False)
+    return True
 
-    return
+def get_ssscc_list():
+    """
+    Load in list of stations/casts to process.
+    """
+    ssscc_list = []
+    with open(cfg.directory["ssscc_file"], "r") as filename:
+        ssscc_list = [line.strip() for line in filename]
 
-def pressure_calibrate(file):
-
-    pressure_log = load_pressure_logs(file)
-    p_off = get_pressure_offset(pressure_log)
-
-    return p_off
+    return ssscc_list
 
 def load_hy_file(path_to_hyfile):
     df = pd.read_csv(path_to_hyfile, comment='#', skiprows=[0])
     df = df[df['EXPOCODE'] != 'END_DATA']
     return df
 
-def load_all_ctd_files(ssscc,prefix,postfix,series,cols,reft_prefix='data/reft/',reft_postfix='_reft.csv',
-                       refc_prefix='data/salt/',refc_postfix='_salts.csv',press_file='data/logs/ondeck_pressure.csv', cast_details = 'data/logs/cast_details.csv',
-                       oxy_prefix='data/oxygen/', oxy_postfix='',index_col='btl_fire_num',t_col='CTDTMP1',
-                       p_col='CTDPRS',ssscc_col='SSSCC'):
+def load_all_ctd_files(ssscc_list, series, cols=None):
     """
-    LOAD ALL CTD FILES was changed (commented out)
-    Lines 1324-1328,1335,1337, 1338,345
+    Load CTD and secondary (e.g. reference temperature, bottle salts, bottle oxygen)
+    files for station/cast list and merge into a dataframe.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to load
+    series : str
+        Data series to load ("bottle" or "time")
+    cols : list of str, optional
+        Subset of columns to load, defaults to loading all
+
+    Returns
+    -------
+    df_data_all : DataFrame
+        Merged dataframe containing all loaded data
+    
     """
     df_data_all = pd.DataFrame()
 
     if series == 'bottle':
-        for x in ssscc:
-            print('Loading BTL data for station: ' + x + '...')
-            btl_file = prefix + x + postfix
-            btl_data = load_btl_data(btl_file,cols)
+        for ssscc in ssscc_list:
+            print('Loading BTL data for station: ' + ssscc + '...')
+            btl_file = cfg.directory["bottle"] + ssscc + '_btl_mean.pkl'
+            btl_data = _load_btl_data(btl_file,cols)
 
-
-            reft_file = reft_prefix + x + reft_postfix
+            ### load REFT data
+            reft_file = cfg.directory["reft"] + ssscc + '_reft.csv'
             try:
-                reft_data = load_reft_data(reft_file)
+                reft_data = _load_reft_data(reft_file)
             except FileNotFoundError:
-                print('Missing (or misnamed) REFT Data Station: ' + x + '...filling with NaNs')
-                reft_data = pd.DataFrame()
-                reft_data[index_col] = pd.Series(btl_data[index_col].values.astype(int))
-                reft_data['T90'] = pd.Series([np.nan]*len(btl_data))
-                ref_ssscc = ssscc_col + '_TEMP'
-                reft_data[ref_ssscc] = x
-                reft_data.index = btl_data.index
+                print('Missing (or misnamed) REFT Data Station: ' + ssscc + '...filling with NaNs')
+                reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"])
+                reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
+                reft_data["SSSCC_TEMP"] = ssscc
 
-
-            #refc_file = refc_prefix + x + refc_postfix
-            refc_file = refc_prefix + x + refc_postfix
+            ### load REFC data
+            refc_file = cfg.directory["salt"] + ssscc + '_salts.csv'
             try:
-                #refc_data = fit_ctd.salt_calc(refc_file,index_col,t_col,p_col,btl_data)
-                refc_data = load_salt_data(refc_file, index_name= 'SAMPNO')
-
-
+                refc_data = _load_salt_data(refc_file, index_name='SAMPNO')
             except FileNotFoundError:
-                print('Missing (or misnamed) REFC Data Station: ' + x + '...filling with NaNs')
-                refc_data = pd.DataFrame()
-                refc_data['SAMPNO_SALT'] = pd.Series(btl_data[index_col].values.astype(int))
-                refc_data['CRavg'] = pd.Series([np.nan]*len(btl_data))
-                refc_data['BathTEMP'] = pd.Series([np.nan]*len(btl_data))
-                refc_data['BTLCOND'] = pd.Series([np.nan]*len(btl_data))
-                refc_data.index = btl_data.index
+                print('Missing (or misnamed) REFC Data Station: ' + ssscc + '...filling with NaNs')
+                refc_data = pd.DataFrame(
+                    index=btl_data.index,
+                    columns=["CRavg", "BathTEMP", "BTLCOND"],
+                )
+                refc_data['SAMPNO_SALT'] = btl_data['btl_fire_num'].astype(int)
 
-
-            #Fix Index for each parameter to bottle number
-
-#            btl_data[index_col] = btl_data[index_col].astype(int)
-#            btl_data=btl_data.set_index(btl_data[index_col].values)
-#
-#            reft_data = reft_data.set_index(reft_data[index_col].values)
-
-            oxy_file = oxy_prefix + x + oxy_postfix
+            ### load OXY data
+            oxy_file = cfg.directory["oxy"] + ssscc
             try:
                 oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
             except FileNotFoundError:
-                print('Missing (or misnamed) REFO Data Station: ' + x + '...filling with NaNs')
-                oxy_data = pd.DataFrame()
-                oxy_data['BOTTLENO_OXY'] = pd.Series(btl_data[index_col].values.astype(int))
-                oxy_data['STNNO_OXY'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['CASTNO_OXY'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['FLASKNO'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['TITR_VOL'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['TITR_TEMP'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['DRAW_TEMP'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['TITER_TIME'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data['END_VOLTS'] = pd.Series([np.nan]*len(btl_data))
-                oxy_data.index = btl_data.index
+                print('Missing (or misnamed) REFO Data Station: ' + ssscc + '...filling with NaNs')
+                oxy_data = pd.DataFrame(
+                    index=btl_data.index,
+                    columns=[
+                        "STNNO_OXY",
+                        "CASTNO_OXY",
+                        "FLASKNO",
+                        "TITR_VOL",
+                        "TITR_TEMP",
+                        "DRAW_TEMP",
+                        "TITR_TIME",
+                        "END_VOLTS",
+                    ],
+                )
+                oxy_data['BOTTLENO_OXY'] = btl_data['btl_fire_num'].astype(int)
 
-#            #Horizontally concat DFs to have all data in one DF
-#            btl_data_full = pd.concat([btl_data,reft_data,refc_data,oxy_data],axis=1)
-
+            ### clean up dataframe
+            # Horizontally concat DFs to have all data in one DF
             btl_data = pd.merge(btl_data,reft_data,on='btl_fire_num',how='outer')
             btl_data = pd.merge(btl_data,refc_data,left_on='btl_fire_num',right_on='SAMPNO_SALT',how='outer')
             btl_data = pd.merge(btl_data,oxy_data,left_on='btl_fire_num',right_on='BOTTLENO_OXY',how='outer')
 
             if len(btl_data) > 36:
-                print("***** Len of btl data for station: ",x,' is > 36, check for multiple stations/casts in reference parameter files *****')
+                print("***** Len of btl data for station: ",ssscc,' is > 36, check for multiple stations/casts in reference parameter files *****')
 
-            ### Calculate dv/dt for oxygen fitting
+            # Calculate dv/dt for oxygen fitting
             btl_data['dv_dt'] = oxy_fitting.calculate_dVdT(btl_data['CTDOXYVOLTS'],btl_data['scan_datetime'])
-            #btl_data = get_btl_time(btl_data,'btl_fire_num','scan_datetime')
-
 
             # Add bottom of cast information (date,time,lat,lon,etc.)
-            btl_data = add_btl_bottom_data(btl_data, x, cast_details)
+            btl_data = _add_btl_bottom_data(btl_data, ssscc, cfg.directory["logs"] + "cast_details.csv")
 
-#            #Drop columns that have no CTD data
-#            btl_data_full = btl_data_full.dropna(subset=cols)
-            #btl_data = btl_data.set_index(['SSSCC','GPSLAT','GPSLON','CTDPRS'],drop=True)
+            # Merge cast into df_data_all
             try:
                 df_data_all = pd.concat([df_data_all,btl_data],sort=False)
             except AssertionError:
-                raise AssertionError('Colums of ' + x + ' do not match those of previous columns')
-            print('* Finished BTL data station: ' + x + ' *')
+                raise AssertionError('Columns of ' + ssscc + ' do not match those of previous columns')
+            print('* Finished BTL data station: ' + ssscc + ' *')
 
-        #Drops duplicated columns generated by concatenation
+        # Drop duplicated columns generated by concatenation
         df_data_all = df_data_all.loc[:,~df_data_all.columns.duplicated()]
-        #if 'GPSLAT' in df_data_all.keys():
-         #   df_data_all['LATITUDE'] = df_data_all['GPSLAT']
-        #if 'GPSLON' in df_data_all.keys():
-        #    df_data_all['LONGITUDE'] = df_data_all['GPSLON']
+        
     elif series == 'time':
-        for x in ssscc:
-
-            print('Loading TIME data for station: ' + x + '...')
-            file = prefix + x + postfix
-            #time_data = load_time_data(file)
-            time_data = pd.read_pickle(file)
-            time_data['SSSCC'] = str(x)
+        df_data_all = []
+        for ssscc in ssscc_list:
+            print('Loading TIME data for station: ' + ssscc + '...')
+            time_file = cfg.directory["time"] + ssscc + '_time.pkl'
+            time_data = pd.read_pickle(time_file)
+            time_data['SSSCC'] = str(ssscc)
             time_data['dv_dt'] = oxy_fitting.calculate_dVdT(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
-            df_data_all = pd.concat([df_data_all,time_data], sort=False)
-            print('** Finished TIME data station: ' + x + ' **')
+            df_data_all.append(time_data)
+            print('** Finished TIME data station: ' + ssscc + ' **')
+        df_data_all = pd.concat(df_data_all, axis=0, sort=False)
 
     df_data_all['master_index'] = range(len(df_data_all))
 
@@ -1583,13 +1669,32 @@ def merge_oxy_flags(btl_data):
     mask = (btl_data['OXYGEN'].isna())
     btl_data.loc[mask,'OXYGEN_FLAG_W'] = 9
 
-def find_cast_depth(press,lat,alt,threshold=80):
-    # Create Dataframe containing args
-    df = pd.DataFrame()
-    df['CTDPRS'] = press
-    df['LAT'] = lat
-    df['ALT'] = alt
+def _find_cast_depth(ssscc,press,lat,alt,threshold=80):
+    """
+    Calculate the depth of a given cast. If rosette does not get within the threshold
+    distance of the bottom, returns NaN.
 
+    Parameters
+    -----------
+    ssscc : str
+        Current station/cast name
+    press : array-like
+        CTD pressure
+    lat : array-like
+        Ship latitude
+    alt : array-like
+        CTD altimeter reading
+    threshold : int, optional
+        Maximum altimeter reading to consider cast "at the bottom" (defaults to 80)
+
+    Returns
+    --------
+    max_depth : int
+        Maximum depth from the cast
+
+    """
+    # Create Dataframe containing args
+    df = pd.DataFrame({"CTDPRS": press, "LAT": lat, "ALT": alt})
     # Calculate DEPTH using gsw
     df['DEPTH'] = np.abs(gsw.z_from_p(df['CTDPRS'],df['LAT']))
 
@@ -1599,7 +1704,12 @@ def find_cast_depth(press,lat,alt,threshold=80):
         max_depth = bottom_alt + df['CTDPRS'].max()
         max_depth = int(max_depth.values[0])
     else:
-        print('Altimeter reading is not reporting values below the threshold ',threshold,' setting max depth to NaN')
+        print(
+            ssscc,
+            "- minimum altimeter reading above",
+            threshold,
+            "m threshold, setting max depth to NaN",
+        )
         max_depth = np.NaN
 
     return max_depth
@@ -1656,27 +1766,13 @@ def get_btl_time(df,btl_num_col,time_col):
 
     return df
 
-def add_btl_bottom_data(df, cast, log_file, press_col='CTDPRS', lat_col='LATITUDE', lon_col='LONGITUDE', time_col = 'TIME',prcn=4):
+def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', decimals=4):
+    cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
+    cast_details = cast_details[cast_details["SSSCC"] == cast]
+    df[lat_col] = np.round(cast_details['latitude'].iat[0], decimals)
+    df[lon_col] = np.round(cast_details['longitude'].iat[0], decimals)
 
-    cast_details = dataToNDarray(log_file,str,None,',',0)
-
-    for line in cast_details:
-        if cast in line[0]:
-            for val in line:
-                if 'at_depth' in val: btime = float(str.split(val, ':')[1])
-                if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
-                if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
-                if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
-                if 'at_depth' in val: btm_time = float(str.split(val, ':')[1])
-                if 'max_pressure' in val: btm_press = float(str.split(val, ':')[1])
-            break
-
-
-    df[lat_col] = np.round(btm_lat,prcn)
-    df[lon_col] = np.round(btm_lon,prcn)
-
-
-    ts = pd.to_datetime(btm_time,unit='s')
+    ts = pd.to_datetime(cast_details['bottom_time'].iat[0], unit="s")
     date = ts.strftime('%Y%m%d')
     hour= ts.strftime('%H%M')
     df['DATE'] = date
@@ -1757,6 +1853,7 @@ def flag_missing_values(df,flag_suffix='_FLAG_W'):
     return df
 
 def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='CTDPRS', ssscc_col='SSSCC', bin_size=2, direction='down'):
+    # remove
     df_binned = pd.DataFrame()
     for cast in ssscc:
         time_data = df.loc[df[ssscc_col] == cast].copy()
@@ -1786,123 +1883,119 @@ def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='
         df_binned = pd.concat([df_binned,time_data])
     return df_binned
 
-def export_ct1(df,ssscc,expocode,section_id,ctd,p_column_names,p_column_units,
-               out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
-               logFile='data/logs/cast_details.csv'):
-    """ Export Time data to pressure directory as well as adding qual_flags and
-    removing unneeded columns"""
+def export_ct1(df, ssscc_list):
+    """ 
+    Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
+    adding quality flags and removing unneeded columns.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Continuous CTD data
+    ssscc_list : list of str
+        List of stations to export
 
+    Returns
+    -------
+
+    Notes
+    -----
+    Needs depth_log.csv and manual_depth_log.csv to run successfully
+
+    """
+    print("Exporting *_ct1.csv files")
+    # clean up columns
+    p_column_names = cfg.ctd_time_output["col_names"]
+    p_column_units = cfg.ctd_time_output["col_units"]
+    # initial flagging (some of this should be moved)
+    # TODO: actual CTDOXY flagging (oxy_fitting.calibrate_oxy)
+    df["CTDOXY_FLAG_W"] = 2
+    # TODO: flag bad based on cond/temp and handcoded salt
+    df["CTDSAL_FLAG_W"] = 2
+    df["CTDTMP_FLAG_W"] = 2
+    # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
+    # TODO: may not always have these channels so don't hardcode them in!
+    df["CTDFLUOR_FLAG_W"] = 1
+    df["CTDXMISS_FLAG_W"] = 1
+    df["CTDBACKSCATTER_FLAG_W"] = 1
+    # renames
+    df = df.rename(columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"})
+    # check that all columns are there
+    # TODO: make this better... (see process_ctd.format_time_data())
+    try:
+        df[p_column_names];  # this is lazy, do better
+    except KeyError:
+        print("Column names not configured properly... attempting to correct")
+        for col in p_column_names:
+            try:
+                df[col];
+            except KeyError:
+                if col.endswith("FLAG_W"):
+                    print(col + " missing, flagging with 9s")
+                    df[col] = 9
+                else:
+                    print(col + " missing, filling with -999s")
+                    df[col] = -999
+
+    # load other necessary params
+    # TODO: this will change when config.py improves, find different method
+    expocode = cfg.cruise["expocode"]
+    section_id = cfg.cruise["sectionid"]
+    ctd = cfg.ctd_serial
+    out_dir = cfg.directory["pressure"]
+    p_col = 'CTDPRS'
+    stacst_col = 'SSSCC'
+    logFile = cfg.directory["logs"] + 'cast_details.csv'
 
     df[stacst_col] = df[stacst_col].astype(str).copy()
 
-    cast_details = dataToNDarray(logFile,str,None,',',0)
-    depth_df = pd.read_csv('data/logs/depth_log.csv')
-    depth_df.dropna(inplace=True)
-    manual_depth_df = pd.read_csv('data/logs/manual_depth_log.csv')
-    full_depth_df = pd.concat([depth_df,manual_depth_df])
+    cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
+    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv').dropna()
+    manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv')
+    full_depth_df = pd.concat([depth_df,manual_depth_df])  # TODO: update from STNNBR to SSSCC
     full_depth_df.drop_duplicates(subset='STNNBR', keep='first',inplace=True)
 
-    for cast in ssscc:
+    for ssscc in ssscc_list:
 
-        time_data = df[df['SSSCC'] == cast].copy()
-
-        s_num = cast[-5:-2]
-        c_num = cast[-2:]
-        depth = full_depth_df.loc[full_depth_df['STNNBR'] == int(s_num),'DEPTH']
-        for line in cast_details:
-            if cast in line[0]:
-                for val in line:
-                    if 'at_depth' in val: btime = float(str.split(val, ':')[1])
-                    if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
-                    if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
-                    if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
-                break
-        time_data.drop(columns='SSSCC',inplace=True)
-        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
-        b_date = bdt[0]
-        b_time = bdt[1]
-        now = datetime.datetime.now()
-        file_datetime = now.strftime("%Y%m%d") #%H:%M")
-        file_datetime = file_datetime + 'ODFSIO'
-        outfile = open(out_dir+cast+'_ct1.csv', "w+")
-        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %.4f\nLONGITUDE = %.4f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
-        cn = np.asarray(p_column_names)
-        cn.tofile(outfile,sep=',', format='%s')
-        outfile.write('\n')
-        cu = np.asarray(p_column_units)
-        cu.tofile(outfile,sep=',', format='%s')
-        outfile.write('\n')
-        outfile.close()
-
-        file = out_dir+cast+'_ct1.csv'
-        with open(file,'a') as f:
-            time_data.to_csv(f, header=False,index=False)
-        f.close()
-
-        outfile = open(out_dir+cast+'_ct1.csv', "a")
-        outfile.write('END_DATA')
-        outfile.close()
-
-def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_column_names,p_column_units,
-                     t_sensor=1,out_dir='data/pressure/',p_col='CTDPRS',stacst_col='SSSCC',
-                     logFile='data/logs/cast_details.csv'):
-
-    """ Export Time data to pressure directory as well as adding qual_flags and
-    removing unneeded columns  DEPRECATED USE EXPORT_CT1 INSTEAD"""
-
-
-    df[stacst_col] = df[stacst_col].astype(str).copy()
-
-
-    # Round to 4 decimal places
-
-    df = df.round(4)
-
-
-    cast_details = dataToNDarray(logFile,str,None,',',0)
-    #df = flag_backfill_data(df)
-    #df = flag_missing_values(df)
-
-    for cast in ssscc:
-        #time_data = pressure_seq_data.copy()
-        #time_data = time_data[pressure_seq_data['SSSCC'] == cast]
-        time_data = df[df['SSSCC'] == cast].copy()
-        try:
-            time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
-        except:
-            time_data = binning_df(time_data, bin_size=2.0)
-        depth = time_data['DEPTH'].mean()
+        time_data = df[df['SSSCC'] == ssscc].copy()
+        time_data = pressure_sequence(time_data)
         time_data = flag_backfill_data(time_data)
+        time_data = fill_surface_data(time_data)
         time_data = time_data[p_column_names]
-        time_data = flag_missing_values(time_data)
-        time_data=time_data.round(4)
+        time_data = time_data.round(4)
 
-        for i in time_data.columns:
-            if '_FLAG_W' in i:
-                time_data[i] = time_data[i].astype(int)
+        s_num = ssscc[-5:-2]
+        c_num = ssscc[-2:]
+        depth = full_depth_df.loc[full_depth_df['STNNBR'] == int(s_num),'DEPTH']
+        # get cast_details for current SSSCC
+        cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("r")[0]
+        b_datetime = datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc).strftime('%Y%m%d %H%M').split(" ")
+        b_date = b_datetime[0]
+        b_time = b_datetime[1]
+        btm_lat = cast_dict["latitude"]
+        btm_lon = cast_dict["longitude"]
+        btm_alt = cast_dict["altimeter_bottom"]
 
-
-        s_num = cast[-5:-2]
-        c_num = cast[-2:]
-
-        for line in cast_details:
-            if cast in line[0]:
-                for val in line:
-                    if 'at_depth' in val: btime = float(str.split(val, ':')[1])
-                    if 'latitude' in val: btm_lat = float(str.split(val, ':')[1])
-                    if 'longitude' in val: btm_lon = float(str.split(val, ':')[1])
-                    if 'altimeter_bottom' in val: btm_alt = float(str.split(val, ':')[1])
-                break
-
-        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
-        b_date = bdt[0]
-        b_time = bdt[1]
-        #depth = -99
-        now = datetime.datetime.now()
+        now = datetime.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
-        outfile = open(out_dir+cast+'_ct1.csv', "w+")
-        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %f\nLONGITUDE = %f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
+        outfile = open(out_dir+ssscc+'_ct1.csv', "w+")
+        # put in logic to check columns?
+        # number_headers should be calculated, not defined
+        ctd_header = f"""CTD,{file_datetime}
+        NUMBER_HEADERS = 11
+        EXPOCODE = {expocode}
+        SECT_ID = {section_id}
+        STNNBR = {s_num}
+        CASTNO = {c_num}
+        DATE = {b_date}
+        TIME = {b_time}
+        LATITUDE = {btm_lat:.4f}
+        LONGITUDE = {btm_lon:.4f}
+        INSTRUMENT_ID = {ctd}
+        DEPTH = {depth}
+        """
+        outfile.write(ctd_header)
         cn = np.asarray(p_column_names)
         cn.tofile(outfile,sep=',', format='%s')
         outfile.write('\n')
@@ -1911,19 +2004,20 @@ def export_time_data(df,ssscc,sample_rate,search_time,expocode,section_id,ctd,p_
         outfile.write('\n')
         outfile.close()
 
-        file = out_dir+cast+'_ct1.csv'
+        file = out_dir+ssscc+'_ct1.csv'
         with open(file,'a') as f:
             time_data.to_csv(f, header=False,index=False)
         f.close()
 
-        outfile = open(out_dir+cast+'_ct1.csv', "a")
+        outfile = open(out_dir+ssscc+'_ct1.csv', "a")
         outfile.write('END_DATA')
         outfile.close()
 
-def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir='data/pressure/',org='ODF'):
+
+def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir=cfg.directory["pressure"],org='ODF'):
 
     btl_data = df.copy()
-    now = datetime.datetime.now()
+    now = datetime.now()
     file_datetime = now.strftime("%Y%m%d")
 
     time_stamp = file_datetime+org

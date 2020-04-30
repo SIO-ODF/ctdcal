@@ -5,27 +5,35 @@ import scipy.stats as st
 import datetime
 import pandas as pd
 import math
+from pathlib import Path
 
 def report_pressure_details(stacast, log_file, start, end):
-    """report_cast_details function
-
-    Function takes deck pressure and writes them to a file in log
-    directory
-
-    Args:
-        param1 (str): stacast, station cast data for file
-        param2 (str): c_file, file name location for cast details
-        param3 (str): start, cast start time from top of cast after 10m soak
-        param4 (str): end, cast end time when instrument leaves water
-
-    Prints formatted csv file.
-
-    Returns:
-        No return
     """
-    outfile = open(log_file, 'a')
-    outfile.write("stacast:%s, ondeck_start_p:%s, ondeck_end_p:%s\n" % (stacast, start, end))
-    return
+    Write start/end deck pressure to ondeck_pressure.csv log file.
+
+    Parameters
+    ----------
+    stacast : str
+        station cast data for file
+    c_file : str
+        file name location for cast details
+    start : str
+        cast start time from top of cast after 10m soak
+    end : str
+        cast end time when instrument leaves water
+
+    Returns
+    -------
+    None
+    """
+    df = pd.DataFrame(
+        {"SSSCC": stacast, "ondeck_start_p": start, "ondeck_end_p": end}, index=[0]
+    )
+    add_header = not Path(log_file).exists()  # add header iff file doesn't exist
+    with open(log_file, "a") as f:
+        df.to_csv(f, mode='a', header=add_header, index=False)
+
+    return True
 
 
 def report_polyfit(coef, stacast_list, fitfile):
@@ -77,32 +85,53 @@ def report_pressure_offset(p_off_file, p_offset, stacast_list):
 
 
 def report_cast_details(stacast, c_file, start, end, bottom, start_p, max_p, b_alt, b_lat, b_lon):
-    """report_cast_details function
-
-    Function takes cast details and writes them to a file in log
-    directory
-
-    Args:
-        param1 (str): stacast, station cast data for file
-        param2 (str): c_file, file name location for cast details
-        param3 (str): start, cast start time from top of cast after 10m soak
-        param4 (str): end, cast end time when instrument leaves water
-        param5 (str): bottom, bottom of cast time when instrument reaches max depth
-        param6 (str): start_p, starting pressure at the time the cast begins
-        param7 (str): max_p, maximum pressure for entire cast.
-        param8 (str): b_alt, altimeter value at bottom of cast.
-        param9 (str): b_lat, latitude at bottom of cast.
-        param10 (str): b_lon, longitude at bottom of cast.
-
-    Prints formatted csv file.
-
-    Returns:
-        No return
     """
+    Write cast details to cast_details.csv log file.
 
-    outfile = open(c_file, "a")
-    outfile.write("stacast:%s, begin:%s, at_depth:%s, end:%s, start_pressure:%s, max_pressure:%s, altimeter_bottom:%s, latitude:%s, longitude:%s\n" % (stacast, start, bottom, end, start_p, max_p, b_alt, b_lat, b_lon))
-    outfile.close()
+    Parameters
+    ----------
+    stacast : str
+        station cast data for file
+    c_file : str
+        file name location for cast details
+    start : str
+        cast start time from top of cast after 10m soak
+    end : str
+        cast end time when instrument leaves water
+    bottom : str
+        bottom of cast time when instrument reaches max depth
+    start_p : str
+        starting pressure at the time the cast begins
+    max_p : str
+        maximum pressure for entire cast
+    b_alt : str
+        altimeter value at bottom of cast
+    b_lat : str
+        latitude at bottom of cast
+    b_lon : str
+        longitude at bottom of cast
+
+    Returns
+    -------
+    None
+    """
+    df = pd.DataFrame(
+        {
+            "SSSCC": stacast,
+            "start_time": start,
+            "bottom_time": bottom,
+            "end_time": end,
+            "start_pressure": start_p,
+            "max_pressure": max_p,
+            "altimeter_bottom": b_alt,
+            "latitude": b_lat,
+            "longitude": b_lon,
+        },
+        index=[0],
+    )
+    add_header = not Path(c_file).exists()  # add header iff file doesn't exist
+    with open(c_file, "a") as f:
+        df.to_csv(f, mode="a", header=add_header, index=False)
 
     return
 
@@ -188,8 +217,10 @@ def report_time_series_data(stacast, printdir, expocode, column_names, column_un
         No return
     """
     try:
-        inMat = pd.DataFrame.from_records(inMat)
-        #inMat = inMat.iloc[:, 1:]
+        # inMat is already a DataFrame
+        # inMat = pd.DataFrame.from_records(inMat)
+        # remove duplicate index column and reset to count from 0
+        inMat = inMat.drop(labels='index', axis=1).reset_index(drop=True)
         inMat.to_pickle(printdir+stacast+'_time.pkl')
     except:
         if inMat is None:
@@ -255,7 +286,7 @@ def report_pressure_series_data(stacast, expocode, section_id, btime=-999, btm_l
         h_num = 11
         now = datetime.datetime.now()
         file_datetime = now.strftime("%Y%m%d %H:%M")
-        bdt = datetime.datetime.fromtimestamp(btime).strftime('%Y%m%d %H%M').split(" ")
+        bdt = datetime.datetime.fromtimestamp(btime, tz=datetime.timezone.utc).strftime('%Y%m%d %H%M').split(" ")
         b_date = bdt[0]
         b_time = bdt[1]
 

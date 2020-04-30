@@ -12,9 +12,13 @@ import time
 import sys
 import configparser
 #sys.path.append('ctdcal/')
+import pandas as pd
+import numpy as np
 import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
+import ctdcal.rinko as rinko
 
+# MK: deprecated 04/29/20, use odf_process_all_MK.py instead
 
 def process_all_new():
 
@@ -128,8 +132,30 @@ def process_all_new():
     time_bottle = time.perf_counter()
 
     # generate salts file here: (salt parser)
+    salt_dir = './data/salt/'
+    import scripts.odf_salt_parser as salt_parser
+
+    file_list = os.listdir(salt_dir)
+    files = []
+    for file in file_list:
+        if '.' not in file:
+            files.append(file)
+
+    for file in files:
+        print(file)
+        salt_path = salt_dir + file
+        saltDF = salt_parser.salt_loader(saltpath=salt_path)
+        salt_parser.salt_df_parser(saltDF, salt_dir)
 
     # generate reft file here
+    reft_path = './data/reft/'
+    import scripts.odf_reft_parser as reft_parser
+    for station in ssscc:
+        with open(reft_path + station + '.cap', 'r') as ssscc_reftemp:
+            # create csv files
+            df_part = reft_parser.parse(ssscc_reftemp, station)
+
+        df_part.to_csv(reft_path + station + '_reft.csv',index=False)
 
     # generate oxy file here (separate out from calib)
 
@@ -296,6 +322,17 @@ def process_all_new():
     import ctdcal.oxy_fitting as oxy_fitting
     import gsw
 
+    # definitions
+    import ctdcal.settings as settings
+    hex_prefix = settings.ctd_processing_dir['hex_prefix']
+    hex_postfix = settings.ctd_processing_dir['hex_postfix']
+    xml_prefix = settings.ctd_processing_dir['xml_prefix']
+    xml_postfix = settings.ctd_processing_dir['xml_postfix']
+    oxy_btl_col = settings.bottle_inputs['btl_oxy']
+    rinko_volts = settings.ctd_inputs['rinko_oxy']
+    rinko_btl_volts = settings.bottle_inputs['rinko_oxy']
+    dov_col = settings.ctd_inputs['dov']
+
     # unsure about these
     lat_col = config['analytical_inputs']['lat']
     lon_col = config['analytical_inputs']['lon']
@@ -309,6 +346,10 @@ def process_all_new():
     btl_data_all['sigma_btl'] = oxy_fitting.sigma_from_CTD(btl_data_all[sal_btl_col], btl_data_all[t_btl_col], btl_data_all[p_btl_col], btl_data_all[lon_btl_col], btl_data_all[lat_btl_col])
     time_data_all['sigma_ctd'] = oxy_fitting.sigma_from_CTD(time_data_all[sal_col], time_data_all[t_col], time_data_all[p_col], time_data_all[lon_col], time_data_all[lat_col])
 
+    btl_data_all[oxy_btl_col] = oxy_fitting.calculate_bottle_oxygen(ssscc, btl_data_all['SSSCC'], btl_data_all['TITR_VOL'], btl_data_all['TITR_TEMP'], btl_data_all['FLASKNO'])
+    btl_data_all[oxy_btl_col] = oxy_fitting.oxy_ml_to_umolkg(btl_data_all[oxy_btl_col], btl_data_all['sigma_btl'])
+    btl_data_all['OXYGEN_FLAG_W'] = oxy_fitting.flag_winkler_oxygen(btl_data_all[oxy_btl_col])
+
     # Calculate SA and PT
     btl_data_all['SA'] = gsw.SA_from_SP(btl_data_all[sal_btl_col], btl_data_all[p_btl_col], btl_data_all[lon_btl_col], btl_data_all[lat_btl_col])
     btl_data_all['PT'] = gsw.pt0_from_t(btl_data_all['SA'], btl_data_all[t_btl_col], btl_data_all[p_btl_col])
@@ -320,14 +361,125 @@ def process_all_new():
 
     btl_data_all['OS_btl'] = oxy_fitting.os_umol_kg(btl_data_all['SA'], btl_data_all['PT'])
     time_data_all['OS_ctd'] = oxy_fitting.os_umol_kg(time_data_all['SA'], time_data_all['PT'])
+
+    # collect data by stations
+
+    btl_data_all['oxy_stn_group'] = btl_data_all['SSSCC'].str[0:3]
+    time_data_all['oxy_stn_group'] = time_data_all['SSSCC'].str[0:3]
+
+    station_list = time_data_all['oxy_stn_group'].unique()
+    station_list = station_list.tolist()
+    station_list.sort()
+
+    btl_data_oxy = btl_data_all.copy()#loc[btl_data_all['OXYGEN'].notnull()]
+
+    rinko_coef0 = rinko.rinko_o2_cal_parameters()
+
+    all_rinko_df = pd.DataFrame()
+    all_sbe43_df = pd.DataFrame()
+    rinko_dict = {}
+    sbe43_dict = {}
+    for station in station_list:
+        
+        #time_data = time_data_all[time_data_all['SSSCC'].str[0:3] == station].copy()
+        #btl_data = btl_data_oxy[btl_data_oxy['SSSCC'].str[0:3] == station].copy()
+        
+        time_data = time_data_all[time_data_all['oxy_stn_group'] == station].copy()
+        btl_data = btl_data_oxy[btl_data_oxy['oxy_stn_group'] == station].copy()
+        
+        if (btl_data['OXYGEN_FLAG_W'] == 9).all():
+            rinko_dict[station] = np.full(8,np.nan)
+            sbe43_dict[station] = np.full(7,np.nan)
+            print(station + ' skipped, all oxy data is NaN')
+            continue
+
+        rinko_coef, rinko_oxy_df = rinko.rinko_oxygen_fit(btl_data[p_btl_col],btl_data[oxy_btl_col],btl_data['sigma_btl'],time_data['sigma_ctd'],
+                            time_data['OS_ctd'],time_data[p_col],time_data[t_col],time_data[rinko_volts],rinko_coef0, btl_data['SSSCC'])
+
+        station_ssscc = time_data['SSSCC'].values[0]
+        hex_file = hex_prefix + station_ssscc + hex_postfix
+        xml_file = xml_prefix + station_ssscc + xml_postfix
+        sbe_coef0 = oxy_fitting.get_SB_coef(hex_file, xml_file)
+        sbe_coef, sbe_oxy_df = oxy_fitting.sbe43_oxy_fit(btl_data[p_btl_col], btl_data[oxy_btl_col], btl_data['sigma_btl'],time_data['sigma_ctd'],
+                                                        time_data['OS_ctd'],time_data[p_col],time_data[t_col],time_data[dov_col],
+                                                        time_data['scan_datetime'],sbe_coef0,btl_data['SSSCC'])
+        
+        rinko_dict[station] = rinko_coef
+        sbe43_dict[station] = sbe_coef
+        all_rinko_df = pd.concat([all_rinko_df,rinko_oxy_df])
+        all_sbe43_df = pd.concat([all_sbe43_df,sbe_oxy_df])
+        
+        print(station + ' Done!')
+
+    sbe43_coef_df = oxy_fitting.create_coef_df(sbe43_dict)
+    rinko_coef_df = oxy_fitting.create_coef_df(rinko_dict)
+
+    btl_data_all = btl_data_all.merge(all_rinko_df, left_on=['SSSCC',p_btl_col], right_on=['SSSCC_rinko','CTDPRS_rinko_btl'],how='left')
+
+    btl_data_all = btl_data_all.merge(all_sbe43_df, left_on=['SSSCC',p_btl_col], right_on=['SSSCC_sbe43','CTDPRS_sbe43_btl'],how='left')
+
+    btl_data_all.drop(list(btl_data_all.filter(regex = 'rinko')), axis = 1, inplace = True)
+
+    btl_data_all.drop(list(btl_data_all.filter(regex = 'sbe43')), axis = 1, inplace = True)
+
+    ### Handle Missing Values
+
+    X = btl_data_all['CTDOXYVOLTS_x'], btl_data_all['CTDPRS'], btl_data_all[t_btl_col], btl_data_all['dv_dt_x'], btl_data_all['OS_btl']
+    rinko_X = btl_data_all[p_btl_col], btl_data_all[t_btl_col], btl_data_all['CTDRINKOVOLTS'], btl_data_all['OS_btl']
+
+    for station in btl_data_all['SSSCC']:
+        coef_43 = sbe43_coef_df.loc[station[0:3]]
+        coef_rinko = rinko_coef_df.loc[station[0:3]]
+        btl_data_all['CTDOXY_fill'] = oxy_fitting.oxy_equation(X, coef_43[0], coef_43[1], coef_43[2], coef_43[3], coef_43[4], coef_43[5], coef_43[6])
+        btl_data_all['CTDRINKO_fill'] = rinko.rinko_curve_fit_eq(rinko_X, coef_rinko[0], coef_rinko[1], coef_rinko[2], coef_rinko[3], coef_rinko[4], coef_rinko[5], coef_rinko[6], coef_rinko[7])
+
+    btl_data_all.loc[btl_data_all['CTDOXY'].isnull(),'CTDOXY_FLAG_W'] = 2
+    btl_data_all.loc[btl_data_all['CTDOXY'].isnull(),'CTDOXY'] = btl_data_all.loc[btl_data_all['CTDOXY'].isnull(),'CTDOXY_fill']
+    btl_data_all.loc[btl_data_all['CTDRINKO'].isnull(),'CTDRINKO_FLAG_W'] = 2
+    btl_data_all.loc[btl_data_all['CTDRINKO'].isnull(),'CTDRINKO'] = btl_data_all.loc[btl_data_all['CTDRINKO'].isnull(),'CTDRINKO_fill']
+
+    btl_data_all = oxy_fitting.flag_oxy_data(btl_data_all)
+    btl_data_all = oxy_fitting.flag_oxy_data(btl_data_all,ctd_oxy_col='CTDRINKO',flag_col='CTDRINKO_FLAG_W')
+
+    btl_data_all['res_rinko'] = btl_data_all['OXYGEN'] - btl_data_all['CTDRINKO']
+    btl_data_all['res_sbe43'] = btl_data_all['OXYGEN'] - btl_data_all['CTDOXY']
+    btl_data_all.loc[np.abs(btl_data_all['res_rinko']) >=6 , 'CTDRINKO_FLAG_W'] = 3 # what's the benefit of np.abs() vs abs()?
+    btl_data_all.loc[np.abs(btl_data_all['res_sbe43']) >=6 , 'CTDOXY_FLAG_W'] = 3
+
+    time_data_all['CTDOXY'] = '-999'
+    time_data_all['CTDRINKO'] = '-999'
+    btl_data_all.sort_values(by='sigma_btl',inplace=True)
+    time_data_all.sort_values(by='sigma_ctd',inplace=True)
+    for station in station_list:
+        rinko_coef = rinko_coef_df.loc[station].values
+        if np.isnan(rinko_coef).all():
+            print(station + ' data bad, leaving -999 values and flagging as 9')
+            time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDRINKO_FLAG_W'] = 9
+            time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDOXY_FLAG_W'] = 9
+            continue
+
+        time_data = time_data_all[time_data_all['oxy_stn_group'] == station].copy()
+        time_data['CTDOXY'] = oxy_fitting.SB_oxy_eq(sbe43_coef_df.loc[station],time_data[dov_col],time_data[p_col],time_data[t_col],time_data['dv_dt'],time_data['OS_ctd'])
+        time_data['CTDRINKO'] = rinko.rinko_curve_fit_eq((time_data[p_col],time_data[t_col],time_data[rinko_volts],time_data['OS_ctd']),rinko_coef[0],rinko_coef[1],
+                                                        rinko_coef[2],rinko_coef[3],rinko_coef[4],rinko_coef[5],rinko_coef[6],rinko_coef[7])
+        
+        time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDOXY'] = time_data['CTDOXY']
+        time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDRINKO'] = time_data['CTDRINKO']
+        time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDRINKO_FLAG_W'] = 2
+        time_data_all.loc[time_data_all['SSSCC'].str[0:3] == station,'CTDOXY_FLAG_W'] = 2
+        print(station + ' time data done')
+
     #####
 
     #######################
     # turn correction instantaneous CTD measurements into points @ bottle firings
-    # this is working now (MK)
-    subprocess.run(['ctd_to_bottle.py'], stdout=subprocess.PIPE)
+    # subprocess.run(['ctd_to_bottle.py'], stdout=subprocess.PIPE)
 
 ################ Clean and export data #######################
+    # btl_data_all = process_ctd.merge_cond_flags(btl_data_all,qual_flag_cond, c_btl_col) # make code not require specific column input
+    btl_data_all = process_ctd.merge_refcond_flags(btl_data_all,qual_flag_cond)
+    # btl_data_all = process_ctd.merge_temp_flags(btl_data_all, qual_flag_temp, t_btl_col)
+    btl_data_all = process_ctd.merged_reftemp_flags(btl_data_all,qual_flag_temp)
 
 ### Export Quality Flags
 
@@ -336,6 +488,7 @@ def process_all_new():
 
 ### Clean up Bottle Data by removing rows with no ctd data
 
+    btl_data_all = oxy_fitting.clean_oxygen_df(btl_data_all) # clean up column names
     btl_data_all =  btl_data_all.dropna(subset=cols)
 
 ### Create CT Files(oxygen done by hand)
@@ -351,7 +504,6 @@ def process_all_new():
 
     ### MK
     # create depth_log.csv
-    import pandas as pd
     station_list = time_data_all['SSSCC'].str[0:3].unique()
     depth_dict = {}
     for station in station_list:
@@ -367,7 +519,7 @@ def process_all_new():
     depth_df.to_csv('data/logs/depth_log.csv',index=False)
 
     # needs depth_log.csv, manual_depth_log.csv
-    process_ctd.export_ct1(btl_data_all,ssscc,expocode,sectionID,ctd,p_column_names,p_column_units)
+    process_ctd.export_ct1(time_data_all,ssscc,expocode,sectionID,ctd,p_column_names,p_column_units)
 
     # section for making plots/etc.
 

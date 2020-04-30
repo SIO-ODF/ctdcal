@@ -4,6 +4,9 @@ import pandas as pd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
+from pathlib import Path
+import ctdcal.process_bottle as btl
+import config as cfg
 
 DEBUG = False
 
@@ -49,6 +52,64 @@ def convertFromFiles(hex_file, xmlcon_file, debug=False):
     sbeReader = sbe_rd.SBEReader.from_paths(hex_file, xmlcon_file)
 
     return convertFromSBEReader(sbeReader, DEBUG)
+
+
+def hex_to_ctd(ssscc_list, debug=False):
+    # TODO: add (some) error handling from odf_convert_sbe.py
+    """
+    Convert raw CTD data and export to .pkl files.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to convert
+    debug : bool, optional
+        Display verbose messages
+
+    Returns
+    -------
+
+    """
+    # TODO: use logger module instead
+    print('Converting .hex files')
+    for ssscc in ssscc_list:
+        if not Path(cfg.directory["converted"] + ssscc + ".pkl").exists():
+            hexFile = cfg.directory["raw"] + ssscc + ".hex"
+            xmlconFile = cfg.directory["raw"] + ssscc + ".XMLCON"
+            sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
+            converted_df = convertFromSBEReader(sbeReader, debug=debug)
+            converted_df.to_pickle(cfg.directory["converted"] + ssscc + ".pkl")
+
+    return True
+
+
+def make_btl_mean(ssscc_list, debug=False):
+    # TODO: add (some) error handling from odf_process_bottle.py
+    """
+    Create "bottle mean" files from continuous CTD data averaged at the bottle stops.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to convert
+    debug : bool, optional
+        Display verbose messages
+
+    Returns
+    -------
+    boolean
+        bottle averaging of mean has finished successfully
+    """
+    print('Generating btl_mean.pkl files')
+    for ssscc in ssscc_list:
+        if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
+            imported_df = importConvertedFile(cfg.directory["converted"] + ssscc + ".pkl", False)
+            bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
+            mean_df = btl.bottle_mean(bottle_df)
+            saveConvertedDataToFile(mean_df, cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
+
+    return True
+
 
 
 def convertFromSBEReader(sbeReader, debug=False):
@@ -183,7 +244,7 @@ def convertFromSBEReader(sbeReader, debug=False):
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             if temp_meta['list_id'] == 0:
-                t_array = converted_df[column_name].astype(type('float', (float,), {}))
+                t_array = converted_df[column_name].astype(float)
                 k_array = [273.15+celcius for celcius in t_array]
                 debugPrint('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
@@ -193,7 +254,7 @@ def convertFromSBEReader(sbeReader, debug=False):
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
             if temp_meta['list_id'] == 2:
-                p_array = converted_df[column_name].astype(type('float', (float,), {}))
+                p_array = converted_df[column_name].astype(float)
                 debugPrint('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
@@ -202,7 +263,7 @@ def convertFromSBEReader(sbeReader, debug=False):
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
             if temp_meta['list_id'] == 1:
-                c_array = converted_df[column_name].astype(type('float', (float,), {}))
+                c_array = converted_df[column_name].astype(float)
                 debugPrint('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
