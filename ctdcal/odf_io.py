@@ -5,6 +5,7 @@ import gsw
 import csv
 from collections import OrderedDict
 from pathlib import Path
+import config as cfg
 
 import sys
 
@@ -259,7 +260,7 @@ def _salt_loader(ssscc, salt_dir):
     return saltDF
 
 
-def _salt_exporter(saltDF, outdir="data/salt/", stn_col="STNNBR", cast_col="CASTNO"):
+def _salt_exporter(saltDF, outdir=cfg.directory["salt"], stn_col="STNNBR", cast_col="CASTNO"):
     """
     Export salt DataFrame to .csv file. Extra logic is included in the event that
     multiple stations and/or casts are included in a single raw salt file.
@@ -279,7 +280,7 @@ def _salt_exporter(saltDF, outdir="data/salt/", stn_col="STNNBR", cast_col="CAST
             stn_cast_salts.to_csv(outfile, index=False)
 
 
-def process_salts(ssscc_list, salt_dir="data/salt/"):
+def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
     # TODO: import salt_dir from a config file
     # TODO: update and include linear drift correction from above
     """

@@ -69,7 +69,7 @@ def oxy_loader(oxyfile):
 
     return df ,params #DF
 
-def flask_load(flaskfile='data/oxygen/o2flasks.vol',skip_rows=12):
+def flask_load(flaskfile=cfg.directory["oxy"] + 'o2flasks.vol', skip_rows=12):
     """Load information from flask.vol file
 
     """
@@ -188,7 +188,7 @@ def gather_oxy_params(oxyfile):
 
     return df
 
-def gather_all_oxy_params(ssscc,oxyfile_prefix='data/oxygen/',oxyfile_postfix=''):
+def gather_all_oxy_params(ssscc,oxyfile_prefix=cfg.directory["oxy"],oxyfile_postfix=''):
     """
     Collects all oxygen parameters for a given SSSCC (multiple stations)
 
@@ -614,8 +614,8 @@ def merge_parameters(btl_df,time_df,l_param='sigma0_btl',r_param='sigma0_ctd'):
 
 def get_sbe_coef(station='00101'):
 
-    hexfile = "data/raw/" + station + ".hex"
-    xmlfile = "data/raw/" + station + ".XMLCON"
+    hexfile = cfg.directory["raw"] + station + ".hex"
+    xmlfile = cfg.directory["raw"] + station + ".XMLCON"
 
     sbeReader = sbe_rd.SBEReader.from_paths(hexfile, xmlfile)
     rawConfig = sbeReader.parsed_config()
@@ -991,7 +991,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged)
 
     # Fit oxygen stations using SSSCC chunks to refine coefficients
-    ssscc_files = sorted(Path("data/ssscc/").glob("ssscc_ox*.csv"))
+    ssscc_files = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_ox*.csv"))
     for f in ssscc_files:
         ssscc_list_ox = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         sbe_coef, sbe_df = sbe43_oxy_fit(

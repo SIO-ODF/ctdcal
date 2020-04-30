@@ -30,7 +30,7 @@ CONVERTED_SUFFIX = '_cnv'
 PKL_EXT = 'pkl'
 
 
-# these two can be removed
+# these two can be removed in favor of logger
 def debugPrint(*args, **kwargs):
     if DEBUG:
         errPrint(*args, **kwargs)

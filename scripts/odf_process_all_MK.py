@@ -30,9 +30,7 @@ def process_all():
     #####
 
     # load station/cast list from file
-    ssscc_list = []
-    with open(cfg.directory["ssscc_file"], "r") as filename:
-        ssscc_list = [line.strip() for line in filename]
+    ssscc_list = process_ctd.get_ssscc_list()
 
     # convert raw .hex files
     convert.hex_to_ctd(ssscc_list)
@@ -44,7 +42,7 @@ def process_all():
     time_dir_list = os.listdir("data/time/")
     for ssscc in ssscc_list:
         if "{}_time.pkl".format(ssscc) not in time_dir_list:
-            odf_sbe_metadata.main("data/converted/" + ssscc + ".pkl")
+            odf_sbe_metadata.main(cfg.directory["converted"] + ssscc + ".pkl")
             print("odf_sbe_metadata.py SSSCC: " + ssscc + " done")
 
     # process bottle file

@@ -630,9 +630,7 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
         if (len(ep) > (time_delay)):
             end_p = np.average(ep[(time_delay):])
         else:
-            with warnings.catch_warnings():  # ignore mean of empty slice error
-                warnings.simplefilter("ignore", category=RuntimeWarning)
-                end_p = np.average(ep[(len(ep)):])
+            end_p = np.average(ep[(len(ep)):])
 
         # Remove on-deck ending
         outMat = inMat[:tmp]
@@ -952,7 +950,7 @@ def _reft_loader(ssscc, reft_dir):
     return reftDF
 
 
-def process_reft(ssscc_list, reft_dir="data/reft/"):
+def process_reft(ssscc_list, reft_dir=cfg.directory["reft"]):
     # TODO: import reft_dir from a config file
     """
     SBE35 reference thermometer processing function. Load in .cap files for given
@@ -1434,7 +1432,7 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
         DataFrame containing updated pressure values and a new flag column
 
     """
-    p_log = pd.read_csv("data/logs/ondeck_pressure.csv", dtype={"SSSCC":str})
+    p_log = pd.read_csv(cfg.directory["logs"] + "ondeck_pressure.csv", dtype={"SSSCC":str})
     p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p)
     df[p_col] += p_offset
     df[p_col + "_FLAG_W"] = 2
@@ -1470,8 +1468,18 @@ def make_depth_log(time_df):
     depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
     depth_df.reset_index(inplace=True)
     depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
-    depth_df.to_csv("data/logs/depth_log.csv", index=False)
+    depth_df.to_csv(cfg.directory["logs"] + "depth_log.csv", index=False)
     return True
+
+def get_ssscc_list():
+    """
+    Load in list of stations/casts to process.
+    """
+    ssscc_list = []
+    with open(cfg.directory["ssscc_file"], "r") as filename:
+        ssscc_list = [line.strip() for line in filename]
+
+    return ssscc_list
 
 def load_hy_file(path_to_hyfile):
     df = pd.read_csv(path_to_hyfile, comment='#', skiprows=[0])
@@ -1503,11 +1511,11 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
     if series == 'bottle':
         for ssscc in ssscc_list:
             print('Loading BTL data for station: ' + ssscc + '...')
-            btl_file = 'data/bottle/' + ssscc + '_btl_mean.pkl'
+            btl_file = cfg.directory["bottle"] + ssscc + '_btl_mean.pkl'
             btl_data = _load_btl_data(btl_file,cols)
 
             ### load REFT data
-            reft_file = 'data/reft/' + ssscc + '_reft.csv'
+            reft_file = cfg.directory["reft"] + ssscc + '_reft.csv'
             try:
                 reft_data = _load_reft_data(reft_file)
             except FileNotFoundError:
@@ -1517,7 +1525,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 reft_data["SSSCC_TEMP"] = ssscc
 
             ### load REFC data
-            refc_file = 'data/salt/' + ssscc + '_salts.csv'
+            refc_file = cfg.directory["salt"] + ssscc + '_salts.csv'
             try:
                 refc_data = _load_salt_data(refc_file, index_name='SAMPNO')
             except FileNotFoundError:
@@ -1529,7 +1537,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 refc_data['SAMPNO_SALT'] = btl_data['btl_fire_num'].astype(int)
 
             ### load OXY data
-            oxy_file = 'data/oxygen/' + ssscc 
+            oxy_file = cfg.directory["oxy"] + ssscc
             try:
                 oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
             except FileNotFoundError:
@@ -1562,7 +1570,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
             btl_data['dv_dt'] = oxy_fitting.calculate_dVdT(btl_data['CTDOXYVOLTS'],btl_data['scan_datetime'])
 
             # Add bottom of cast information (date,time,lat,lon,etc.)
-            btl_data = _add_btl_bottom_data(btl_data, ssscc, 'data/logs/cast_details.csv')
+            btl_data = _add_btl_bottom_data(btl_data, ssscc, cfg.directory["logs"] + "cast_details.csv")
 
             # Merge cast into df_data_all
             try:
@@ -1578,7 +1586,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
         df_data_all = []
         for ssscc in ssscc_list:
             print('Loading TIME data for station: ' + ssscc + '...')
-            time_file = 'data/time/' + ssscc + '_time.pkl'
+            time_file = cfg.directory["time"] + ssscc + '_time.pkl'
             time_data = pd.read_pickle(time_file)
             time_data['SSSCC'] = str(ssscc)
             time_data['dv_dt'] = oxy_fitting.calculate_dVdT(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
@@ -1759,7 +1767,7 @@ def get_btl_time(df,btl_num_col,time_col):
     return df
 
 def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', decimals=4):
-    cast_details = pd.read_csv("data/logs/cast_details.csv", dtype={"SSSCC": str})
+    cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
     cast_details = cast_details[cast_details["SSSCC"] == cast]
     df[lat_col] = np.round(cast_details['latitude'].iat[0], decimals)
     df[lon_col] = np.round(cast_details['longitude'].iat[0], decimals)
@@ -1934,16 +1942,16 @@ def export_ct1(df, ssscc_list):
     expocode = cfg.cruise["expocode"]
     section_id = cfg.cruise["sectionid"]
     ctd = cfg.ctd_serial
-    out_dir = 'data/pressure/'
+    out_dir = cfg.directory["pressure"]
     p_col = 'CTDPRS'
     stacst_col = 'SSSCC'
-    logFile = 'data/logs/cast_details.csv'
+    logFile = cfg.directory["logs"] + 'cast_details.csv'
 
     df[stacst_col] = df[stacst_col].astype(str).copy()
 
-    cast_details = pd.read_csv("data/logs/cast_details.csv", dtype={"SSSCC": str})
-    depth_df = pd.read_csv('data/logs/depth_log.csv').dropna()
-    manual_depth_df = pd.read_csv('data/logs/manual_depth_log.csv')
+    cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
+    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv').dropna()
+    manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv')
     full_depth_df = pd.concat([depth_df,manual_depth_df])  # TODO: update from STNNBR to SSSCC
     full_depth_df.drop_duplicates(subset='STNNBR', keep='first',inplace=True)
 
@@ -1973,7 +1981,21 @@ def export_ct1(df, ssscc_list):
         file_datetime = file_datetime + 'ODFSIO'
         outfile = open(out_dir+ssscc+'_ct1.csv', "w+")
         # put in logic to check columns?
-        outfile.write("CTD,%s\nNUMBER_HEADERS = %s \nEXPOCODE = %s \nSECT_ID = %s\nSTNNBR = %s\nCASTNO = %s\nDATE = %s\nTIME = %s\nLATITUDE = %.4f\nLONGITUDE = %.4f\nINSTRUMENT_ID = %s\nDEPTH = %i\n" % (file_datetime, 11, expocode, section_id, s_num, c_num, b_date, b_time, btm_lat, btm_lon, ctd, depth))
+        # number_headers should be calculated, not defined
+        ctd_header = f"""CTD,{file_datetime}
+        NUMBER_HEADERS = 11
+        EXPOCODE = {expocode}
+        SECT_ID = {section_id}
+        STNNBR = {s_num}
+        CASTNO = {c_num}
+        DATE = {b_date}
+        TIME = {b_time}
+        LATITUDE = {btm_lat:.4f}
+        LONGITUDE = {btm_lon:.4f}
+        INSTRUMENT_ID = {ctd}
+        DEPTH = {depth}
+        """
+        outfile.write(ctd_header)
         cn = np.asarray(p_column_names)
         cn.tofile(outfile,sep=',', format='%s')
         outfile.write('\n')
@@ -1992,7 +2014,7 @@ def export_ct1(df, ssscc_list):
         outfile.close()
 
 
-def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir='data/pressure/',org='ODF'):
+def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir=cfg.directory["pressure"],org='ODF'):
 
     btl_data = df.copy()
     now = datetime.now()

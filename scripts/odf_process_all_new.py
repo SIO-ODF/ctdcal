@@ -18,6 +18,7 @@ import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
 import ctdcal.rinko as rinko
 
+# MK: deprecated 04/29/20, use odf_process_all_MK.py instead
 
 def process_all_new():
 

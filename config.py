@@ -1,4 +1,6 @@
 ### configuration file for odf_process_all_MK.py
+# this is an example to fill with your own values
+#
 # TODO: organize these by editable/fixed variables
 
 # Cruise specifics
@@ -10,7 +12,7 @@ cruise = dict(
     vessel="R/V Palmer",
     ship_code="3206",
     expocode="320620180309",
-    chief_sci="Alison Macdonald",
+    chief_sci="Scientist McScienceface",
     sectionid="S04P",
     start_date="2018-03-09 14:00:00",
     start_port="Hobart, Tasmania, Australia",
@@ -51,6 +53,15 @@ ctd_time_output = dict(col_names=ctd_col_names, col_units=ctd_col_units)
 # List of directories for I/O purposes
 directory = {
     "ssscc_file": "data/ssscc.csv",
+    "ssscc": "data/ssscc/",
+    "raw": "data/raw/",
+    "converted": "data/converted/",
+    "time": "data/time/",
+    "pressure": "data/pressure/",
+    "bottle": "data/bottle/",
+    "salt": "data/salt/",
+    "reft": "data/reft/",
+    "oxy": "data/oxygen/",
     "logs": "data/logs/",
     "qual_temp_primary": "quality_code/temp_primary/",
     "qual_temp_secondary": "quality_code/temp_secondary/",

@@ -6,6 +6,7 @@ import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 from pathlib import Path
 import ctdcal.process_bottle as btl
+import config as cfg
 
 DEBUG = False
 
@@ -69,14 +70,15 @@ def hex_to_ctd(ssscc_list, debug=False):
     -------
 
     """
+    # TODO: use logger module instead
     print('Converting .hex files')
     for ssscc in ssscc_list:
-        if not Path("data/converted/" + ssscc + ".pkl").exists():
-            hexFile = "data/raw/" + ssscc + ".hex"
-            xmlconFile = "data/raw/" + ssscc + ".XMLCON"
+        if not Path(cfg.directory["converted"] + ssscc + ".pkl").exists():
+            hexFile = cfg.directory["raw"] + ssscc + ".hex"
+            xmlconFile = cfg.directory["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader, debug=debug)
-            converted_df.to_pickle("data/converted/" + ssscc + ".pkl")
+            converted_df.to_pickle(cfg.directory["converted"] + ssscc + ".pkl")
 
     return True
 
@@ -100,11 +102,11 @@ def make_btl_mean(ssscc_list, debug=False):
     """
     print('Generating btl_mean.pkl files')
     for ssscc in ssscc_list:
-        if not Path("data/bottle/" + ssscc + "_btl_mean.pkl").exists():
-            imported_df = importConvertedFile("data/converted/" + ssscc + ".pkl", False)
+        if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
+            imported_df = importConvertedFile(cfg.directory["converted"] + ssscc + ".pkl", False)
             bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
             mean_df = btl.bottle_mean(bottle_df)
-            saveConvertedDataToFile(mean_df, "data/bottle/" + ssscc + "_btl_mean.pkl")
+            saveConvertedDataToFile(mean_df, cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
 
@@ -242,7 +244,6 @@ def convertFromSBEReader(sbeReader, debug=False):
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             if temp_meta['list_id'] == 0:
-                # t_array = converted_df[column_name].astype(type('float', (float,), {}))  # depreciated pandas syntax?
                 t_array = converted_df[column_name].astype(float)
                 k_array = [273.15+celcius for celcius in t_array]
                 debugPrint('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
@@ -253,7 +254,6 @@ def convertFromSBEReader(sbeReader, debug=False):
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
             if temp_meta['list_id'] == 2:
-                # p_array = converted_df[column_name].astype(type('float', (float,), {}))  # depreciated pandas syntax?
                 p_array = converted_df[column_name].astype(float)
                 debugPrint('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
@@ -263,7 +263,6 @@ def convertFromSBEReader(sbeReader, debug=False):
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
             if temp_meta['list_id'] == 1:
-                # c_array = converted_df[column_name].astype(type('float', (float,), {}))  # depreciated pandas syntax?
                 c_array = converted_df[column_name].astype(float)
                 debugPrint('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)

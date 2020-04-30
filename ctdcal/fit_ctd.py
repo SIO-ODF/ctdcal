@@ -627,7 +627,7 @@ def calibrate_temp(btl_df, time_df):
     --------
 
     """
-    ssscc_subsets = list(Path('data/ssscc/').glob('ssscc_t*.csv'))
+    ssscc_subsets = list(Path(cfg.directory["ssscc"]).glob('ssscc_t*.csv'))
     qual_flag_t1 = pd.DataFrame()
     qual_flag_t2 = pd.DataFrame()
     coef_t1_all = pd.DataFrame()
@@ -808,7 +808,7 @@ def calibrate_cond(btl_df, time_df):
     else:
         btl_df["SALNTY_FLAG_W"] = 2
 
-    ssscc_subsets = list(Path('data/ssscc/').glob('ssscc_c*.csv'))
+    ssscc_subsets = list(Path(cfg.directory["ssscc"]).glob('ssscc_c*.csv'))
     qual_flag_c1 = pd.DataFrame()
     qual_flag_c2 = pd.DataFrame()
     coef_c1_all = pd.DataFrame()
