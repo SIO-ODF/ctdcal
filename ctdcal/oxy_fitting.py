@@ -991,16 +991,21 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged)
 
     # Fit oxygen stations using SSSCC chunks to refine coefficients
-    ssscc_files = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_ox*.csv"))
-    for f in ssscc_files:
-        ssscc_list_ox = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_ox*.csv"))
+    if not ssscc_subsets:  # if no ox-segments exists, write one from full list
+        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_ox1.csv")]
+        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
+
+    for f in ssscc_subsets:
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         sbe_coef, sbe_df = sbe43_oxy_fit(
-            all_sbe43_merged.loc[all_sbe43_merged["SSSCC_sbe43"].isin(ssscc_list_ox)],
+            all_sbe43_merged.loc[all_sbe43_merged["SSSCC_sbe43"].isin(ssscc_sublist)],
             sbe_coef0=sbe_coef0,
             f_out=f,
         )
         # build coef dictionary
-        for ssscc in ssscc_list_ox:
+        for ssscc in ssscc_sublist:
             if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
                 sbe43_dict[ssscc] = sbe_coef
         # all non-NaN oxygen data with flags
