@@ -908,7 +908,8 @@ def fill_surface_data(df, **kwargs):
 
 
 def _reft_loader(ssscc, reft_dir):
-    reft_path = reft_dir + ssscc + ".cap"
+    # semi-flexible search for reft file (in the form of *ssscc.cap)
+    reft_path = sorted(Path(reft_dir).glob(f"*{ssscc}.cap"))[0]
     # this works better than pd.read_csv as format is semi-inconsistent (cf .cap files)
     with open(reft_path, "r", newline="") as f:
         reftF = csv.reader(
