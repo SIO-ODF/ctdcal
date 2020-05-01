@@ -12,7 +12,7 @@ import scipy
 import numpy as np
 #import sys
 #sys.path.append('ctdcal/')
-#import ctdcal.process_ctd as process_ctd
+import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
@@ -612,8 +612,13 @@ def merge_parameters(btl_df,time_df,l_param='sigma0_btl',r_param='sigma0_ctd'):
 
     return merge_df
 
-def get_sbe_coef(station='00101'):
-
+def _get_sbe_coef(idx=0):
+    """
+    Get SBE oxygen coefficients from raw data files.
+    Defaults to using first station in ssscc.csv file.
+    """
+    ssscc_list = process_ctd.get_ssscc_list()
+    station = ssscc_list[idx]
     hexfile = cfg.directory["raw"] + station + ".hex"
     xmlfile = cfg.directory["raw"] + station + ".XMLCON"
 
@@ -772,7 +777,7 @@ def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_fire_num, ctd_sigma, ctd_os, c
 
     # Apply coef and calculate CTDOXY
     # TODO: station shouldn't be hardcoded (in case it doesn't exist)
-    sbe_coef0 = get_sbe_coef(station='00101') # initial coefficient guess
+    sbe_coef0 = _get_sbe_coef() # initial coefficient guess
     merged_df['CTDOXY'] = _PMEL_oxy_eq(sbe_coef0, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))
 
     return merged_df
@@ -785,8 +790,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_out=None):
     good_df = pd.DataFrame()
 
     if sbe_coef0 is None:
-        # Load initial coefficient guess
-        sbe_coef0 = get_sbe_coef(station='00101')
+        sbe_coef0 = _get_sbe_coef()  # load initial coefficient guess
 
     p0 = sbe_coef0[0], sbe_coef0[1], sbe_coef0[2], sbe_coef0[3], sbe_coef0[4]
     
