@@ -1468,7 +1468,7 @@ def make_depth_log(time_df):
 
     depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
     depth_df.reset_index(inplace=True)
-    depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
+    depth_df.rename(columns={0: "DEPTH", "index": "SSSCC"}, inplace=True)
     depth_df.to_csv(cfg.directory["logs"] + "depth_log.csv", index=False)
     return True
 
@@ -1709,9 +1709,9 @@ def _find_cast_depth(ssscc,press,lat,alt,threshold=80):
             ssscc,
             "- minimum altimeter reading above",
             threshold,
-            "m threshold, setting max depth to NaN",
+            "m threshold, setting max depth to -999",
         )
-        max_depth = np.NaN
+        max_depth = -999
 
     return max_depth
 
@@ -1951,10 +1951,14 @@ def export_ct1(df, ssscc_list):
     df[stacst_col] = df[stacst_col].astype(str).copy()
 
     cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
-    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv').dropna()
-    manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv')
-    full_depth_df = pd.concat([depth_df,manual_depth_df])  # TODO: update from STNNBR to SSSCC
-    full_depth_df.drop_duplicates(subset='STNNBR', keep='first',inplace=True)
+    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv', dtype={"SSSCC": str}).dropna()
+    try:
+        manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv', dtype={"SSSCC": str})
+    except FileNotFoundError:
+        manual_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
+        manual_df.to_csv(cfg.directory["logs"] + 'manual_depth_log.csv', index=False)
+    full_depth_df = pd.concat([depth_df,manual_depth_df])
+    full_depth_df.drop_duplicates(subset='SSSCC', keep='first',inplace=True)
 
     for ssscc in ssscc_list:
 
@@ -1967,7 +1971,7 @@ def export_ct1(df, ssscc_list):
 
         s_num = ssscc[-5:-2]
         c_num = ssscc[-2:]
-        depth = full_depth_df.loc[full_depth_df['STNNBR'] == int(s_num),'DEPTH']
+        depth = full_depth_df.loc[full_depth_df['SSSCC'] == ssscc,'DEPTH'].iloc[0]
         # get cast_details for current SSSCC
         cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("r")[0]
         b_datetime = datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc).strftime('%Y%m%d %H%M').split(" ")
