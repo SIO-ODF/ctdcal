@@ -628,6 +628,10 @@ def calibrate_temp(btl_df, time_df):
 
     """
     ssscc_subsets = list(Path(cfg.directory["ssscc"]).glob('ssscc_t*.csv'))
+    if not ssscc_subsets:  # if no t-segments exists, write one from full list
+        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_t1.csv")]
+        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     qual_flag_t1 = pd.DataFrame()
     qual_flag_t2 = pd.DataFrame()
     coef_t1_all = pd.DataFrame()
@@ -809,6 +813,10 @@ def calibrate_cond(btl_df, time_df):
         btl_df["SALNTY_FLAG_W"] = 2
 
     ssscc_subsets = list(Path(cfg.directory["ssscc"]).glob('ssscc_c*.csv'))
+    if not ssscc_subsets:  # if no c-segments exists, write one from full list
+        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_c1.csv")]
+        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     qual_flag_c1 = pd.DataFrame()
     qual_flag_c2 = pd.DataFrame()
     coef_c1_all = pd.DataFrame()

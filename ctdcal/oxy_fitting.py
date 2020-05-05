@@ -12,7 +12,7 @@ import scipy
 import numpy as np
 #import sys
 #sys.path.append('ctdcal/')
-#import ctdcal.process_ctd as process_ctd
+import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
@@ -612,8 +612,13 @@ def merge_parameters(btl_df,time_df,l_param='sigma0_btl',r_param='sigma0_ctd'):
 
     return merge_df
 
-def get_sbe_coef(station='00101'):
-
+def _get_sbe_coef(idx=0):
+    """
+    Get SBE oxygen coefficients from raw data files.
+    Defaults to using first station in ssscc.csv file.
+    """
+    ssscc_list = process_ctd.get_ssscc_list()
+    station = ssscc_list[idx]
     hexfile = cfg.directory["raw"] + station + ".hex"
     xmlfile = cfg.directory["raw"] + station + ".XMLCON"
 
@@ -772,7 +777,7 @@ def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_fire_num, ctd_sigma, ctd_os, c
 
     # Apply coef and calculate CTDOXY
     # TODO: station shouldn't be hardcoded (in case it doesn't exist)
-    sbe_coef0 = get_sbe_coef(station='00101') # initial coefficient guess
+    sbe_coef0 = _get_sbe_coef() # initial coefficient guess
     merged_df['CTDOXY'] = _PMEL_oxy_eq(sbe_coef0, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS_sbe43_ctd'], merged_df['CTDTMP_sbe43_ctd'], merged_df['dv_dt'], merged_df['OS_sbe43_ctd']))
 
     return merged_df
@@ -785,8 +790,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_out=None):
     good_df = pd.DataFrame()
 
     if sbe_coef0 is None:
-        # Load initial coefficient guess
-        sbe_coef0 = get_sbe_coef(station='00101')
+        sbe_coef0 = _get_sbe_coef()  # load initial coefficient guess
 
     p0 = sbe_coef0[0], sbe_coef0[1], sbe_coef0[2], sbe_coef0[3], sbe_coef0[4]
     
@@ -991,16 +995,21 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged)
 
     # Fit oxygen stations using SSSCC chunks to refine coefficients
-    ssscc_files = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_ox*.csv"))
-    for f in ssscc_files:
-        ssscc_list_ox = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_ox*.csv"))
+    if not ssscc_subsets:  # if no ox-segments exists, write one from full list
+        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_ox1.csv")]
+        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
+
+    for f in ssscc_subsets:
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         sbe_coef, sbe_df = sbe43_oxy_fit(
-            all_sbe43_merged.loc[all_sbe43_merged["SSSCC_sbe43"].isin(ssscc_list_ox)],
+            all_sbe43_merged.loc[all_sbe43_merged["SSSCC_sbe43"].isin(ssscc_sublist)],
             sbe_coef0=sbe_coef0,
             f_out=f,
         )
         # build coef dictionary
-        for ssscc in ssscc_list_ox:
+        for ssscc in ssscc_sublist:
             if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
                 sbe43_dict[ssscc] = sbe_coef
         # all non-NaN oxygen data with flags

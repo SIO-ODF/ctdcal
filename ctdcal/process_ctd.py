@@ -908,7 +908,8 @@ def fill_surface_data(df, **kwargs):
 
 
 def _reft_loader(ssscc, reft_dir):
-    reft_path = reft_dir + ssscc + ".cap"
+    # semi-flexible search for reft file (in the form of *ssscc.cap)
+    reft_path = sorted(Path(reft_dir).glob(f"*{ssscc}.cap"))[0]
     # this works better than pd.read_csv as format is semi-inconsistent (cf .cap files)
     with open(reft_path, "r", newline="") as f:
         reftF = csv.reader(
@@ -1467,7 +1468,7 @@ def make_depth_log(time_df):
 
     depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
     depth_df.reset_index(inplace=True)
-    depth_df.rename(columns={0: "DEPTH", "index": "STNNBR"}, inplace=True)
+    depth_df.rename(columns={0: "DEPTH", "index": "SSSCC"}, inplace=True)
     depth_df.to_csv(cfg.directory["logs"] + "depth_log.csv", index=False)
     return True
 
@@ -1708,9 +1709,9 @@ def _find_cast_depth(ssscc,press,lat,alt,threshold=80):
             ssscc,
             "- minimum altimeter reading above",
             threshold,
-            "m threshold, setting max depth to NaN",
+            "m threshold, setting max depth to -999",
         )
-        max_depth = np.NaN
+        max_depth = -999
 
     return max_depth
 
@@ -1937,23 +1938,18 @@ def export_ct1(df, ssscc_list):
                     print(col + " missing, filling with -999s")
                     df[col] = -999
 
-    # load other necessary params
-    # TODO: this will change when config.py improves, find different method
-    expocode = cfg.cruise["expocode"]
-    section_id = cfg.cruise["sectionid"]
-    ctd = cfg.ctd_serial
-    out_dir = cfg.directory["pressure"]
-    p_col = 'CTDPRS'
-    stacst_col = 'SSSCC'
-    logFile = cfg.directory["logs"] + 'cast_details.csv'
-
-    df[stacst_col] = df[stacst_col].astype(str).copy()
-
+    df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
-    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv').dropna()
-    manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv')
-    full_depth_df = pd.concat([depth_df,manual_depth_df])  # TODO: update from STNNBR to SSSCC
-    full_depth_df.drop_duplicates(subset='STNNBR', keep='first',inplace=True)
+    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv', dtype={"SSSCC": str}).dropna()
+    try:
+        manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv', dtype={"SSSCC": str})
+    except FileNotFoundError:
+        # TODO: add logging; look into inheriting/extending a class to add features
+        print("manual_depth_log.csv not found... duplicating depth_log.csv")
+        manual_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
+        manual_df.to_csv(cfg.directory["logs"] + 'manual_depth_log.csv', index=False)
+    full_depth_df = pd.concat([depth_df,manual_depth_df])
+    full_depth_df.drop_duplicates(subset='SSSCC', keep='first',inplace=True)
 
     for ssscc in ssscc_list:
 
@@ -1964,14 +1960,11 @@ def export_ct1(df, ssscc_list):
         time_data = time_data[p_column_names]
         time_data = time_data.round(4)
 
-        s_num = ssscc[-5:-2]
-        c_num = ssscc[-2:]
-        depth = full_depth_df.loc[full_depth_df['STNNBR'] == int(s_num),'DEPTH']
+        depth = full_depth_df.loc[full_depth_df['SSSCC'] == ssscc,'DEPTH'].iloc[0]
         # get cast_details for current SSSCC
         cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("r")[0]
         b_datetime = datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc).strftime('%Y%m%d %H%M').split(" ")
-        b_date = b_datetime[0]
-        b_time = b_datetime[1]
+        # TODO: yo-yo casts are an edge case where this may be different
         btm_lat = cast_dict["latitude"]
         btm_lon = cast_dict["longitude"]
         btm_alt = cast_dict["altimeter_bottom"]
@@ -1979,39 +1972,32 @@ def export_ct1(df, ssscc_list):
         now = datetime.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
-        outfile = open(out_dir+ssscc+'_ct1.csv', "w+")
-        # put in logic to check columns?
-        # number_headers should be calculated, not defined
-        ctd_header = f"""CTD,{file_datetime}
-        NUMBER_HEADERS = 11
-        EXPOCODE = {expocode}
-        SECT_ID = {section_id}
-        STNNBR = {s_num}
-        CASTNO = {c_num}
-        DATE = {b_date}
-        TIME = {b_time}
-        LATITUDE = {btm_lat:.4f}
-        LONGITUDE = {btm_lon:.4f}
-        INSTRUMENT_ID = {ctd}
-        DEPTH = {depth}
-        """
-        outfile.write(ctd_header)
-        cn = np.asarray(p_column_names)
-        cn.tofile(outfile,sep=',', format='%s')
-        outfile.write('\n')
-        cu = np.asarray(p_column_units)
-        cu.tofile(outfile,sep=',', format='%s')
-        outfile.write('\n')
-        outfile.close()
-
-        file = out_dir+ssscc+'_ct1.csv'
-        with open(file,'a') as f:
-            time_data.to_csv(f, header=False,index=False)
-        f.close()
-
-        outfile = open(out_dir+ssscc+'_ct1.csv', "a")
-        outfile.write('END_DATA')
-        outfile.close()
+        # TODO: only "cast" needs to be int; "station" is explicitly allowed to incl.
+        # letters/etc. Moving from SSSCC to station & cast fields will be beneficial
+        with open(f"{cfg.directory['pressure']}{ssscc}_ct1.csv", "w+") as f:
+            # put in logic to check columns?
+            # number_headers should be calculated, not defined
+            ctd_header = (  # this is ugly but prevents tabs before label
+                f"CTD,{file_datetime}\n"
+                f"NUMBER_HEADERS = 11\n"
+                f"EXPOCODE = {cfg.cruise['expocode']}\n"
+                f"SECT_ID = {cfg.cruise['sectionid']}\n"
+                f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
+                f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
+                f"DATE = {b_datetime[0]}\n"
+                f"TIME = {b_datetime[1]}\n"
+                f"LATITUDE = {btm_lat:.4f}\n"
+                f"LONGITUDE = {btm_lon:.4f}\n"
+                f"INSTRUMENT_ID = {cfg.ctd_serial}\n"
+                f"DEPTH = {depth}\n"
+            )
+            f.write(ctd_header)
+            np.asarray(p_column_names).tofile(f, sep=',', format='%s')
+            f.write('\n')
+            np.asarray(p_column_units).tofile(f, sep=',', format='%s')
+            f.write('\n')
+            time_data.to_csv(f, header=False, index=False)
+            f.write("END_DATA")
 
 
 def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir=cfg.directory["pressure"],org='ODF'):
