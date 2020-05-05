@@ -1944,6 +1944,8 @@ def export_ct1(df, ssscc_list):
     try:
         manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv', dtype={"SSSCC": str})
     except FileNotFoundError:
+        # TODO: add logging; look into inheriting/extending a class to add features
+        print("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
         manual_df.to_csv(cfg.directory["logs"] + 'manual_depth_log.csv', index=False)
     full_depth_df = pd.concat([depth_df,manual_depth_df])
@@ -1962,6 +1964,7 @@ def export_ct1(df, ssscc_list):
         # get cast_details for current SSSCC
         cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("r")[0]
         b_datetime = datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc).strftime('%Y%m%d %H%M').split(" ")
+        # TODO: yo-yo casts are an edge case where this may be different
         btm_lat = cast_dict["latitude"]
         btm_lon = cast_dict["longitude"]
         btm_alt = cast_dict["altimeter_bottom"]
@@ -1969,6 +1972,8 @@ def export_ct1(df, ssscc_list):
         now = datetime.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d") #%H:%M")
         file_datetime = file_datetime + 'ODFSIO'
+        # TODO: only "cast" needs to be int; "station" is explicitly allowed to incl.
+        # letters/etc. Moving from SSSCC to station & cast fields will be beneficial
         with open(f"{cfg.directory['pressure']}{ssscc}_ct1.csv", "w+") as f:
             # put in logic to check columns?
             # number_headers should be calculated, not defined
