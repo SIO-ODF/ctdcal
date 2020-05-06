@@ -15,6 +15,7 @@ import os
 import json
 from pathlib import Path
 import config as cfg
+import matplotlib.pyplot as plt
 
 M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
@@ -611,6 +612,28 @@ def _get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num,
     return coefs, df_ques
 
 
+def _residual_plot(diff, prs, ssscc, f_out=None, xlim=[-0.01,0.01], ylim=[5000,0]):
+
+    idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
+
+    plt.figure(figsize=(5,6))
+    plt.scatter(
+        diff,
+        prs,
+        c=idx,
+        marker="+"
+        )
+    plt.xlim(xlim)
+    plt.xticks(rotation=45)
+    plt.ylim(ylim)
+    plt.colorbar()  # TODO: replace with SSSCC values instead of idx
+    plt.grid()
+    plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")  # check this
+    plt.savefig(f_out)
+
+    return True
+
+
 def calibrate_temp(btl_df, time_df):
     # TODO: break off parts of this to useful functions for all vars (C/T/O)
     """
@@ -627,6 +650,7 @@ def calibrate_temp(btl_df, time_df):
     --------
 
     """
+    print("Calibrating temperature")
     ssscc_subsets = list(Path(cfg.directory["ssscc"]).glob('ssscc_t*.csv'))
     if not ssscc_subsets:  # if no t-segments exists, write one from full list
         ssscc_list = process_ctd.get_ssscc_list()
@@ -656,8 +680,8 @@ def calibrate_temp(btl_df, time_df):
             df_good[cfg.column["p_btl"]],
             df_good["SSSCC"],
             df_good["btl_fire_num"],
-            T_order=2,
-            P_order=2,
+            T_order=1,
+            P_order=1,
             zRange="1000:5000",
         )
         coef_t2, df_ques_t2 = _get_T_coefs(
@@ -666,8 +690,8 @@ def calibrate_temp(btl_df, time_df):
             df_good[cfg.column["p_btl"]],
             df_good["SSSCC"],
             df_good["btl_fire_num"],
-            T_order=2,
-            P_order=2,
+            T_order=1,
+            P_order=1,
             zRange="1000:5000",
         )
 
@@ -691,6 +715,21 @@ def calibrate_temp(btl_df, time_df):
             time_df.loc[time_rows, cfg.column["t2"]],
             time_df.loc[time_rows, cfg.column["p"]],
             coef_t2,
+        )
+
+        # 4.5) plot residual
+        f_suffix = f.stem.split("ssscc")[1]  # get "_t*" from "ssscc_t*.csv"
+        _residual_plot(
+            btl_df[cfg.column["t1_btl"]] - btl_df[cfg.column["reft"]],
+            btl_df[cfg.column["p_btl"]],
+            btl_df["SSSCC"],
+            f_out=cfg.directory["logs"] + "t1_residual" + f_suffix + ".png"
+        )
+        _residual_plot(
+            btl_df[cfg.column["t2_btl"]] - btl_df[cfg.column["reft"]],
+            btl_df[cfg.column["p_btl"]],
+            btl_df["SSSCC"],
+            f_out=cfg.directory["logs"] + "t2_residual" + f_suffix + ".png"
         )
 
         # 5) handle quality flags
@@ -783,6 +822,7 @@ def calibrate_cond(btl_df, time_df):
     --------
 
     """
+    print("Calibrating conductivity")
     # calculate BTLCOND values from autosal data
     btl_df[cfg.column["refc"]] = CR_to_cond(
         btl_df["CRavg"],
@@ -885,6 +925,21 @@ def calibrate_cond(btl_df, time_df):
             time_df.loc[time_rows, cfg.column["t2"]],
             time_df.loc[time_rows, cfg.column["p"]],
             coef_c2,
+        )
+
+        # 4.5) plot residual
+        f_suffix = f.stem.split("ssscc")[1]  # get "_c*" from "ssscc_c*.csv"
+        _residual_plot(
+            btl_df[cfg.column["c1_btl"]] - btl_df[cfg.column["refc"]],
+            btl_df[cfg.column["p_btl"]],
+            btl_df["SSSCC"],
+            f_out=cfg.directory["logs"] + "c1_residual" + f_suffix + ".png"
+        )
+        _residual_plot(
+            btl_df[cfg.column["c2_btl"]] - btl_df[cfg.column["refc"]],
+            btl_df[cfg.column["p_btl"]],
+            btl_df["SSSCC"],
+            f_out=cfg.directory["logs"] + "c2_residual" + f_suffix + ".png"
         )
 
         # 5) handle quality flags
@@ -1134,7 +1189,7 @@ def write_calib_coef(ssscc,coef,param):
 
 #
 # MK: depreciated 04/23/20
-# use fit_temp/fit_cond
+# use calibrate_temp/calibrate_cond
 # def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
 #                    cond_col = 'CTDCOND'):
 #     """ Applies Coef to time and bottle Data
