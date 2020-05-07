@@ -833,7 +833,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
             merged_df["CTDPRS_sbe43_ctd"],
             merged_df["SSSCC_sbe43"],
             f_out=f_out,
-            xlim=[-10,10]
+            xlim=(-10,10)
         )
 
     # good_df = pd.concat([good_df, merged_df])

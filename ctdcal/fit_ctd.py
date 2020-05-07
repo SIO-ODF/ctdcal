@@ -612,7 +612,7 @@ def _get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num,
     return coefs, df_ques
 
 
-def _residual_plot(diff, prs, ssscc, f_out, xlim=[-0.01,0.01], ylim=[6000,0]):
+def _residual_plot(diff, prs, ssscc, f_out, xlim=(-0.01,0.01), ylim=(6000,0)):
 
     idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
 
@@ -623,8 +623,10 @@ def _residual_plot(diff, prs, ssscc, f_out, xlim=[-0.01,0.01], ylim=[6000,0]):
         c=idx,
         marker="+"
         )
-    plt.xlim(xlim)
-    plt.xticks(rotation=45)
+    # only set xlims if original range is smaller
+    if np.diff(plt.xlim()) < np.diff(xlim):
+        plt.xlim(xlim)
+        plt.xticks(rotation=45)
     plt.ylim(ylim)
     cbar = plt.colorbar(pad=0.1)  # set cbar ticks to SSSCC names
     cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
@@ -722,15 +724,17 @@ def calibrate_temp(btl_df, time_df):
         # 4.5) plot residual
         f_suffix = f.stem.split("ssscc")[1]  # get "_t*" from "ssscc_t*.csv"
         _residual_plot(
-            btl_df[cfg.column["t1_btl"]] - btl_df[cfg.column["reft"]],
-            btl_df[cfg.column["p_btl"]],
-            btl_df["SSSCC"],
+            btl_df.loc[btl_rows, cfg.column["t1_btl"]]
+            - btl_df.loc[btl_rows, cfg.column["reft"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, "SSSCC"],
             f_out=cfg.directory["logs"] + "t1_residual" + f_suffix + ".png"
         )
         _residual_plot(
-            btl_df[cfg.column["t2_btl"]] - btl_df[cfg.column["reft"]],
-            btl_df[cfg.column["p_btl"]],
-            btl_df["SSSCC"],
+            btl_df.loc[btl_rows, cfg.column["t2_btl"]]
+            - btl_df.loc[btl_rows, cfg.column["reft"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, "SSSCC"],
             f_out=cfg.directory["logs"] + "t2_residual" + f_suffix + ".png"
         )
 
@@ -932,15 +936,17 @@ def calibrate_cond(btl_df, time_df):
         # 4.5) plot residual
         f_suffix = f.stem.split("ssscc")[1]  # get "_c*" from "ssscc_c*.csv"
         _residual_plot(
-            btl_df[cfg.column["c1_btl"]] - btl_df[cfg.column["refc"]],
-            btl_df[cfg.column["p_btl"]],
-            btl_df["SSSCC"],
+            btl_df.loc[btl_rows, cfg.column["c1_btl"]]
+            - btl_df.loc[btl_rows, cfg.column["refc"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, "SSSCC"],
             f_out=cfg.directory["logs"] + "c1_residual" + f_suffix + ".png"
         )
         _residual_plot(
-            btl_df[cfg.column["c2_btl"]] - btl_df[cfg.column["refc"]],
-            btl_df[cfg.column["p_btl"]],
-            btl_df["SSSCC"],
+            btl_df.loc[btl_rows, cfg.column["c2_btl"]]
+            - btl_df.loc[btl_rows, cfg.column["refc"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, "SSSCC"],
             f_out=cfg.directory["logs"] + "c2_residual" + f_suffix + ".png"
         )
 
