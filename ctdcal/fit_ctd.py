@@ -616,7 +616,7 @@ def _residual_plot(diff, prs, ssscc, f_out=None, xlim=[-0.01,0.01], ylim=[5000,0
 
     idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
 
-    plt.figure(figsize=(5,6))
+    plt.figure(figsize=(6,6))
     plt.scatter(
         diff,
         prs,
@@ -626,7 +626,9 @@ def _residual_plot(diff, prs, ssscc, f_out=None, xlim=[-0.01,0.01], ylim=[5000,0
     plt.xlim(xlim)
     plt.xticks(rotation=45)
     plt.ylim(ylim)
-    plt.colorbar()  # TODO: replace with SSSCC values instead of idx
+    cbar = plt.colorbar(pad=0.1)  # set cbar ticks to SSSCC names
+    cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
+    cbar.ax.set_title("SSSCC")
     plt.grid()
     plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")  # check this
     plt.savefig(f_out)
@@ -884,8 +886,8 @@ def calibrate_cond(btl_df, time_df):
             df_good["SSSCC"],
             df_good["btl_fire_num"],
             P_order=2,
-            T_order=0,
-            C_order=1,
+            T_order=2,
+            C_order=2,
             zRange="1000:5000",
         )
         coef_c2, df_ques_c2 = _get_C_coefs(
@@ -896,8 +898,8 @@ def calibrate_cond(btl_df, time_df):
             df_good["SSSCC"],
             df_good["btl_fire_num"],
             P_order=2,
-            T_order=0,
-            C_order=1,
+            T_order=2,
+            C_order=2,
             zRange="1000:5000",
         )
 
