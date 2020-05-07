@@ -612,7 +612,7 @@ def _get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num,
     return coefs, df_ques
 
 
-def _residual_plot(diff, prs, ssscc, f_out=None, xlim=[-0.01,0.01], ylim=[5000,0]):
+def _residual_plot(diff, prs, ssscc, f_out, xlim=[-0.01,0.01], ylim=[6000,0]):
 
     idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
 
@@ -684,7 +684,7 @@ def calibrate_temp(btl_df, time_df):
             df_good["btl_fire_num"],
             T_order=1,
             P_order=1,
-            zRange="1000:5000",
+            zRange="1000:6000",
         )
         coef_t2, df_ques_t2 = _get_T_coefs(
             df_good[cfg.column["t2_btl"]],
@@ -694,7 +694,7 @@ def calibrate_temp(btl_df, time_df):
             df_good["btl_fire_num"],
             T_order=1,
             P_order=1,
-            zRange="1000:5000",
+            zRange="1000:6000",
         )
 
         # 4) apply fit
@@ -888,7 +888,7 @@ def calibrate_cond(btl_df, time_df):
             P_order=2,
             T_order=2,
             C_order=2,
-            zRange="1000:5000",
+            zRange="1000:6000",
         )
         coef_c2, df_ques_c2 = _get_C_coefs(
             df_good[cfg.column["c2_btl"]],
@@ -900,7 +900,7 @@ def calibrate_cond(btl_df, time_df):
             P_order=2,
             T_order=2,
             C_order=2,
-            zRange="1000:5000",
+            zRange="1000:6000",
         )
 
         # 4) apply fit

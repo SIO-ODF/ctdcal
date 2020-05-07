@@ -20,6 +20,7 @@ import gsw
 import pandas as pd
 import csv
 from pathlib import Path
+import matplotlib.pyplot as plt
 import config as cfg
 
 #Line 342 module isopycnals
@@ -783,7 +784,7 @@ def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_fire_num, ctd_sigma, ctd_os, c
     return merged_df
 
 
-def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_out=None):
+def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
 
     # Create DF for good and questionable values
     bad_df = pd.DataFrame()
@@ -823,25 +824,17 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_out=None):
         bad_df = pd.concat([bad_df, thrown_values])
         merged_df = merged_df[np.abs(merged_df['res_sbe43']) <= cutoff]
 
-    # implement into bokeh/flask dashboard
     # intermediate plots to diagnose data chunks goodness
-    # TODO: for all parameters (T/C/O)
-    if f_out is not None:
-        # grab _ox# from ssscc_ox1.csv
-        f_suffix = f_out.stem.split('ssscc')[1]
-        import matplotlib.pyplot as plt
-        import config as cfg
-        plt.figure(figsize=(5,6))
-        plt.scatter(
-            merged_df['res_sbe43'], 
-            merged_df['CTDPRS_sbe43_ctd'], 
-            c=merged_df['SSSCC_sbe43'].astype(int),
-            marker="+"
-            )
-        plt.xlim([-10,10])
-        plt.ylim([5000,0])
-        plt.grid()
-        plt.savefig(cfg.directory['logs'] + 'oxy_residual' + f_suffix + '.png')
+    # TODO: implement into bokeh/flask dashboard
+    if f_suffix is not None:
+        f_out = f"{cfg.directory['logs']}sbe43_residual{f_suffix}.png"
+        fit_ctd._residual_plot(
+            merged_df["res_sbe43"],
+            merged_df["CTDPRS_sbe43_ctd"],
+            merged_df["SSSCC_sbe43"],
+            f_out=f_out,
+            xlim=[-10,10]
+        )
 
     # good_df = pd.concat([good_df, merged_df])
     merged_df['CTDOXY_FLAG_W'] = 2
@@ -1006,7 +999,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         sbe_coef, sbe_df = sbe43_oxy_fit(
             all_sbe43_merged.loc[all_sbe43_merged["SSSCC_sbe43"].isin(ssscc_sublist)],
             sbe_coef0=sbe_coef0,
-            f_out=f,
+            f_suffix=f.stem.split("ssscc")[1],  # get _ox* from data/ssscc/ssscc_ox*.csv
         )
         # build coef dictionary
         for ssscc in ssscc_sublist:
