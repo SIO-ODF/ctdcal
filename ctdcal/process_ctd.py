@@ -1065,6 +1065,8 @@ def calibrate_param(param,ref_param,press,ssscc,btl_num,xRange=None,):
 
     # return coef,df_ques
 
+# MK: deprecated 05/12/20
+# use fit_ctd._flag_btl_data() instead
 def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
 
 
@@ -1193,6 +1195,8 @@ def combine_quality_flags(df_list):
     #Sort by sta/cast, bottle number, rev. press
 
 
+# MK: deprecated 05/12/20
+# use fit_ctd.calibrate_cond() instead
 def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
                            refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2',
                            p_col='CTDPRS'):#refc_data
@@ -1339,7 +1343,8 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
         coef[6] = cf[2]
     return coef,df_ques,df_ref
 
-
+# MK: moved to fit_ctd
+# all calls to this are from deprecated (or soon to be deprecated) functions
 def prepare_fit_data(df,ref_col):
 
     good_data = df.copy()

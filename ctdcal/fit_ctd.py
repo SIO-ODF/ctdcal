@@ -17,6 +17,8 @@ from pathlib import Path
 import config as cfg
 import matplotlib.pyplot as plt
 
+# TODO: clean up oxygen fitting things, they should be in ctdcal.oxy_fitting
+
 M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
 D = 1.42905481 #  /* density O2 g/l @ 0 C */
@@ -561,6 +563,102 @@ def calculate_b_CTM(a, alpha):
     return b
 
 
+def _flag_btl_data(param, ref_param, prs, ssscc, btl_num, find, thresh=[0.002, 0.005, 0.010, 0.020]):
+
+    # TODO: clean this up and make sure it fits in to calibrate_cond() properly
+
+    param = fit_ctd.array_like_to_series(param)
+    ref_param = fit_ctd.array_like_to_series(ref_param)
+    prs = fit_ctd.array_like_to_series(prs)
+    ssscc = fit_ctd.array_like_to_series(ssscc)
+    btl_num = fit_ctd.array_like_to_series(btl_num)
+
+    diff = ref_param - param
+
+    df = pd.concat([ssscc,btl_num.rename('Bottle'),param.rename('Param_1'),ref_param.rename('ref_param'),prs.rename('CTDPRS'),diff.rename('Diff')],axis=1)
+
+    if find == 'good':
+    # Find data values for each sensor that are below the threshold (good)
+        df['Flag'] = 1
+        #df_range_comp = df_range[(df_range[diff].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
+        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() < thresh[0]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() < thresh[1]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() < thresh[2]), 'Flag'] = 2
+        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() < thresh[3]), 'Flag'] = 2
+#
+        # Filter out bad values
+
+        df = df[df['Flag'] == 2]
+
+        # Rename Columns back to what they were
+
+        if param.name != None:
+            df.rename(columns = {'Param_1' : param.name}, inplace=True)
+
+        if ref_param.name != None:
+            df.rename(columns = {'ref_param' : ref_param.name},inplace=True)
+
+        if prs.name != None:
+            df.rename(columns = {'CTDPRS' : prs.name}, inplace=True )
+
+    elif find == 'quest':
+    # Find data values for each sensor that are above the threshold (questionable)
+
+        df['Flag'] = 1
+        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() > thresh[0]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() > thresh[1]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() > thresh[2]), 'Flag'] = 3
+        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() > thresh[3]), 'Flag'] = 3
+
+        # Filter out good values
+
+        df = df[df['Flag'] == 3]
+
+        # Remove unneeded columns
+
+        df = df.drop(['Param_1','ref_param'],axis=1)
+
+        # Re-Order Columns for better readability
+
+        df = df[[ssscc.name,'Bottle',prs.name,'Flag','Diff']]
+
+
+    else:
+        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
+
+    return df
+
+
+def _prepare_fit_data(df, param, ref_param):
+
+    good_data = df[np.isfinite(df[ref_param])].copy()
+    df_good, df_bad = _wild_edit(
+        good_data[param],
+        good_data[ref_param],
+        good_data["CTDPRS"],
+        good_data["SSSCC"],
+        good_data["btl_fire_num"],
+    )
+
+    return df_good, df_bad
+
+
+def _wild_edit(param, ref_param, prs, ssscc, btl_num, n_sigma=10):
+    """
+    Calculate residual then find extreme outliers and flag as bad (code 4).
+    """
+    diff = ref_param - param
+    df = pd.concat([ssscc, btl_num, param, ref_param, prs], axis=1)
+    df["Diff"] = ref_param - param
+    outliers = df["Diff"].abs() > (n_sigma * df["Diff"].std())
+    df_good = df[~outliers].copy()
+    df_good["Flag"] = 2
+    df_bad = df[outliers].copy()
+    df_bad["Flag"] = 4
+
+    return df_good, df_bad
+
+
 def _temperature_polyfit(temp,press,coef):
     
     fitted_temp = (
@@ -612,7 +710,7 @@ def _get_T_coefs(df_T, df_refT, df_prs, ssscc_list, btl_num,
     return coefs, df_ques
 
 
-def _residual_plot(diff, prs, ssscc, f_out, xlim=(-0.01,0.01), ylim=(6000,0)):
+def _residual_plot(diff, prs, ssscc, f_out=None, xlim=(-0.02,0.02), ylim=(6000,0)):
 
     idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
 
@@ -624,16 +722,17 @@ def _residual_plot(diff, prs, ssscc, f_out, xlim=(-0.01,0.01), ylim=(6000,0)):
         marker="+"
         )
     # only set xlims if original range is smaller
-    if np.diff(plt.xlim()) < np.diff(xlim):
-        plt.xlim(xlim)
-        plt.xticks(rotation=45)
+    # if np.diff(plt.xlim()) < np.diff(xlim):
+    plt.xlim(xlim)
+    plt.xticks(rotation=45)
     plt.ylim(ylim)
     cbar = plt.colorbar(pad=0.1)  # set cbar ticks to SSSCC names
     cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
     cbar.ax.set_title("SSSCC")
     plt.grid()
     plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")  # check this
-    plt.savefig(f_out)
+    if f_out is not None:
+        plt.savefig(f_out)
 
     return True
 
@@ -672,7 +771,6 @@ def calibrate_temp(btl_df, time_df):
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
         # 1) remove non-finite data
-        # TODO: move prepare_fit_data to fit_ctd module?
         df_good = process_ctd.prepare_fit_data(btl_df[btl_rows], cfg.column["reft"])
 
         # TODO: allow for cast-by-cast T_order/P_order/zRange
@@ -762,19 +860,25 @@ def calibrate_temp(btl_df, time_df):
     coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
     coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
 
-    return True
+    return btl_df, time_df
 
 
-def _get_C_coefs(df_C, df_refC, df_T, df_prs, ssscc_list, btl_num,
-                P_order=2, T_order=2, C_order=2, zRange=None):
+def _get_C_coefs(df, C_col=None, P_order=2, T_order=2, C_order=2, zRange=None):
 
-    # TODO: clean calibrate_param and move to fit_ctd
-    df_good, df_ques = process_ctd.calibrate_param(df_C, df_refC, df_prs, ssscc_list, btl_num, zRange)
+    if C_col is None:
+        print("Parameter invalid, specify what sensor is being calibrated")
+        return
+    elif C_col == cfg.column["c1_btl"]:
+        T_col = cfg.column["t1_btl"]
+    elif C_col == cfg.column["c2_btl"]:
+        T_col = cfg.column["t2_btl"]
+    P_col = cfg.column["p_btl"]
+
+    # remove non-finite data and extreme outliers
+    df_good, df_bad = _prepare_fit_data(df, C_col, cfg.column["refc"])
 
     # add CTDTMP column
-    # reindex df_T then resample using inds from df_good
-    df_T.reset_index(drop=True, inplace=True)
-    df_good[df_T.name] = df_T.iloc[df_good.index]
+    df_good[T_col] = df.loc[df_good.index, T_col]
 
     # Toggle columns based on desired polyfit order
     # (i.e. don't calculate 2nd order term if only doing 1st order fit)
@@ -789,13 +893,13 @@ def _get_C_coefs(df_C, df_refC, df_T, df_prs, ssscc_list, btl_num,
     # C_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4*C^2 + c5*C + c6
     fit_matrix = np.vstack(
         [
-        P_fit[0]*df_good[df_prs.name]**2,
-        P_fit[1]*df_good[df_prs.name],
-        T_fit[0]*df_good[df_T.name]**2,
-        T_fit[1]*df_good[df_T.name],
-        C_fit[0]*df_good[df_C.name]**2,
-        C_fit[1]*df_good[df_C.name],
-        np.ones(len(df_good[df_C.name]))
+        P_fit[0]*df_good[cfg.column["p_btl"]]**2,
+        P_fit[1]*df_good[cfg.column["p_btl"]],
+        T_fit[0]*df_good[T_col]**2,
+        T_fit[1]*df_good[T_col],
+        C_fit[0]*df_good[C_col]**2,
+        C_fit[1]*df_good[C_col],
+        np.ones(len(df_good[C_col]))
         ]
         )
     coefs = np.linalg.lstsq(
@@ -807,7 +911,7 @@ def _get_C_coefs(df_C, df_refC, df_T, df_prs, ssscc_list, btl_num,
     # so force uncalculated fit terms to be truly zero
     coefs = coefs*np.concatenate((P_fit,T_fit,C_fit,[1]))
 
-    return coefs, df_ques
+    return coefs, df_bad
 
 
 def calibrate_cond(btl_df, time_df):
@@ -876,35 +980,24 @@ def calibrate_cond(btl_df, time_df):
         )
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
-        # 1) remove non-finite data
-        df_good = process_ctd.prepare_fit_data(btl_df[btl_rows], cfg.column["refc"])
-
         # TODO: allow for cast-by-cast T_order/P_order/zRange
         # TODO: truncate coefs (10 digits? look at historical data)
         # 2 & 3) calculate fit params
         coef_c1, df_ques_c1 = _get_C_coefs(
-            df_good[cfg.column["c1_btl"]],
-            df_good[cfg.column["refc"]],
-            df_good[cfg.column["t1_btl"]],
-            df_good[cfg.column["p_btl"]],
-            df_good["SSSCC"],
-            df_good["btl_fire_num"],
+            btl_df[btl_rows],
+            C_col=cfg.column["c1_btl"],
             P_order=2,
-            T_order=2,
-            C_order=2,
-            zRange="1000:6000",
+            T_order=0,
+            C_order=0,
+            zRange="1000:4000",
         )
         coef_c2, df_ques_c2 = _get_C_coefs(
-            df_good[cfg.column["c2_btl"]],
-            df_good[cfg.column["refc"]],
-            df_good[cfg.column["t1_btl"]],
-            df_good[cfg.column["p_btl"]],
-            df_good["SSSCC"],
-            df_good["btl_fire_num"],
+            btl_df[btl_rows],
+            C_col=cfg.column["c2_btl"],
             P_order=2,
-            T_order=2,
-            C_order=2,
-            zRange="1000:6000",
+            T_order=0,
+            C_order=0,
+            zRange="1000:4000",
         )
 
         # 4) apply fit
@@ -951,8 +1044,8 @@ def calibrate_cond(btl_df, time_df):
         )
 
         # 5) handle quality flags
-        qual_flag_c1 = pd.concat([qual_flag_c1, df_ques_c1])
-        qual_flag_c2 = pd.concat([qual_flag_c2, df_ques_c2])
+        # qual_flag_c1 = pd.concat([qual_flag_c1, df_ques_c1])
+        # qual_flag_c2 = pd.concat([qual_flag_c2, df_ques_c2])
 
         # 6) handle fit params
         coef_c1_df = pd.DataFrame()
@@ -967,8 +1060,8 @@ def calibrate_cond(btl_df, time_df):
         coef_c2_all = pd.concat([coef_c2_all, coef_c2_df])
 
     # export cond quality flags
-    qual_flag_c1.to_csv(cfg.directory["logs"] + "qual_flag_c1.csv", index=False)
-    qual_flag_c2.to_csv(cfg.directory["logs"] + "qual_flag_c2.csv", index=False)
+    # qual_flag_c1.to_csv(cfg.directory["logs"] + "qual_flag_c1.csv", index=False)
+    # qual_flag_c2.to_csv(cfg.directory["logs"] + "qual_flag_c2.csv", index=False)
 
     # export cond fit params
     coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
@@ -981,7 +1074,7 @@ def calibrate_cond(btl_df, time_df):
         time_df[cfg.column["p"]],
     )
 
-    return True
+    return btl_df, time_df
         
 
 #def load_qual(path):
