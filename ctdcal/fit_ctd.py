@@ -563,70 +563,59 @@ def calculate_b_CTM(a, alpha):
     return b
 
 
-def _flag_btl_data(param, ref_param, prs, ssscc, btl_num, find, thresh=[0.002, 0.005, 0.010, 0.020]):
+def _flag_btl_data(
+    df, param=None, ref=None, thresh=[0.002, 0.005, 0.010, 0.020], f_out=None,
+):
+    """
+    Flag CTD "btl" data against reference measurement (e.g. SBE35, bottle salts).
 
-    # TODO: clean this up and make sure it fits in to calibrate_cond() properly
+    Parameters
+    ----------
+    df : DataFrame,
+        DataFrame containing btl data
+    param : str
+        Name of parameter to calibrate (e.g. "CTDCOND1", "CTDTMP2")
+    ref : str
+        Name of reference parameter to calibrate against (e.g. "BTLCOND", "T90")
+    thresh : list of float, optional
+        Maximum acceptable residual for each pressure range
+    f_out : str, optional
+        Path and filename to save residual vs. pressure plots
 
-    param = fit_ctd.array_like_to_series(param)
-    ref_param = fit_ctd.array_like_to_series(ref_param)
-    prs = fit_ctd.array_like_to_series(prs)
-    ssscc = fit_ctd.array_like_to_series(ssscc)
-    btl_num = fit_ctd.array_like_to_series(btl_num)
+    Returns
+    -------
+    df_ques : DataFrame
+        Data flagged as questionable (flag 3s)
+    df_bad : DataFrame
+        Data flagged as bad (flag 4s)
 
-    diff = ref_param - param
+    """
 
-    df = pd.concat([ssscc,btl_num.rename('Bottle'),param.rename('Param_1'),ref_param.rename('ref_param'),prs.rename('CTDPRS'),diff.rename('Diff')],axis=1)
+    prs = cfg.column["p_btl"]
 
-    if find == 'good':
-    # Find data values for each sensor that are below the threshold (good)
-        df['Flag'] = 1
-        #df_range_comp = df_range[(df_range[diff].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
-        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() < thresh[0]), 'Flag'] = 2
-        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() < thresh[1]), 'Flag'] = 2
-        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() < thresh[2]), 'Flag'] = 2
-        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() < thresh[3]), 'Flag'] = 2
-#
-        # Filter out bad values
+    # Remove extreme outliers and code bad
+    df, df_bad = _wild_edit(
+        df[param], df[ref], df[prs], df["SSSCC"], df["btl_fire_num"]
+    )
 
-        df = df[df['Flag'] == 2]
+    # Find values that are above the threshold and code questionable
+    df.loc[(df[prs] > 2000) & (df["Diff"].abs() > thresh[0]), "Flag"] = 3
+    df.loc[
+        (df[prs] <= 2000) & (df[prs] > 1000) & (df["Diff"].abs() > thresh[1]), "Flag",
+    ] = 3
+    df.loc[
+        (df[prs] <= 1000) & (df[prs] > 500) & (df["Diff"].abs() > thresh[2]), "Flag"
+    ] = 3
+    df.loc[(df[prs] <= 500) & (df["Diff"].abs() > thresh[3]), "Flag"] = 3
+    df_good = df[df["Flag"] == 2]
+    df_ques = df[df["Flag"] == 3]
 
-        # Rename Columns back to what they were
+    if f_out is not None:
+        _residual_plot(df["Diff"], df[prs], df["SSSCC"], f_out=f_out)
+        f_out = f_out.split(".png")[0] + "_flag2.png"
+        _residual_plot(df_good["Diff"], df_good[prs], df_good["SSSCC"], f_out=f_out)
 
-        if param.name != None:
-            df.rename(columns = {'Param_1' : param.name}, inplace=True)
-
-        if ref_param.name != None:
-            df.rename(columns = {'ref_param' : ref_param.name},inplace=True)
-
-        if prs.name != None:
-            df.rename(columns = {'CTDPRS' : prs.name}, inplace=True )
-
-    elif find == 'quest':
-    # Find data values for each sensor that are above the threshold (questionable)
-
-        df['Flag'] = 1
-        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() > thresh[0]), 'Flag'] = 3
-        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() > thresh[1]), 'Flag'] = 3
-        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() > thresh[2]), 'Flag'] = 3
-        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() > thresh[3]), 'Flag'] = 3
-
-        # Filter out good values
-
-        df = df[df['Flag'] == 3]
-
-        # Remove unneeded columns
-
-        df = df.drop(['Param_1','ref_param'],axis=1)
-
-        # Re-Order Columns for better readability
-
-        df = df[[ssscc.name,'Bottle',prs.name,'Flag','Diff']]
-
-
-    else:
-        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
-
-    return df
+    return df_ques, df_bad
 
 
 def _prepare_fit_data(df, param, ref_param):
@@ -983,21 +972,23 @@ def calibrate_cond(btl_df, time_df):
         # TODO: allow for cast-by-cast T_order/P_order/zRange
         # TODO: truncate coefs (10 digits? look at historical data)
         # 2 & 3) calculate fit params
-        coef_c1, df_ques_c1 = _get_C_coefs(
+        # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
+        # but are left here for future debugging (if necessary)
+        coef_c1, df_bad_c1 = _get_C_coefs(
             btl_df[btl_rows],
             C_col=cfg.column["c1_btl"],
             P_order=2,
             T_order=0,
             C_order=0,
-            zRange="1000:4000",
+            zRange="1000:5000",
         )
-        coef_c2, df_ques_c2 = _get_C_coefs(
+        coef_c2, df_bad_c2 = _get_C_coefs(
             btl_df[btl_rows],
             C_col=cfg.column["c2_btl"],
             P_order=2,
             T_order=0,
             C_order=0,
-            zRange="1000:4000",
+            zRange="1000:5000",
         )
 
         # 4) apply fit
@@ -1026,26 +1017,24 @@ def calibrate_cond(btl_df, time_df):
             coef_c2,
         )
 
-        # 4.5) plot residual
+        # 4.5) flag cond and make residual plots
         f_suffix = f.stem.split("ssscc")[1]  # get "_c*" from "ssscc_c*.csv"
-        _residual_plot(
-            btl_df.loc[btl_rows, cfg.column["c1_btl"]]
-            - btl_df.loc[btl_rows, cfg.column["refc"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
-            btl_df.loc[btl_rows, "SSSCC"],
-            f_out=cfg.directory["logs"] + "c1_residual" + f_suffix + ".png"
+        df_ques_c1, df_bad_c1 = _flag_btl_data(
+            btl_df[btl_rows],
+            param=cfg.column["c1_btl"],
+            ref=cfg.column["refc"],
+            f_out=f"{cfg.directory['logs']}c1_residual{f_suffix}.png",
         )
-        _residual_plot(
-            btl_df.loc[btl_rows, cfg.column["c2_btl"]]
-            - btl_df.loc[btl_rows, cfg.column["refc"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
-            btl_df.loc[btl_rows, "SSSCC"],
-            f_out=cfg.directory["logs"] + "c2_residual" + f_suffix + ".png"
+        df_ques_c2, df_bad_c2 = _flag_btl_data(
+            btl_df[btl_rows],
+            param=cfg.column["c2_btl"],
+            ref=cfg.column["refc"],
+            f_out=f"{cfg.directory['logs']}c2_residual{f_suffix}.png",
         )
 
         # 5) handle quality flags
-        # qual_flag_c1 = pd.concat([qual_flag_c1, df_ques_c1])
-        # qual_flag_c2 = pd.concat([qual_flag_c2, df_ques_c2])
+        qual_flag_c1 = pd.concat([qual_flag_c1, df_bad_c1, df_ques_c1])
+        qual_flag_c2 = pd.concat([qual_flag_c2, df_bad_c2, df_ques_c2])
 
         # 6) handle fit params
         coef_c1_df = pd.DataFrame()
@@ -1060,8 +1049,12 @@ def calibrate_cond(btl_df, time_df):
         coef_c2_all = pd.concat([coef_c2_all, coef_c2_df])
 
     # export cond quality flags
-    # qual_flag_c1.to_csv(cfg.directory["logs"] + "qual_flag_c1.csv", index=False)
-    # qual_flag_c2.to_csv(cfg.directory["logs"] + "qual_flag_c2.csv", index=False)
+    qual_flag_c1.sort_index().to_csv(
+        cfg.directory["logs"] + "qual_flag_c1.csv", index=False,
+    )
+    qual_flag_c2.sort_index().to_csv(
+        cfg.directory["logs"] + "qual_flag_c2.csv", index=False,
+    )
 
     # export cond fit params
     coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
