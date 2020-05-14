@@ -590,10 +590,11 @@ def _flag_btl_data(
         Data flagged as bad (flag 4s)
 
     """
-
+    # TODO: thresh should probably be put in config/cast-by-cast config
     prs = cfg.column["p_btl"]
 
     # Remove extreme outliers and code bad
+    df = df.reset_index(drop=True)
     df, df_bad = _wild_edit(
         df[param], df[ref], df[prs], df["SSSCC"], df["btl_fire_num"]
     )
@@ -611,9 +612,10 @@ def _flag_btl_data(
     df_ques = df[df["Flag"] == 3].copy()
 
     if f_out is not None:
-        _residual_plot(df["Diff"], df[prs], df["SSSCC"], f_out=f_out)
+        f_out = f_out.split(".png")[0] + "_postfit.png"
+        _residual_plot(df["Diff"], df[prs], df["SSSCC"], show_thresh=True, f_out=f_out)
         f_out = f_out.split(".png")[0] + "_flag2.png"
-        _residual_plot(df_good["Diff"], df_good[prs], df_good["SSSCC"], f_out=f_out)
+        _residual_plot(df_good["Diff"], df_good[prs], df_good["SSSCC"], show_thresh=True, f_out=f_out)
 
     return df_ques, df_bad
 
@@ -707,14 +709,23 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None):
     return coefs, df_bad
 
 
-def _residual_plot(diff, prs, ssscc, f_out=None, xlim=(-0.02,0.02), ylim=(6000,0)):
+def _residual_plot(
+    diff, prs, ssscc, xlim=(-0.02,0.02), ylim=(6000,0), show_thresh=False, f_out=None
+):
 
     idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
 
     plt.figure(figsize=(6,6))
     plt.scatter(diff, prs, c=idx, marker="+")
-    # only set xlims if original range is smaller
-    # if np.diff(plt.xlim()) < np.diff(xlim):
+    if show_thresh:
+        # TODO: thresh should probably be put in config/cast-by-cast config
+        thresh = np.array([0.002, 0.005, 0.010, 0.020])
+        p_range = np.array([6000, 2000, 1000, 500])
+        thresh = np.append(thresh, thresh[-1])  # this should still work fine even when
+        p_range = np.append(p_range, 0)  # thresh/p_range are defined elsewhere
+        plt.step(thresh, p_range, ':k')
+        plt.step(-thresh, p_range, ':k')
+
     plt.xlim(xlim)
     plt.xticks(rotation=45)
     plt.ylim(ylim)
@@ -763,20 +774,20 @@ def calibrate_temp(btl_df, time_df):
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
         # 1) plot pre-fit residual
-        f_suffix = f.stem.split("ssscc")[1]  # get "_t*" from "ssscc_t*.csv"
+        f_stem = f.stem  # get "ssscc_t*" from path
         _residual_plot(
             btl_df.loc[btl_rows, cfg.column["reft"]]
             - btl_df.loc[btl_rows, cfg.column["t1_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
             btl_df.loc[btl_rows, "SSSCC"],
-            f_out=f"{cfg.directory['logs']}t1_residual{f_suffix}_prefit.png",
+            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_prefit.png",
         )
         _residual_plot(
             btl_df.loc[btl_rows, cfg.column["reft"]]
             - btl_df.loc[btl_rows, cfg.column["t2_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
             btl_df.loc[btl_rows, "SSSCC"],
-            f_out=f"{cfg.directory['logs']}t2_residual{f_suffix}_prefit.png",
+            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_prefit.png",
         )
 
         # TODO: allow for cast-by-cast T_order/P_order/zRange
@@ -826,13 +837,13 @@ def calibrate_temp(btl_df, time_df):
             btl_df[btl_rows],
             param=cfg.column["t1_btl"],
             ref=cfg.column["reft"],
-            f_out=f"{cfg.directory['logs']}t1_residual{f_suffix}.png",
+            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}.png",
         )
         df_ques_t2, df_bad_t2 = _flag_btl_data(
             btl_df[btl_rows],
             param=cfg.column["t2_btl"],
             ref=cfg.column["reft"],
-            f_out=f"{cfg.directory['logs']}t2_residual{f_suffix}.png",
+            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}.png",
         )
 
         # 5) handle quality flags
@@ -984,20 +995,20 @@ def calibrate_cond(btl_df, time_df):
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
         # 1) plot pre-fit residual
-        f_suffix = f.stem.split("ssscc")[1]  # get "_c*" from "ssscc_c*.csv"
+        f_stem = f.stem  # get "ssscc_c*" from path
         _residual_plot(
             btl_df.loc[btl_rows, cfg.column["refc"]]
             - btl_df.loc[btl_rows, cfg.column["c1_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
             btl_df.loc[btl_rows, "SSSCC"],
-            f_out=f"{cfg.directory['logs']}c1_residual{f_suffix}_prefit.png",
+            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_prefit.png",
         )
         _residual_plot(
             btl_df.loc[btl_rows, cfg.column["refc"]]
             - btl_df.loc[btl_rows, cfg.column["c2_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
             btl_df.loc[btl_rows, "SSSCC"],
-            f_out=f"{cfg.directory['logs']}c2_residual{f_suffix}_prefit.png",
+            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_prefit.png",
         )
 
         # TODO: allow for cast-by-cast T_order/P_order/zRange
@@ -1053,13 +1064,13 @@ def calibrate_cond(btl_df, time_df):
             btl_df[btl_rows],
             param=cfg.column["c1_btl"],
             ref=cfg.column["refc"],
-            f_out=f"{cfg.directory['logs']}c1_residual{f_suffix}.png",
+            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}.png",
         )
         df_ques_c2, df_bad_c2 = _flag_btl_data(
             btl_df[btl_rows],
             param=cfg.column["c2_btl"],
             ref=cfg.column["refc"],
-            f_out=f"{cfg.directory['logs']}c2_residual{f_suffix}.png",
+            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}.png",
         )
 
         # 5) handle quality flags

@@ -67,6 +67,10 @@ directory = {
     "qual_temp_secondary": "quality_code/temp_secondary/",
     "qual_cond_primary": "quality_code/cond_primary/",
     "qual_cond_secondary": "quality_code/cond_secondary/",
+    "t1_fit_figs": "data/logs/fitting_figs/temp_primary/",
+    "t2_fit_figs": "data/logs/fitting_figs/temp_secondary/",
+    "c1_fit_figs": "data/logs/fitting_figs/cond_primary/",
+    "c2_fit_figs": "data/logs/fitting_figs/cond_secondary/",
 }
 
 # remnant of old system, will be pushed into xarray metadata/attrs
