@@ -762,6 +762,23 @@ def calibrate_temp(btl_df, time_df):
         btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
+        # 1) plot pre-fit residual
+        f_suffix = f.stem.split("ssscc")[1]  # get "_t*" from "ssscc_t*.csv"
+        _residual_plot(
+            btl_df.loc[btl_rows, cfg.column["reft"]]
+            - btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, "SSSCC"],
+            f_out=f"{cfg.directory['logs']}t1_residual{f_suffix}_prefit.png",
+        )
+        _residual_plot(
+            btl_df.loc[btl_rows, cfg.column["reft"]]
+            - btl_df.loc[btl_rows, cfg.column["t2_btl"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, "SSSCC"],
+            f_out=f"{cfg.directory['logs']}t2_residual{f_suffix}_prefit.png",
+        )
+
         # TODO: allow for cast-by-cast T_order/P_order/zRange
         # TODO: truncate coefs (10 digits? look at historical data)
         # 2 & 3) calculate fit params
@@ -805,7 +822,6 @@ def calibrate_temp(btl_df, time_df):
         )
 
         # 4.5) flag CTDTMP and make residual plots
-        f_suffix = f.stem.split("ssscc")[1]  # get "_t*" from "ssscc_t*.csv"
         df_ques_t1, df_bad_t1 = _flag_btl_data(
             btl_df[btl_rows],
             param=cfg.column["t1_btl"],
@@ -827,10 +843,10 @@ def calibrate_temp(btl_df, time_df):
         coef_t1_df = pd.DataFrame()
         coef_t1_df["SSSCC"] = ssscc_sublist
         coef_t2_df = coef_t1_df.copy()
-        for idx, val in enumerate(coef_t1):
-            # build df w/ columns c0, c1, c2, etc.
-            coef_t1_df["c" + str(idx)] = coef_t1[idx]
-            coef_t2_df["c" + str(idx)] = coef_t2[idx]
+        coef_names = ["cp2", "cp1", "ct2", "ct1", "c0"]
+        for idx, coef_name in enumerate(coef_names):
+            coef_t1_df[coef_name] = coef_t1[idx]
+            coef_t2_df[coef_name] = coef_t2[idx]
 
         coef_t1_all = pd.concat([coef_t1_all, coef_t1_df])
         coef_t2_all = pd.concat([coef_t2_all, coef_t2_df])
@@ -967,6 +983,23 @@ def calibrate_cond(btl_df, time_df):
         )
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
+        # 1) plot pre-fit residual
+        f_suffix = f.stem.split("ssscc")[1]  # get "_c*" from "ssscc_c*.csv"
+        _residual_plot(
+            btl_df.loc[btl_rows, cfg.column["refc"]]
+            - btl_df.loc[btl_rows, cfg.column["c1_btl"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, "SSSCC"],
+            f_out=f"{cfg.directory['logs']}c1_residual{f_suffix}_prefit.png",
+        )
+        _residual_plot(
+            btl_df.loc[btl_rows, cfg.column["refc"]]
+            - btl_df.loc[btl_rows, cfg.column["c2_btl"]],
+            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, "SSSCC"],
+            f_out=f"{cfg.directory['logs']}c2_residual{f_suffix}_prefit.png",
+        )
+
         # TODO: allow for cast-by-cast T_order/P_order/zRange
         # TODO: truncate coefs (10 digits? look at historical data)
         # 2 & 3) calculate fit params
@@ -1016,7 +1049,6 @@ def calibrate_cond(btl_df, time_df):
         )
 
         # 4.5) flag CTDCOND and make residual plots
-        f_suffix = f.stem.split("ssscc")[1]  # get "_c*" from "ssscc_c*.csv"
         df_ques_c1, df_bad_c1 = _flag_btl_data(
             btl_df[btl_rows],
             param=cfg.column["c1_btl"],
@@ -1038,10 +1070,10 @@ def calibrate_cond(btl_df, time_df):
         coef_c1_df = pd.DataFrame()
         coef_c1_df["SSSCC"] = ssscc_sublist
         coef_c2_df = coef_c1_df.copy()
-        for idx, val in enumerate(coef_c1):
-            # TODO: can constant names be more meaningful? (e.g. cp2,cp1,ct1,etc.)
-            coef_c1_df["c" + str(idx)] = coef_c1[idx]
-            coef_c2_df["c" + str(idx)] = coef_c2[idx]
+        coef_names = ["cp2", "cp1", "ct2", "ct1", "cc2", "cc1", "c0"]
+        for idx, coef_name in enumerate(coef_names):
+            coef_c1_df[coef_name] = coef_c1[idx]
+            coef_c2_df[coef_name] = coef_c2[idx]
 
         coef_c1_all = pd.concat([coef_c1_all, coef_c1_df])
         coef_c2_all = pd.concat([coef_c2_all, coef_c2_df])
