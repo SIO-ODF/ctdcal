@@ -827,11 +827,12 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     # intermediate plots to diagnose data chunks goodness
     # TODO: implement into bokeh/flask dashboard
     if f_suffix is not None:
-        f_out = f"{cfg.directory['logs']}sbe43_residual{f_suffix}.png"
+        f_out = f"{cfg.directory['logs']}sbe43_residual{f_suffix}.pdf"
         fit_ctd._residual_plot(
             merged_df["res_sbe43"],
             merged_df["CTDPRS_sbe43_ctd"],
             merged_df["SSSCC_sbe43"],
+            xlabel="CTDOXY Residual (umol/kg)",
             f_out=f_out,
             xlim=(-10,10)
         )

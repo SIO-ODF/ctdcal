@@ -612,10 +612,32 @@ def _flag_btl_data(
     df_ques = df[df["Flag"] == 3].copy()
 
     if f_out is not None:
-        f_out = f_out.split(".png")[0] + "_postfit.png"
-        _residual_plot(df["Diff"], df[prs], df["SSSCC"], show_thresh=True, f_out=f_out)
-        f_out = f_out.split(".png")[0] + "_flag2.png"
-        _residual_plot(df_good["Diff"], df_good[prs], df_good["SSSCC"], show_thresh=True, f_out=f_out)
+        if param == cfg.column["t1_btl"]:
+            xlabel = "T1 Residual (T90 C)"
+        elif param == cfg.column["t2_btl"]:
+            xlabel = "T2 Residual (T90 C)"
+        elif param == cfg.column["c1_btl"]:
+            xlabel = "C1 Residual (mS/cm)"
+        elif param == cfg.column["c2_btl"]:
+            xlabel = "C2 Residual (mS/cm)"
+        f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
+        _residual_plot(
+            df["Diff"],
+            df[prs],
+            df["SSSCC"],
+            show_thresh=True,
+            xlabel=xlabel,
+            f_out=f_out,
+        )
+        f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
+        _residual_plot(
+            df_good["Diff"],
+            df_good[prs],
+            df_good["SSSCC"],
+            show_thresh=True,
+            xlabel=xlabel,
+            f_out=f_out,
+        )
 
     return df_ques, df_bad
 
@@ -668,7 +690,8 @@ def _temperature_polyfit(temp,press,coef):
     
     return fitted_temp.round(4)
 
-def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None):
+
+def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None):
 
     if T_col is None:
         print("Parameter invalid, specify what temp sensor is being calibrated")
@@ -678,9 +701,25 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None):
     # remove non-finite data and extreme outliers and trim to fit zRange
     df_good, df_bad = _prepare_fit_data(df, T_col, cfg.column["reft"], zRange)
 
+    # plot data which will be used in fit (for debugging purposes)
+    if f_stem is not None:
+        if T_col == cfg.column["t1_btl"]:
+            xlabel = "T1 Residual (T90 C)"
+            f_out = f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_fit_data.pdf"
+        elif T_col == cfg.column["t2_btl"]:
+            xlabel = "T2 Residual (T90 C)"
+            f_out = f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_fit_data.pdf"
+        _residual_plot(
+            df_good["Diff"],
+            df_good[cfg.column["p_btl"]],
+            df_good["SSSCC"],
+            xlabel=xlabel,
+            f_out=f_out,
+        )
+
     # Toggle columns based on desired polyfit order
     # (i.e. don't calculate 2nd order term if only doing 1st order fit)
-    order_list = [[0,0],[0,1],[1,1]]
+    order_list = [[0, 0], [0, 1], [1, 1]]
     P_fit = order_list[P_order]
     T_fit = order_list[T_order]
 
@@ -690,32 +729,37 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None):
     # T_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4
     fit_matrix = np.vstack(
         [
-        P_fit[0]*df_good[cfg.column["p_btl"]]**2,
-        P_fit[1]*df_good[cfg.column["p_btl"]],
-        T_fit[0]*df_good[T_col]**2,
-        T_fit[1]*df_good[T_col],
-        np.ones(len(df_good[T_col]))
+            P_fit[0] * df_good[cfg.column["p_btl"]] ** 2,
+            P_fit[1] * df_good[cfg.column["p_btl"]],
+            T_fit[0] * df_good[T_col] ** 2,
+            T_fit[1] * df_good[T_col],
+            np.ones(len(df_good[T_col])),
         ]
-        )
-    coefs = np.linalg.lstsq(
-        fit_matrix.T,
-        df_good['Diff'],
-        rcond=None)[0]
+    )
+    coefs = np.linalg.lstsq(fit_matrix.T, df_good["Diff"], rcond=None)[0]
 
     # Column of zeros can sometimes return a non-zero value (machine precision),
     # so force uncalculated fit terms to be truly zero
-    coefs = coefs*np.concatenate((P_fit,T_fit,[1]))
+    coefs = coefs * np.concatenate((P_fit, T_fit, [1]))
 
     return coefs, df_bad
 
 
 def _residual_plot(
-    diff, prs, ssscc, xlim=(-0.02,0.02), ylim=(6000,0), show_thresh=False, f_out=None
+    diff,
+    prs,
+    ssscc,
+    xlim=(-0.02, 0.02),
+    ylim=(6000, 0),
+    xlabel="Residual",
+    ylabel="CTDPRS",
+    show_thresh=False,
+    f_out=None,
 ):
 
     idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
 
-    plt.figure(figsize=(6,6))
+    plt.figure(figsize=(6, 6))
     plt.scatter(diff, prs, c=idx, marker="+")
     if show_thresh:
         # TODO: thresh should probably be put in config/cast-by-cast config
@@ -723,8 +767,8 @@ def _residual_plot(
         p_range = np.array([6000, 2000, 1000, 500])
         thresh = np.append(thresh, thresh[-1])  # this should still work fine even when
         p_range = np.append(p_range, 0)  # thresh/p_range are defined elsewhere
-        plt.step(thresh, p_range, ':k')
-        plt.step(-thresh, p_range, ':k')
+        plt.step(thresh, p_range, ":k")
+        plt.step(-thresh, p_range, ":k")
 
     plt.xlim(xlim)
     plt.xticks(rotation=45)
@@ -733,7 +777,10 @@ def _residual_plot(
     cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
     cbar.ax.set_title("SSSCC")
     plt.grid()
-    plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")  # check this
+    plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")
+    plt.xlabel(xlabel, fontsize=12)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.tight_layout()
     if f_out is not None:
         plt.savefig(f_out)
 
@@ -780,14 +827,16 @@ def calibrate_temp(btl_df, time_df):
             - btl_df.loc[btl_rows, cfg.column["t1_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
             btl_df.loc[btl_rows, "SSSCC"],
-            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_prefit.png",
+            xlabel="T1 Residual (T90 C)",
+            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_prefit.pdf",
         )
         _residual_plot(
             btl_df.loc[btl_rows, cfg.column["reft"]]
             - btl_df.loc[btl_rows, cfg.column["t2_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
             btl_df.loc[btl_rows, "SSSCC"],
-            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_prefit.png",
+            xlabel="T2 Residual (T90 C)",
+            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_prefit.pdf",
         )
 
         # TODO: allow for cast-by-cast T_order/P_order/zRange
@@ -801,6 +850,7 @@ def calibrate_temp(btl_df, time_df):
             P_order=1,
             T_order=1,
             zRange="1000:6000",
+            f_stem=f_stem,
         )
         coef_t2, df_bad_t2 = _get_T_coefs(
             btl_df[btl_rows],
@@ -808,6 +858,7 @@ def calibrate_temp(btl_df, time_df):
             P_order=1,
             T_order=1,
             zRange="1000:6000",
+            f_stem=f_stem,
         )
 
         # 4) apply fit
@@ -837,13 +888,13 @@ def calibrate_temp(btl_df, time_df):
             btl_df[btl_rows],
             param=cfg.column["t1_btl"],
             ref=cfg.column["reft"],
-            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}.png",
+            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}.pdf",
         )
         df_ques_t2, df_bad_t2 = _flag_btl_data(
             btl_df[btl_rows],
             param=cfg.column["t2_btl"],
             ref=cfg.column["reft"],
-            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}.png",
+            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}.pdf",
         )
 
         # 5) handle quality flags
@@ -877,7 +928,9 @@ def calibrate_temp(btl_df, time_df):
     return True
 
 
-def _get_C_coefs(df, C_col=None, P_order=2, T_order=2, C_order=2, zRange=None):
+def _get_C_coefs(
+    df, C_col=None, P_order=2, T_order=2, C_order=2, zRange=None, f_stem=None
+):
 
     if C_col is None:
         print("Parameter invalid, specify what cond sensor is being calibrated")
@@ -894,9 +947,25 @@ def _get_C_coefs(df, C_col=None, P_order=2, T_order=2, C_order=2, zRange=None):
     # add CTDTMP column
     df_good[T_col] = df.loc[df_good.index, T_col]
 
+    # plot data which will be used in fit (for debugging purposes)
+    if f_stem is not None:
+        if C_col == cfg.column["c1_btl"]:
+            xlabel = "C1 Residual (mS/cm)"
+            f_out = f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_fit_data.pdf"
+        elif C_col == cfg.column["c2_btl"]:
+            xlabel = "C2 Residual (mS/cm)"
+            f_out = f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_fit_data.pdf"
+        _residual_plot(
+            df_good["Diff"],
+            df_good[cfg.column["p_btl"]],
+            df_good["SSSCC"],
+            xlabel=xlabel,
+            f_out=f_out,
+        )
+
     # Toggle columns based on desired polyfit order
     # (i.e. don't calculate 2nd order term if only doing 1st order fit)
-    order_list = [[0,0],[0,1],[1,1]]
+    order_list = [[0, 0], [0, 1], [1, 1]]
     P_fit = order_list[P_order]
     T_fit = order_list[T_order]
     C_fit = order_list[C_order]
@@ -907,23 +976,20 @@ def _get_C_coefs(df, C_col=None, P_order=2, T_order=2, C_order=2, zRange=None):
     # C_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4*C^2 + c5*C + c6
     fit_matrix = np.vstack(
         [
-        P_fit[0]*df_good[cfg.column["p_btl"]]**2,
-        P_fit[1]*df_good[cfg.column["p_btl"]],
-        T_fit[0]*df_good[T_col]**2,
-        T_fit[1]*df_good[T_col],
-        C_fit[0]*df_good[C_col]**2,
-        C_fit[1]*df_good[C_col],
-        np.ones(len(df_good[C_col]))
+            P_fit[0] * df_good[cfg.column["p_btl"]] ** 2,
+            P_fit[1] * df_good[cfg.column["p_btl"]],
+            T_fit[0] * df_good[T_col] ** 2,
+            T_fit[1] * df_good[T_col],
+            C_fit[0] * df_good[C_col] ** 2,
+            C_fit[1] * df_good[C_col],
+            np.ones(len(df_good[C_col])),
         ]
-        )
-    coefs = np.linalg.lstsq(
-        fit_matrix.T,
-        df_good['Diff'],
-        rcond=None)[0]
+    )
+    coefs = np.linalg.lstsq(fit_matrix.T, df_good["Diff"], rcond=None)[0]
 
     # Column of zeros can sometimes return a non-zero value (machine precision),
     # so force uncalculated fit terms to be truly zero
-    coefs = coefs*np.concatenate((P_fit,T_fit,C_fit,[1]))
+    coefs = coefs * np.concatenate((P_fit, T_fit, C_fit, [1]))
 
     return coefs, df_bad
 
@@ -1001,14 +1067,16 @@ def calibrate_cond(btl_df, time_df):
             - btl_df.loc[btl_rows, cfg.column["c1_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
             btl_df.loc[btl_rows, "SSSCC"],
-            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_prefit.png",
+            xlabel="C1 Residual (mS/cm)",
+            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_prefit.pdf",
         )
         _residual_plot(
             btl_df.loc[btl_rows, cfg.column["refc"]]
             - btl_df.loc[btl_rows, cfg.column["c2_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
             btl_df.loc[btl_rows, "SSSCC"],
-            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_prefit.png",
+            xlabel="C2 Residual (mS/cm)",
+            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_prefit.pdf",
         )
 
         # TODO: allow for cast-by-cast T_order/P_order/zRange
@@ -1023,6 +1091,7 @@ def calibrate_cond(btl_df, time_df):
             T_order=0,
             C_order=0,
             zRange="1000:5000",
+            f_stem=f_stem,
         )
         coef_c2, df_bad_c2 = _get_C_coefs(
             btl_df[btl_rows],
@@ -1031,6 +1100,7 @@ def calibrate_cond(btl_df, time_df):
             T_order=0,
             C_order=0,
             zRange="1000:5000",
+            f_stem=f_stem,
         )
 
         # 4) apply fit
@@ -1064,13 +1134,13 @@ def calibrate_cond(btl_df, time_df):
             btl_df[btl_rows],
             param=cfg.column["c1_btl"],
             ref=cfg.column["refc"],
-            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}.png",
+            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}.pdf",
         )
         df_ques_c2, df_bad_c2 = _flag_btl_data(
             btl_df[btl_rows],
             param=cfg.column["c2_btl"],
             ref=cfg.column["refc"],
-            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}.png",
+            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}.pdf",
         )
 
         # 5) handle quality flags
