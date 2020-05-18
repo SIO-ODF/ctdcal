@@ -657,6 +657,7 @@ def _prepare_fit_data(df, param, ref_param, zRange=None):
         good_data["CTDPRS"],
         good_data["SSSCC"],
         good_data["btl_fire_num"],
+        n_sigma=5,
     )
 
     return df_good, df_bad
@@ -783,6 +784,7 @@ def _residual_plot(
     plt.tight_layout()
     if f_out is not None:
         plt.savefig(f_out)
+    plt.close()
 
     return True
 
@@ -848,7 +850,7 @@ def calibrate_temp(btl_df, time_df):
             btl_df[btl_rows],
             T_col=cfg.column["t1_btl"],
             P_order=1,
-            T_order=1,
+            T_order=0,
             zRange="1000:6000",
             f_stem=f_stem,
         )
@@ -856,7 +858,7 @@ def calibrate_temp(btl_df, time_df):
             btl_df[btl_rows],
             T_col=cfg.column["t2_btl"],
             P_order=1,
-            T_order=1,
+            T_order=0,
             zRange="1000:6000",
             f_stem=f_stem,
         )
@@ -912,6 +914,26 @@ def calibrate_temp(btl_df, time_df):
 
         coef_t1_all = pd.concat([coef_t1_all, coef_t1_df])
         coef_t2_all = pd.concat([coef_t2_all, coef_t2_df])
+
+    # one more fig with all cuts
+    _residual_plot(
+        btl_df[cfg.column["reft"]]
+        - btl_df[cfg.column["t1_btl"]],
+        btl_df[cfg.column["p_btl"]],
+        btl_df["SSSCC"],
+        xlabel="T1 Residual (T90 C)",
+        show_thresh=True,
+        f_out=f"{cfg.directory['t1_fit_figs']}residual_all_postfit.pdf",
+    )
+    _residual_plot(
+        btl_df[cfg.column["reft"]]
+        - btl_df[cfg.column["t2_btl"]],
+        btl_df[cfg.column["p_btl"]],
+        btl_df["SSSCC"],
+        xlabel="T2 Residual (T90 C)",
+        show_thresh=True,
+        f_out=f"{cfg.directory['t2_fit_figs']}residual_all_postfit.pdf",
+    )
 
     # export temp quality flags
     qual_flag_t1.sort_index().to_csv(
@@ -1087,7 +1109,7 @@ def calibrate_cond(btl_df, time_df):
         coef_c1, df_bad_c1 = _get_C_coefs(
             btl_df[btl_rows],
             C_col=cfg.column["c1_btl"],
-            P_order=2,
+            P_order=1,
             T_order=0,
             C_order=0,
             zRange="1000:5000",
@@ -1096,7 +1118,7 @@ def calibrate_cond(btl_df, time_df):
         coef_c2, df_bad_c2 = _get_C_coefs(
             btl_df[btl_rows],
             C_col=cfg.column["c2_btl"],
-            P_order=2,
+            P_order=1,
             T_order=0,
             C_order=0,
             zRange="1000:5000",
@@ -1158,6 +1180,26 @@ def calibrate_cond(btl_df, time_df):
 
         coef_c1_all = pd.concat([coef_c1_all, coef_c1_df])
         coef_c2_all = pd.concat([coef_c2_all, coef_c2_df])
+
+    # one more fig with all cuts
+    _residual_plot(
+        btl_df[cfg.column["refc"]]
+        - btl_df[cfg.column["c1_btl"]],
+        btl_df[cfg.column["p_btl"]],
+        btl_df["SSSCC"],
+        xlabel="C1 Residual (mS/cm)",
+        show_thresh=True,
+        f_out=f"{cfg.directory['c1_fit_figs']}residual_all_postfit.pdf",
+    )
+    _residual_plot(
+        btl_df[cfg.column["refc"]]
+        - btl_df[cfg.column["c2_btl"]],
+        btl_df[cfg.column["p_btl"]],
+        btl_df["SSSCC"],
+        xlabel="C2 Residual (mS/cm)",
+        show_thresh=True,
+        f_out=f"{cfg.directory['c2_fit_figs']}residual_all_postfit.pdf",
+    )
 
     # export cond quality flags
     qual_flag_c1.sort_index().to_csv(
