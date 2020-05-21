@@ -4,6 +4,7 @@ import pandas as pd
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
+import xarray as xr
 from pathlib import Path
 import ctdcal.process_bottle as btl
 import config as cfg
@@ -57,7 +58,7 @@ def convertFromFiles(hex_file, xmlcon_file, debug=False):
 def hex_to_ctd(ssscc_list, debug=False):
     # TODO: add (some) error handling from odf_convert_sbe.py
     """
-    Convert raw CTD data and export to .pkl files.
+    Convert raw CTD data and export to .nc files.
 
     Parameters
     ----------
@@ -73,12 +74,14 @@ def hex_to_ctd(ssscc_list, debug=False):
     # TODO: use logger module instead
     print('Converting .hex files')
     for ssscc in ssscc_list:
-        if not Path(cfg.directory["converted"] + ssscc + ".pkl").exists():
+        if not Path(cfg.directory["converted"] + ssscc + ".nc").exists():
             hexFile = cfg.directory["raw"] + ssscc + ".hex"
             xmlconFile = cfg.directory["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
-            converted_df = convertFromSBEReader(sbeReader, debug=debug)
-            converted_df.to_pickle(cfg.directory["converted"] + ssscc + ".pkl")
+            converted_ds = convertFromSBEReader(sbeReader, debug=debug)
+            # TODO: ds.to_netcdf takes kwarg group=(e.g. "raw", "intermediate", "final")
+            # NOTE: when loading, appropriate group needs to be called, else empty file
+            converted_ds.to_netcdf(cfg.directory["converted"] + ssscc + ".nc")
 
     return True
 
@@ -111,7 +114,6 @@ def make_btl_mean(ssscc_list, debug=False):
     return True
 
 
-
 def convertFromSBEReader(sbeReader, debug=False):
     """Handler to convert engineering data to sci units automatically.
     Takes SBEReader object that is already connected to the .hex and .XMLCON files.
@@ -137,6 +139,8 @@ def convertFromSBEReader(sbeReader, debug=False):
     rawConfig = sbeReader.parsed_config()
 
     # The meta data field needs to be processed seperately and then joined with the converted_df
+    # NOTE: it's easier to process meta data as a DataFrame and then merge
+    # into converted_ds instead of starting this as a Dataset
     debugPrint("Building meta data dataframe... ", end='')
     metaArray = [line.split(',') for line in sbeReader._parse_scans_meta().tolist()]
     metaArrayheaders = sbeReader._breakdown_header()
@@ -232,8 +236,8 @@ def convertFromSBEReader(sbeReader, debug=False):
     queue_metadata = sorted(queue_metadata, key = lambda sensor: sensor['ranking'])
     #debugPrint("Queue Metadata:", json.dumps(queue_metadata, indent = 2))
 
-    #empty converted dataframs
-    converted_df = pd.DataFrame()
+    #empty converted dataset
+    converted_ds = xr.Dataset()
 
     for temp_meta in queue_metadata:
 
@@ -242,70 +246,63 @@ def convertFromSBEReader(sbeReader, debug=False):
         ###Temperature block
         if temp_meta['sensor_id'] == '55':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            converted_ds[column_name] = ('index',sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']]))
             if temp_meta['list_id'] == 0:
-                t_array = converted_df[column_name].astype(float)
+                t_array = converted_ds[column_name].astype(float).values
                 k_array = [273.15+celcius for celcius in t_array]
                 debugPrint('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
-            #processed_data.append(temp_meta)
 
         ### Pressure block
         elif temp_meta['sensor_id'] == '45':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
+            converted_ds[column_name] = ('index',sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp))
             if temp_meta['list_id'] == 2:
-                p_array = converted_df[column_name].astype(float)
+                p_array = converted_ds[column_name].astype(float).values
                 debugPrint('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
-            #processed_data.append(temp_meta)
 
         ### Conductivity block
         elif temp_meta['sensor_id'] == '3':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
+            converted_ds[column_name] = ('index',sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array))
             if temp_meta['list_id'] == 1:
-                c_array = converted_df[column_name].astype(float)
+                c_array = converted_ds[column_name].astype(float).values
                 debugPrint('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
-            #processed_data.append(temp_meta)
 
         ### Oxygen block
         elif temp_meta['sensor_id'] == '38':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
-            converted_df['CTDOXYVOLTS'] = raw_df[temp_meta['column']]
-            #processed_data.append(temp_meta)
+            converted_ds[column_name] = ('index',sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']]))
+            converted_ds['CTDOXYVOLTS'] = ('index',raw_df[temp_meta['column']])
 
         ### Fluorometer Seapoint block
         elif temp_meta['sensor_id'] == '11':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
-            #processed_data.append(temp_meta)
+            converted_ds[column_name] = ('index',sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']]))
 
         ###Salinity block
         elif temp_meta['sensor_id'] == '1000':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = gsw.SP_from_C(c_array, t_array, p_array)
-            #processed_data.append(temp_meta)
+            converted_ds[column_name] = ('index',gsw.SP_from_C(c_array, t_array, p_array))
 
         ###Altimeter block
         elif temp_meta['sensor_id'] == '0':
             debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.altimeter_voltage(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            converted_ds[column_name] = ('index',sbe_eq.altimeter_voltage(temp_meta['sensor_info'], raw_df[temp_meta['column']]))
 
         ### Aux block
         else:
             debugPrint('Passing along Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = raw_df[temp_meta['column']]
-            #processed_data.append(temp_meta)
+            converted_ds[column_name] = ('index',raw_df[temp_meta['column']])
 
-    # Set the column name for the index
-    converted_df.index.name = 'index'
+        ### Dump all info into attributes for each sensor
+        converted_ds[column_name].attrs = temp_meta['sensor_info']
 
-    debugPrint("Joining meta data dataframe with converted data... ", end='')
-    converted_df = converted_df.join(meta_df)
+    debugPrint("Joining meta data dataset with converted data... ", end='')
+    converted_ds = converted_ds.merge(meta_df)
     debugPrint('Success!')
 
-    # return the converted data as a dataframe
-    return converted_df
+    # return the converted data as a dataset
+    return converted_ds
 
 
 def importConvertedFile(file_name, debug=False):
