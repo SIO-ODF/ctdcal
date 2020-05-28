@@ -81,7 +81,7 @@ def hex_to_ctd(ssscc_list, debug=False):
             converted_ds = convertFromSBEReader(sbeReader, debug=debug)
             # TODO: ds.to_netcdf takes kwarg group=(e.g. "raw", "intermediate", "final")
             # NOTE: when loading, appropriate group needs to be called, else empty file
-            converted_ds.to_netcdf(cfg.directory["converted"] + ssscc + ".nc")
+            converted_ds.to_netcdf(cfg.directory["converted"] + ssscc + ".nc", group="raw")
 
     return True
 

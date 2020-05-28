@@ -554,7 +554,7 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
     return return_array
 
 
-def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
+def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inDs=None, cond_startup=20.0, log_file=None):
     """ondeck_pressure function
     Function takes full NUMPY ndarray with predefined dtype array
     of filtered ctd raw data the stores, analizes and removes ondeck
@@ -573,13 +573,6 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
         Also output start/end ondeck pressure.
     """
     start_pressure = []
-    tmpMat = []
-    outMat = []
-    tmp = 0
-    start_p = 0.0
-    n = 0
-    ep = []
-    end_p = 0.0
 
     # Frequency
     fl = 24
@@ -594,52 +587,53 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
         print("Ondeck_pressure function: No data.")
         return
     else:
-        # Searches first quarter of matrix, uses conductivity
+        # Search first quarter of matrix, using conductivity
         # threshold min to capture startup pressure
-        for j in range(0,int(len(inMat)/4)):
-            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
-                tmp = j
-                start_pressure.append(inMat[p_col][j])
+        c1 = inDs[c1_col].to_series()
+        c2 = inDs[c2_col].to_series()
+        p = inDs[p_col].to_series()
+        n = int(len(p)/4)
+        start_pressure = p[
+            np.flatnonzero((c1[:n] < cond_startup) & (c2[:n] < cond_startup))
+        ]
 
         # Evaluate starting pressures
-        if not start_pressure: start_p = "Started in Water"
+        if start_pressure is None:
+            start_p = "Started in Water"
         else:
-            n = len(start_pressure)
-            if (n > time_delay): start_p = np.average(start_pressure[fl2:n-(time_delay)])
-            else: start_p = np.average(start_pressure[fl2:n])
+            n_start = len(start_pressure)
+            if (n > time_delay):
+                start_p = np.average(start_pressure[fl2:(n_start-time_delay)]).round(4)
+            else:
+                start_p = np.average(start_pressure[fl2:n]).round(4)
 
         # Remove on-deck startup
-        inMat = inMat[tmp:]
+        inDs = inDs.sel(index=np.arange(n_start, len(p)))  # reset_index functionality differs
+        inDs["index"] = np.arange(0, len(inDs.index))  # from how it works in pandas
 
-        tmp = len(inMat);
         # Searches last half of NDarray for conductivity threshold
-        if len(inMat) % 2 == 0:
-            inMat_2 = inMat.copy()
+        c1 = inDs[c1_col].to_series()
+        c2 = inDs[c2_col].to_series()
+        p = inDs[p_col].to_series()
+        n = int(len(p)/2)
+        end_pressure = p[  # flatnonzero effectively resets index, so re-add n
+            np.flatnonzero((c1[n:] < cond_startup) & (c2[n:] < cond_startup)) + n
+        ]
+
+        n_end = len(end_pressure)
+        if (n_end > time_delay):
+            end_p = np.average(end_pressure[time_delay:]).round(4)
         else:
-            inMat_2 = inMat[1:].copy()
-
-        inMat_half1, inMat_half2 = np.split(inMat_2,2)
-        ep = inMat_half2[(inMat_half2[c1_col] < conductivity_startup) & (inMat_half2[c2_col] < conductivity_startup)][p_col]
-
-#        for j in range(int(len(inMat)*0.5), len(inMat)):
-#            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
-#                ep.append(inMat[p_col][j])
-#                if (tmp > j): tmp = j
-
-        # Evaluate ending pressures
-        if (len(ep) > (time_delay)):
-            end_p = np.average(ep[(time_delay):])
-        else:
-            end_p = np.average(ep[(len(ep)):])
+            end_p = np.average(end_pressure[n:]).round(4)
 
         # Remove on-deck ending
-        outMat = inMat[:tmp]
+        inDs = inDs.sel(index=np.arange(0, len(p)-n_end))
 
         # Store ending on-deck pressure
-        if log_file != None:
+        if log_file is not None:
             report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
-    return outMat
+    return inDs
 
 def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function

@@ -10,6 +10,7 @@ import ctdcal.process_ctd as process_ctd
 import ctdcal.report_ctd as report_ctd
 import pickle
 from pathlib import PurePosixPath
+import xarray as xr
 
 #remove and streamline imports below later
 import argparse
@@ -112,35 +113,41 @@ def main(pkl_path):
     filename_base = PurePosixPath(pkl_path).stem  # returns ssscc
 
     converted_df = pd.read_pickle(pkl_path)
+    ds_path = pkl_path.split(".pkl")[0] + ".nc"
+    try:
+        raw_ds = xr.open_dataset(ds_path, group="raw")
+    except OSError:
+        raw_ds = xr.open_dataset(ds_path)
 
     # Construct NDarray - fix this serialization asap
     #raw_data = process_ctd.dataToNDarray(convertedfilePath,None,list(converted_df.columns.insert(0,'index')),',',2)
     raw_data = converted_df.to_records()
     #import pdb; pdb.set_trace()
 
-    if nmea_time_col in converted_df.columns:
-      time_col = nmea_time_col
+    if nmea_time_col in raw_ds.variables:
+        time_col = nmea_time_col
     else:
-      time_col = scan_time_col
+        time_col = scan_time_col
 
     #this gets the ondeck pressure for future pressure calibration
-    raw_data = process_ctd.ondeck_pressure(filename_base, p_col, c1_col, c2_col, time_col, raw_data, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
+    raw_data = process_ctd.ondeck_pressure(filename_base, p_col, c1_col, c2_col, time_col, raw_ds, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
 
+    breakpoint()
     if not c1_col in raw_data.dtype.names:
-      errPrint('c1_col data not found, skipping')
+        errPrint('c1_col data not found, skipping')
     else:
-      raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
+        raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
 
     if not c2_col in raw_data.dtype.names:
-      errPrint('c2_col data not found, skipping')
+        errPrint('c2_col data not found, skipping')
     else:
-      raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
+        raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
 
     if not dopl_col in raw_data.dtype.names:
-      errPrint('do_col data not found, skipping')
+        errPrint('do_col data not found, skipping')
     else:
-      raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
-      #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix)
+        raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
+        #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix)
 
     # Filter data
     filter_data = process_ctd.raw_ctd_filter(raw_data, 'triangle', 24, input_parameters)
