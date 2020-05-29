@@ -2,7 +2,7 @@
 from scipy import interpolate
 import numpy as np
 from numpy.lib.recfunctions import append_fields
-import scipy.signal as sig
+import scipy.signal as signal
 import scipy.stats as st
 import time, os
 import pandas as pd
@@ -26,7 +26,7 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
 
-def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
+def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, ds=None):
     '''
     We determine the cast details using pandas magic.
     First find alternating periods of pumps on and pumps off, then select the
@@ -58,12 +58,11 @@ def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_c
     inMat is trimmed to start and end of cast
     '''
 
-    df_test = pd.DataFrame.from_records(inMat)
-
-    dfs = find_pump_on_off_dfs(df_test)
-    dfs_1 = find_pumps_on_dfs(dfs)
-    df_cast = find_max_pressure_df(dfs_1)
-    df_cast1 = find_last_soak_period(df_cast)
+    # TODO: clean these up into one function after conversion to xarray
+    ds_list = find_pump_on_off_groups(ds)
+    ds_on_list = find_pumps_on_dfs(ds_list)
+    ds_cast = find_max_pressure_ds(ds_on_list)
+    df_cast1 = find_last_soak_period(ds_cast)  # <- pick up here
     df_cast2 = trim_soak_period_from_df(df_cast1)
 
     start_cast_time = float(df_cast2['scan_datetime'].head(1))
@@ -85,25 +84,22 @@ def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_c
 
     return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
 #Move next four functions to a library or class(?) Clean up module
-def find_pump_on_off_dfs(df):
-    '''Find pump_on patterns of dataframes, and return a list(?) of dataframes to iterate over.
-    '''
-    return [g for i,g in df.groupby(df['pump_on'].ne(df['pump_on'].shift()).cumsum())]
+def find_pump_on_off_groups(ds):
+    '''Find pump on/off patterns and return a list of datasets to iterate over.'''
+    return [g for i,g in ds.groupby((ds["pump_on"] != ds["pump_on"].shift(index=1)).cumsum())]
 
-def find_max_pressure_df(dfs):
-    '''Giving a list of data frames, return a reference to the frame with which contians the highest pressure value
+def find_max_pressure_ds(ds_list):
     '''
-    max_pressure_df = dfs[0]
-    max_pressure = max_pressure_df['CTDPRS'].max() #TODO make into config var
-    for df in dfs:
-        if df['CTDPRS'].max() > max_pressure:
-            max_pressure_df = df
-    return max_pressure_df
+    Given a list of datasets, return a reference to the frame
+    which contains the highest pressure value
+    '''
+    p_max_list = [ds["CTDPRS"].max() for ds in ds_list]
+    return ds_list[np.argmax(p_max_list)]
 
-def find_pumps_on_dfs(dfs):
-    '''given a list of dataframes, remove all the frames with one or more rows containing a "false" pump on flag
+def find_pumps_on_dfs(ds_list):
+    '''given a list of datasets, remove all the sets with one or more rows containing a "false" pump on flag
     '''
-    return list(filter(lambda df: df['pump_on'].all(), dfs))
+    return [ds for ds in ds_list if ds["pump_on"].all()]
 
 def trim_soak_period_from_df(df):
     '''Look for minimum pressure in dataframe, then return everything after minimum pressure/top of cast.
@@ -277,35 +273,36 @@ def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pres
 #
 #     return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
 
-def ctd_align(inMat=None, col=None, time=0.0):
-    """ctd_align function
+def ctd_align(raw_ds=None, col=None, time=0.0):
+    """
+    Adjust time of sensor response and water flow relative to the time frame of
+    temperature sensor. Last value is duplicated and appended to time series.
 
-    Function takes full NUMPY ndarray with predefined dtype array
-    and adjusts time of sensor responce and water flow relative to
-    the time frame of temperature sensor.
+    Parameters
+    ----------
+    raw_ds : xarray Dataset
+        Dataset containing raw CTD data
+    col : str
+        Name of variable being offset
+    time : float
+        Time offset (in seconds) to apply to variable
 
-    Args:
-        param1 (ndarray): inMat, numpy ndarray with dtype array
-        param2 (float): col, column to apply time advance to.
-        param3 (float): time, advance in seconds to apply to raw data.
-
-    Returns:
-        Narray: The return value is ndarray with adjusted time of parameter
-          specified.
+    Returns
+    -------
+    raw_ds : xarray Dataset
+        Dataset with adjusted variable
 
     """
-    # Num of frames per second.
-    fl = 24
+    fl = 24  # sampling frequency (TODO: put in sensor attrs?)
 
-    if (inMat is not None) & (col is not None) & ( time > 0.0):
-        # Time to advance
-        advnc = int(fl * time)
-        tmp = np.arange(advnc, dtype=np.float)
-        last = inMat[col][len(inMat)-1]
-        tmp.fill(float(last))
-        inMat[col] = np.concatenate((inMat[col][advnc:],tmp))
+    if (raw_ds is not None) & (col is not None) & (time > 0.0):
+        advnc = int(fl * time)  # number of samples to advance
+        last = raw_ds[col][-1]
+        tmp_col = raw_ds[col].pad(index=(0, advnc), constant_values=last)[advnc:]
+        tmp_col["index"] = np.arange(0, len(tmp_col))  # trim and reindex to match len
+        raw_ds[col].values = tmp_col
 
-    return inMat
+    return raw_ds
 
 def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, p_qual_col=None, qual_one=None, inMat=None):
     """ctd_quality_codes function
@@ -508,7 +505,7 @@ def oxy_to_umolkg(df_sal, df_pressure, df_lat, df_lon, df_temp, df_oxy):
     series = df_oxy * 44660 / (s0 + 1000)
     return series
 
-def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
+def raw_ctd_filter(raw_ds=None, filter_type='triangle', win_size=24, parameters=None):
     """raw_ctd_filter function
 
     Function takes NUMPY array
@@ -532,29 +529,36 @@ def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parame
 
     """
 
-    if input_array is None:
+    if raw_ds is None:
         print("In raw_ctd_filter: No data array.")
         return
+    elif parameters is None:
+        print("In raw_ctd_filter: Empty parameter list.")
     else:
-        return_array = input_array
-        if parameters is None:
-            print("In raw_ctd_filter: Empty parameter list.")
-        else:
-            for p in parameters:
-                if filter_type == 'boxcar':
-                    win = sig.boxcar(win_size)
-                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/len(win)
-                elif filter_type == 'gaussian':
-                    sigma = np.std(arr)
-                    win = sig.general_gaussian(win_size, 1.0, sigma)
-                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/(len(win))
-                elif filter_type == 'triangle':
-                    win = sig.triang(win_size)
-                    return_array[p] = 2*sig.convolve(input_array[p], win, mode='same')/len(win)
-    return return_array
+        filt_ds = raw_ds.copy()
+        for p in parameters:
+            if p not in raw_ds.variables:
+                print(f"'{p}' not found in dataset, filter not applied")
+                continue
+
+            filt_ds[p].attrs["filter_type"] = filter_type
+            filt_ds[p].attrs["filter_window_size"] = win_size
+
+            if filter_type == "boxcar":
+                win = signal.boxcar(win_size)
+                filt_ds[p].values = signal.convolve(raw_ds[p], win, mode="same")/len(win)
+            elif filter_type == "gaussian":
+                sigma = np.std(arr)
+                win = signal.general_gaussian(win_size, 1.0, sigma)
+                filt_ds[p].values = signal.convolve(raw_ds[p], win, mode="same")/len(win)
+            elif filter_type == "triangle":
+                win = signal.triang(win_size)
+                filt_ds[p].values = 2*signal.convolve(raw_ds[p], win, mode="same")/len(win)
+
+    return filt_ds
 
 
-def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inDs=None, cond_startup=20.0, log_file=None):
+def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, raw_ds=None, cond_startup=20.0, log_file=None):
     """ondeck_pressure function
     Function takes full NUMPY ndarray with predefined dtype array
     of filtered ctd raw data the stores, analizes and removes ondeck
@@ -583,15 +587,15 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inDs=None, cond_st
     ms = 30
     time_delay = fl*ms
 
-    if inMat is None:
+    if raw_ds is None:
         print("Ondeck_pressure function: No data.")
         return
     else:
         # Search first quarter of matrix, using conductivity
         # threshold min to capture startup pressure
-        c1 = inDs[c1_col].to_series()
-        c2 = inDs[c2_col].to_series()
-        p = inDs[p_col].to_series()
+        c1 = raw_ds[c1_col].to_series()
+        c2 = raw_ds[c2_col].to_series()
+        p = raw_ds[p_col].to_series()
         n = int(len(p)/4)
         start_pressure = p[
             np.flatnonzero((c1[:n] < cond_startup) & (c2[:n] < cond_startup))
@@ -608,18 +612,19 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inDs=None, cond_st
                 start_p = np.average(start_pressure[fl2:n]).round(4)
 
         # Remove on-deck startup
-        inDs = inDs.sel(index=np.arange(n_start, len(p)))  # reset_index functionality differs
-        inDs["index"] = np.arange(0, len(inDs.index))  # from how it works in pandas
+        raw_ds = raw_ds.sel(index=np.arange(n_start, len(p)))  # reset_index differs
+        raw_ds["index"] = np.arange(0, len(raw_ds.index))  # from how it works in pandas
 
         # Searches last half of NDarray for conductivity threshold
-        c1 = inDs[c1_col].to_series()
-        c2 = inDs[c2_col].to_series()
-        p = inDs[p_col].to_series()
+        c1 = raw_ds[c1_col].to_series()
+        c2 = raw_ds[c2_col].to_series()
+        p = raw_ds[p_col].to_series()
         n = int(len(p)/2)
         end_pressure = p[  # flatnonzero effectively resets index, so re-add n
             np.flatnonzero((c1[n:] < cond_startup) & (c2[n:] < cond_startup)) + n
         ]
 
+        # Evaluate ending pressures
         n_end = len(end_pressure)
         if (n_end > time_delay):
             end_p = np.average(end_pressure[time_delay:]).round(4)
@@ -627,13 +632,13 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inDs=None, cond_st
             end_p = np.average(end_pressure[n:]).round(4)
 
         # Remove on-deck ending
-        inDs = inDs.sel(index=np.arange(0, len(p)-n_end))
+        raw_ds = raw_ds.sel(index=np.arange(0, len(p)-n_end))
 
         # Store ending on-deck pressure
         if log_file is not None:
             report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
-    return inDs
+    return raw_ds
 
 def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=20.0, log_file=None):
     """ondeck_pressure function

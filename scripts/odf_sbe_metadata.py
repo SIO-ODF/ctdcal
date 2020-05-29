@@ -132,19 +132,18 @@ def main(pkl_path):
     #this gets the ondeck pressure for future pressure calibration
     raw_data = process_ctd.ondeck_pressure(filename_base, p_col, c1_col, c2_col, time_col, raw_ds, float(conductivity_startup), log_directory+'ondeck_pressure.csv')
 
-    breakpoint()
-    if not c1_col in raw_data.dtype.names:
-        errPrint('c1_col data not found, skipping')
+    if c1_col not in raw_data.variables:
+        errPrint('c1_col data not found, skipping ctd_align')
     else:
         raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
 
-    if not c2_col in raw_data.dtype.names:
-        errPrint('c2_col data not found, skipping')
+    if c2_col not in raw_data.variables:
+        errPrint('c2_col data not found, skipping ctd_align')
     else:
         raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
 
-    if not dopl_col in raw_data.dtype.names:
-        errPrint('do_col data not found, skipping')
+    if dopl_col not in raw_data.variables:
+        errPrint('do_col data not found, skipping ctd_align')
     else:
         raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
         #hysteresis_matrix = process_ctd.hysteresis_correction(float(H1),float(H2), float(H3), raw_matrix)
@@ -154,6 +153,7 @@ def main(pkl_path):
 
     # Cast Details
     stime, etime, btime, startP, maxP, btm_lat, btm_lon, btm_alt, cast_data = process_ctd.cast_details(filename_base, log_directory+'cast_details.csv', p_col, time_col, lat_col, lon_col, alt_col, filter_data)
+    breakpoint()
     # Write time data to file
     report_ctd.report_time_series_data(filename_base, time_directory, expocode, time_column_names, time_column_units, time_column_data, time_column_format, cast_data)
     #import pdb; pdb.set_trace()
