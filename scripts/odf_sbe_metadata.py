@@ -115,7 +115,8 @@ def main(pkl_path):
     converted_df = pd.read_pickle(pkl_path)
     ds_path = pkl_path.split(".pkl")[0] + ".nc"
     try:
-        raw_ds = xr.open_dataset(ds_path, group="raw")
+        with xr.open_dataset(ds_path, group="raw") as ds:
+            raw_ds = ds
     except OSError:
         raw_ds = xr.open_dataset(ds_path)
 
@@ -152,24 +153,29 @@ def main(pkl_path):
     filter_data = process_ctd.raw_ctd_filter(raw_data, 'triangle', 24, input_parameters)
 
     # Cast Details
-    stime, etime, btime, startP, maxP, btm_lat, btm_lon, btm_alt, cast_data = process_ctd.cast_details(filename_base, log_directory+'cast_details.csv', p_col, time_col, lat_col, lon_col, alt_col, filter_data)
-    breakpoint()
-    # Write time data to file
-    report_ctd.report_time_series_data(filename_base, time_directory, expocode, time_column_names, time_column_units, time_column_data, time_column_format, cast_data)
-    #import pdb; pdb.set_trace()
+    cast_data = process_ctd.cast_details(filename_base, log_directory+'cast_details.csv', p_col, time_col, lat_col, lon_col, alt_col, filter_data)
 
+    # Write out time data
+    # TODO: appending to data/converted/SSSCC.nc with group="time" doesn't work...
+    cast_data.to_netcdf(time_directory + filename_base + "_time.nc")
+
+    ###
+    # MK 05/29/20: Is it necessary to do this step?
+    # Raw data are being sequenced, flagged, and exported to _ct1 files
+    # They will be overwritten when the code runs all the way through
+    # and outputs calibrated data...
+    ###
     # Pressure Sequence
-    #pressure_seq_data = process_ctd.pressure_sequence(filename_base, p_col, time_col, 2.0, stime, startP, 'down', int(sample_rate), int(search_time), cast_data)
-    pressure_seq_data = process_ctd.pressure_sequence(cast_data,p_col,2.0,stime,startP,'down',int(sample_rate),int(search_time))
+    # pressure_seq_data = process_ctd.pressure_sequence(cast_data,p_col,2.0,stime,startP,'down',int(sample_rate),int(search_time))
     # Convert dissolved oxygen from ml/l to umol/kg
-    dopkg = process_ctd.o2pl2pkg(p_col, t1_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, pressure_seq_data)
+    # dopkg = process_ctd.o2pl2pkg(p_col, t1_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, pressure_seq_data)
 
     # Add quality codes to data
-    qual_pseq_data = process_ctd.ctd_quality_codes(None, None, None, False, p_column_qual, p_column_one, pressure_seq_data)
+    # qual_pseq_data = process_ctd.ctd_quality_codes(None, None, None, False, p_column_qual, p_column_one, pressure_seq_data)
 
     # Write time data to file
-    depth = -999
-    report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, p_column_data, qual_pseq_data, dopkg, pressure_seq_data)
+    # depth = -999
+    # report_ctd.report_pressure_series_data(filename_base, expocode, sectionID, btime, btm_lat, btm_lon, depth, btm_alt, ctd, pressure_directory, p_column_names, p_column_units, p_column_data, qual_pseq_data, dopkg, pressure_seq_data)
 
     debugPrint('Done!')
 
