@@ -15,6 +15,7 @@ import datetime
 import statistics
 import ctdcal.convert as cnv
 import pandas as pd
+import xarray as xr
 import time
 
 
@@ -39,17 +40,16 @@ def retrieveBottleDataFromFile(converted_file, debug=False):
 
 
 # Retrieve the bottle data from a dataframe created from a converted file.
-def retrieveBottleData(converted_df, debug=False):
-    if BOTTLE_FIRE_COL in converted_df.columns:
-        converted_df[BOTTLE_FIRE_NUM_COL] = ((converted_df[BOTTLE_FIRE_COL] == True) & (converted_df[BOTTLE_FIRE_COL] != converted_df[BOTTLE_FIRE_COL].shift(1))).astype(int).cumsum()
-        #converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL] == False)).astype(int).cumsum()
+def retrieveBottleData(ds, debug=False):
+    if BOTTLE_FIRE_COL in ds.variables:
+        ds[BOTTLE_FIRE_NUM_COL] = ((ds[BOTTLE_FIRE_COL] == True) & (ds[BOTTLE_FIRE_COL] != ds[BOTTLE_FIRE_COL].shift(index=1))).astype(int).cumsum()
 
-        return converted_df.loc[converted_df[BOTTLE_FIRE_COL] == True]
-        #return converted_df
+        return ds.sel(index=np.flatnonzero(ds[BOTTLE_FIRE_COL] == True))
+
     else:
         debugPrint("Bottle fire column:", BOTTLE_FIRE_COL, "not found")
 
-    return pd.DataFrame() #empty dataframe
+    return xr.Dataset()  # empty dataset
 
 def bottle_mean(btl_df):
     '''Compute the mean for each bottle from a dataframe.'''

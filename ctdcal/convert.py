@@ -103,13 +103,20 @@ def make_btl_mean(ssscc_list, debug=False):
     boolean
         bottle averaging of mean has finished successfully
     """
-    print('Generating btl_mean.pkl files')
+    print('Generating *_btl_mean.nc files')
     for ssscc in ssscc_list:
-        if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
-            imported_df = importConvertedFile(cfg.directory["converted"] + ssscc + ".pkl", False)
-            bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
-            mean_df = btl.bottle_mean(bottle_df)
-            saveConvertedDataToFile(mean_df, cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
+        if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.nc").exists():
+            breakpoint()
+            with xr.open_dataset(cfg.directory["converted"] + ssscc + ".nc", group="raw") as ds:
+                imported_ds = ds
+            # imported_df = importConvertedFile(cfg.directory["converted"] + ssscc + ".pkl", False)
+            btl_ds = btl.retrieveBottleData(imported_ds, debug=debug)
+            mean_ds = btl_ds.groupby("btl_fire_num").mean(dim="index")
+            mean_ds.attrs["bottle_file_averaging_type"] = "mean"  # or median or mode
+            # there's probably a better way to do this
+            mean_ds.attrs["bottle_file_averaging_length"] = len(btl_ds["index"] )// len(mean_ds["btl_fire_num"])
+            # saveConvertedDataToFile(mean_ds, cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
+            mean_ds.to_netcdf(cfg.directory["bottle"] + ssscc + "_btl_mean.nc")
 
     return True
 
@@ -304,46 +311,46 @@ def convertFromSBEReader(sbeReader, debug=False):
     # return the converted data as a dataset
     return converted_ds
 
+# MK 05/29/20: deprecated, .nc files are self describing
+# def importConvertedFile(file_name, debug=False):
 
-def importConvertedFile(file_name, debug=False):
+#     """Handler to import converted data from a csv-formatted file created by run.py
+#     """
+#     try:
+#         output_df = pd.read_pickle(file_name)
+#     except FileNotFoundError:
+#         global DEBUG
+#         DEBUG = debug
 
-    """Handler to import converted data from a csv-formatted file created by run.py
-    """
-    try:
-        output_df = pd.read_pickle(file_name)
-    except FileNotFoundError:
-        global DEBUG
-        DEBUG = debug
+#         debugPrint("Importing data from:", file_name + '... ', end='')
+#         output_df = pd.read_csv(file_name, index_col=0, skiprows=[1], parse_dates=False)
+#         #debugPrint(output_df.head())
+#         header_raw = output_df.columns.values.tolist()
+#         header_type = []
 
-        debugPrint("Importing data from:", file_name + '... ', end='')
-        output_df = pd.read_csv(file_name, index_col=0, skiprows=[1], parse_dates=False)
-        #debugPrint(output_df.head())
-        header_raw = output_df.columns.values.tolist()
-        header_type = []
+#         with open(file_name) as csvfile:
+#             dtypeReader = csv.reader(csvfile, delimiter=',')
+#             dtypeReader.__next__() # skip first row
+#             dtype_header = dtypeReader.__next__() #second row
+#             dtype_header.pop(0) #remove 'index' from left of dtype list
+#             #debugPrint(dtype_header)
 
-        with open(file_name) as csvfile:
-            dtypeReader = csv.reader(csvfile, delimiter=',')
-            dtypeReader.__next__() # skip first row
-            dtype_header = dtypeReader.__next__() #second row
-            dtype_header.pop(0) #remove 'index' from left of dtype list
-            #debugPrint(dtype_header)
+#         for i, x in enumerate(dtype_header):
+#             #debugPrint('Set', header_raw[i], 'to', dtype_header[i])
+#             if dtype_header[i] == 'bool_':
+#                 d = {'True': True, 'False': False}
+#                 output_df[header_raw[i]].map(d)
+#             elif dtype_header[i] == 'datetime_':
+#                 output_df[header_raw[i]] = output_df[header_raw[i]].astype('datetime64')
+#             elif dtype_header[i] == 'int_':
+#                 output_df[header_raw[i]] = output_df[header_raw[i]].astype('int64')
+#             elif dtype_header[i] == 'float_':
+#                 output_df[header_raw[i]] = output_df[header_raw[i]].astype('float64')
 
-        for i, x in enumerate(dtype_header):
-            #debugPrint('Set', header_raw[i], 'to', dtype_header[i])
-            if dtype_header[i] == 'bool_':
-                d = {'True': True, 'False': False}
-                output_df[header_raw[i]].map(d)
-            elif dtype_header[i] == 'datetime_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('datetime64')
-            elif dtype_header[i] == 'int_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('int64')
-            elif dtype_header[i] == 'float_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('float64')
+#         debugPrint("Done!")
 
-        debugPrint("Done!")
-
-        # return the imported data as a dataframe
-    return output_df
+#         # return the imported data as a dataframe
+#     return output_df
 
 
 def saveConvertedDataToFile(converted_df, filename, debug=False):
