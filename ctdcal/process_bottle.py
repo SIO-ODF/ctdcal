@@ -51,6 +51,30 @@ def retrieveBottleData(ds, debug=False):
 
     return xr.Dataset()  # empty dataset
 
+
+def _btl_average(btl_ds, method="mean", group="btl_fire_num", dim="index"):
+    """
+    Generate bottle average file using desired method (mean or median).
+    Relevant attributes (averaging method and length) are added to xarray.
+    """
+    if method == "mean":
+        avg_ds = btl_ds.groupby(group).mean(dim=dim)
+    elif method == "median":
+        avg_ds = btl_ds.groupby(group).median(dim=dim)
+    # elif method == "mode":  # doesn't exist in xarray (yet?)
+    #     avg_ds = btl_ds.groupby(group).mode(dim=dim)
+    else:
+        print(f"Btl average method {method} not valid. Use mean or median.")
+        return btl_ds
+
+    avg_ds.attrs["bottle_file_averaging_type"] = method
+    avg_ds.attrs["bottle_file_averaging_length"] = len(btl_ds[dim]) // len(
+        avg_ds[group]
+    )
+    return avg_ds
+
+
+# MK 06/01/20: deprecated, use _btl_average
 def bottle_mean(btl_df):
     '''Compute the mean for each bottle from a dataframe.'''
     btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
@@ -61,6 +85,7 @@ def bottle_mean(btl_df):
         i += 1
     return output
 
+# MK 06/01/20: deprecated, use _btl_average
 def bottle_median(btl_df):
     '''Compute the median for each bottle from a dataframe.'''
     btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))

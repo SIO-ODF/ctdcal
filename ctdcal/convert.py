@@ -103,20 +103,15 @@ def make_btl_mean(ssscc_list, debug=False):
     boolean
         bottle averaging of mean has finished successfully
     """
-    print('Generating *_btl_mean.nc files')
+    print("Generating *_btl_mean.nc files")
     for ssscc in ssscc_list:
         if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.nc").exists():
-            breakpoint()
-            with xr.open_dataset(cfg.directory["converted"] + ssscc + ".nc", group="raw") as ds:
-                imported_ds = ds
-            # imported_df = importConvertedFile(cfg.directory["converted"] + ssscc + ".pkl", False)
-            btl_ds = btl.retrieveBottleData(imported_ds, debug=debug)
-            mean_ds = btl_ds.groupby("btl_fire_num").mean(dim="index")
-            mean_ds.attrs["bottle_file_averaging_type"] = "mean"  # or median or mode
-            # there's probably a better way to do this
-            mean_ds.attrs["bottle_file_averaging_length"] = len(btl_ds["index"] )// len(mean_ds["btl_fire_num"])
-            # saveConvertedDataToFile(mean_ds, cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
-            mean_ds.to_netcdf(cfg.directory["bottle"] + ssscc + "_btl_mean.nc")
+            with xr.open_dataset(
+                cfg.directory["converted"] + ssscc + ".nc", group="raw"
+            ) as ds:
+                btl_ds = btl.retrieveBottleData(ds, debug=debug)
+                mean_ds = btl._btl_average(btl_ds, method="mean")
+                mean_ds.to_netcdf(cfg.directory["bottle"] + ssscc + "_btl_mean.nc")
 
     return True
 

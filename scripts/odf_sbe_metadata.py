@@ -117,8 +117,11 @@ def main(pkl_path):
     try:
         with xr.open_dataset(ds_path, group="raw") as ds:
             raw_ds = ds
-    except OSError:
-        raw_ds = xr.open_dataset(ds_path)
+    except OSError as error:
+        print(f"""{error}: Group does not exist in {filename_base}.nc ...
+            Attempting to load without group""")
+        with xr.open_dataset(ds_path) as ds:
+            raw_ds = ds
 
     # Construct NDarray - fix this serialization asap
     #raw_data = process_ctd.dataToNDarray(convertedfilePath,None,list(converted_df.columns.insert(0,'index')),',',2)
