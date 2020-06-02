@@ -940,14 +940,14 @@ def _reft_loader(ssscc, reft_dir):
                 continue
             reftArray.append(row)
 
-    reftDF = pd.DataFrame.from_records(reftArray)
-    reftDF = reftDF.replace(  # remove text columns, only need numbers and dates
+    reft_df = pd.DataFrame.from_records(reftArray)
+    reft_df = reft_df.replace(  # remove text columns, only need numbers and dates
         to_replace=["bn", "diff", "val", "t90", "="], value=np.nan
     )
-    reftDF = reftDF.dropna(axis=1)
-    reftDF[1] = reftDF[[1, 2, 3, 4]].agg(" ".join, axis=1)  # dd/mm/yy/time cols are
-    reftDF.drop(columns=[2, 3, 4], inplace=True)  # read separately; combine into one 
-    columns = OrderedDict(  # having this as a dict streamlines next steps
+    reft_df = reft_df.dropna(axis=1)
+    reft_df[1] = reft_df[[1, 2, 3, 4]].agg(" ".join, axis=1)  # dd/mm/yy/time cols are
+    reft_df.drop(columns=[2, 3, 4], inplace=True)  # read separately; combine into one
+    cols = OrderedDict(  # having this as a dict streamlines next steps
         [
             ("index_memory", int),
             ("datetime", object),
@@ -957,24 +957,34 @@ def _reft_loader(ssscc, reft_dir):
             ("T90", float),
         ]
     )
-    reftDF.columns = list(columns.keys())  # name columns
-    reftDF = reftDF.astype(columns)  # force dtypes
+    reft_df.columns = list(cols.keys())  # name columns
+    reft_df = reft_df.astype(cols)  # force dtypes
     # assign initial qality flags
-    reftDF.loc[:, "REFTMP_FLAG_W"] = 2
-    reftDF.loc[abs(reftDF["diff"]) >= 3000, "REFTMP_FLAG_W"] = 3
+    reft_df.loc[:, "REFTMP_FLAG_W"] = 2
+    reft_df.loc[abs(reft_df["diff"]) >= 3000, "REFTMP_FLAG_W"] = 3
     # add in STNNBR, CASTNO columns
     # TODO: should these be objects or floats? be consistent!
     # string prob better for other sta/cast formats (names, letters, etc.)
-    reftDF["STNNBR"] = ssscc[0:3]
-    reftDF["CASTNO"] = ssscc[3:5]
-    return reftDF
+    reft_df["STNNBR"] = ssscc[0:3]
+    reft_df["CASTNO"] = ssscc[3:5]
+
+    # convert to dataset and add attrs
+    reft_ds = xr.Dataset.from_dataframe(reft_df)
+    reft_ds["T90"].attrs = {
+        "sensor_type": "sbe_35",  # TODO: double check this info
+        "standard_name": "Sea-Bird SBE 35 thermometer",
+        "averaging_period_seconds": 15,
+        "ancillary_variables": "REFTMP_FLAG_W",  # do this here or at end?
+    }
+
+    return reft_ds
 
 
 def process_reft(ssscc_list, reft_dir=cfg.directory["reft"]):
     # TODO: import reft_dir from a config file
     """
     SBE35 reference thermometer processing function. Load in .cap files for given
-    station/cast list, perform basic flagging, and export to .csv files.
+    station/cast list, perform basic flagging, and export to .nc files.
 
     Inputs
     ------
@@ -984,11 +994,12 @@ def process_reft(ssscc_list, reft_dir=cfg.directory["reft"]):
         Path to folder containing raw salt files (defaults to data/reft/)
 
     """
+    print("Processing reft files")
     for ssscc in ssscc_list:
-        if not Path(reft_dir + ssscc + "_reft.csv").exists():
+        if not Path(reft_dir + ssscc + "_reft.nc").exists():
             try:
-                reftDF = _reft_loader(ssscc, reft_dir)
-                reftDF.to_csv(reft_dir + ssscc + "_reft.csv", index=False)
+                reft_ds = _reft_loader(ssscc, reft_dir)
+                reft_ds.to_netcdf(reft_dir + ssscc + "_reft.nc")
             except FileNotFoundError:
                 print("refT file for cast " + ssscc + " does not exist... skipping")
                 return
