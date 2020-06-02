@@ -1,4 +1,5 @@
 import pandas as pd
+import xarray as xr
 import numpy as np
 import datetime as dt
 import gsw
@@ -221,7 +222,7 @@ def create_multi_index(df,index=['SSSCC','GPSLAT','GPSLON','CTDPRS']):
 
 def _salt_loader(ssscc, salt_dir):
     """
-    Load raw salt file into DataFrame and calculate salinity.
+    Load raw salt file into Dataset, calculate salinity, add relevant attributes.
     """
     saltpath = salt_dir + ssscc  # salt files have no extension
     with open(saltpath, newline="") as f:
@@ -231,9 +232,10 @@ def _salt_loader(ssscc, salt_dir):
         saltArray = []
         for row in saltF:
             saltArray.append(row)
+        header = saltArray[0]
         del saltArray[0]  # remove header
 
-    header = OrderedDict(  # having this as a dict streamlines next steps
+    cols = OrderedDict(  # having this as a dict streamlines next steps
         [
             ("STNNBR", int),
             ("CASTNO", int),
@@ -247,37 +249,44 @@ def _salt_loader(ssscc, salt_dir):
             ("Attempts", int),
         ]
     )
-    saltDF = pd.DataFrame.from_records(saltArray)
+    salt_df = pd.DataFrame.from_records(saltArray)
     # add as many "Reading#"s as needed
-    for ii in range(0, len(saltDF.columns) - len(header)):
-        header["Reading{}".format(ii + 1)] = float
-    saltDF.columns = list(header.keys())  # name columns
-    saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"]
-    saltDF = saltDF.astype(header)  # force dtypes
-    saltDF["SALNTY"] = gsw.SP_salinometer(
-        (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
+    for ii in range(0, len(salt_df.columns) - len(cols)):
+        cols["Reading{}".format(ii + 1)] = float
+    salt_df.columns = list(cols.keys())  # name columns
+    salt_df = salt_df[salt_df["autosalSAMPNO"] != "worm"]
+    salt_df = salt_df.astype(cols)  # force dtypes
+    salt_df["SALNTY"] = gsw.SP_salinometer(
+        (salt_df["CRavg"] / 2.0), salt_df["BathTEMP"]
     ).round(4)
-    return saltDF
+
+    # convert to dataset and add attrs
+    salt_ds = xr.Dataset.from_dataframe(salt_df)
+    # TODO: there is maybe a better way to do this
+    # this is in odf_io so it's probably fine to hard code
+    # what attrs do we need/want?
+    header.insert(0, "autosal_serial_number")
+    header = [h.replace(":", "") for h in header]
+    header = header[:header.index("std")]
+    salt_ds["SALNTY"].attrs = dict(zip(header[::2], header[1::2]))
+
+    return salt_ds
 
 
-def _salt_exporter(saltDF, outdir=cfg.directory["salt"], stn_col="STNNBR", cast_col="CASTNO"):
+def _salt_exporter(
+    salt_ds, outdir=cfg.directory["salt"], stn_col="STNNBR", cast_col="CASTNO"
+):
     """
     Export salt DataFrame to .csv file. Extra logic is included in the event that
     multiple stations and/or casts are included in a single raw salt file.
     """
-    stations = saltDF[stn_col].unique()
-    for station in stations:
-        stn_salts = saltDF[saltDF[stn_col] == station]
-        casts = stn_salts[cast_col].unique()
-        for cast in casts:
-            stn_cast_salts = stn_salts[stn_salts[cast_col] == cast]
-            outfile = (  # format to SSSCC_salts.csv
-                outdir + "{0:03}".format(station) + "{0:02}".format(cast) + "_salts.csv"
-            )
+    for (station, station_ds) in salt_ds.groupby(stn_col):
+        for (cast, cast_ds) in station_ds.groupby(cast_col):
+            outfile = f"{outdir}{station:03d}{cast:02d}_salts.nc"  # to SSSCC_salts.nc
             if Path(outfile).exists():
                 print(outfile + " already exists...skipping")
                 continue
-            stn_cast_salts.to_csv(outfile, index=False)
+            cast_ds.to_netcdf(outfile)
 
 
 def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
@@ -296,13 +305,13 @@ def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
 
     """
     for ssscc in ssscc_list:
-        if not Path(salt_dir + ssscc + "_salts.csv").exists():
+        if not Path(salt_dir + ssscc + "_salts.nc").exists():
             try:
-                saltDF = _salt_loader(ssscc, salt_dir)
+                salt_ds = _salt_loader(ssscc, salt_dir)
             except FileNotFoundError:
                 print("Salt file for cast " + ssscc + " does not exist... skipping")
                 continue
-            _salt_exporter(saltDF, salt_dir)
+            _salt_exporter(salt_ds, salt_dir)
 
     return True
 
