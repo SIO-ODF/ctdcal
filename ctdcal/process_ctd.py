@@ -965,11 +965,12 @@ def _reft_loader(ssscc, reft_dir):
     # add in STNNBR, CASTNO columns
     # TODO: should these be objects or floats? be consistent!
     # string prob better for other sta/cast formats (names, letters, etc.)
-    reft_df["STNNBR"] = ssscc[0:3]
-    reft_df["CASTNO"] = ssscc[3:5]
+    reft_df["STNNBR"] = int(ssscc[0:3])  # int for now while spinning up xarray
+    reft_df["CASTNO"] = int(ssscc[3:5])  # will need to sort out salt naming (only int?)
 
     # convert to dataset and add attrs
-    reft_ds = xr.Dataset.from_dataframe(reft_df)
+    reft_ds = xr.Dataset.from_dataframe(reft_df.set_index("btl_fire_num"))
+    reft_ds = reft_ds.set_coords(["STNNBR", "CASTNO"])
     reft_ds["T90"].attrs = {
         "sensor_type": "sbe_35",  # TODO: double check this info
         "standard_name": "Sea-Bird SBE 35 thermometer",
