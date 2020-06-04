@@ -970,7 +970,6 @@ def _reft_loader(ssscc, reft_dir):
 
     # convert to dataset and add attrs
     reft_ds = xr.Dataset.from_dataframe(reft_df.set_index("btl_fire_num"))
-    reft_ds = reft_ds.set_coords(["STNNBR", "CASTNO"])
     reft_ds["T90"].attrs = {
         "sensor_type": "sbe_35",  # TODO: double check this info
         "standard_name": "Sea-Bird SBE 35 thermometer",

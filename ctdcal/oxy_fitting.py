@@ -104,14 +104,8 @@ def load_to_xarray(oxyfile):
     df = df[df["TITR_VOL"] > 0]  # remove "aborted data"
     df = df.sort_values("BOTTLENO_OXY")
 
-    # Get necessary columns for output
-    # TODO: this and "cols" will change when we move away from numeric sta/cast
-    df[["STNNO_OXY", "CASTNO_OXY", "FLASKNO"]] = df[
-        ["STNNO_OXY", "CASTNO_OXY", "FLASKNO"]
-    ].astype(str)
-    df["SSSCC_OXY"] = df["STNNO_OXY"] + "0" + df["CASTNO_OXY"]  # TODO: fstrings?
-
-    ds = xr.Dataset.from_dataframe(df)
+    # converted to dataset and add attrs
+    ds = xr.Dataset.from_dataframe(df.set_index("BOTTLENO_OXY"))
     # TODO: add attrs? params?
 
     return ds, params

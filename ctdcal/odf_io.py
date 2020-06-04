@@ -262,7 +262,6 @@ def _salt_loader(ssscc, salt_dir):
 
     # convert to dataset and add attrs
     salt_ds = xr.Dataset.from_dataframe(salt_df.set_index("SAMPNO"))
-    salt_ds = salt_ds.set_coords(["STNNBR", "CASTNO"])
     # TODO: there is maybe a better way to do this
     # this is in odf_io so it's probably fine to hard code
     # what attrs do we need/want?
