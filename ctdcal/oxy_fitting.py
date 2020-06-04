@@ -18,6 +18,8 @@ import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 import pandas as pd
+import xarray as xr
+from collections import OrderedDict
 import csv
 from pathlib import Path
 import config as cfg
@@ -68,6 +70,51 @@ def oxy_loader(oxyfile):
     df['SSSCC_OXY'] = df['STNNO_OXY']+'0'+df['CASTNO_OXY']
 
     return df ,params #DF
+
+def load_to_xarray(oxyfile):
+
+    with open(oxyfile, newline="") as f:
+        oxyF = csv.reader(
+            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True",
+        )
+        oxyArray = []
+        for row in oxyF:
+            if len(row) > 9:
+                row = row[:9]
+            oxyArray.append(row)
+
+        params = oxyArray[0]
+        del oxyArray[0]
+
+    cols = OrderedDict(  # having this as a dict streamlines next steps
+        [
+            ("STNNO_OXY", int),
+            ("CASTNO_OXY", int),
+            ("BOTTLENO_OXY", int),
+            ("FLASKNO", int),
+            ("TITR_VOL", float),
+            ("TITR_TEMP", float),
+            ("DRAW_TEMP", float),
+            ("TITR_TIME", int),
+            ("END_VOLTS", float),
+        ]
+    )
+    df = pd.DataFrame.from_records(oxyArray, columns=list(cols.keys())).astype(cols)
+    df = df[df["BOTTLENO_OXY"] != 99]  # remove "dummy data"
+    df = df[df["TITR_VOL"] > 0]  # remove "aborted data"
+    df = df.sort_values("BOTTLENO_OXY")
+
+    # Get necessary columns for output
+    # TODO: this and "cols" will change when we move away from numeric sta/cast
+    df[["STNNO_OXY", "CASTNO_OXY", "FLASKNO"]] = df[
+        ["STNNO_OXY", "CASTNO_OXY", "FLASKNO"]
+    ].astype(str)
+    df["SSSCC_OXY"] = df["STNNO_OXY"] + "0" + df["CASTNO_OXY"]  # TODO: fstrings?
+
+    ds = xr.Dataset.from_dataframe(df)
+    # TODO: add attrs? params?
+
+    return ds, params
 
 def flask_load(flaskfile=cfg.directory["oxy"] + 'o2flasks.vol', skip_rows=12):
     """Load information from flask.vol file
