@@ -1537,44 +1537,32 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
         Merged dataframe containing all loaded data
     
     """
-    df_data_all = pd.DataFrame()
-    ds_data_all = xr.Dataset()
-
     if series == 'bottle':
+        ds_data_all = []  # empty list to append data
         for ssscc in ssscc_list:
+
             print('Loading BTL data for station: ' + ssscc + '...')
 
+            ### load bottle mean CTD data
             btl_file = cfg.directory["bottle"] + ssscc + '_btl_mean.nc'
             btl_ds = xr.open_dataset(btl_file)
 
             ### load REFT data
-            # reft_file = cfg.directory["reft"] + ssscc + '_reft.csv'
-            # try:
-            #     reft_data = _load_reft_data(reft_file)
-            # except FileNotFoundError:
-            #     print('Missing (or misnamed) REFT Data Station: ' + ssscc + '...filling with NaNs')
-            #     reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"])
-            #     reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
-            #     reft_data["SSSCC_TEMP"] = ssscc
             reft_file = cfg.directory["reft"] + ssscc + '_reft.nc'
             try:
                 reft_ds = xr.open_dataset(reft_file)
                 reft_ds = reft_ds[["T90", "REFTMP_FLAG_W"]]
             except FileNotFoundError:
                 print(f"missing reft data for station {ssscc}")
-                breakpoint()  # TODO: figure out how to handle this w/ xr
+                reft_ds = xr.Dataset(  # TODO: find a cleaner way if possible
+                    coords={"btl_fire_num": btl_ds['btl_fire_num']},
+                    data_vars={
+                        "T90": np.nan,
+                        "REFTMP_FLAG_W": np.nan,
+                    },
+                )
 
             ### load REFC data
-            # refc_file = cfg.directory["salt"] + ssscc + '_salts.csv'
-            # try:
-            #     refc_data = _load_salt_data(refc_file, index_name='SAMPNO')
-            # except FileNotFoundError:
-            #     print('Missing (or misnamed) REFC Data Station: ' + ssscc + '...filling with NaNs')
-            #     refc_data = pd.DataFrame(
-            #         index=btl_data.index,
-            #         columns=["CRavg", "BathTEMP", "BTLCOND"],
-            #     )
-            #     refc_data['SAMPNO_SALT'] = btl_data['btl_fire_num'].astype(int)
             refc_file = cfg.directory["salt"] + ssscc + '_salts.nc'
             try:
                 refc_ds = xr.open_dataset(refc_file)
@@ -1582,68 +1570,65 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 refc_ds = refc_ds.rename({"SAMPNO":"btl_fire_num"})
             except FileNotFoundError:
                 print(f"missing refc data for station {ssscc}")
-                refc_ds = xr.Dataset(
+                refc_ds = xr.Dataset(  # TODO: find a cleaner way if possible
                     coords={"btl_fire_num": btl_ds['btl_fire_num']},
                     data_vars={
-                        "BathTEMP": np.nan * btl_ds['btl_fire_num'],
-                        "CRavg": np.nan * btl_ds['btl_fire_num'],
-                        "SALNTY": np.nan * btl_ds['btl_fire_num'],
+                        "BathTEMP": np.nan,
+                        "CRavg": np.nan,
+                        "SALNTY": np.nan,
                     },
                 )
 
             ### load OXY data
-            # TODO: update oxygen loader to xarray
             oxy_file = cfg.directory["oxy"] + ssscc
             try:
-                oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
+                refo_ds, params = oxy_fitting.load_to_xarray(oxy_file)
+                refo_ds = refo_ds.rename({"BOTTLENO_OXY":"btl_fire_num"})
             except FileNotFoundError:
-                print('Missing (or misnamed) REFO Data Station: ' + ssscc + '...filling with NaNs')
-                oxy_data = pd.DataFrame(
-                    index=btl_data.index,
-                    columns=[
-                        "STNNO_OXY",
-                        "CASTNO_OXY",
-                        "FLASKNO",
-                        "TITR_VOL",
-                        "TITR_TEMP",
-                        "DRAW_TEMP",
-                        "TITR_TIME",
-                        "END_VOLTS",
-                    ],
+                print(f"missing btl oxy data for station {ssscc}")
+                refo_ds = xr.Dataset(  # TODO: find a cleaner way if possible
+                    coords={"btl_fire_num": btl_ds['btl_fire_num']},
+                    data_vars={
+                        "STNNO_OXY": np.nan,
+                        "CASTNO_OXY": np.nan,
+                        "FLASKNO": np.nan,
+                        "TITR_VOL": np.nan,
+                        "TITR_TEMP": np.nan,
+                        "DRAW_TEMP": np.nan,
+                        "TITR_TIME": np.nan,
+                        "END_VOLTS": np.nan,
+                    },
                 )
-                oxy_data['BOTTLENO_OXY'] = btl_data['btl_fire_num'].astype(int)
 
-            ### clean up dataframe
-            # Horizontally concat DFs to have all data in one DF
-            # TODO: duplicates (salts) have to be dropped before this step
+            ### clean up
+            # merge all ref data into one dataset
+            # TODO: duplicates (salts) have to be dropped before this step.
             # clean up raw salt files or ...?
             try:
-                btl_ds = xr.merge([btl_ds, reft_ds, refc_ds])  # TODO: bottle oxygen
+                btl_ds = xr.merge([btl_ds, reft_ds, refc_ds, refo_ds])
+                btl_ds = btl_ds.assign_coords({"SSSCC": ssscc})  # add new coord to use
+                btl_ds = btl_ds.expand_dims({"SSSCC": 1})  # for merging in next step
+                # TODO: investigate having separate "station" and "cast" coords
             except ValueError:
                 print(f"{ssscc} has duplicate btl_fire_num; check salt file")
-                continue
-
-            # btl_data = pd.merge(btl_data,oxy_data,left_on='btl_fire_num',right_on='BOTTLENO_OXY',how='outer')
+                breakpoint()
 
             if len(btl_ds["btl_fire_num"]) > 36:
                 print("***** Len of btl data for station: ",ssscc,' is > 36, check for multiple stations/casts in reference parameter files *****')
 
             # Calculate dv/dt for oxygen fitting
+            # TODO: update this to work with xarray
             # btl_data['dv_dt'] = oxy_fitting.calculate_dVdT(btl_data['CTDOXYVOLTS'],btl_data['scan_datetime'])
 
-            # Add bottom of cast information (date,time,lat,lon,etc.)
+            # Add bottom of cast information (date,time,lat,lon)
             btl_ds = _add_btl_bottom_data(btl_ds, ssscc)
 
-            # Merge cast into ds_data_all
-            try:
-                ds_data_all = xr.concat([ds_data_all, btl_ds], dim="btl_data_all", join="right")
-            except AssertionError:
-                raise AssertionError('Columns of ' + ssscc + ' do not match those of previous columns')
+            # add cast to list to be merged at end
+            ds_data_all.append(btl_ds)
             print('* Finished BTL data station: ' + ssscc + ' *')
 
-        # Drop duplicated columns generated by concatenation
-        breakpoint()
-        df_data_all = df_data_all.loc[:,~df_data_all.columns.duplicated()]
+        # concatenate all btl datasets into xarray of shape (SSSCC, btl_fire_num)
+        ds_data_all = xr.concat(ds_data_all, dim="SSSCC")
         
     elif series == 'time':
         df_data_all = []
@@ -1657,9 +1642,9 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
             print('** Finished TIME data station: ' + ssscc + ' **')
         df_data_all = pd.concat(df_data_all, axis=0, sort=False)
 
-    df_data_all['master_index'] = range(len(df_data_all))
+    # df_data_all['master_index'] = range(len(df_data_all))
 
-    return df_data_all
+    return ds_data_all
 
 def merge_refcond_flags(btl_data, qual_flag_cond):
     # Merge df
@@ -1829,28 +1814,27 @@ def get_btl_time(df,btl_num_col,time_col):
 
     return df
 
-def _add_btl_bottom_data(ds, cast, lat_col='LATITUDE', lon_col='LONGITUDE', decimals=4):
-    cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
+def _add_btl_bottom_data(ds, cast, decimals=4):
+    cast_details = pd.read_csv(
+        cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+    )
     cast_details = cast_details[cast_details["SSSCC"] == cast]
-    cast_lat = np.round(cast_details['latitude'].iat[0], decimals)
-    cast_lon = np.round(cast_details['longitude'].iat[0], decimals)
-    ts = pd.to_datetime(cast_details['bottom_time'].iat[0], unit="s")
-    cast_date = ts.strftime('%Y%m%d')
-    cast_time = ts.strftime('%H%M')
+    cast_lat = np.round(cast_details["latitude"].iat[0], decimals)
+    cast_lon = np.round(cast_details["longitude"].iat[0], decimals)
+    ts = pd.to_datetime(cast_details["bottom_time"].iat[0], unit="s")
+    cast_date = ts.strftime("%Y%m%d")
+    cast_time = ts.strftime("%H%M")
     ds = ds.assign_coords(
         {
-            lat_col: (("btl_fire_num"), [cast_lat] * len(ds["btl_fire_num"])),
-            lon_col: (("btl_fire_num"), [cast_lon] * len(ds["btl_fire_num"])),
+            "LATITUDE": (("SSSCC", [cast_lat])),
+            "LONGITUDE": (("SSSCC", [cast_lon])),
+            "DATE": (("SSSCC", [cast_date])),
+            "TIME": (("SSSCC", [cast_time])),
         }
-    )  # add lat and lon as coords
-    ds = ds.assign(
-        {
-            "DATE": (("btl_fire_num"), [cast_date] * len(ds["btl_fire_num"])),
-            "TIME": (("btl_fire_num"), [cast_time] * len(ds["btl_fire_num"])),
-        }
-    )  # add date and time as variables
+    )  # add lat/lon/date/time as coords on "SSSCC" dim (i.e. scalar)
 
     return ds
+
 
 def flag_missing_btl_values(df,flag_columns,flag_suffix='_FLAG_W'):
     for column in flag_columns:
