@@ -30,4 +30,4 @@ df_coded.to_pickle('data/values_and_codes.pkl')
 #print(df_coded.axes)
 ##### PATCHED IN FOR NBP1802 #####
 
-ctd_plots.all_plots(df_coded)
+ctd_plots.make_cruise_report_plots(df_coded)
