@@ -3,6 +3,7 @@ import math
 import scipy
 import numpy as np
 import pandas as pd
+import ctdcal.ctd_plots as ctd_plots
 import ctdcal.sbe_reader as sbe_rd
 import ctdcal.sbe_equations_dict as sbe_eq
 import ctdcal.process_ctd as process_ctd
@@ -15,7 +16,6 @@ import os
 import json
 from pathlib import Path
 import config as cfg
-import matplotlib.pyplot as plt
 
 # TODO: clean up oxygen fitting things, they should be in ctdcal.oxy_fitting
 
@@ -621,7 +621,7 @@ def _flag_btl_data(
         elif param == cfg.column["c2_btl"]:
             xlabel = "C2 Residual (mS/cm)"
         f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
-        _residual_plot(
+        ctd_plots._intermediate_residual_plot(
             df["Diff"],
             df[prs],
             df["SSSCC"],
@@ -630,7 +630,7 @@ def _flag_btl_data(
             f_out=f_out,
         )
         f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
-        _residual_plot(
+        ctd_plots._intermediate_residual_plot(
             df_good["Diff"],
             df_good[prs],
             df_good["SSSCC"],
@@ -710,7 +710,7 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None)
         elif T_col == cfg.column["t2_btl"]:
             xlabel = "T2 Residual (T90 C)"
             f_out = f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_fit_data.pdf"
-        _residual_plot(
+        ctd_plots._intermediate_residual_plot(
             df_good["Diff"],
             df_good[cfg.column["p_btl"]],
             df_good["SSSCC"],
@@ -744,49 +744,6 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None)
     coefs = coefs * np.concatenate((P_fit, T_fit, [1]))
 
     return coefs, df_bad
-
-
-def _residual_plot(
-    diff,
-    prs,
-    ssscc,
-    xlim=(-0.02, 0.02),
-    ylim=(6000, 0),
-    xlabel="Residual",
-    ylabel="CTDPRS",
-    show_thresh=False,
-    f_out=None,
-):
-
-    idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
-
-    plt.figure(figsize=(6, 6))
-    plt.scatter(diff, prs, c=idx, marker="+")
-    if show_thresh:
-        # TODO: thresh should probably be put in config/cast-by-cast config
-        thresh = np.array([0.002, 0.005, 0.010, 0.020])
-        p_range = np.array([6000, 2000, 1000, 500])
-        thresh = np.append(thresh, thresh[-1])  # this should still work fine even when
-        p_range = np.append(p_range, 0)  # thresh/p_range are defined elsewhere
-        plt.step(thresh, p_range, ":k")
-        plt.step(-thresh, p_range, ":k")
-
-    plt.xlim(xlim)
-    plt.xticks(rotation=45)
-    plt.ylim(ylim)
-    cbar = plt.colorbar(pad=0.1)  # set cbar ticks to SSSCC names
-    cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
-    cbar.ax.set_title("SSSCC")
-    plt.grid()
-    plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel(ylabel, fontsize=12)
-    plt.tight_layout()
-    if f_out is not None:
-        plt.savefig(f_out)
-    plt.close()
-
-    return True
 
 
 def calibrate_temp(btl_df, time_df):
@@ -824,7 +781,7 @@ def calibrate_temp(btl_df, time_df):
 
         # 1) plot pre-fit residual
         f_stem = f.stem  # get "ssscc_t*" from path
-        _residual_plot(
+        ctd_plots._intermediate_residual_plot(
             btl_df.loc[btl_rows, cfg.column["reft"]]
             - btl_df.loc[btl_rows, cfg.column["t1_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
@@ -832,7 +789,7 @@ def calibrate_temp(btl_df, time_df):
             xlabel="T1 Residual (T90 C)",
             f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_prefit.pdf",
         )
-        _residual_plot(
+        ctd_plots._intermediate_residual_plot(
             btl_df.loc[btl_rows, cfg.column["reft"]]
             - btl_df.loc[btl_rows, cfg.column["t2_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
@@ -916,7 +873,7 @@ def calibrate_temp(btl_df, time_df):
         coef_t2_all = pd.concat([coef_t2_all, coef_t2_df])
 
     # one more fig with all cuts
-    _residual_plot(
+    ctd_plots._intermediate_residual_plot(
         btl_df[cfg.column["reft"]]
         - btl_df[cfg.column["t1_btl"]],
         btl_df[cfg.column["p_btl"]],
@@ -925,7 +882,7 @@ def calibrate_temp(btl_df, time_df):
         show_thresh=True,
         f_out=f"{cfg.directory['t1_fit_figs']}residual_all_postfit.pdf",
     )
-    _residual_plot(
+    ctd_plots._intermediate_residual_plot(
         btl_df[cfg.column["reft"]]
         - btl_df[cfg.column["t2_btl"]],
         btl_df[cfg.column["p_btl"]],
@@ -977,7 +934,7 @@ def _get_C_coefs(
         elif C_col == cfg.column["c2_btl"]:
             xlabel = "C2 Residual (mS/cm)"
             f_out = f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_fit_data.pdf"
-        _residual_plot(
+        ctd_plots._intermediate_residual_plot(
             df_good["Diff"],
             df_good[cfg.column["p_btl"]],
             df_good["SSSCC"],
@@ -1084,7 +1041,7 @@ def calibrate_cond(btl_df, time_df):
 
         # 1) plot pre-fit residual
         f_stem = f.stem  # get "ssscc_c*" from path
-        _residual_plot(
+        ctd_plots._intermediate_residual_plot(
             btl_df.loc[btl_rows, cfg.column["refc"]]
             - btl_df.loc[btl_rows, cfg.column["c1_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
@@ -1092,7 +1049,7 @@ def calibrate_cond(btl_df, time_df):
             xlabel="C1 Residual (mS/cm)",
             f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_prefit.pdf",
         )
-        _residual_plot(
+        ctd_plots._intermediate_residual_plot(
             btl_df.loc[btl_rows, cfg.column["refc"]]
             - btl_df.loc[btl_rows, cfg.column["c2_btl"]],
             btl_df.loc[btl_rows, cfg.column["p_btl"]],
@@ -1182,7 +1139,7 @@ def calibrate_cond(btl_df, time_df):
         coef_c2_all = pd.concat([coef_c2_all, coef_c2_df])
 
     # one more fig with all cuts
-    _residual_plot(
+    ctd_plots._intermediate_residual_plot(
         btl_df[cfg.column["refc"]]
         - btl_df[cfg.column["c1_btl"]],
         btl_df[cfg.column["p_btl"]],
@@ -1191,7 +1148,7 @@ def calibrate_cond(btl_df, time_df):
         show_thresh=True,
         f_out=f"{cfg.directory['c1_fit_figs']}residual_all_postfit.pdf",
     )
-    _residual_plot(
+    ctd_plots._intermediate_residual_plot(
         btl_df[cfg.column["refc"]]
         - btl_df[cfg.column["c2_btl"]],
         btl_df[cfg.column["p_btl"]],

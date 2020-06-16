@@ -11,7 +11,7 @@ import cmocean
 # that later. Code copy pasted from jupyter notebook.
 #####
 
-def all_plots(df):
+def make_cruise_report_plots(df):
     '''Create and output all plots'''
     btl_t1_residuals_pressure_plot(df)
     btl_t2_residuals_pressure_plot(df)
@@ -785,3 +785,46 @@ def btl_oxy_residuals_station_concentration_plot(ref_oxy, ctd_oxy, press, stnno)
     fig.savefig('./data/images/btl_oxy_stn_concentration.pdf', format='pdf')
     plt.close()
     return None
+
+
+def _intermediate_residual_plot(
+    diff,
+    prs,
+    ssscc,
+    xlim=(-0.02, 0.02),
+    ylim=(6000, 0),
+    xlabel="Residual",
+    ylabel="CTDPRS",
+    show_thresh=False,
+    f_out=None,
+):
+
+    idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
+
+    plt.figure(figsize=(6, 6))
+    plt.scatter(diff, prs, c=idx, marker="+")
+    if show_thresh:
+        # TODO: thresh should probably be put in config/cast-by-cast config
+        thresh = np.array([0.002, 0.005, 0.010, 0.020])
+        p_range = np.array([6000, 2000, 1000, 500])
+        thresh = np.append(thresh, thresh[-1])  # this should still work fine even when
+        p_range = np.append(p_range, 0)  # thresh/p_range are defined elsewhere
+        plt.step(thresh, p_range, ":k")
+        plt.step(-thresh, p_range, ":k")
+
+    plt.xlim(xlim)
+    plt.xticks(rotation=45)
+    plt.ylim(ylim)
+    cbar = plt.colorbar(pad=0.1)  # set cbar ticks to SSSCC names
+    cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
+    cbar.ax.set_title("SSSCC")
+    plt.grid()
+    plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")
+    plt.xlabel(xlabel, fontsize=12)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.tight_layout()
+    if f_out is not None:
+        plt.savefig(f_out)
+    plt.close()
+
+    return True
