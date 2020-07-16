@@ -978,10 +978,11 @@ def _load_reft_data(reft_file, index_name="btl_fire_num"):
     """
     Loads reft_file to dataframe and reindexes to match bottle data dataframe
 
-    Note: loading in REFTMP_FLAG_W here will conflict with the REFTMP_FLAG_W
-    determined during temperature calibration.
+    # TODO: figure out why this comment was here because it is not currently true...
+    # Note: loading in REFTMP_FLAG_W here will conflict with the REFTMP_FLAG_W
+    # determined during temperature calibration.
     """
-    reft_data = pd.read_csv(reft_file, usecols=["btl_fire_num","T90"])
+    reft_data = pd.read_csv(reft_file, usecols=["btl_fire_num","T90","REFTMP_FLAG_W"])
     reft_data.set_index(index_name)
     reft_data['SSSCC_TEMP'] = Path(reft_file).stem.split("_")[0]
     reft_data['REFTMP'] = reft_data['T90']
@@ -1571,7 +1572,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
             btl_data['dv_dt'] = oxy_fitting.calculate_dVdT(btl_data['CTDOXYVOLTS'],btl_data['scan_datetime'])
 
             # Add bottom of cast information (date,time,lat,lon,etc.)
-            btl_data = _add_btl_bottom_data(btl_data, ssscc, cfg.directory["logs"] + "cast_details.csv")
+            btl_data = _add_btl_bottom_data(btl_data, ssscc)
 
             # Merge cast into df_data_all
             try:
@@ -1946,8 +1947,8 @@ def export_ct1(df, ssscc_list):
     except FileNotFoundError:
         # TODO: add logging; look into inheriting/extending a class to add features
         print("manual_depth_log.csv not found... duplicating depth_log.csv")
-        manual_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
-        manual_df.to_csv(cfg.directory["logs"] + 'manual_depth_log.csv', index=False)
+        manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
+        manual_depth_df.to_csv(cfg.directory["logs"] + 'manual_depth_log.csv', index=False)
     full_depth_df = pd.concat([depth_df,manual_depth_df])
     full_depth_df.drop_duplicates(subset='SSSCC', keep='first',inplace=True)
 
@@ -2000,15 +2001,143 @@ def export_ct1(df, ssscc_list):
             f.write("END_DATA")
 
 
-def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir=cfg.directory["pressure"],org='ODF'):
+def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
 
     btl_data = df.copy()
     now = datetime.now()
     file_datetime = now.strftime("%Y%m%d")
+    btl_columns = [
+        "EXPOCODE",
+        "SECT_ID",
+        "STNNBR",
+        "CASTNO",
+        "SAMPNO",
+        "BTLNBR",
+        "BTLNBR_FLAG_W",
+        "DATE",
+        "TIME",
+        "LATITUDE",
+        "LONGITUDE",
+        "DEPTH",
+        "CTDPRS",
+        "CTDTMP",
+        "CTDSAL",
+        "CTDSAL_FLAG_W",
+        "SALNTY",
+        "SALNTY_FLAG_W",
+        "CTDOXY",
+        "CTDOXY_FLAG_W",
+        "OXYGEN",
+        "OXYGEN_FLAG_W",
+        "REFTMP",
+        "REFTMP_FLAG_W",
+    ]
+    btl_units = [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "METERS",
+        "DBAR",
+        "ITS-90",
+        "PSS-78",
+        "",
+        "PSS-78",
+        "",
+        "UMOL/KG",
+        ""
+        "UMOL/KG",
+        "",
+        "ITS-90",
+        "",
+    ]
+
+    # rename
+    btl_data = btl_data.rename(columns={"CTDTMP2": "CTDTMP"})
+    btl_data["EXPOCODE"] = cfg.cruise["expocode"]
+    btl_data["SECT_ID"] = cfg.cruise["sectionid"]
+    btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
+    btl_data["CASTNO"] = [int(x[3:]) for x in btl_data["SSSCC"]]
+    btl_data["SAMPNO"] = btl_data["btl_fire_num"].astype(int)
+    btl_data = add_btlnbr_cols(btl_data, btl_num_col="btl_fire_num")
+
+    # round data
+    for col in ["CTDPRS", "CTDTMP", "CTDSAL", "SALNTY", "CTDOXY", "OXYGEN", "REFTMP"]:
+        btl_data[col] = btl_data[col].round(4)
+
+    # add depth
+    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv', dtype={"SSSCC": str}).dropna()
+    manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv', dtype={"SSSCC": str})
+    full_depth_df = pd.concat([depth_df,manual_depth_df])
+    full_depth_df.drop_duplicates(subset='SSSCC', keep='first',inplace=True)
+    for index, row in full_depth_df.iterrows():
+        btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
+
+    # add salt flags
+    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
+    if Path(salt_file).exists():
+        handcoded_salts = pd.read_csv(
+            salt_file, dtype={"SSSCC": str, "salinity_flag": int}
+        )
+        handcoded_salts = handcoded_salts.rename(
+            columns={"salinity_flag": "SALNTY_FLAG_W"}
+        ).drop(columns=["diff", "Comments"])
+        btl_data = btl_data.merge(
+            handcoded_salts, on=["SSSCC", "SAMPNO"], how="left"
+        )
+        btl_data.loc[btl_data["BTLCOND"].isnull(), "SALNTY_FLAG_W"] = 9
+        btl_data["SALNTY_FLAG_W"] = btl_data["SALNTY_FLAG_W"].fillna(
+            2, downcast="infer"  # fill remaining NaNs with 2s and cast to dtype int
+        )
+    else:
+        btl_data["SALNTY_FLAG_W"] = 2
+
+    # deal with nans
+    btl_data.loc[btl_data["REFTMP_FLAG_W"].isnull(), "REFTMP_FLAG_W"] = 9
+    btl_data["REFTMP_FLAG_W"] = btl_data["REFTMP_FLAG_W"].astype(int)
+    btl_data = btl_data.where(~btl_data.isnull(), -999)
+
+    # flag CTDSAL and CTDOXY
+    btl_data["CTDOXY_FLAG_W"] = 2
+    diff = btl_data["CTDOXY"] - btl_data["OXYGEN"]
+    btl_data.loc[diff.abs()*100 > btl_data["CTDOXY"], "CTDOXY_FLAG_W"] = 3
+
+    thresh = [0.002, 0.005, 0.010, 0.020]
+    btl_data["CTDSAL_FLAG_W"] = 2
+    diff = btl_data["CTDSAL"] - btl_data["SALNTY"]
+    btl_data.loc[(btl_data["CTDPRS"] > 2000) & (diff.abs() > thresh[0]), "CTDSAL_FLAG_W"] = 3
+    btl_data.loc[(btl_data["CTDPRS"] <= 2000) & (btl_data["CTDPRS"] > 1000) & (diff.abs() > thresh[1]), "CTDSAL_FLAG_W"] = 3
+    btl_data.loc[(btl_data["CTDPRS"] <= 1000) & (btl_data["CTDPRS"] > 500) & (diff.abs() > thresh[2]), "CTDSAL_FLAG_W"] = 3
+    btl_data.loc[(btl_data["CTDPRS"] <= 500) & (diff.abs() > thresh[3]), "CTDSAL_FLAG_W"] = 3
+
+    # check columns
+    try:
+        btl_data[btl_columns];  # this is lazy, do better
+    except KeyError:
+        print("Column names not configured properly... attempting to correct")
+        for col in btl_columns:
+            try:
+                btl_data[col];
+            except KeyError:
+                if col.endswith("FLAG_W"):
+                    print(col + " missing, flagging with 9s")
+                    btl_data[col] = 9
+                else:
+                    print(col + " missing, filling with -999s")
+                    btl_data[col] = -999
+
+    btl_data = btl_data[btl_columns]
 
     time_stamp = file_datetime+org
 
-    outfile = open(out_dir + expocode + '_hy1.csv', mode='w+')
+    outfile = open(out_dir + cfg.cruise["expocode"] + '_hy1.csv', mode='w+')
     outfile.write("BOTTLE, %s\n" % (time_stamp))
     cn = np.asarray(btl_columns)
     cn.tofile(outfile,sep=',', format='%s')
@@ -2018,13 +2147,12 @@ def export_btl_data(df,expocode,btl_columns, btl_units, sectionID,out_dir=cfg.di
     outfile.write('\n')
     outfile.close()
 
-    file = out_dir + expocode + '_hy1.csv'
+    file = out_dir + cfg.cruise["expocode"] + '_hy1.csv'
     with open(file,'a') as f:
         btl_data.to_csv(f, header=False,index=False)
     f.close()
 
-    outfile = open(out_dir + expocode + '_hy1.csv', "a")
-#    outfile.write('\n')
+    outfile = open(out_dir + cfg.cruise["expocode"] + '_hy1.csv', "a")
     outfile.write('END_DATA')
     outfile.close()
 

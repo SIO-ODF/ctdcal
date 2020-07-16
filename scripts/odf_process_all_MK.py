@@ -91,6 +91,7 @@ def process_all():
     # export time data to _ct1.csv format
     # TODO: clean this up more
     process_ctd.export_ct1(time_data_all, ssscc_list)
+    process_ctd.export_btl_data(btl_data_all)
 
     # run: ctd_to_bottle.py
 
