@@ -6,8 +6,6 @@ import os
 import sys
 import glob
 
-from setup_extras import make_data_dirs
-
 import pkg_resources
 from setuptools import Extension, setup
 
@@ -40,8 +38,6 @@ Python {py} detected.
     print(error, file=sys.stderr)
     sys.exit(1)
 
-# Make raw/reference data folders
-make_data_dirs()
 
 rootpath = os.path.abspath(os.path.dirname(__file__))
 
