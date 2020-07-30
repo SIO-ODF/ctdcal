@@ -11,7 +11,7 @@ import versioneer
 
 
 # Check Python version.
-if sys.version_info < (3, 5):
+if sys.version_info < (3, 7):
     pip_message = ('This may be due to an out of date pip. '
                    'Make sure you have pip >= 9.0.1.')
     try:
@@ -28,7 +28,7 @@ if sys.version_info < (3, 5):
         pass
 
     error = """
-Latest ctd does not support Python < 3.5.
+Latest ctd does not support Python < 3.7.
 Python {py} detected.
 {pip}
 """.format(py=sys.version_info, pip=pip_message)
