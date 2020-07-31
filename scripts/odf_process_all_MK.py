@@ -73,7 +73,7 @@ def process_all():
     fit_ctd.calibrate_temp(btl_data_all, time_data_all)
 
     # calibrate temperature against reference
-    fit_ctd.calibrate_cond(btl_data_all, time_data_all)
+    btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
     # calculate params needs for oxy/rinko calibration
     oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
@@ -94,55 +94,7 @@ def process_all():
 
     # run: ctd_to_bottle.py
 
-    breakpoint()
-
-    # TODO: write/abstract code to a function (in process_ctd?)
-    # TODO: look at Argo .nc files for inspiration on structuring
-    #
-    # experiment with xarray
-    # import xarray  # not needed apparently? at least as currently coded
-
-    # da_out = df.to_xarray()  # xarray calls them DataArrays instead of DataFrames
-
-    # # set attributes
-    # da_out["CTDTMP"].attrs["long_name"] = "Temperature"
-    # da_out["CTDTMP"].attrs["units"] = "ITS-90"
-    # da_out["CTDTMP"].attrs["description"] = "Continuous temperature from CTD downcast"
-
-    # # can set attrs from dict
-    # prs_attrs = dict(
-    #     long_name="Pressure", units="dbar", description="Continuous pressure"
-    # )
-    # tmp_attrs = dict(
-    #     long_name="Temperature", units="ITS-90", description="Continuous temperature"
-    # )
-    # sal_attrs = dict(
-    #     long_name="Salinity", units="PSS-78", description="Continuous salinity",
-    # )
-
-    # # can do one at at time
-    # da_out["CTDSAL"].attrs = sal_attrs
-
-    # # maybe do nested dicts in config.py and loop? e.g.:
-    # ctd_attrs = dict(
-    #     CTDPRS=prs_attrs,
-    #     CTDTMP=tmp_attrs,
-    #     CTDSAL=sal_attrs,
-    #     # CTDOXY=oxy_attrs,
-    #     # CTDRINKO=rinko_attrs,
-    #     # CTDXMISS=xmiss_attrs,
-    #     # CTDFLUOR=fluor_attrs,
-    # )
-
-    # for var in da_out.keys():
-    #     if var == "SSSCC":
-    #         continue
-    #     if not var.endswith("_FLAG_W"):
-    #         da_out[var].attrs = ctd_attrs[var]
-
-    # # output files
-    # # don't actually run bc this is 24Hz data...
-    # # da_out.to_netcdf('example.nc')
+    process_ctd.export_btl_data(btl_data_all)
 
 
 def main(argv):

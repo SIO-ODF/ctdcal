@@ -645,7 +645,7 @@ def _flag_btl_data(
 def _prepare_fit_data(df, param, ref_param, zRange=None):
     """Remove non-finite data, trim to desired zRange, and remove extreme outliers"""
 
-    good_data = df[np.isfinite(df[ref_param])].copy()
+    good_data = df[np.isfinite(df[ref_param]) & np.isfinite(df[param])].copy()
     if zRange is not None:
         zMin, zMax = zRange.split(":")
         good_data = good_data[
@@ -669,7 +669,7 @@ def _wild_edit(param, ref_param, prs, ssscc, btl_num, n_sigma=10):
     diff = ref_param - param
     df = pd.concat([ssscc, btl_num, param, ref_param, prs], axis=1)
     df["Diff"] = ref_param - param
-    outliers = df["Diff"].abs() > (n_sigma * df["Diff"].std())
+    outliers = (df["Diff"] - df["Diff"].mean()).abs() > (n_sigma * df["Diff"].std())
     df_good = df[~outliers].copy()
     df_good["Flag"] = 2
     df_bad = df[outliers].copy()
@@ -763,8 +763,11 @@ def calibrate_temp(btl_df, time_df):
 
     """
     print("Calibrating temperature")
-    ssscc_subsets = list(Path(cfg.directory["ssscc"]).glob('ssscc_t*.csv'))
+    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob('ssscc_t*.csv'))
     if not ssscc_subsets:  # if no t-segments exists, write one from full list
+        print("No CTDTMP grouping file found... creating ssscc_t1.csv with all casts")
+        if not Path(cfg.directory["ssscc"]).exists():
+            Path(cfg.directory["ssscc"]).mkdir()
         ssscc_list = process_ctd.get_ssscc_list()
         ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_t1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
@@ -920,6 +923,7 @@ def _get_C_coefs(
         T_col = cfg.column["t2_btl"]
     P_col = cfg.column["p_btl"]
 
+    df = df.reset_index().copy()
     # remove non-finite data and extreme outliers and trim to fit zRange
     df_good, df_bad = _prepare_fit_data(df, C_col, cfg.column["refc"], zRange)
 
@@ -996,7 +1000,7 @@ def calibrate_cond(btl_df, time_df):
     btl_df[cfg.column["refc"]] = CR_to_cond(
         btl_df["CRavg"],
         btl_df["BathTEMP"],
-        btl_df[cfg.column["reft"]],
+        btl_df[cfg.column["t1_btl"]],
         btl_df[cfg.column["p_btl"]],
     )
 
@@ -1014,15 +1018,16 @@ def calibrate_cond(btl_df, time_df):
         btl_df = btl_df.merge(
             handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left"
         )
-        btl_df.loc[btl_df["BTLCOND"].isnull(), "SALNTY_FLAG_W"] = 9
+        btl_df.loc[btl_df["SALNTY"].isnull(), "SALNTY_FLAG_W"] = 9
         btl_df["SALNTY_FLAG_W"] = btl_df["SALNTY_FLAG_W"].fillna(
             2, downcast="infer"  # fill remaining NaNs with 2s and cast to dtype int
         )
     else:
         btl_df["SALNTY_FLAG_W"] = 2
 
-    ssscc_subsets = list(Path(cfg.directory["ssscc"]).glob('ssscc_c*.csv'))
+    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob('ssscc_c*.csv'))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
+        print("No CTDCOND grouping file found... creating ssscc_c1.csv with all casts")
         ssscc_list = process_ctd.get_ssscc_list()
         ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_c1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
@@ -1176,8 +1181,13 @@ def calibrate_cond(btl_df, time_df):
         time_df[cfg.column["t1"]],
         time_df[cfg.column["p"]],
     )
+    btl_df[cfg.column["sal"]] = gsw.SP_from_C(
+        btl_df[cfg.column["c1_btl"]],
+        btl_df[cfg.column["t1_btl"]],
+        btl_df[cfg.column["p_btl"]],
+    )
 
-    return True
+    return btl_df, time_df
         
 
 #def load_qual(path):

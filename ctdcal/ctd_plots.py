@@ -816,10 +816,11 @@ def _intermediate_residual_plot(
     plt.xticks(rotation=45)
     plt.ylim(ylim)
     cbar = plt.colorbar(pad=0.1)  # set cbar ticks to SSSCC names
-    cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
+    if not uniques.empty:
+        cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
+        plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")
     cbar.ax.set_title("SSSCC")
     plt.grid()
-    plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")
     plt.xlabel(xlabel, fontsize=12)
     plt.ylabel(ylabel, fontsize=12)
     plt.tight_layout()
