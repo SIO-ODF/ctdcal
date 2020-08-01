@@ -753,78 +753,66 @@ def _PMEL_oxy_eq(coefs,inputs,cc=[1.92634e-4,-4.64803e-2]):
 def PMEL_oxy_weighted_residual(coefs,weights,inputs,refoxy):
     return np.sum((weights*(refoxy-_PMEL_oxy_eq(coefs, inputs))**2))/np.sum(weights**2)
 
-def match_sigmas(btl_prs, btl_oxy, btl_sigma, btl_tmp, btl_SA, btl_fire_num, btl_dv_dt, ctd_sigma, ctd_os, ctd_prs, ctd_tmp, ctd_SA, ctd_oxyvolts, ctd_time, btl_ssscc=None):
+def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ctd_SA, ctd_oxyvolts, ctd_time):
 
     # Construct Dataframe from bottle and ctd values for merging
-    # TODO: clean up this mess
-    if 'btl_ssscc' in  locals():
-        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma, 'CTDTMP_sbe43_btl':btl_tmp, 'SA_btl':btl_SA, 'btl_fire_num':btl_fire_num, 'dv_dt':btl_dv_dt, 'SSSCC_sbe43':btl_ssscc}
-    else:
-        btl_dict = {'CTDPRS_sbe43_btl':btl_prs, 'REFOXY_sbe43':btl_oxy, 'sigma_sbe43_btl':btl_sigma, 'btl_fire_num':btl_fire_num, 'dv_dt':btl_dv_dt,}
-    btl_data = pd.DataFrame(btl_dict)
-    time_dict = {'CTDPRS_sbe43_ctd':ctd_prs, 'sigma_sbe43_ctd':ctd_sigma, 'OS_sbe43_ctd':ctd_os, 'CTDTMP_sbe43_ctd':ctd_tmp, 'SA_ctd':ctd_SA, 'CTDOXYVOLTS':ctd_oxyvolts, 'CTDTIME':ctd_time}
-    time_data = pd.DataFrame(time_dict)
+    btl_data = pd.DataFrame(data={
+        "CTDPRS": btl_prs,
+        "REFOXY": btl_oxy,
+        "CTDTMP": btl_tmp,
+        "SA": btl_SA,
+    })
+    time_data = pd.DataFrame(data={
+        "CTDPRS": ctd_prs,
+        "OS": ctd_os,
+        "CTDTMP": ctd_tmp,
+        "SA": ctd_SA,
+        "CTDOXYVOLTS": ctd_oxyvolts,
+        "CTDTIME": ctd_time,
+    })
     time_data["dv_dt"] = calculate_dVdT(time_data["CTDOXYVOLTS"], time_data["CTDTIME"])
 
     # Merge DF
     merged_df = pd.DataFrame(
         columns=["CTDPRS", "CTDOXYVOLTS", "CTDTMP", "dv_dt", "OS"], dtype=float
     )
-    merged_df["REFOXY"] = btl_data["REFOXY_sbe43"].copy()
+    merged_df["REFOXY"] = btl_data["REFOXY"].copy()
 
     # calculate sigma referenced to multiple depths
     for idx, p_ref in enumerate([0, 1000, 2000, 3000, 4000, 5000, 6000]):
         btl_data[f"sigma{idx}"] = (
             gsw.pot_rho_t_exact(
-                btl_data["SA_btl"],
-                btl_data["CTDTMP_sbe43_btl"],
-                btl_data["CTDPRS_sbe43_btl"],
+                btl_data["SA"],
+                btl_data["CTDTMP"],
+                btl_data["CTDPRS"],
                 p_ref,
             )
             - 1000  # subtract 1000 to get potential density *anomaly*
-        ) + 1e-8*np.random.standard_normal(btl_data["SA_btl"].size)
+        ) + 1e-8*np.random.standard_normal(btl_data["SA"].size)
         time_data[f"sigma{idx}"] = (
             gsw.pot_rho_t_exact(
-                time_data["SA_ctd"],
-                time_data["CTDTMP_sbe43_ctd"],
-                time_data["CTDPRS_sbe43_ctd"],
+                time_data["SA"],
+                time_data["CTDTMP"],
+                time_data["CTDPRS"],
                 p_ref,
             )
             - 1000  # subtract 1000 to get potential density *anomaly*
-        ) + 1e-8*np.random.standard_normal(time_data["SA_ctd"].size)
+        ) + 1e-8*np.random.standard_normal(time_data["SA"].size)
         time_sigma_sorted = time_data[f"sigma{idx}"].sort_values().to_numpy()
-        rows = (btl_data["CTDPRS_sbe43_btl"] > (p_ref - 500)) & (btl_data["CTDPRS_sbe43_btl"] < (p_ref + 500))
         sigma_min = np.min([np.min(btl_data.loc[rows, f"sigma{idx}"]), np.min(time_sigma_sorted)])
         sigma_max = np.max([np.max(btl_data.loc[rows, f"sigma{idx}"]), np.max(time_sigma_sorted)])
         time_sigma_sorted = np.insert(time_sigma_sorted, 0, sigma_min - 1e-4)
         time_sigma_sorted = np.append(time_sigma_sorted, sigma_max + 1e-4)
-        # TODO: once names are cleaned up, loop over list of cols?
         # TODO: can this be vectorized?
-        merged_df.loc[rows, "CTDPRS"] = np.interp(
-            btl_data.loc[rows, f"sigma{idx}"],
-            time_sigma_sorted,
-            pd.concat([time_data["CTDPRS_sbe43_ctd"].iloc[:1],time_data["CTDPRS_sbe43_ctd"],time_data["CTDPRS_sbe43_ctd"].iloc[-1:]]),
-        )
-        merged_df.loc[rows, "CTDOXYVOLTS"] = np.interp(
-            btl_data.loc[rows, f"sigma{idx}"],
-            time_sigma_sorted,
-            pd.concat([time_data["CTDOXYVOLTS"].iloc[:1],time_data["CTDOXYVOLTS"],time_data["CTDOXYVOLTS"].iloc[-1:]]),
-        )
-        merged_df.loc[rows, "CTDTMP"] = np.interp(
-            btl_data.loc[rows, f"sigma{idx}"],
-            time_sigma_sorted,
-            pd.concat([time_data["CTDTMP_sbe43_ctd"].iloc[:1],time_data["CTDTMP_sbe43_ctd"],time_data["CTDTMP_sbe43_ctd"].iloc[-1:]]),
-        )
-        merged_df.loc[rows, "dv_dt"] = np.interp(
-            btl_data.loc[rows, f"sigma{idx}"],
-            time_sigma_sorted,
-            pd.concat([time_data["dv_dt"].iloc[:1],time_data["dv_dt"],time_data["dv_dt"].iloc[-1:]]),
-        )
-        merged_df.loc[rows, "OS"] = np.interp(
-            btl_data.loc[rows, f"sigma{idx}"],
-            time_sigma_sorted,
-            pd.concat([time_data["OS_sbe43_ctd"].iloc[:1],time_data["OS_sbe43_ctd"],time_data["OS_sbe43_ctd"].iloc[-1:]]),
-        )
+        rows = (btl_data["CTDPRS"] > (p_ref - 500)) & (btl_data["CTDPRS"] < (p_ref + 500))
+        cols = ["CTDPRS", "CTDOXYVOLTS", "CTDTMP", "dv_dt", "OS"]
+        inds = np.concatenate(([0], np.arange(0, len(time_data)), [len(time_data) - 1]))
+        for col in cols:
+            merged_df.loc[rows, col] = np.interp(
+                btl_data.loc[rows, f"sigma{idx}"],
+                time_sigma_sorted,
+                time_data[col].iloc[inds],
+            )
 
     # Apply coef and calculate CTDOXY
     sbe_coef0 = _get_sbe_coef() # initial coefficient guess
@@ -1050,19 +1038,14 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         sbe43_merged = match_sigmas(
             btl_data[cfg.column["p_btl"]],
             btl_data[cfg.column["oxy_btl"]],
-            btl_data["sigma_btl"],
             btl_data["CTDTMP1"],
             btl_data["SA"],
-            btl_data["btl_fire_num"],  # used for sorting later
-            btl_data["dv_dt"],
-            time_data["sigma_ctd"],
             time_data["OS"],
             time_data[cfg.column["p"]],
             time_data[cfg.column["t1"]],
             time_data["SA"],
             time_data[cfg.column["oxyvolts"]],
             time_data["scan_datetime"],
-            btl_data["SSSCC"],
         )
         sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
         btl_df.loc[btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS","dv_dt","OS"]] = sbe43_merged[["CTDOXYVOLTS","dv_dt","OS"]]
