@@ -1448,35 +1448,41 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
     return df
 
 
-def make_depth_log(time_df):
+def make_depth_log(time_df, threshold=80):
     # TODO: get column names from config file
     """
     Create depth log file from maximum depth of each station/cast in time DataFrame.
+    If rosette does not get within the threshold distance of the bottom, returns NaN.
 
     Parameters
     ----------
     time_df : DataFrame
         DataFrame containing continuous CTD data
+    threshold : int, optional
+        Maximum altimeter reading to consider cast "at the bottom" (defaults to 80)
 
     """
-    ssscc_list = time_df["SSSCC"].unique()
-    depth_dict = {}
-    for ssscc in ssscc_list:
-        time_rows = time_df["SSSCC"] == ssscc
-        # TODO: improve error handling s.t. SSSCC is reported with error message for
-        # stations with altimeter readings below threshold (in_find_cast_depth)
-        max_depth = _find_cast_depth(
-            ssscc,
-            time_df.loc[time_rows, "CTDPRS"],
-            time_df.loc[time_rows, "GPSLAT"],
-            time_df.loc[time_rows, "ALT"],
-        )
-        depth_dict[ssscc] = max_depth
+    # TODO: make inputs be arraylike rather than dataframe
+    df = time_df[["SSSCC", "CTDPRS", "GPSLAT", "ALT"]].copy().reset_index()
+    df_group = df.groupby("SSSCC", sort=False)
+    idx_p_max = df_group["CTDPRS"].idxmax()
+    bottom_df = pd.DataFrame(data={
+        "SSSCC": df["SSSCC"].unique(),
+        "max_p": df.loc[idx_p_max, "CTDPRS"],
+        "lat": df.loc[idx_p_max, "GPSLAT"],
+        "alt": df.loc[idx_p_max, "ALT"],
+    })
+    bottom_df.loc[bottom_df["alt"] > threshold, "alt"] = np.nan
+    bottom_df["DEPTH"] = (
+        (bottom_df["alt"] + np.abs(gsw.z_from_p(bottom_df["max_p"], bottom_df["lat"])))
+        .fillna(value=-999)
+        .round()
+        .astype(int)
+    )
+    bottom_df[["SSSCC", "DEPTH"]].to_csv(
+        cfg.directory["logs"] + "depth_log.csv", index=False
+    )
 
-    depth_df = pd.DataFrame.from_dict(depth_dict, orient="index")
-    depth_df.reset_index(inplace=True)
-    depth_df.rename(columns={0: "DEPTH", "index": "SSSCC"}, inplace=True)
-    depth_df.to_csv(cfg.directory["logs"] + "depth_log.csv", index=False)
     return True
 
 def get_ssscc_list():
@@ -1673,51 +1679,6 @@ def merge_oxy_flags(btl_data):
 
     mask = (btl_data['OXYGEN'].isna())
     btl_data.loc[mask,'OXYGEN_FLAG_W'] = 9
-
-def _find_cast_depth(ssscc,press,lat,alt,threshold=80):
-    """
-    Calculate the depth of a given cast. If rosette does not get within the threshold
-    distance of the bottom, returns NaN.
-
-    Parameters
-    -----------
-    ssscc : str
-        Current station/cast name
-    press : array-like
-        CTD pressure
-    lat : array-like
-        Ship latitude
-    alt : array-like
-        CTD altimeter reading
-    threshold : int, optional
-        Maximum altimeter reading to consider cast "at the bottom" (defaults to 80)
-
-    Returns
-    --------
-    max_depth : int
-        Maximum depth from the cast
-
-    """
-    # Create Dataframe containing args
-    df = pd.DataFrame({"CTDPRS": press, "LAT": lat, "ALT": alt})
-    # Calculate DEPTH using gsw
-    df['DEPTH'] = np.abs(gsw.z_from_p(df['CTDPRS'],df['LAT']))
-
-    # Find max depth and see if ALT has locked in
-    bottom_alt = df.loc[df['CTDPRS'] == df['CTDPRS'].max(),'ALT']
-    if bottom_alt.values[0] <= threshold:
-        max_depth = bottom_alt + df['DEPTH'].max()
-        max_depth = int(max_depth.values[0])
-    else:
-        print(
-            ssscc,
-            "- minimum altimeter reading above",
-            threshold,
-            "m threshold, setting max depth to -999",
-        )
-        max_depth = -999
-
-    return max_depth
 
 def format_time_data(df):
 
