@@ -798,13 +798,13 @@ def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ct
             )
             - 1000  # subtract 1000 to get potential density *anomaly*
         ) + 1e-8*np.random.standard_normal(time_data["SA"].size)
+        rows = (btl_data["CTDPRS"] > (p_ref - 500)) & (btl_data["CTDPRS"] < (p_ref + 500))
         time_sigma_sorted = time_data[f"sigma{idx}"].sort_values().to_numpy()
         sigma_min = np.min([np.min(btl_data.loc[rows, f"sigma{idx}"]), np.min(time_sigma_sorted)])
         sigma_max = np.max([np.max(btl_data.loc[rows, f"sigma{idx}"]), np.max(time_sigma_sorted)])
         time_sigma_sorted = np.insert(time_sigma_sorted, 0, sigma_min - 1e-4)
         time_sigma_sorted = np.append(time_sigma_sorted, sigma_max + 1e-4)
         # TODO: can this be vectorized?
-        rows = (btl_data["CTDPRS"] > (p_ref - 500)) & (btl_data["CTDPRS"] < (p_ref + 500))
         cols = ["CTDPRS", "CTDOXYVOLTS", "CTDTMP", "dv_dt", "OS"]
         inds = np.concatenate(([0], np.arange(0, len(time_data)), [len(time_data) - 1]))
         for col in cols:

@@ -1706,7 +1706,7 @@ def _find_cast_depth(ssscc,press,lat,alt,threshold=80):
     # Find max depth and see if ALT has locked in
     bottom_alt = df.loc[df['CTDPRS'] == df['CTDPRS'].max(),'ALT']
     if bottom_alt.values[0] <= threshold:
-        max_depth = bottom_alt + df['CTDPRS'].max()
+        max_depth = bottom_alt + df['DEPTH'].max()
         max_depth = int(max_depth.values[0])
     else:
         print(
@@ -1994,7 +1994,7 @@ def export_ct1(df, ssscc_list):
                 f"LATITUDE = {btm_lat:.4f}\n"
                 f"LONGITUDE = {btm_lon:.4f}\n"
                 f"INSTRUMENT_ID = {cfg.ctd_serial}\n"
-                f"DEPTH = {depth}\n"
+                f"DEPTH = {depth:.0f}\n"
             )
             f.write(ctd_header)
             np.asarray(p_column_names).tofile(f, sep=',', format='%s')
@@ -2076,14 +2076,17 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
     btl_data = btl_data.sort_values(by=["STNNBR", "SAMPNO"], ascending=[True, False])
 
     # round data
-    for col in ["CTDPRS", "CTDTMP", "CTDSAL", "SALNTY", "CTDOXY", "OXYGEN", "REFTMP"]:
+    for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
         btl_data[col] = btl_data[col].round(4)
+    for col in ["CTDPRS", "CTDOXY", "OXYGEN"]:
+        btl_data[col] = btl_data[col].round(1)
 
     # add depth
     depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv', dtype={"SSSCC": str}, na_values=-999).dropna()
     manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv', dtype={"SSSCC": str})
     full_depth_df = pd.concat([depth_df,manual_depth_df])
     full_depth_df.drop_duplicates(subset='SSSCC', keep='first',inplace=True)
+    btl_data["DEPTH"] = -999
     for index, row in full_depth_df.iterrows():
         btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
 
