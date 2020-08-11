@@ -824,7 +824,7 @@ def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ct
 def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
 
     # Plot data to be fit together
-    f_out = f"{cfg.directory['logs']}sbe43_residual{f_suffix}_prefit.pdf"
+    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual{f_suffix}_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
         merged_df['REFOXY'] - merged_df['CTDOXY'],
         merged_df["CTDPRS"],
@@ -877,7 +877,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     # intermediate plots to diagnose data chunks goodness
     # TODO: implement into bokeh/flask dashboard
     if f_suffix is not None:
-        f_out = f"{cfg.directory['logs']}sbe43_residual{f_suffix}.pdf"
+        f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual{f_suffix}.pdf"
         ctd_plots._intermediate_residual_plot(
             merged_df["residual"],
             merged_df["CTDPRS"],
@@ -970,6 +970,8 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         time_df[cfg.column["lon"]],
         time_df[cfg.column["lat"]],
     )
+    # Convert CTDOXY units
+    btl_df["CTDOXY"] = oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
     # Calculate bottle oxygen
     btl_df[cfg.column["oxy_btl"]] = calculate_bottle_oxygen(
         ssscc_list,
@@ -981,14 +983,17 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     btl_df[cfg.column["oxy_btl"]] = oxy_ml_to_umolkg(
         btl_df[cfg.column["oxy_btl"]], btl_df["sigma_btl"]
     )
-    btl_df["OXYGEN_FLAG_W"] = flag_winkler_oxygen(
-        btl_df[cfg.column["oxy_btl"]]
-    )
-    # load manual OXYGEN flags
-    manual_flags = pd.read_csv("data/oxygen/manual_oxy_flags.csv", dtype={"SSSCC": str})
-    for _, flags in manual_flags.iterrows():
-        df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (btl_df["btl_fire_num"] == flags["Bottle"])
-        btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
+    btl_df["OXYGEN_FLAG_W"] = flag_winkler_oxygen(btl_df[cfg.column["oxy_btl"]])
+    # Load manual OXYGEN flags
+    if Path("data/oxygen/manual_oxy_flags.csv").exists():
+        manual_flags = pd.read_csv(
+            "data/oxygen/manual_oxy_flags.csv", dtype={"SSSCC": str}
+        )
+        for _, flags in manual_flags.iterrows():
+            df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
+                btl_df["btl_fire_num"] == flags["Bottle"]
+            )
+            btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
 
     return True
 
@@ -1011,8 +1016,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     """
     # Plot all pre fit data
-    btl_df["CTDOXY"] = _PMEL_oxy_eq(_get_sbe_coef(), (btl_df['CTDOXYVOLTS'], btl_df['CTDPRS'], btl_df['CTDTMP1'], btl_df['dv_dt'], btl_df['OS']))
-    f_out = f"{cfg.directory['logs']}sbe43_residual_all_prefit.pdf"
+    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
         btl_df['OXYGEN'] - btl_df['CTDOXY'],
         btl_df["CTDPRS"],
@@ -1026,6 +1030,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_dict = {}
     all_sbe43_fit = pd.DataFrame()
 
+    btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
     for ssscc in ssscc_list:
         time_data = time_df[time_df["SSSCC"] == ssscc].copy()
@@ -1064,7 +1069,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         sbe_coef, sbe_df = sbe43_oxy_fit(
             all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc],
             sbe_coef0=sbe_coef0,
-            f_suffix=ssscc,
+            f_suffix=f"_{ssscc}",
         )
         # build coef dictionary
         if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
@@ -1111,7 +1116,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # TODO: flag oxy data here? compare w/ T/C routines
 
     # Plot all post fit data
-    f_out = f"{cfg.directory['logs']}sbe43_residual_all_postfit.pdf"
+    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_postfit.pdf"
     ctd_plots._intermediate_residual_plot(
         btl_df['OXYGEN'] - btl_df['CTDOXY'],
         btl_df["CTDPRS"],

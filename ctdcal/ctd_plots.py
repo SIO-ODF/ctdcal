@@ -4,7 +4,9 @@ import matplotlib
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import cmocean
+from pathlib import Path
 
 #####
 # The following section is a little brittle due to hardcoded names, but we'll fix
@@ -817,7 +819,9 @@ def _intermediate_residual_plot(
     plt.ylim(ylim)
     cbar = plt.colorbar(pad=0.1)  # set cbar ticks to SSSCC names
     if not uniques.empty:
-        cbar.ax.set_yticklabels(uniques[cbar.get_ticks().astype(int)])
+        tick_inds = cbar.get_ticks().astype(int)
+        cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
+        cbar.ax.set_yticklabels(uniques[tick_inds])
         plt.title(f"Mean: {diff.mean().round(4)} / Stdev: {diff.std().round(4)}")
     cbar.ax.set_title("SSSCC")
     plt.grid()
@@ -825,6 +829,9 @@ def _intermediate_residual_plot(
     plt.ylabel(ylabel, fontsize=12)
     plt.tight_layout()
     if f_out is not None:
+        if not Path(f_out).parent.exists():
+            print(f"Path {Path(f_out).parent.as_posix()} does not exists... creating")
+            Path(f_out).parent.mkdir(parents=True)
         plt.savefig(f_out)
     plt.close()
 

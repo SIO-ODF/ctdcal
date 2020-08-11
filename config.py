@@ -71,6 +71,7 @@ directory = {
     "t2_fit_figs": "data/logs/fitting_figs/temp_secondary/",
     "c1_fit_figs": "data/logs/fitting_figs/cond_primary/",
     "c2_fit_figs": "data/logs/fitting_figs/cond_secondary/",
+    "ox_fit_figs": "data/logs/fitting_figs/oxy_primary/",
 }
 
 # remnant of old system, will be pushed into xarray metadata/attrs
