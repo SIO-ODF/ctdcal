@@ -1411,11 +1411,15 @@ def write_calib_coef(ssscc,coef,param):
         
 
     return df
+<<<<<<< HEAD
 
 '''
 
 # MK: depreciated 04/23/20
 # use calibrate_temp/calibrate_cond
+=======
+'''
+>>>>>>> a3ae9b4fb2422b9e5a3dcb6e3c6595d488a439b6
 '''code_pruning: looks like not used. marked for removal
 def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
                    cond_col = 'CTDCOND'):
