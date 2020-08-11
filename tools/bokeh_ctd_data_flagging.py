@@ -23,10 +23,11 @@ from bokeh.models import (
 # TODO: following above, make parts reusable?
 
 # load continuous CTD data and make into a dict (only ~20MB)
-file_list = sorted(glob.glob("../data/pressure/*.csv"))
+file_list = sorted(glob.glob("../data/pressure/*ct1.csv"))
 ssscc_list = [ssscc.strip("../data/pressure/")[:5] for ssscc in file_list]
 ctd_data = []
 for f in file_list:
+    print(f"Loading {f}")
     df = pd.read_csv(f, header=12, skiprows=[13], skipfooter=1, engine="python")
     df["SSSCC"] = f.strip("../data/pressure/")[:5]
     ctd_data.append(df)
@@ -163,8 +164,6 @@ fig = figure(
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
     y_axis_label="Pressure (dbar)",
 )
-fig.select(BoxSelectTool).select_every_mousemove = False
-fig.y_range.flipped = True  # invert y-axis
 fig.line(
     "x",
     "y",
@@ -198,6 +197,8 @@ upcast_sal = fig.triangle(
     source=src_plot_upcast,
     legend_label="Upcast CTD sample",
 )
+fig.select(BoxSelectTool).select_every_mousemove = False
+fig.y_range.flipped = True  # invert y-axis
 fig.legend.location = "bottom_left"
 fig.legend.border_line_width = 3
 fig.legend.border_line_alpha = 1
@@ -362,96 +363,45 @@ src_table.selected.on_change("indices", selected_from_table)
 btl_sal.data_source.selected.on_change("indices", selected_from_plot)
 
 
-columns = [
-    TableColumn(
-        field="SSSCC",
-        title="SSSCC",
-        width=40,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="SAMPNO",
-        title="Bottle",
-        width=20,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="CTDPRS",
-        title="CTDPRS",
-        width=75,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="CTDSAL",
-        title="CTDSAL",
-        width=65,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="SALNTY",
-        title="SALNTY",
-        width=65,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="diff",
-        title="Residual",
-        width=65,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="flag",
-        title="Flag",
-        width=15,
-        formatter=StringFormatter(text_align="center", font_style="bold"),
-    ),
-    TableColumn(
-        field="Comments",
-        title="Comments",
-        width=135,
-        formatter=StringFormatter(text_align="left"),
-    ),
-]
-columns_changed = [
-    TableColumn(
-        field="SSSCC",
-        title="SSSCC",
-        width=40,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="SAMPNO",
-        title="Bottle",
-        width=20,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="diff",
-        title="Residual",
-        width=40,
-        formatter=StringFormatter(text_align="right"),
-    ),
-    TableColumn(
-        field="flag_old",
-        title="Old",
-        width=20,
-        formatter=StringFormatter(text_align="center", font_style="bold"),
-    ),
-    TableColumn(
-        field="flag_new",
-        title="New",
-        width=20,
-        formatter=StringFormatter(
-            text_align="center", font_style="bold", text_color="red"
-        ),
-    ),
-    TableColumn(
-        field="Comments",
-        title="Comments",
-        width=200,
-        formatter=StringFormatter(text_align="left"),
-    ),
-]
+# build data tables
+columns = []
+fields = ["SSSCC", "SAMPNO", "CTDPRS", "CTDSAL", "SALNTY", "diff", "flag", "Comments"]
+titles = ["SSSCC", "Bottle", "CTDPRS", "CTDSAL", "SALNTY", "Residual", "Flag", "Comments"]
+widths = [40, 20, 75, 65, 65, 65, 15, 135]
+for (field, title, width) in zip(fields, titles, widths):
+    if field == "flag":
+        strfmt_in = {"text_align": "center", "font_style": "bold"}
+    elif field == "Comments":
+        strfmt_in = {}
+    else:
+        strfmt_in = {"text_align": "right"}
+    columns.append(TableColumn(
+        field=field,
+        title=title,
+        width=width,
+        formatter=StringFormatter(**strfmt_in)
+    ))
+
+columns_changed = []
+fields = ["SSSCC", "SAMPNO", "diff", "flag_old", "flag_new", "Comments"]
+titles = ["SSSCC", "Bottle", "Residual", "Old", "New", "Comments"]
+widths = [40, 20, 40, 20, 20, 200]
+for (field, title, width) in zip(fields, titles, widths):
+    if field == "flag_old":
+        strfmt_in = {"text_align": "center", "font_style": "bold"}
+    elif field == "flag_new":
+        strfmt_in = {"text_align": "center", "font_style": "bold", "text_color": "red"}
+    elif field == "Comments":
+        strfmt_in = {}
+    else:
+        strfmt_in = {"text_align": "right"}
+    columns_changed.append(TableColumn(
+        field=field,
+        title=title,
+        width=width,
+        formatter=StringFormatter(**strfmt_in)
+    ))
+
 data_table = DataTable(
     source=src_table,
     columns=columns,
