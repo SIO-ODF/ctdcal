@@ -1151,6 +1151,7 @@ def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0
 
     return df
 
+"""code_pruning: not used anymore. delete in favor of fit_ctd._get_(T/C)_coefs"""
 def get_param_coef(calib_param,diff,order,calib):
     '''Jackson code'''
 
@@ -1202,6 +1203,7 @@ def get_param_coef(calib_param,diff,order,calib):
 
     return coef
 
+"""code_pruning: only used in old versions of process_all"""
 def combine_quality_flags(df_list):
 
     combined_df = pd.concat(df_list)
@@ -1217,6 +1219,7 @@ def combine_quality_flags(df_list):
 
 # MK: deprecated 05/12/20
 # use fit_ctd.calibrate_cond() instead
+"""code_pruning: not used anywhere, flagged for removal"""
 def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
                            refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2',
                            p_col='CTDPRS'):#refc_data
@@ -1366,6 +1369,7 @@ def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
 
 # MK: moved to fit_ctd
 # all calls to this are from deprecated (or soon to be deprecated) functions
+"""code_pruning: only used in following 3 funcs and old process_all scripts"""
 def prepare_fit_data(df,ref_col):
 
     good_data = df.copy()
@@ -1375,6 +1379,7 @@ def prepare_fit_data(df,ref_col):
 
 
 
+"""code_pruning: no calls to this function"""
 def prepare_conductivity_data(ssscc,df,refc,ssscc_col = 'SSSCC',index_col = 'btl_fire_num'):
 
     btl_concat = pd.DataFrame()
@@ -1389,6 +1394,7 @@ def prepare_conductivity_data(ssscc,df,refc,ssscc_col = 'SSSCC',index_col = 'btl
 
     return btl_concat, refc
 
+"""code_pruning: no calls to this function"""
 def prepare_all_fit_data(ssscc,df,ref_data,param):
 
     data_concat = pd.DataFrame()
@@ -1628,6 +1634,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
 
     return df_data_all
 
+"""code_pruning: the following four merge flag functions are only used in old scripts"""
 def merge_refcond_flags(btl_data, qual_flag_cond):
     # Merge df
     mask = qual_flag_cond[qual_flag_cond['Parameter'] == 'REF_COND'].copy()
@@ -1694,6 +1701,7 @@ def merge_temp_flags(btl_data, qual_flag_temp, parameter):
 
     return btl_data
 
+"""code_pruning: no calls to this function"""
 def merge_oxy_flags(btl_data):
 
     mask = (btl_data['OXYGEN'].isna())
@@ -1724,22 +1732,26 @@ def add_btlnbr_cols(df,btl_num_col):
     df['BTLNBR_FLAG_W'] = 2
     return df
 
+"""code_pruning: no calls, also just a one liner really"""
 def castno_from_ssscc(ssscc):
     # ssscc: column (pandas series) containing station and cast numbers in the SSSCC format
     ssscc = pd.Series(ssscc)
     castno = ssscc.str[3:].astype(int)
     return castno
 
+"""code_pruning: no calls, also just a one liner really"""
 def stnnbr_from_ssscc(ssscc):
     # ssscc: column (pandas series) containing station and cast numbers in the SSSCC format
     ssscc = pd.Series(ssscc)
     stnno = ssscc.str[0:3].astype(int)
     return stnno
 
+"""code_pruning: no calls, also just a one liner really"""
 def add_sampno_col(df,btl_num_col):
     df['SAMPNO'] = df[btl_num_col].astype(int)
     return df
 
+"""code_pruning: no calls except old processing script; use next func instead"""
 def get_btl_time(df,btl_num_col,time_col):
     # Get time for first btl fire
     time = df[df[btl_num_col]== df[btl_num_col].min()][time_col].values
@@ -1764,6 +1776,8 @@ def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', deci
     df['TIME'] = hour
     return df
 
+"""code_pruning: duplicate of flag_missing_values(), pick one to keep
+only need one func for continuous and btl; missing data is flagged 9 regardless"""
 def flag_missing_btl_values(df,flag_columns,flag_suffix='_FLAG_W'):
     for column in flag_columns:
         flag_name = column + flag_suffix
@@ -1801,6 +1815,7 @@ def format_btl_data(df,data_cols, prcn=4):
             df[i] = df[i].round(prcn)
     return df
 
+"""code_pruning: no calls, fill_surface_data() above is used instead"""
 def manual_backfill_values(df,bfill_prs,p_col='CTDPRS',flag_suffix='_FLAG_W'):
     col_list = df.columns.tolist()
     col_list.remove(p_col)
@@ -1823,6 +1838,7 @@ def flag_backfill_data(df,p_col='CTDPRS',flag_bol_col='interp_bol',flag_suffix='
             df.loc[df[flag_bol_col] == 1, column] = 6
     return df
 
+"""code_pruning: duplicate of flag_missing_btl_values(), pick one to keep"""
 def flag_missing_values(df,flag_suffix='_FLAG_W'):
     full_col_list = df.columns.tolist()
     col_list = full_col_list
@@ -1837,6 +1853,7 @@ def flag_missing_values(df,flag_suffix='_FLAG_W'):
         df.loc[df[column].astype(int) == -999, flag_name] = 9
     return df
 
+"""code_pruning: no calls to this function. delete and use export_btl_data()"""
 def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='CTDPRS', ssscc_col='SSSCC', bin_size=2, direction='down'):
     # remove
     df_binned = pd.DataFrame()
