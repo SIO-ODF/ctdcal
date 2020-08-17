@@ -1221,6 +1221,7 @@ def calibrate_cond(btl_df, time_df):
 #salts = requests.get("http://go-ship.rrevelle.sio.ucsd.edu/api/salt").json()
 #def o2_calc(path, o2_payload, thio_ns):
 
+"""code_pruning: replaced by oxy_fitting.calculate_bottle_oxygen(), marked for removal
 def o2_calc(o2flasks, o2path, btl_num): #, salt
 #    qual = load_qual("/Volumes/public/O2Backup/o2_codes_001-083.csv")
 
@@ -1279,8 +1280,10 @@ def o2_calc(o2flasks, o2path, btl_num): #, salt
         #except ValueError:
             #print('File probably malformed. Check datafile for problems.')
     return o2ml #o2kg,
+"""
 
 
+"""code_pruning: replaced by convert.process_salts(), marked for removal
 def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     
     f = open(saltpath, newline='')
@@ -1347,6 +1350,7 @@ def salt_calc(saltpath, btl_num_col, btl_tmp_col, btl_p_col, btl_data):
     
     
     return cond#DF
+"""
     
 def CR_to_cond(cr,bath_t,ref_t,btl_p):
 
@@ -1411,15 +1415,11 @@ def write_calib_coef(ssscc,coef,param):
         
 
     return df
-<<<<<<< HEAD
 
 '''
 
 # MK: depreciated 04/23/20
 # use calibrate_temp/calibrate_cond
-=======
-'''
->>>>>>> a3ae9b4fb2422b9e5a3dcb6e3c6595d488a439b6
 '''code_pruning: looks like not used. marked for removal
 def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CTDPRS',
                    cond_col = 'CTDCOND'):

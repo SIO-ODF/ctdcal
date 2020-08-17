@@ -95,8 +95,6 @@ def process_all():
 
     # run: ctd_to_bottle.py
 
-    process_ctd.export_btl_data(btl_data_all)
-
 
 def main(argv):
     """Run everything.

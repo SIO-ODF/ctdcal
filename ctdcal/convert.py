@@ -307,7 +307,8 @@ def convertFromSBEReader(sbeReader, debug=False):
     # return the converted data as a dataframe
     return converted_df
 
-
+"""code_pruning: this func is effectively just pd.read_pickle()
+with outdated error handling, can likely remove"""
 def importConvertedFile(file_name, debug=False):
 
     """Handler to import converted data from a csv-formatted file created by run.py
@@ -348,7 +349,8 @@ def importConvertedFile(file_name, debug=False):
         # return the imported data as a dataframe
     return output_df
 
-
+"""code_pruning: this func is effectively just pd.to_pickle()
+with outdated error handling, can likely remove"""
 def saveConvertedDataToFile(converted_df, filename, debug=False):
     try:
         converted_df.to_pickle(filename)
