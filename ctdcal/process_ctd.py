@@ -509,50 +509,39 @@ def oxy_to_umolkg(df_sal, df_pressure, df_lat, df_lon, df_temp, df_oxy):
     series = df_oxy * 44660 / (s0 + 1000)
     return series
 
-def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
-    """raw_ctd_filter function
+def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
+    """
+    Filter raw CTD data using one of three window types (boxcar, hanning, triangle).
 
-    Function takes NUMPY array
-    of raw ctd data and returns filtered data. This function also needs
-    one of three filter types (boxcar, gaussian, triangle) as well as
-    window size.
+    Parameters
+    ----------
+    df : DataFrame
+        Raw CTD data
+    window : str, optional
+        Type of filter window
+    win_size : int, optional
+        Length of window in number of samples
+    parameters : list of str, optional
+        List of DataFrame columns to be filtered
 
-    Args:
-        param1 (ndarray): Numpy ndarray with predefined header with at
-        param2 (str): One of three tested filter types
-          boxcar, gaussian_std, triangle.
-          default is triangle
-        param3 (int): A window size for the filter. Default is 24, which
-          is the number of frames per second from a SBE9+/11 CTD/Dech unit.
-        param4 (ndarray): parameters the dtype names used in filtering the
-          analytical inputs.
-
-    Returns:
-        Narray: The return value is a matrix of filtered ctd data with
-          the above listed header values.
-
+    Returns
+    -------
+    filtered_df : DataFrame
+        CTD data with filtered parameters
     """
 
-    if input_array is None:
-        print("In raw_ctd_filter: No data array.")
-        return
-    else:
-        return_array = input_array
-        if parameters is None:
-            print("In raw_ctd_filter: Empty parameter list.")
-        else:
-            for p in parameters:
-                if filter_type == 'boxcar':
-                    win = sig.boxcar(win_size)
-                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/len(win)
-                elif filter_type == 'gaussian':
-                    sigma = np.std(arr)
-                    win = sig.general_gaussian(win_size, 1.0, sigma)
-                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/(len(win))
-                elif filter_type == 'triangle':
-                    win = sig.triang(win_size)
-                    return_array[p] = 2*sig.convolve(input_array[p], win, mode='same')/len(win)
-    return return_array
+    filter_df = df.copy()
+    if parameters is not None:
+        for p in parameters:
+            if window == "boxcar":
+                win = sig.boxcar(win_size)
+            elif window == "hanning":
+                win = sig.hann(win_size)
+            elif window == "triangle":
+                win = sig.triang(win_size)
+            filter_df[p] = sig.convolve(filter_df[p], win, mode="same") / np.sum(win)
+
+    return filter_df
 
 
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):

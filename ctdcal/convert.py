@@ -116,10 +116,8 @@ def make_time_files(ssscc_list):
             # TODO: add despike/wild edit filter (optional?)
 
             # Filter data
-            breakpoint()
-            # pick up here
             filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df, "triangle", parameters=cfg.filter_cols,
+                trimmed_df, window="triangle", parameters=cfg.filter_cols,
             )
 
             # Trim to downcast
