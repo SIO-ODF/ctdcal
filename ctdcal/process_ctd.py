@@ -642,23 +642,28 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
     return outMat
 
-def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=20.0, log_file=None):
-    """ondeck_pressure function
-    Function takes pandas Dataframe of filtered ctd raw data the stores, analizes and removes ondeck
-    values from data.
-    Args:
-        param1 (str): stacast, station cast info
-        param1 (str): p_col, pressure data column name
-        param2 (str): c1_col, cond1 data column name
-        param3 (str): c2_col, cond2 data column name
-        param4 (str): time_col, time data column name
-        param5 (ndarray): numpy ndarray with dtype array
-        param6 (float): conductivity_startup, threshold value
-        param7 (str): log_file, log file name
-    Returns:
-        Narray: The return ndarray with ondeck data removed.
-        Also output start/end ondeck pressure.
+def ondeck_pressure_2(df, stacast, cond_startup=20.0, log_file=None):
     """
+    Find and remove times when rosette is on deck.
+    Optionally log average pressure at start and end of cast.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Raw CTD data
+    stacast : str
+        Station/cast name
+    cond_startup : float, optional
+        Minimum conductivity (units?) threshold indicating rosette is in water
+    log_file : str, optional
+        Path and filename to save start/end deck pressure values
+
+    Returns
+    -------
+    trimmed_df : DataFrame
+        Raw CTD data trimmed to times when rosette is in water
+    """
+    # TODO: move these to config file
     # Frequency
     fl = 24
     fl2 = fl*2
@@ -668,45 +673,47 @@ def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=2
     ms = 30
     time_delay = fl*ms
 
-    #split dataframe into upcast/downcast
+    # split dataframe into upcast/downcast
+    downcast = df.iloc[:(df["CTDPRS"].argmax() + 1)]
+    upcast = df.iloc[(df["CTDPRS"].argmax() + 1):]
 
-    down, up = df.split(p_col=p_col)
-
-
-    # Searches each half of df, uses conductivity
-    # threshold min to capture startup pressure
-
-    start_df = down.loc[(down[c1_col] < 20) & (down[c2_col] < 20)]
-    end_df = up.loc[(up[c1_col] < 20) & (up[c2_col] < 20)]
+    # Search each half of df for minimum conductivity
+    # threshold to identify when rosette is out of water
+    start_df = downcast.loc[
+        (downcast[cfg.column["c1"]] < cond_startup)
+        & (downcast[cfg.column["c2"]] < cond_startup),
+        cfg.column["p"],
+    ]
+    end_df = upcast.loc[
+        (upcast[cfg.column["c1"]] < cond_startup)
+        & (upcast[cfg.column["c2"]] < cond_startup),
+        cfg.column["p"],
+    ]
 
     # Evaluate starting and ending pressures
-    sp = len(start_df)
-
-    if (sp > time_delay):
-        start_p = np.average(start_df.iloc[fl2:sp-(time_delay)][p_col])
+    start_samples = len(start_df)
+    if (start_samples > time_delay):
+        start_p = np.average(start_df.iloc[fl2:(start_samples - time_delay)])
     else:
-        start_p = np.average(start_df[fl2:sp])
+        start_p = np.average(start_df.iloc[fl2:start_samples])
 
-    ep = len(end_df)
-
-    ep = len(end_df)
-
-    if (ep > time_delay):
+    end_samples = len(end_df)
+    if (end_samples > time_delay):
         end_p = np.average(end_df.iloc[(time_delay):])
     else:
         try:
-            end_p = np.average(end_df.iloc[(ep):])
+            end_p = np.average(end_df.iloc[(end_samples):])
         except ZeroDivisionError:
             end_p = np.NaN
 
     # Remove ondeck start and end pressures
+    trimmed_df = df.iloc[start_df.index.max():end_df.index.min()].copy()
 
-    df.iloc[start_df.index.max():end_df.index.min()][p_col].max().copy()
-        # Store ending on-deck pressure
+    # Log ondeck pressures
     if log_file != None:
         report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
-    return outMat
+    return trimmed_df
 
 
 
