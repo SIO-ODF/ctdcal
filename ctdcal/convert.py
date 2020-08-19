@@ -122,7 +122,7 @@ def make_time_files(ssscc_list):
 
             # Trim to downcast
             cast_data = process_ctd.cast_details(
-                filter_data, ssscc, cfg.directory["logs"] + "cast_details.csv",
+                filter_data, ssscc, log_file=cfg.directory["logs"] + "cast_details.csv",
             )
 
             cast_data.to_pickle(cfg.directory["time"] + ssscc + "_time.pkl")

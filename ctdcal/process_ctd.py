@@ -26,93 +26,93 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
 
-def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
-    '''
+def cast_details(df, ssscc, log_file=None):
+    """
     We determine the cast details using pandas magic.
     First find alternating periods of pumps on and pumps off, then select the
     pumps on period with the highest pressure. Get values from the row with the
     highest pressure, and return all values to be sent to log.
 
-    Input:
-    stacast - integer, the station and cast, as SSSCC format
-    log_file - file handle or string, log_file
-    p_col - string, name of the pressure column
-    time_col - string, name of the time column
-    b_lat_col - string, name of the latitude column
-    b_lon_col - string, name of the longitude column
-    alt_col - string, name of the altimeter column
-    inMat - pandas dataframe, the dataframe to come in
+    Parameters
+    ----------
+    df : DataFrame
+        Filtered CTD data
+    ssscc : integer
+        The station and cast, as SSSCC format
+    log_file : file handle or string
+        File destination for cast details
 
-    Output:
-    start_cast_time - float, unix epoch seconds?, start of cast time, to be reported to log file
-    end_cast_time - float, unix epoch seconds?, end of cast time, to be reported to log file
-    bottom_cast_time - float, unix epoch seconds?, bottom of cast time, to be reported to log file
-    start_pressure - float, pressure at which cast started, to be reported to log file
-    max_pressure - float, bottom of the cast pressure, to be reported to log file
-    b_lat - float, latitude at bottom of cast
-    b_lon - float, longitude at bottom of cast
-    b_alti - float, altimeter reading at bottom of cast - volts only!
-    inMat - the dataframe that came in, with soak period trimmed off
+    Returns
+    -------
+    df_downcast : DataFrame
+        CTD data with the soak period and upcast trimmed off
 
-    don't need end_cast_time, max_pressure
-    inMat is trimmed to start and end of cast
-    '''
+    Notes
+    -----
+    The following (float) variables are output to log_file:
+    time_start : Time at start of cast (in unix epoch time)
+    time_end : Time at end of cast (in unix epoch time)
+    time_bottom : Time at bottom of cast (in unix epoch time)
+    p_start : Pressure at which cast started
+    p_max : Bottom of the cast pressure
+    b_lat : Latitude at bottom of cast
+    b_lon : Longitude at bottom of cast
+    b_alt : Altimeter reading at bottom of cast
+    """
+    df_cast = _trim_soak_period(df)
 
-    df_test = pd.DataFrame.from_records(inMat)
+    # TODO: call parameters from config file instead
+    p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))
+    p_max_ind = df_cast["CTDPRS"].argmax()
+    p_max = float(np.around(df_cast["CTDPRS"].max(), 4))
+    time_start = float(df_cast["scan_datetime"].head(1))
+    time_end = float(df_cast["scan_datetime"].tail(1))
+    time_bottom = float(df_cast["scan_datetime"][p_max_ind])
+    b_lat = float(np.around(df_cast["GPSLAT"][p_max_ind], 4))
+    b_lon = float(np.around(df_cast["GPSLON"][p_max_ind], 4))
+    b_alt = float(np.around(df_cast["ALT"][p_max_ind], 4))
 
-    dfs = find_pump_on_off_dfs(df_test)
-    dfs_1 = find_pumps_on_dfs(dfs)
-    df_cast = find_max_pressure_df(dfs_1)
-    df_cast1 = find_last_soak_period(df_cast)
-    df_cast2 = trim_soak_period_from_df(df_cast1)
+    report_ctd.report_cast_details(
+        ssscc,
+        log_file,
+        time_start,
+        time_end,
+        time_bottom,
+        p_start,
+        p_max,
+        b_alt,
+        b_lat,
+        b_lon,
+    )
 
-    start_cast_time = float(df_cast2['scan_datetime'].head(1))
-    start_pressure = float(df_cast2['CTDPRS'].head(1))
-    end_cast_time = float(df_cast2['scan_datetime'].tail(1))
-    max_pressure = float(df_cast2['CTDPRS'].max())
-    bottom_cast_time = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['scan_datetime'])
-    b_lat = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['GPSLAT'])
-    b_lon = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['GPSLON'])
-    b_alti = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['ALT'])
+    # remove upcast
+    df_downcast = df_cast[: p_max_ind].copy()
 
-    #last two lines must be in to return the same as old - change to slices of df later
-    report_ctd.report_cast_details(stacast, log_file, start_cast_time, end_cast_time,
-                                   bottom_cast_time, start_pressure, max_pressure, b_alti,
-                                   b_lat, b_lon)
-    #reconvert to ndarray - might need to be altered to remove second index
-    # inMat = df_cast2.loc[:df_cast2['CTDPRS'].idxmax()].to_records(index=False)
-    inMat = df_cast2.loc[:df_cast2['CTDPRS'].idxmax()]
+    return df_downcast
 
-    return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
-#Move next four functions to a library or class(?) Clean up module
-def find_pump_on_off_dfs(df):
-    '''Find pump_on patterns of dataframes, and return a list(?) of dataframes to iterate over.
-    '''
-    return [g for i,g in df.groupby(df['pump_on'].ne(df['pump_on'].shift()).cumsum())]
 
-def find_max_pressure_df(dfs):
-    '''Giving a list of data frames, return a reference to the frame with which contians the highest pressure value
-    '''
-    max_pressure_df = dfs[0]
-    max_pressure = max_pressure_df['CTDPRS'].max() #TODO make into config var
-    for df in dfs:
-        if df['CTDPRS'].max() > max_pressure:
-            max_pressure_df = df
-            max_pressure = df['CTDPRS'].max()
-    return max_pressure_df
+def _trim_soak_period(df=None):
+    """
+    1) Find pump on/off patterns
+    2) Select pump_on=True group with largest pressure recording
+    3) Find soak period before start of downcast
+    4) Trim cast, return everything after top of cast (i.e. minimum pressure)
+    """
+    df_list = [
+        g for i, g in df.groupby(df["pump_on"].ne(df["pump_on"].shift()).cumsum())
+    ]
+    df_pump_on_list = [df for df in df_list if df["pump_on"].all()]
+    df_cast = df_pump_on_list[np.argmax([df["CTDPRS"].max() for df in df_pump_on_list])]
+    df_cast = df_cast.reset_index(drop=True)
+    # next fn deals w/ edge cases, leave as is for now
+    df_cast = _find_last_soak_period(df_cast)
+    start_ind = df_cast.loc[: len(df) // 4, "CTDPRS"].argmin()
+    df_trimmed = df_cast[start_ind:].reset_index(drop=True).copy()
 
-def find_pumps_on_dfs(dfs):
-    '''given a list of dataframes, remove all the frames with one or more rows containing a "false" pump on flag
-    '''
-    return list(filter(lambda df: df['pump_on'].all(), dfs))
+    return df_trimmed
 
-def trim_soak_period_from_df(df):
-    '''Look for minimum pressure in dataframe, then return everything after minimum pressure/top of cast.
-    '''
-    test = int(df.iloc[1:int((len(df)/4))]['CTDPRS'].idxmin())
-    return df.loc[test:]
 
-def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
+def _find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
     """Find the soak period before the downcast starts.
 
     The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
