@@ -26,93 +26,93 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
 
-def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
-    '''
+def cast_details(df, ssscc, log_file=None):
+    """
     We determine the cast details using pandas magic.
     First find alternating periods of pumps on and pumps off, then select the
     pumps on period with the highest pressure. Get values from the row with the
     highest pressure, and return all values to be sent to log.
 
-    Input:
-    stacast - integer, the station and cast, as SSSCC format
-    log_file - file handle or string, log_file
-    p_col - string, name of the pressure column
-    time_col - string, name of the time column
-    b_lat_col - string, name of the latitude column
-    b_lon_col - string, name of the longitude column
-    alt_col - string, name of the altimeter column
-    inMat - pandas dataframe, the dataframe to come in
+    Parameters
+    ----------
+    df : DataFrame
+        Filtered CTD data
+    ssscc : integer
+        The station and cast, as SSSCC format
+    log_file : file handle or string
+        File destination for cast details
 
-    Output:
-    start_cast_time - float, unix epoch seconds?, start of cast time, to be reported to log file
-    end_cast_time - float, unix epoch seconds?, end of cast time, to be reported to log file
-    bottom_cast_time - float, unix epoch seconds?, bottom of cast time, to be reported to log file
-    start_pressure - float, pressure at which cast started, to be reported to log file
-    max_pressure - float, bottom of the cast pressure, to be reported to log file
-    b_lat - float, latitude at bottom of cast
-    b_lon - float, longitude at bottom of cast
-    b_alti - float, altimeter reading at bottom of cast - volts only!
-    inMat - the dataframe that came in, with soak period trimmed off
+    Returns
+    -------
+    df_downcast : DataFrame
+        CTD data with the soak period and upcast trimmed off
 
-    don't need end_cast_time, max_pressure
-    inMat is trimmed to start and end of cast
-    '''
+    Notes
+    -----
+    The following (float) variables are output to log_file:
+    time_start : Time at start of cast (in unix epoch time)
+    time_end : Time at end of cast (in unix epoch time)
+    time_bottom : Time at bottom of cast (in unix epoch time)
+    p_start : Pressure at which cast started
+    p_max : Bottom of the cast pressure
+    b_lat : Latitude at bottom of cast
+    b_lon : Longitude at bottom of cast
+    b_alt : Altimeter reading at bottom of cast
+    """
+    df_cast = _trim_soak_period(df)
 
-    df_test = pd.DataFrame.from_records(inMat)
+    # TODO: call parameters from config file instead
+    p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))
+    p_max_ind = df_cast["CTDPRS"].argmax()
+    p_max = float(np.around(df_cast["CTDPRS"].max(), 4))
+    time_start = float(df_cast["scan_datetime"].head(1))
+    time_end = float(df_cast["scan_datetime"].tail(1))
+    time_bottom = float(df_cast["scan_datetime"][p_max_ind])
+    b_lat = float(np.around(df_cast["GPSLAT"][p_max_ind], 4))
+    b_lon = float(np.around(df_cast["GPSLON"][p_max_ind], 4))
+    b_alt = float(np.around(df_cast["ALT"][p_max_ind], 4))
 
-    dfs = find_pump_on_off_dfs(df_test)
-    dfs_1 = find_pumps_on_dfs(dfs)
-    df_cast = find_max_pressure_df(dfs_1)
-    df_cast1 = find_last_soak_period(df_cast)
-    df_cast2 = trim_soak_period_from_df(df_cast1)
+    report_ctd.report_cast_details(
+        ssscc,
+        log_file,
+        time_start,
+        time_end,
+        time_bottom,
+        p_start,
+        p_max,
+        b_alt,
+        b_lat,
+        b_lon,
+    )
 
-    start_cast_time = float(df_cast2['scan_datetime'].head(1))
-    start_pressure = float(df_cast2['CTDPRS'].head(1))
-    end_cast_time = float(df_cast2['scan_datetime'].tail(1))
-    max_pressure = float(df_cast2['CTDPRS'].max())
-    bottom_cast_time = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['scan_datetime'])
-    b_lat = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['GPSLAT'])
-    b_lon = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['GPSLON'])
-    b_alti = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['ALT'])
+    # remove upcast
+    df_downcast = df_cast[: p_max_ind].copy()
 
-    #last two lines must be in to return the same as old - change to slices of df later
-    report_ctd.report_cast_details(stacast, log_file, start_cast_time, end_cast_time,
-                                   bottom_cast_time, start_pressure, max_pressure, b_alti,
-                                   b_lat, b_lon)
-    #reconvert to ndarray - might need to be altered to remove second index
-    # inMat = df_cast2.loc[:df_cast2['CTDPRS'].idxmax()].to_records(index=False)
-    inMat = df_cast2.loc[:df_cast2['CTDPRS'].idxmax()]
+    return df_downcast
 
-    return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
-#Move next four functions to a library or class(?) Clean up module
-def find_pump_on_off_dfs(df):
-    '''Find pump_on patterns of dataframes, and return a list(?) of dataframes to iterate over.
-    '''
-    return [g for i,g in df.groupby(df['pump_on'].ne(df['pump_on'].shift()).cumsum())]
 
-def find_max_pressure_df(dfs):
-    '''Giving a list of data frames, return a reference to the frame with which contians the highest pressure value
-    '''
-    max_pressure_df = dfs[0]
-    max_pressure = max_pressure_df['CTDPRS'].max() #TODO make into config var
-    for df in dfs:
-        if df['CTDPRS'].max() > max_pressure:
-            max_pressure_df = df
-            max_pressure = df['CTDPRS'].max()
-    return max_pressure_df
+def _trim_soak_period(df=None):
+    """
+    1) Find pump on/off patterns
+    2) Select pump_on=True group with largest pressure recording
+    3) Find soak period before start of downcast
+    4) Trim cast, return everything after top of cast (i.e. minimum pressure)
+    """
+    df_list = [
+        g for i, g in df.groupby(df["pump_on"].ne(df["pump_on"].shift()).cumsum())
+    ]
+    df_pump_on_list = [df for df in df_list if df["pump_on"].all()]
+    df_cast = df_pump_on_list[np.argmax([df["CTDPRS"].max() for df in df_pump_on_list])]
+    df_cast = df_cast.reset_index(drop=True)
+    # next fn deals w/ edge cases, leave as is for now
+    df_cast = _find_last_soak_period(df_cast)
+    start_ind = df_cast.loc[: len(df) // 4, "CTDPRS"].argmin()
+    df_trimmed = df_cast[start_ind:].reset_index(drop=True).copy()
 
-def find_pumps_on_dfs(dfs):
-    '''given a list of dataframes, remove all the frames with one or more rows containing a "false" pump on flag
-    '''
-    return list(filter(lambda df: df['pump_on'].all(), dfs))
+    return df_trimmed
 
-def trim_soak_period_from_df(df):
-    '''Look for minimum pressure in dataframe, then return everything after minimum pressure/top of cast.
-    '''
-    test = int(df.iloc[1:int((len(df)/4))]['CTDPRS'].idxmin())
-    return df.loc[test:]
 
-def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
+def _find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
     """Find the soak period before the downcast starts.
 
     The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
@@ -509,50 +509,39 @@ def oxy_to_umolkg(df_sal, df_pressure, df_lat, df_lon, df_temp, df_oxy):
     series = df_oxy * 44660 / (s0 + 1000)
     return series
 
-def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
-    """raw_ctd_filter function
+def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
+    """
+    Filter raw CTD data using one of three window types (boxcar, hanning, triangle).
 
-    Function takes NUMPY array
-    of raw ctd data and returns filtered data. This function also needs
-    one of three filter types (boxcar, gaussian, triangle) as well as
-    window size.
+    Parameters
+    ----------
+    df : DataFrame
+        Raw CTD data
+    window : str, optional
+        Type of filter window
+    win_size : int, optional
+        Length of window in number of samples
+    parameters : list of str, optional
+        List of DataFrame columns to be filtered
 
-    Args:
-        param1 (ndarray): Numpy ndarray with predefined header with at
-        param2 (str): One of three tested filter types
-          boxcar, gaussian_std, triangle.
-          default is triangle
-        param3 (int): A window size for the filter. Default is 24, which
-          is the number of frames per second from a SBE9+/11 CTD/Dech unit.
-        param4 (ndarray): parameters the dtype names used in filtering the
-          analytical inputs.
-
-    Returns:
-        Narray: The return value is a matrix of filtered ctd data with
-          the above listed header values.
-
+    Returns
+    -------
+    filtered_df : DataFrame
+        CTD data with filtered parameters
     """
 
-    if input_array is None:
-        print("In raw_ctd_filter: No data array.")
-        return
-    else:
-        return_array = input_array
-        if parameters is None:
-            print("In raw_ctd_filter: Empty parameter list.")
-        else:
-            for p in parameters:
-                if filter_type == 'boxcar':
-                    win = sig.boxcar(win_size)
-                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/len(win)
-                elif filter_type == 'gaussian':
-                    sigma = np.std(arr)
-                    win = sig.general_gaussian(win_size, 1.0, sigma)
-                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/(len(win))
-                elif filter_type == 'triangle':
-                    win = sig.triang(win_size)
-                    return_array[p] = 2*sig.convolve(input_array[p], win, mode='same')/len(win)
-    return return_array
+    filter_df = df.copy()
+    if parameters is not None:
+        for p in parameters:
+            if window == "boxcar":
+                win = sig.boxcar(win_size)
+            elif window == "hanning":
+                win = sig.hann(win_size)
+            elif window == "triangle":
+                win = sig.triang(win_size)
+            filter_df[p] = sig.convolve(filter_df[p], win, mode="same") / np.sum(win)
+
+    return filter_df
 
 
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
@@ -642,23 +631,28 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
     return outMat
 
-def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=20.0, log_file=None):
-    """ondeck_pressure function
-    Function takes pandas Dataframe of filtered ctd raw data the stores, analizes and removes ondeck
-    values from data.
-    Args:
-        param1 (str): stacast, station cast info
-        param1 (str): p_col, pressure data column name
-        param2 (str): c1_col, cond1 data column name
-        param3 (str): c2_col, cond2 data column name
-        param4 (str): time_col, time data column name
-        param5 (ndarray): numpy ndarray with dtype array
-        param6 (float): conductivity_startup, threshold value
-        param7 (str): log_file, log file name
-    Returns:
-        Narray: The return ndarray with ondeck data removed.
-        Also output start/end ondeck pressure.
+def ondeck_pressure_2(df, stacast, cond_startup=20.0, log_file=None):
     """
+    Find and remove times when rosette is on deck.
+    Optionally log average pressure at start and end of cast.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Raw CTD data
+    stacast : str
+        Station/cast name
+    cond_startup : float, optional
+        Minimum conductivity (units?) threshold indicating rosette is in water
+    log_file : str, optional
+        Path and filename to save start/end deck pressure values
+
+    Returns
+    -------
+    trimmed_df : DataFrame
+        Raw CTD data trimmed to times when rosette is in water
+    """
+    # TODO: move these to config file
     # Frequency
     fl = 24
     fl2 = fl*2
@@ -668,45 +662,47 @@ def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=2
     ms = 30
     time_delay = fl*ms
 
-    #split dataframe into upcast/downcast
+    # split dataframe into upcast/downcast
+    downcast = df.iloc[:(df["CTDPRS"].argmax() + 1)]
+    upcast = df.iloc[(df["CTDPRS"].argmax() + 1):]
 
-    down, up = df.split(p_col=p_col)
-
-
-    # Searches each half of df, uses conductivity
-    # threshold min to capture startup pressure
-
-    start_df = down.loc[(down[c1_col] < 20) & (down[c2_col] < 20)]
-    end_df = up.loc[(up[c1_col] < 20) & (up[c2_col] < 20)]
+    # Search each half of df for minimum conductivity
+    # threshold to identify when rosette is out of water
+    start_df = downcast.loc[
+        (downcast[cfg.column["c1"]] < cond_startup)
+        & (downcast[cfg.column["c2"]] < cond_startup),
+        cfg.column["p"],
+    ]
+    end_df = upcast.loc[
+        (upcast[cfg.column["c1"]] < cond_startup)
+        & (upcast[cfg.column["c2"]] < cond_startup),
+        cfg.column["p"],
+    ]
 
     # Evaluate starting and ending pressures
-    sp = len(start_df)
-
-    if (sp > time_delay):
-        start_p = np.average(start_df.iloc[fl2:sp-(time_delay)][p_col])
+    start_samples = len(start_df)
+    if (start_samples > time_delay):
+        start_p = np.average(start_df.iloc[fl2:(start_samples - time_delay)])
     else:
-        start_p = np.average(start_df[fl2:sp])
+        start_p = np.average(start_df.iloc[fl2:start_samples])
 
-    ep = len(end_df)
-
-    ep = len(end_df)
-
-    if (ep > time_delay):
+    end_samples = len(end_df)
+    if (end_samples > time_delay):
         end_p = np.average(end_df.iloc[(time_delay):])
     else:
         try:
-            end_p = np.average(end_df.iloc[(ep):])
+            end_p = np.average(end_df.iloc[(end_samples):])
         except ZeroDivisionError:
             end_p = np.NaN
 
     # Remove ondeck start and end pressures
+    trimmed_df = df.iloc[start_df.index.max():end_df.index.min()].copy()
 
-    df.iloc[start_df.index.max():end_df.index.min()][p_col].max().copy()
-        # Store ending on-deck pressure
+    # Log ondeck pressures
     if log_file != None:
         report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
-    return outMat
+    return trimmed_df
 
 
 

@@ -6,6 +6,7 @@ import ctdcal.sbe_equations_dict as sbe_eq
 import gsw
 from pathlib import Path
 import ctdcal.process_bottle as btl
+import ctdcal.process_ctd as process_ctd
 import config as cfg
 
 DEBUG = False
@@ -83,6 +84,50 @@ def hex_to_ctd(ssscc_list, debug=False):
     return True
 
 
+def make_time_files(ssscc_list):
+    print("Generating time.pkl files")
+    for ssscc in ssscc_list:
+        if not Path(cfg.directory["time"] + ssscc + "_time.pkl").exists():
+            converted_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
+
+            # Trim to times when rosette is in water
+            trimmed_df = process_ctd.ondeck_pressure_2(
+                converted_df,
+                ssscc,
+                log_file=cfg.directory["logs"] + "ondeck_pressure.csv",
+            )
+
+            # # TODO: switch to loop instead, e.g.:
+            # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
+
+            # if not c1_col in raw_data.dtype.names:
+            #     print('c1_col data not found, skipping')
+            # else:
+            #     raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
+            # if not c2_col in raw_data.dtype.names:
+            #     print('c2_col data not found, skipping')
+            # else:
+            #     raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
+            # if not dopl_col in raw_data.dtype.names:
+            #     print('do_col data not found, skipping')
+            # else:
+            #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
+
+            # TODO: add despike/wild edit filter (optional?)
+
+            # Filter data
+            filter_data = process_ctd.raw_ctd_filter(
+                trimmed_df, window="triangle", parameters=cfg.filter_cols,
+            )
+
+            # Trim to downcast
+            cast_data = process_ctd.cast_details(
+                filter_data, ssscc, log_file=cfg.directory["logs"] + "cast_details.csv",
+            )
+
+            cast_data.to_pickle(cfg.directory["time"] + ssscc + "_time.pkl")
+
+
 def make_btl_mean(ssscc_list, debug=False):
     # TODO: add (some) error handling from odf_process_bottle.py
     """
@@ -109,7 +154,6 @@ def make_btl_mean(ssscc_list, debug=False):
             saveConvertedDataToFile(mean_df, cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
-
 
 
 def convertFromSBEReader(sbeReader, debug=False):
