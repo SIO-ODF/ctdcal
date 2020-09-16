@@ -268,7 +268,7 @@ def thio_n_calc(params,ssscc):#(titr, blank, kio3_n, kio3_v, kio3_t, thio_t):
     kio3_v = params[3]
     kio3_t = params[4]
     thio_t = params[5]
-
+    """code_pruning: these rho_t calls can be replaced with gsw (see fit_ctd)"""
     rho_stp  = fit_ctd.rho_t(20)
     rho_kio  = fit_ctd.rho_t(kio3_t)
     rho_thio = fit_ctd.rho_t(thio_t)

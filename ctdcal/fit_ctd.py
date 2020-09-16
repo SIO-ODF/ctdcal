@@ -28,6 +28,7 @@ alpha = 0.03 #0.043 - 1999 Value # Seabird Covered glass inital fluid thermal an
 beta = 1.0 / 7 #1.0 / 4.3 1999 Value # Thermal anomaly time constant
 sample_int = 1./24.
 
+"""code_pruning: not called anywhere and useless..."""
 def offset(offset, inArr):
     """offset column of data
 
@@ -202,7 +203,8 @@ def IESRho_df(df,sal_col='CTDSAL',t_col='CTDTMP1',p_col='CTDPRS'):
     df['rho']   = rho/(1.0-bars/kstp)
     return df '''
 
-'''code_pruning: consider moving out to specialized oxygen section, or move oxygen into here'''
+'''code_pruning: consider moving out to specialized oxygen section, or move oxygen into here
+duplicate of oxy_fitting.flask_load()'''
 def get_flasks(o2flasks):
     with open(o2flasks, 'r') as f:
         flasks = {}
@@ -238,6 +240,7 @@ def rho_t(t):
     Rho20Deg =     998.2041
     return ((z0+(t)*(z1+(t)*((z2+(t)*(z3+(t)*(z4+(t)*z5))))))/(1.0+z6*(t)))
 
+"""code_pruning: duplicate in oxy_fitting, flagged here for removal"""
 def thio_n_calc(titr, blank, kio3_n, kio3_v, kio3_t, thio_t):
 
     rho_stp  = rho_t(20)
@@ -250,6 +253,7 @@ def thio_n_calc(titr, blank, kio3_n, kio3_v, kio3_t, thio_t):
     thio_n = kio3_v_20c * kio3_n / thio_v_20c
     return thio_n
 
+"""code_pruning: exact duplicate in oxy_fitting, flagged here for removal"""
 def titr_20_calc(titr, titr_temp,):
     rho_titr = rho_t(titr_temp)
     rho_stp = rho_t(20)
@@ -343,6 +347,8 @@ def calibration(independent_arr, dependent_diff_arr, order):
     return np.polyfit(independent_arr, dependent_diff_arr, order)
 '''
 
+"""code_pruning: only called in odf_fit_ctd.py script...
+and this is outdated fitting marked for removal"""
 # Oxygen Coef
 def find_oxy_coef(o2pl, p, t, salt, dov, hexfilePath, xmlfilePath):
     """fit_oxy fits CTD dissolved oxygen
@@ -409,6 +415,7 @@ def oxy_dict(calib, P, K, T, S, V):
     #           * np.exp(calib[5] * P / K))
 
 
+"""code_pruning: only called by outdated oxy fitting routine.. marked for removal"""
 # Residual calculation
 def residualO2(calib, o2pl, P, K, T, S, V):
     """residual weighted difference of dissolved oxygen bottle data
@@ -1451,6 +1458,7 @@ def apply_fit_coef(df,ssscc,coef_frame,param,sensor,t_col = 'CTDTMP',p_col = 'CT
        
     return df
 '''    
+"""code_pruning: only called by deprecated code and not useful... marked for removal"""
 def array_like_to_series(array):
     
     series = pd.Series(array)
