@@ -221,7 +221,7 @@ def create_multi_index(df,index=['SSSCC','GPSLAT','GPSLON','CTDPRS']):
 
 def _salt_loader(ssscc, salt_dir):
     """
-    Load raw salt file into DataFrame and calculate salinity.
+    Load raw file into salt and reference DataFrames.
     """
     saltpath = salt_dir + ssscc  # salt files have no extension
     with open(saltpath, newline="") as f:
@@ -248,15 +248,34 @@ def _salt_loader(ssscc, salt_dir):
         ]
     )
     saltDF = pd.DataFrame.from_records(saltArray)
+
     # add as many "Reading#"s as needed
     for ii in range(0, len(saltDF.columns) - len(header)):
         header["Reading{}".format(ii + 1)] = float
     saltDF.columns = list(header.keys())  # name columns
-    saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"]
-    saltDF = saltDF.astype(header)  # force dtypes
-    saltDF["SALNTY"] = gsw.SP_salinometer(
-        (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
-    ).round(4)
+
+    # add time (in seconds) needed for autosal drift removal step
+    saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"])
+    saltDF["IndexTime"] = (saltDF["IndexTime"] - saltDF["IndexTime"].iloc[0]).dt.seconds
+    saltDF["IndexTime"] += (saltDF["IndexTime"] < 0) * (3600 * 24)  # fix overnight runs
+
+    refDF = saltDF.loc[
+        saltDF["autosalSAMPNO"] == "worm", ["IndexTime", "CRavg"]
+    ].astype(float)
+    saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"].astype(header)  # force dtypes
+
+    return saltDF, refDF
+
+
+def remove_autosal_drift(saltDF, refDF):
+    """Calculate linear CR drift between reference values"""
+    diff = refDF.diff(axis="index").dropna()
+    time_coef = (diff["CRavg"] / diff["IndexTime"]).iloc[0]
+
+    saltDF["CRavg"] += saltDF["IndexTime"] * time_coef
+    saltDF["CRavg"] = saltDF["CRavg"].round(5)  # match initial precision
+    saltDF = saltDF.drop(labels="IndexTime", axis="columns")
+
     return saltDF
 
 
@@ -298,10 +317,14 @@ def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
     for ssscc in ssscc_list:
         if not Path(salt_dir + ssscc + "_salts.csv").exists():
             try:
-                saltDF = _salt_loader(ssscc, salt_dir)
+                saltDF, refDF = _salt_loader(ssscc, salt_dir)
             except FileNotFoundError:
                 print("Salt file for cast " + ssscc + " does not exist... skipping")
                 continue
+            saltDF = remove_autosal_drift(saltDF, refDF)
+            saltDF["SALNTY"] = gsw.SP_salinometer(
+                (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
+            ).round(4)
             _salt_exporter(saltDF, salt_dir)
 
     return True
