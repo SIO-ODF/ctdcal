@@ -15,10 +15,10 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import config as cfg
 
-import sys
-sys.path.append('ctdcal/')
-import settings
-import oxy_fitting
+# import sys
+# sys.path.append('ctdcal/')
+# import ctdcal.settings
+import ctdcal.oxy_fitting as oxy_fitting
 import gsw
 import csv
 from collections import OrderedDict
