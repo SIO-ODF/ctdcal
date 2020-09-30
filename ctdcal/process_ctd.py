@@ -1652,6 +1652,7 @@ def merge_refcond_flags(btl_data, qual_flag_cond):
 
     return btl_data
 
+"""code_pruning: only used in old processing scripts"""
 def merge_cond_flags(btl_data, qual_flag_cond,parameter):
     # Merge df
     #if sensor == 1:
@@ -1670,6 +1671,7 @@ def merge_cond_flags(btl_data, qual_flag_cond,parameter):
 
     return btl_data
 
+"""code_pruning: only used in old processing scripts"""
 def merged_reftemp_flags(btl_data, qual_flag_temp):
 
     mask = qual_flag_temp[qual_flag_temp['Parameter'] == 'REF_TEMP'].copy()
@@ -1688,6 +1690,7 @@ def merged_reftemp_flags(btl_data, qual_flag_temp):
 
     return btl_data
 
+"""code_pruning: only used in old processing scripts"""
 def merge_temp_flags(btl_data, qual_flag_temp, parameter):
 
     mask = qual_flag_temp[qual_flag_temp['Parameter'] == parameter].copy()
@@ -1707,6 +1710,7 @@ def merge_oxy_flags(btl_data):
     mask = (btl_data['OXYGEN'].isna())
     btl_data.loc[mask,'OXYGEN_FLAG_W'] = 9
 
+"""code_pruning: no calls to this function"""
 def format_time_data(df):
 
     format_columns = settings.pressure_series_output['column_names'].copy()
@@ -1786,6 +1790,7 @@ def flag_missing_btl_values(df,flag_columns,flag_suffix='_FLAG_W'):
         df.loc[df[column].astype(int) == -999, flag_name] = 9
     return df
 
+"""code_pruning: no calls to this function"""
 def format_btl_data(df,data_cols, prcn=4):
     """
     data_cols :(list) list containing the "numerical" columns to be rounded to prcn decimal places

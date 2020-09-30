@@ -263,12 +263,14 @@ def titr_20_calc(titr, titr_temp,):
     return titr_20c
 
 #rho_func should be replaced with gsw_call here
+"""code_pruning: no calls to this, dupe of oxy_ml_to_umolkg"""
 def mll_to_umolkg(o2ml, s, t, rho_func=IESRho):
     o2kg = o2ml / ((M/D * 0.001) * rho_func(s, t, 0)/1000)
     return o2kg
 
 # Find nearest value to argument in array
 # Return the index of that value
+"""code_pruning: only used in old processing script odf_calibrate_ctd.py"""
 def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t_col, sal_col, dov_col, lat_col, lon_col, time_data):
     """find_iscopycnals
 
@@ -331,6 +333,7 @@ def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, lat_btl_col,
 
 # Find nearest value to argument in array
 # Return the index of that value
+"""code_pruning: only used in find_isopycnals"""
 def find_nearest(yarr, val):
     """find_nearest
 

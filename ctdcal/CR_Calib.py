@@ -17,6 +17,7 @@ import pandas as pd
 import sys
 import os
 
+"""code_pruning: this whole file is superseded by odf_io.process_salts()"""
 def SaltLoad(saltFile):
     
     """ Converts a autosal salinometer output file to a Pandas Dataframe.

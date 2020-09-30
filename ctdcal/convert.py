@@ -39,7 +39,7 @@ def debugPrint(*args, **kwargs):
 def errPrint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-
+"""code_pruning: no calls to this function"""
 def convertFromFiles(hex_file, xmlcon_file, debug=False):
     """Handler to convert engineering data to sci units automatically.
     Takes the full path and filename of the .hex and .XMLCON as arguments.

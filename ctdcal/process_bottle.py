@@ -74,7 +74,7 @@ def bottle_median(btl_df):
 
 #old code
 
-
+"""code_pruning: no calls to this function"""
 def handler(converted_file, config_file=False, debug=False):
     """Wrapper for the whole thing.
     Take in the file, then call other methods on it to process.
@@ -118,7 +118,7 @@ def handler(converted_file, config_file=False, debug=False):
         return output
                 #aux struct to hold counter values from group_scans?
 
-
+"""code_pruning: only called from handler() above"""
 def line_extract(row, index):
     """Given a numpy.array row, determine if a bottle has been fired recently.
     Return True or False to tell the upper level system whether to save the row.
@@ -139,7 +139,7 @@ def line_extract(row, index):
     except TypeError:
         debugPrint('Not a boolean - check the column passed to line_extract()')
 
-
+"""code_pruning: only called from handler() above"""
 def group_scans(array, header):
     """Groups up scans by scan count to be passed to bottle_avg().
     Assumes all scans are sequential when looking for values.
@@ -174,6 +174,7 @@ def group_scans(array, header):
                 #print(str(scan) + ': Check input file for errors, scans not sequential')
     return output
 
+"""code_pruning: no calls to this function"""
 def group_scans_custom(array, header, scans):
     """Custom time window version of group_scans.
     Use when a custom time window is wanted, and not the default 1.5-2 second window.
@@ -194,7 +195,7 @@ def group_scans_custom(array, header, scans):
     ##### TO DO #####
     return None
 
-
+"""code_pruning: only called from functions not called above"""
 def bottle_avg(array, header):
     """
     Because we're averaging non-numerical data, we'll need handling code for them.
@@ -235,6 +236,7 @@ def bottle_avg(array, header):
         output += str(x) + ','
     return output.rstrip(',')
 
+"""code_pruning: no calls, looks outdated"""
 def average(column, utype):
     """
     Overloaded method to handle averaging different types.

@@ -1134,6 +1134,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     
     return True
 
+"""code_pruning: only called from old processing script template_script.py"""
 def apply_oxygen_coef_ctd(df, coef_df, ssscc, ssscc_col='SSSCC',oxyvo_col='CTDOXYVOLTS',
                           time_col='scan_datetime',prs_col='CTDPRS',tmp_col='CTDTMP1',
                           os_col='OS_ctd'):
@@ -1152,7 +1153,7 @@ def apply_oxygen_coef_ctd(df, coef_df, ssscc, ssscc_col='SSSCC',oxyvo_col='CTDOX
 
     return df
 
-
+"""code_pruning: only called from old processing script template_script.py"""
 def merge_oxy_df(df,oxy_df,btl_stn_col='SSSCC',btl_prs_col='CTDPRS',
                  oxy_stn_col='SSSCC',oxy_prs_col='CTDPRS_btl'):
 
@@ -1180,6 +1181,7 @@ def merge_oxy_df(df,oxy_df,btl_stn_col='SSSCC',btl_prs_col='CTDPRS',
 
     return df
 
+"""code_pruning: only called from old processing script odf_process_all_new.py"""
 def clean_oxygen_df(df):
 
     df.rename(columns={'CTDPRS_x':'CTDPRS','OXYGEN_x':'OXYGEN','CTDOXYVOLTS_y':'CTDOXYVOLTS'},inplace=True)
@@ -1195,6 +1197,7 @@ def clean_oxygen_df(df):
 
     return df
 
+"""code_pruning: only called from old processing scripts"""
 def create_coef_df(coef_dict):
 
     coef_df = pd.DataFrame(coef_dict)
@@ -1203,6 +1206,7 @@ def create_coef_df(coef_dict):
 
     return coef_df
 
+"""code_pruning: only called from old processing scripts"""
 def flag_oxy_data(df,oxy_col='OXYGEN',ctd_oxy_col='CTDOXY',p_col ='CTDPRS',flag_col='CTDOXY_FLAG_W'):
     df['res_sbe43'] = df[oxy_col] - df[ctd_oxy_col]
     df_deep = df.loc[(df[p_col] >= 2000) & (df[flag_col]==2)]
@@ -1215,13 +1219,14 @@ def flag_oxy_data(df,oxy_col='OXYGEN',ctd_oxy_col='CTDOXY',p_col ='CTDPRS',flag_
 
     return df
 
-
+"""code_pruning: no calls to this function"""
 def least_squares_resid(coef0,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):
 
     coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef0,
                                      args=(oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch))
     return coef
 
+"""code_pruning: only call is from above fn"""
 def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):#temp,dvdt,os,
 
     """"
