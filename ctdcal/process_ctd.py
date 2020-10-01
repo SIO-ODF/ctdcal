@@ -202,84 +202,6 @@ def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pres
     df_cast_ret = df_cast.reset_index()
     return df_cast_ret
 
-'''code_pruning: can remove at this point'''
-#End move four functions
-# def cast_details_old(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
-#     """cast_details function
-#
-#     Function takes full NUMPY ndarray with predefined dtype array
-#     and adjusts ndarray to remove all extraneous surface data.
-#     Function returns cast start time, end time, bottom time and
-#     cleaned up matrix.
-#
-#     Args:
-#         param1 (str): stacast, station cast input
-#         param2 (str): log_file, log file to write cast data.
-#         param3 (str): p_col, pressure data column name
-#         param4 (str): time_col, time data column name
-#         param5 (ndarray): inMat, numpy ndarray with dtype array
-#
-#     Returns:
-#         Narray: The return value is ndarray with adjusted time of parameter
-#           specified.
-#
-#     """
-#
-#
-#     if inMat is None:
-#        print("In cast_details: No data")
-#        return
-#     else:
-#         # Top of cast time, bottom of cast time, end of cast time,
-#         start_cast_time = 0.0
-#         bottom_cast_time = 0.0
-#         end_cast_time = 0.0
-#         # Test cycle time constant
-#         fl = 24
-#         # starting P
-#         start_pressure = 2.0
-#         # Max P
-#         max_pressure = 10000.0
-#         lm = len(inMat)-1
-#         rev = np.arange(int(lm/4),0,-1)
-#
-#         # Find starting top of cast
-#         # Smallest P from reverse array search
-#         for i in rev:
-#             if start_pressure < inMat[p_col][i]:
-#                tmp = i
-#             elif start_pressure > inMat[p_col][i]:
-#                start_pressure = inMat[p_col][i]
-#                tmp = abs(i - 24) #patched to not break through the c(sea)-floor, can be made cleaner
-#                break
-#         start_cast_time = inMat[time_col][tmp]
-#
-#         # Remove everything before cast start
-#         inMat = inMat[tmp:]
-#
-#         # Max P and bottom time
-#         max_pressure = max(inMat[p_col])
-#         tmp = np.argmax((inMat[p_col]))
-#         bottom_cast_time = inMat[time_col][tmp]
-#         b_lat = inMat[b_lat_col][tmp]
-#         b_lon = inMat[b_lon_col][tmp]
-#         b_alti = inMat[alt_col][tmp]
-#
-#         tmp = len(inMat)
-#         # Find ending top of cast time
-#         for i in range(int(tmp/2),tmp):
-#             if start_pressure > inMat[p_col][i]:
-#                 end_cast_time = inMat[time_col][i]
-#                 if i < tmp: tmp = i + 24
-#                 break
-#
-#         # Remove everything after cast end
-#         inMat = inMat[:tmp]
-#
-#     report_ctd.report_cast_details(stacast, log_file, start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_alti, b_lat, b_lon)
-#
-#     return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
-
 def ctd_align(inMat=None, col=None, time=0.0):
     """ctd_align function
 
@@ -369,28 +291,6 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
             epoch_time[i] = int(time.mktime(time.strptime(str(input_time[i], "utf-8"), time_pattern)))
 
     return epoch_time'''
-
-#code_pruning: no usage, should be removed in favor of the raw call itself
-'''def dataToDataFrame(inFile):
-    """dataToDataFrame function
-
-    Function takes full file path to csv type data file and returns a
-    PANDAS dataframe for data treatment with a two row header.
-
-    Data file should have a two row header. The first row being the column
-    title and the second row are the units for each column.
-    Args:
-        param1 (str): Full path to data file.
-
-    Returns:
-        DataFrame: The return value is a full dataframe with header.
-
-    .. REF PAGE:
-       http://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html#pandas.read_csv
-    """
-    #df = pd.read_csv(inFile, header=[0,2])
-    df = pd.read_csv(inFile)
-    return df'''
 
 #code_pruning: should be looked at to see if we can remove this in favor of raw call
 def dataToNDarray(inFile, dtype=None, names=None, separator=',', skip=None):
@@ -1151,58 +1051,6 @@ def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0
 
     return df
 
-"""code_pruning: not used anymore. delete in favor of fit_ctd._get_(T/C)_coefs"""
-def get_param_coef(calib_param,diff,order,calib):
-    '''Jackson code'''
-
-    cf1 = np.polyfit(calib_param, diff, order)
-
-
-    if 'T' in calib:
-        coef = np.zeros(shape=5)
-
-        if order == 0:
-            coef[4] = cf1[0]
-
-        elif (order == 1) and (calib == 'TP'):
-            coef[1] = cf1[0]
-            coef[4] = cf1[1]
-
-        elif (order == 2) and (calib == 'TP'):
-            coef[0] = cf1[0]
-            coef[1] = cf1[1]
-            coef[4] = cf1[2]
-
-        elif (order == 1) and (calib == 'T'):
-            coef[3] = cf1[0]
-            coef[4] = cf1[1]
-
-        elif (order == 2) and (calib == 'T'):
-            coef[2] = cf1[0]
-            coef[3] = cf1[1]
-            coef[4] = cf1[2]
-
-    if 'C' in calib:
-        coef = np.zeros(shape=7)
-        if order == 0:
-            coef[6] = cf1[0]
-        elif (order == 1) and (calib == 'CP'):
-            coef[1] = cf1[0]
-            coef[6] = cf1[1]
-        elif (order == 2) and (calib == 'CP'):
-            coef[0] = cf1[0]
-            coef[1] = cf1[1]
-            coef[6] = cf1[2]
-        elif (order == 1) and (calib == 'C'):
-            coef[5] = cf1[0]
-            coef[6] = cf1[1]
-        elif (order == 2) and (calib == 'C'):
-            coef[4] = cf1[0]
-            coef[5] = cf1[1]
-            coef[6] = cf1[2]
-
-    return coef
-
 """code_pruning: only used in old versions of process_all"""
 def combine_quality_flags(df_list):
 
@@ -1215,157 +1063,6 @@ def combine_quality_flags(df_list):
 
     #Combine these three into a dataframe and write out to a csv
     #Sort by sta/cast, bottle number, rev. press
-
-
-# MK: deprecated 05/12/20
-# use fit_ctd.calibrate_cond() instead
-"""code_pruning: not used anywhere, flagged for removal"""
-def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
-                           refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2',
-                           p_col='CTDPRS'):#refc_data
-### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION
-    if sensor == 1:
-        postfix = 'c1'
-        cond_col = 'CTDCOND1'
-        t_col = 'CTDTMP1'
-    elif sensor ==2:
-        postfix = 'c2'
-        cond_col = 'CTDCOND2'
-        t_col = 'CTDTMP2'
-    else:
-        print('No sensor name supplied, difference column name will be: diff')
-
-    if calib_param == 'P':
-        calib_col = p_col
-    elif calib_param == 'T':
-        calib_col = t_col
-    elif calib_param == 'C':
-        calib_col = cond_col
-    else:
-        print('No calib_param supplied')
-
-    diff = 'd_'+postfix #Difference between ref and prim sensor
-
-    # Calculate absolute differences between sensors and salt sample data
-
-    #df[diff] = refc_data[refc_col] - df[cond_col]
-    df[diff] = df[refc_col] - df[cond_col]
-
-    #df['primary_diff'] = refc_data[refc_col] - df[cond_col_1]
-    df['primary_diff'] = df[refc_col] - df[cond_col_1]
-
-    #df['secondary_diff'] = refc_data[refc_col] - df[cond_col_2]
-    df['secondary_diff'] = df[refc_col] - df[cond_col_2]
-
-    df['P-S'] = df[cond_col_1] - df[cond_col_2]
-
-
-    '''code_pruning: copy pasted code is a bad code smell that should be abstracted to a reusable function'''
-    #Greater than 2000 dBar
-    lower_lim = 2000
-    upper_lim = df[p_col].max()
-    threshold = 0.002
-
-
-    df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_deep_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-
-
-    #Between 2000 and 1000
-    lower_lim = 1000
-    upper_lim = 2000
-    threshold = 0.005
-
-
-    df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_lmid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-
-
-    #Between 1000 and 500
-    lower_lim = 500
-    upper_lim = 1000
-    threshold = 0.010
-
-
-
-    df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_umid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-
-
-    #Less than 500
-    lower_lim = df[p_col].min() - 1
-    upper_lim = 500
-    threshold = 0.020
-
-    df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_shal_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-
-    '''code_pruning: if the dfs made before are simply concat into a bigger ones, why not do it earlier?'''
-    #concat dataframes into two main dfs
-    df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
-    df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
-    df_ref = pd.concat([df_deep_ref,df_lmid_ref,df_umid_ref,df_shal_ref])
-
-    if sensor == 1:
-        df_ques['Parameter'] = 'C1'
-        df_ques['Flag'] = 3
-
-        df_ref['Parameter'] = 'C'
-        df_ref['Flag'] = 3
-
-    elif sensor == 2:
-        df_ques['Parameter'] = 'C2'
-        df_ques['Flag'] = 3
-
-        df_ref['Flag'] = 3
-
-    if xRange != None:
-        x0 = int(xRange.split(":")[0])
-        x1 = int(xRange.split(":")[1])
-
-        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
-
-
-    else:
-        #Take full range of temperature values
-#        x0 = df_good[t_col].min()
-#        x1 = df_good[t_col].max()
-
-        df_good_cons = df_good#[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
-
-    cf = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
-
-    sensor = '_c'+str(sensor)
-    coef = np.zeros(shape=7)
-
-    if order == 0:
-        coef[6] = cf[0]
-    elif (order == 1) and (calib_param == 'P'):
-        coef[1] = cf[0]
-        coef[6] = cf[1]
-    elif (order == 2) and (calib_param == 'P'):
-        coef[0] = cf[0]
-        coef[1] = cf[1]
-        coef[6] = cf[2]
-    elif (order == 1) and (calib_param == 'T'):
-        coef[3] = cf[0]
-        coef[6] = cf[1]
-    elif (order == 2) and (calib_param == 'T'):
-        coef[2] = cf[0]
-        coef[3] = cf[1]
-        coef[6] = cf[2]
-    elif (order == 1) and (calib_param == 'C'):
-        coef[5] = cf[0]
-        coef[6] = cf[1]
-    elif (order == 2) and (calib_param == 'C'):
-        coef[4] = cf[0]
-        coef[5] = cf[1]
-        coef[6] = cf[2]
-    return coef,df_ques,df_ref
 
 # MK: moved to fit_ctd
 # all calls to this are from deprecated (or soon to be deprecated) functions
@@ -1755,18 +1452,6 @@ def add_sampno_col(df,btl_num_col):
     df['SAMPNO'] = df[btl_num_col].astype(int)
     return df
 
-"""code_pruning: no calls except old processing script; use next func instead"""
-def get_btl_time(df,btl_num_col,time_col):
-    # Get time for first btl fire
-    time = df[df[btl_num_col]== df[btl_num_col].min()][time_col].values
-    ts = pd.to_datetime(time,unit='s')
-    date = ts.strftime('%Y%m%d')
-    hour= ts.strftime('%H%M')
-    df['DATE'] = date[0]
-    df['TIME'] = hour[0]
-
-    return df
-
 def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', decimals=4):
     cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
     cast_details = cast_details[cast_details["SSSCC"] == cast]
@@ -1780,9 +1465,7 @@ def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', deci
     df['TIME'] = hour
     return df
 
-"""code_pruning: duplicate of flag_missing_values(), pick one to keep
-only need one func for continuous and btl; missing data is flagged 9 regardless"""
-def flag_missing_btl_values(df,flag_columns,flag_suffix='_FLAG_W'):
+def flag_missing_values(df,flag_columns,flag_suffix='_FLAG_W'):
     for column in flag_columns:
         flag_name = column + flag_suffix
         df.loc[df[column].isna(),flag_name] = 9
@@ -1842,53 +1525,6 @@ def flag_backfill_data(df,p_col='CTDPRS',flag_bol_col='interp_bol',flag_suffix='
         if flag_suffix in column:
             df.loc[df[flag_bol_col] == 1, column] = 6
     return df
-
-"""code_pruning: duplicate of flag_missing_btl_values(), pick one to keep"""
-def flag_missing_values(df,flag_suffix='_FLAG_W'):
-    full_col_list = df.columns.tolist()
-    col_list = full_col_list
-
-    for column in full_col_list:
-        if flag_suffix in column:
-            col_list.remove(column)
-    for column in col_list:
-        flag_name = column + flag_suffix
-
-        df.loc[df[column].isna(),flag_name] = 9
-        df.loc[df[column].astype(int) == -999, flag_name] = 9
-    return df
-
-"""code_pruning: no calls to this function. delete and use export_btl_data()"""
-def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='CTDPRS', ssscc_col='SSSCC', bin_size=2, direction='down'):
-    # remove
-    df_binned = pd.DataFrame()
-    for cast in ssscc:
-        time_data = df.loc[df[ssscc_col] == cast].copy()
-        time_orig = time_data.copy()
-        time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
-        if time_data[p_col].hasnans:
-            time_orig['CTDOXY'] = pd.to_numeric(time_orig['CTDOXY'])
-            time_data = binning_df(time_orig, bin_size=2)
-            time_data['interp_bol'] = 0
-            time_data.loc[time_data['CTDPRS'].isnull(),'interp_bol'] = 1
-            time_data['CTDPRS'] = time_data.index.astype('float')
-        time_data = flag_backfill_data(time_data)
-        time_data = fill_surface_data(time_data)
-        time_data = time_data[p_column_names]
-        time_data = time_data.round(4)
-        try:
-            time_data = flag_missing_values(time_data)
-        except KeyError:
-            raise KeyError('missing columns: ',missing_list)
-        for i in time_data.columns:
-            if '_FLAG_W' in i:
-                time_data[i] = time_data[i].astype(int)
-            else:
-                time_data[i] = time_data[i].round(4)
-        time_data[ssscc_col] = cast
-
-        df_binned = pd.concat([df_binned,time_data])
-    return df_binned
 
 def export_ct1(df, ssscc_list):
     """ 

@@ -92,101 +92,6 @@ def autosal_drift_fit(df):
     df = df[df['SAMPNO'] != 'worm']
     return df
 
-'''code_pruning: The following extracted from gsw library before conversion to python wrapper of C'''
-'''
-def SP_salinometer(Rt, t):
-    r"""Calculates Practical Salinity SP from a salinometer, primarily using
-    the PSS-78 algorithm.  Note that the PSS-78 algorithm for Practical
-    Salinity is only valid in the range 2 < SP < 42.  If the PSS-78 algorithm
-    produces a Practical Salinity that is less than 2 then the Practical
-    Salinity is recalculated with a modified form of the Hill et al. (1986)
-    formula. The modification of the Hill et al. (1986) expression is to
-    ensure that it is exactly consistent with PSS-78 at SP = 2.
-
-    A laboratory salinometer has the ratio of conductivities, Rt, as an output,
-    and the present function uses this conductivity ratio and the temperature t
-    of the salinometer bath as the two input variables.
-
-    Parameters
-    ----------
-    Rt : array
-         C(SP,t_68,0)/C(SP=35,t_68,0) [unitless]
-         conductivity ratio
-         :math:`R = \frac{C(S, t_68, 0)}{C(35, 15(IPTS-68),0)} [unitless]
-
-    t : array
-        Temperature of the bath of the salinometer [:math:`^\circ` C (ITS-90)]
-
-    Returns
-    -------
-    SP : array
-         Practical Salinity [psu (PSS-78), unitless]
-
-    See Also
-    --------
-    TODO: sw.sals
-
-    Notes
-    -----
-    TODO
-
-    Examples
-    --------
-    TODO
-
-    References
-    -----------
-    ..[1] Fofonoff, P. and R.C. Millard Jr. 1983: Algorithms for computation of
-    fundamental properties of seawater.  Unesco Tech. Pap. in Mar. Sci., 44,
-    53 pp.
-
-    ..[2] Hill, K.D., T.M. Dauphinee & D.J. Woods, 1986: The extension of the
-    Practical Salinity Scale 1978 to low salinities. IEEE J. Oceanic Eng., 11,
-    109 - 112.
-
-    .. [3] IOC, SCOR and IAPSO, 2010: The international thermodynamic equation
-    of seawater - 2010: Calculation and use of thermodynamic properties.
-    Intergovernmental Oceanographic Commission, Manuals and Guides No. 56,
-    UNESCO (English), 196 pp. See appendix E of this TEOS-10 Manual, and in
-    particular, Eqns. (E.2.1) and (E.2.6).
-
-    Modifications:
-    2011-04-30. Paul Barker, Trevor McDougall and Rich Pawlowicz. Version 3.0
-    """
-    a = (0.0080, -0.1692, 25.3851, 14.0941, -7.0261, 2.7081)
-    b = (0.0005, -0.0056, -0.0066, -0.0375, 0.0636, -0.0144)
-    k = 0.0162
-
-    Rt, t = np.broadcast_arrays(Rt, t)
-
-    t68 = t * 1.00024
-    ft68 = (t68 - 15) / (1 + k * (t68 - 15))
-
-    Rt[Rt < 0] = np.ma.masked
-    Rtx = np.sqrt(Rt)
-
-    SP = (a[0] + (a[1] + (a[2] + (a[3] + (a[4] + a[5] * Rtx) * Rtx) * Rtx) *
-                  Rtx) * Rtx + ft68 *
-          (b[0] + (b[1] + (b[2] + (b[3] + (b[4] + b[5] * Rtx) * Rtx) * Rtx) *
-                   Rtx) * Rtx))
-
-    """The following section of the code is designed for SP < 2 based on the
-    Hill et al. (1986) algorithm.  This algorithm is adjusted so that it is
-    exactly equal to the PSS-78 algorithm at SP = 2."""
-
-    I2 = SP < 2
-    if I2.any():
-        Hill_ratio = Hill_ratio_at_SP2(t[I2])
-        x = 400 * Rt[I2]
-        sqrty = 10 * Rtx[I2]
-        part1 = 1 + x * (1.5 + x)
-        part2 = 1 + sqrty * (1 + sqrty * (1 + sqrty))
-        SP_Hill_raw = SP[I2] - a[0] / part1 - b[0] * ft68[I2] / part2
-        SP[I2] = Hill_ratio * SP_Hill_raw
-    # Ensure that SP is non-negative.
-    SP = np.maximum(SP, 0)
-    return SP
-'''
 def compute_salinity(df):
     df['SALNTY'] = gsw.SP_salinometer(df['cr_average_fitted']/2, df['bath_temp'])
     return df
@@ -255,6 +160,8 @@ def _salt_loader(ssscc, salt_dir):
     saltDF.columns = list(header.keys())  # name columns
     saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"]
     saltDF = saltDF.astype(header)  # force dtypes
+    # TODO: check autosalSAMPNO against SAMPNO for mismatches?
+    # TODO: handling for re-samples?
     saltDF["SALNTY"] = gsw.SP_salinometer(
         (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
     ).round(4)

@@ -108,6 +108,20 @@ def flask_load(flaskfile=cfg.directory["oxy"] + 'o2flasks.vol', skip_rows=12):
 
 #    return df
 
+
+# code formerly in fit_ctd, need to sort out this vs match_flask
+def get_flask_vol(flask, o2flasks, t=20, glass="borosilicate"):
+    _coef = {
+            "borosilicate": 0.00001,
+            "soft": 0.000025,
+            }
+    _t = 20
+    flasks = flask_load()
+    fv = flasks[flask]
+    coef = _coef[glass]
+    return fv * (1.0 + coef * (t - _t));
+
+
 def match_flask(flask_nums, flask_list, flask_vols, t=20, glass="borosilicate"):
     """
     flask_nums = flasks used in winkler titrations
@@ -135,6 +149,12 @@ def match_flask(flask_nums, flask_list, flask_vols, t=20, glass="borosilicate"):
 
     coef = _coef[glass]
     merge_df = flask_num_df.merge(flask_list_vols, how='left')
+
+    # code formerly in fit_ctd, need to sort this out w/ above NOTE
+    # flasks = flask_load()
+    # fv = flasks[flask]
+    # coef = _coef[glass]
+    # return fv * (1.0 + coef * (t - _t));
 
     volumes = merge_df['FLASK_VOL'].values
     #volumes = merge_df['FLASK_VOL']
@@ -268,24 +288,23 @@ def thio_n_calc(params,ssscc):#(titr, blank, kio3_n, kio3_v, kio3_t, thio_t):
     kio3_v = params[3]
     kio3_t = params[4]
     thio_t = params[5]
-    """code_pruning: these rho_t calls can be replaced with gsw (see fit_ctd)"""
-    rho_stp  = fit_ctd.rho_t(20)
-    rho_kio  = fit_ctd.rho_t(kio3_t)
-    rho_thio = fit_ctd.rho_t(thio_t)
+
+    rho_stp  = gsw.rho_t_exact(0, 20, 0)
+    rho_kio  = gsw.rho_t_exact(0, kio3_t, 0)
+    rho_thio = gsw.rho_t_exact(0, thio_t, 0)
 
     kio3_v_20c = kio3_v * (rho_kio/rho_stp)
     thio_v_20c = titr * (rho_thio/rho_stp) - blank
 
     thio_n = kio3_v_20c * kio3_n / thio_v_20c
-    thio_n = thio_n.values
 
-    return thio_n
+    return thio_n.values
 
 def titr_20_calc(titr, titr_temp):
 
 
-    rho_titr = fit_ctd.rho_t(titr_temp)
-    rho_stp = fit_ctd.rho_t(20)
+    rho_titr = gsw.rho_t_exact(0, titr_temp, 0)
+    rho_stp = gsw.rho_t_exact(0, 20, 0)
 
     #convert the titr ammount to 20c equivalent
     titr_20c = titr * rho_titr/rho_stp
