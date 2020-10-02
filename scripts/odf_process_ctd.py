@@ -115,7 +115,7 @@ def main(argv):
         outputDir = '.'
 
     debugPrint("Import converted data to dataframe... ", end='')
-    imported_df = cnv.importConvertedFile(inputFile, False)
+    imported_df = pd.read_pickle(inputFile)
     debugPrint("Success!")
 
     # CTD Processing

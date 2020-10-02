@@ -23,28 +23,6 @@ M = 31.9988   #Molecular weight of O2
 R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
 D = 1.42905481 #  /* density O2 g/l @ 0 C */
 
-# CTM constants
-alpha = 0.03 #0.043 - 1999 Value # Seabird Covered glass inital fluid thermal anomaly
-beta = 1.0 / 7 #1.0 / 4.3 1999 Value # Thermal anomaly time constant
-sample_int = 1./24.
-
-"""code_pruning: not called anywhere and useless..."""
-def offset(offset, inArr):
-    """offset column of data
-
-    Input:
-        - inMat, 1d numpy array with return True np.isnans()
-    Output:
-        - Mat with offset applied to column of data
-    Example:
-        >>> outArray = offset(offset, col, inMat)
-    """
-    #for i in range(0, len(inArr)):
-    #    inArr[i] = float(inArr[i]) + offset
-
-    #return inArr
-    return inArr + offset
-
 
 # Find nearest value to argument in array
 # Return the index of that value
@@ -163,94 +141,51 @@ def _conductivity_polyfit(cond,temp,press,coef):
      #fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
     return fitted_cond#, fitted_sal
 
-'''code_pruning: while this follows what a high level algorithm should look like, as this is at the lowest level of code it's not really needed.
-Rather, better comments should be applied if all/most functions are one use inside the function.
-'''     
-def cell_therm_mass_corr(temp,cond,sample_int=sample_int,alpha=alpha,beta=beta):
-    
-    a = calculate_a_CTM(alpha, sample_int, beta)
-    b = calculate_b_CTM(a, alpha)
-    dC_dT = calculate_dc_dT_CTM(temp)
-    dT = calculate_dT_CTM(temp)
-    CTM = calculate_CTM(b, 0, a, dC_dT, dT)
-    
-    CTM = calculate_CTM(b, shift(CTM,1,order=0), a, dC_dT, dT)
-    CTM = np.nan_to_num(CTM) 
-    CTM = S_M_to_mS_cm(CTM) 
-    cond_corr = apply_CTM(cond, CTM)
-       
-    return cond_corr
 
-def apply_CTM(cond, CTM):
-    
-    c_corr = cond + CTM
-    
-    return c_corr
+def cell_therm_mass_corr(temp, cond, sample_int=1/24, alpha=0.03, beta=1/7):
+    """Correct conductivity signal for effects of cell thermal mass.
 
-'''code_pruning: this function is the only one that should be kept as the only one reused.
-See ctdcal.process_ctd.find_last_soak_period().poop() as a way of minimizing scope of function'''
-def calculate_CTM(b, CTM_0, a, dC_dT, dT):
-    
-    CTM = -1.0 * b * CTM_0 + a * (dC_dT) * dT
-    
-    return CTM
+    Parameters
+    ----------
+    temp : array-like
+        CTD temperature [degC]
+    cond : array-like
+        CTD conductivity [mS/cm]
+    sample_int : float, optional
+        CTD sample interval [seconds]
+    alpha : float, optional
+        Thermal anomaly amplitude
+    beta : float, optional
+        Thermal anomaly time constant
 
-'''code_pruning: try not to use temp as it's harder to tell difference between temporary and temperature'''
-def calculate_dT_CTM(temp):
-    """
-    Seabird eq: dT = temperature - previous temperature
-    
-    """
-    
-    dT = np.diff(temp)
-    dT = np.insert(dT,0,0)
-    
-    return dT
+    Returns
+    -------
+    cond_corr : array-like
+        Corrected CTD conductivity [mS/cm]
 
-def calculate_dc_dT_CTM(temp):
+    Notes
+    -----
+    See Sea-Bird Seasoft V2 manual (Section 6, page 93) for equation information.
+    Default alpha/beta values taken from Seasoft manual (page 92).
+    c.f. "Thermal Inertia of Conductivity Cells: Theory" (Lueck 1990) for more info
+    https://doi.org/10.1175/1520-0426(1990)007<0741:TIOCCT>2.0.CO;2
     """
-    
-    Seabird eq: dc/dT = 0.1 * (1 + 0.006 * [temperature - 20])
-    
-    """
-    
+    a = 2 * alpha / (sample_int * beta + 2)
+    b = 1 - (2 * a / alpha)
     dc_dT = 0.1 * (1 + 0.006 * (temp - 20))
-    
-    return dc_dT
+    dT = np.insert(np.diff(temp), 0, 0)  # forward diff reduces len by 1
 
-def S_M_to_mS_cm(CTM_S_M):
-    
-    """
-    
-    Seabird eq: ctm [mS/cm] = ctm [S/m] * 10.0
-    
-    """
-    ctm_mS_cm = CTM_S_M * 10.0
-    
-    return ctm_mS_cm
-    
+    def calculate_CTM(b, CTM_0, a, dc_dT, dT):
+        """Return CTM in units of [S/m]"""
+        CTM = -1.0 * b * CTM_0 + a * (dc_dT) * dT
+        return CTM
 
-def calculate_a_CTM(alpha, sample_int, beta):
-    
-    """
-    Seabird eq: a = 2 * alpha / (sample interval * beta + 2)
-    
-    """
-    
-    a = 2 * (alpha / (sample_int * beta + 2))
-    
-    return a
+    CTM = calculate_CTM(b, 0, a, dc_dT, dT)
+    CTM = calculate_CTM(b, shift(CTM, 1, order=0), a, dc_dT, dT)
+    CTM = np.nan_to_num(CTM) * 10.0  # [S/m] to [mS/cm]
+    cond_corr = cond + CTM
 
-def calculate_b_CTM(a, alpha):
-    
-    """
-    Seabird eq: b = 1 - (2 * a / alpha)
-        
-    """
-    
-    b = 1 - (2 * (a / alpha))
-    
-    return b
+    return cond_corr
 
 
 def _flag_btl_data(

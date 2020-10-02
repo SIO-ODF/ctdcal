@@ -39,21 +39,6 @@ def debugPrint(*args, **kwargs):
 def errPrint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-"""code_pruning: no calls to this function"""
-def convertFromFiles(hex_file, xmlcon_file, debug=False):
-    """Handler to convert engineering data to sci units automatically.
-    Takes the full path and filename of the .hex and .XMLCON as arguments.
-    Optionally takes a boolean debug flag to specify whether or not to display
-    verbose messages to stderr
-    """
-    global DEBUG
-    DEBUG = debug
-
-    sbeReader = sbe_rd.SBEReader.from_paths(hex_file, xmlcon_file)
-
-    return convertFromSBEReader(sbeReader, DEBUG)
-
-
 def hex_to_ctd(ssscc_list, debug=False):
     # TODO: add (some) error handling from odf_convert_sbe.py
     """
@@ -103,10 +88,10 @@ def make_btl_mean(ssscc_list, debug=False):
     print('Generating btl_mean.pkl files')
     for ssscc in ssscc_list:
         if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
-            imported_df = importConvertedFile(cfg.directory["converted"] + ssscc + ".pkl", False)
+            imported_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
             mean_df = btl.bottle_mean(bottle_df)
-            saveConvertedDataToFile(mean_df, cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
+            mean_df.to_pickle(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
 
@@ -306,93 +291,3 @@ def convertFromSBEReader(sbeReader, debug=False):
 
     # return the converted data as a dataframe
     return converted_df
-
-"""code_pruning: this func is effectively just pd.read_pickle()
-with outdated error handling, can likely remove"""
-def importConvertedFile(file_name, debug=False):
-
-    """Handler to import converted data from a csv-formatted file created by run.py
-    """
-    try:
-        output_df = pd.read_pickle(file_name)
-    except FileNotFoundError:
-        global DEBUG
-        DEBUG = debug
-
-        debugPrint("Importing data from:", file_name + '... ', end='')
-        output_df = pd.read_csv(file_name, index_col=0, skiprows=[1], parse_dates=False)
-        #debugPrint(output_df.head())
-        header_raw = output_df.columns.values.tolist()
-        header_type = []
-
-        with open(file_name) as csvfile:
-            dtypeReader = csv.reader(csvfile, delimiter=',')
-            dtypeReader.__next__() # skip first row
-            dtype_header = dtypeReader.__next__() #second row
-            dtype_header.pop(0) #remove 'index' from left of dtype list
-            #debugPrint(dtype_header)
-
-        for i, x in enumerate(dtype_header):
-            #debugPrint('Set', header_raw[i], 'to', dtype_header[i])
-            if dtype_header[i] == 'bool_':
-                d = {'True': True, 'False': False}
-                output_df[header_raw[i]].map(d)
-            elif dtype_header[i] == 'datetime_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('datetime64')
-            elif dtype_header[i] == 'int_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('int64')
-            elif dtype_header[i] == 'float_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('float64')
-
-        debugPrint("Done!")
-
-        # return the imported data as a dataframe
-    return output_df
-
-"""code_pruning: this func is effectively just pd.to_pickle()
-with outdated error handling, can likely remove"""
-def saveConvertedDataToFile(converted_df, filename, debug=False):
-    try:
-        converted_df.to_pickle(filename)
-    except:
-        # Save the bottle fire dataframe to file.
-        column_names = ['index']
-        column_names += converted_df.columns.tolist()
-        #debugPrint("Column Names:", ','.join(column_names))
-
-        datatype_names = ['index']
-        for column in converted_df.columns:
-
-            if converted_df[column].dtype.name == 'float64':
-                datatype_names.append('float_')
-            elif converted_df[column].dtype.name == 'datetime64[ns]':
-                datatype_names.append('datetime_')
-            elif converted_df[column].dtype.name == 'bool':
-                datatype_names.append('bool_')
-            elif converted_df[column].dtype.name == 'int64':
-                datatype_names.append('int_')
-            else:
-                datatype_names.append(converted_df[column].dtype.name)
-        #debugPrint("Datatypes Names:", ','.join(datatype_names))
-
-        # write the header and dtype rows to file
-        try:
-            with open(filename, 'w') as f:
-                f.write(','.join(column_names) + '\n')
-                f.write(','.join(datatype_names) + '\n')
-        except:
-            errPrint('ERROR: Could not save bottle fire data header to file')
-            return False
-        else:
-            debugPrint('Success!')
-
-        # write the contents of the dataframe to file
-        try:
-            converted_df.to_csv(filename, mode='a', header=False)
-        except:
-            errPrint('ERROR: Could not save bottle fire data to file')
-            return False
-        else:
-            debugPrint('Success!')
-
-    return True

@@ -33,7 +33,7 @@ def errPrint(*args, **kwargs):
 # Retrieve the bottle data from a converted file.
 def retrieveBottleDataFromFile(converted_file, debug=False):
 
-    converted_df = cnv.importConvertedFile(converted_file, DEBUG)
+    converted_df = pd.read_pickle(converted_file)
 
     return retrieveBottleData(converted_df, debug)
 
