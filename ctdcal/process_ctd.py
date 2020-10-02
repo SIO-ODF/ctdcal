@@ -292,36 +292,6 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
 
     return epoch_time'''
 
-#code_pruning: should be looked at to see if we can remove this in favor of raw call
-def dataToNDarray(inFile, dtype=None, names=None, separator=',', skip=None):
-    """dataToNDarray function
-
-    Function takes full file path to csv type data file and returns NUMPY
-    ndarray type ndarray for data manipulation with a two row header.
-
-    Data file should have a two row header. The first row being the column
-    title and the second row are the units for each column.
-    Args:
-        param1 (str): inFile, full path to csv file
-        param2 (arr): dtype list
-        param3 (str): separator, default comma ','
-
-    Returns:
-        Narray: The return value is a full data ndarray with two row header.
-
-    Reference Page:
-        https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
-    """
-    try:
-        return pd.read_pickle(inFile).to_records()
-    except:
-        if skip is None:
-            arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names)
-        else:
-            arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=skip)
-
-    return arr
-
 '''code_pruning: do timing exercises to see if this is vectorized or not'''
 def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
     """Hysteresis Correction function
@@ -927,23 +897,12 @@ def _load_btl_data(btl_file, cols=None):
     cols is specified (as a list of column names)
     """
 
-    '''code_pruning: the following three lines are redundant, just go straight to df. should go to netCDF in future'''
-    btl_data = dataToNDarray(btl_file,float,True,',',0)
-    btl_data = pd.DataFrame.from_records(btl_data)
+    btl_data = pd.read_pickle(btl_file)
     if cols != None:
         btl_data = btl_data[cols]
     btl_data["SSSCC"] = Path(btl_file).stem.split("_")[0]
 
     return btl_data
-
-
-# MK: deprecated 04/28/20, use load_all_ctd_files
-# def load_time_data(time_file):
-
-#     time_data = dataToNDarray(time_file,float,True,',',1)
-#     time_data = pd.DataFrame.from_records(time_data)
-
-#     return time_data
 
 
 # def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
@@ -1402,12 +1361,6 @@ def merge_temp_flags(btl_data, qual_flag_temp, parameter):
     return btl_data
 
 """code_pruning: no calls to this function"""
-def merge_oxy_flags(btl_data):
-
-    mask = (btl_data['OXYGEN'].isna())
-    btl_data.loc[mask,'OXYGEN_FLAG_W'] = 9
-
-"""code_pruning: no calls to this function"""
 def format_time_data(df):
 
     format_columns = settings.pressure_series_output['column_names'].copy()
@@ -1431,25 +1384,6 @@ def add_btlnbr_cols(df,btl_num_col):
     df['BTLNBR'] = df[btl_num_col].astype(int)
     # default to everything being good
     df['BTLNBR_FLAG_W'] = 2
-    return df
-
-"""code_pruning: no calls, also just a one liner really"""
-def castno_from_ssscc(ssscc):
-    # ssscc: column (pandas series) containing station and cast numbers in the SSSCC format
-    ssscc = pd.Series(ssscc)
-    castno = ssscc.str[3:].astype(int)
-    return castno
-
-"""code_pruning: no calls, also just a one liner really"""
-def stnnbr_from_ssscc(ssscc):
-    # ssscc: column (pandas series) containing station and cast numbers in the SSSCC format
-    ssscc = pd.Series(ssscc)
-    stnno = ssscc.str[0:3].astype(int)
-    return stnno
-
-"""code_pruning: no calls, also just a one liner really"""
-def add_sampno_col(df,btl_num_col):
-    df['SAMPNO'] = df[btl_num_col].astype(int)
     return df
 
 def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', decimals=4):

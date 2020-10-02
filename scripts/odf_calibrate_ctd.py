@@ -148,7 +148,7 @@ def main(argv):
 
     logfileName = str('ondeck_pressure' + '.' + FILE_EXT)
     logfilePath = os.path.join(log_directory, logfileName)
-    log_data = process_ctd.dataToNDarray(logfilePath,str,None,',',None)
+    log_data = pd.read_pickle(inFile).to_records(logfilePath)
     p_start = []
     p_end = []
 
@@ -177,7 +177,7 @@ def main(argv):
                 btlfileName = str(sc + BTL_SUFFIX + MEAN_SUFFIX + '.' + PKL_EXT)
                 btlfilePath = os.path.join(btl_directory, btlfileName)
                 if os.path.isfile(btlfilePath):
-                    btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
+                    btl_data = pd.read_pickle(btlfilePath).to_records()
                 else:
                     print("Missing file: "+btlfilePath)
                     break
@@ -185,7 +185,7 @@ def main(argv):
                 timefileName = str(sc + TIME_SUFFIX + '.' + PKL_EXT)
                 timefilePath = os.path.join(time_directory, timefileName)
                 if os.path.isfile(timefilePath):
-                    time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
+                    time_data = pd.read_pickle(timefilePath).to_records()
                     time_data = pd.DataFrame.from_records(time_data)
                     time_data = time_data.loc[:time_data['CTDPRS'].idxmax()]
                     time_data = time_data.to_records(index=False)
@@ -317,7 +317,7 @@ def main(argv):
             btlfileName = str(filename_base + BTL_SUFFIX + MEAN_SUFFIX + '.' + PKL_EXT)
             btlfilePath = os.path.join(btl_directory, btlfileName)
             if os.path.isfile(btlfilePath):
-                btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',None)
+                btl_data = pd.read_pickle(btlfilePath).to_records()
                 #btl_data = btl_data[:][1:]
             else:
                 print("Missing file: "+btlfilePath)
@@ -326,7 +326,7 @@ def main(argv):
             timefileName = str(filename_base + TIME_SUFFIX + '.' + PKL_EXT)
             timefilePath = os.path.join(time_directory, timefileName)
             if os.path.isfile(timefilePath):
-                time_data = process_ctd.dataToNDarray(timefilePath,float,True,',',1)
+                time_data = pd.read_pickle(timefilePath).to_records()
                 time_data = pd.DataFrame.from_records(time_data)
                 time_data = time_data.loc[:time_data['CTDPRS'].idxmax()]
                 time_data = time_data.to_records(index=False)
@@ -339,7 +339,7 @@ def main(argv):
                 reftfilePath = os.path.join(reft_directory, reftfileName)
                 if os.path.isfile(reftfilePath):
                     print("Processing "+ filename_base)
-                    ref_btl = process_ctd.dataToNDarray(reftfilePath,float,True,',',None)
+                    ref_btl = pd.read_pickle(reftfilePath).to_records()
                 else:
                     print("Missing Reference temperature data for "+ filename_base)
                     continue

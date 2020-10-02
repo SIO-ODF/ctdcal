@@ -114,7 +114,6 @@ def main(pkl_path):
     converted_df = pd.read_pickle(pkl_path)
 
     # Construct NDarray - fix this serialization asap
-    #raw_data = process_ctd.dataToNDarray(convertedfilePath,None,list(converted_df.columns.insert(0,'index')),',',2)
     raw_data = converted_df.to_records()
     #import pdb; pdb.set_trace()
 

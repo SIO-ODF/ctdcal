@@ -100,30 +100,6 @@ def formatted_salt_file(df):
     df = df[['STNNBR', 'CASTNO', 'SAMPNO', 'SALNTY']]
     return df
 
-'''code_pruning: not used, marked for removal.
-def create_multi_index(df,index=['SSSCC','GPSLAT','GPSLON','CTDPRS']):
-    """
-    Changes a normal dataframe to a multiindexed dataframe
-    
-    Parameters
-    ----------
-    
-    df : DataFrame
-         Pandas DataFrame containing indicies to become multi indexed
-         
-    index : List
-            List of columns to be made into multi indexed DataFrame
-            
-    Returns
-    -------
-    
-    df : DataFrame
-        Multi indexed pandas DataFrame
-    
-    """
-    df = df.set_index(index,drop=True)
-    return df'''
-
 
 def _salt_loader(ssscc, salt_dir):
     """

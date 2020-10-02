@@ -514,64 +514,30 @@ def sigma_from_CTD(sal, temp, press, lon, lat, ref=0):
 
     return sigma
 
-# this function now exists as gsw.O2sol()
-def os_umol_kg( sal, PT):
-    """
-    Calculates oxygen solubility in umol/kg as found in Gordon and Garcia 1992
-    (Taken from GSW, use this until gsw releases a version in their toolbox)
+def oxy_ml_to_umolkg(oxy_mL_L, sigma0):
+    """Convert dissolved oxygen from units of mL/L to micromol/kg.
 
-    From GSW:
-    Note that this algorithm has not been approved by IOC and is not work
-    from SCOR/IAPSO Working Group 127. It is included in the GSW
-    Oceanographic Toolbox as it seems to be oceanographic best practice.
-
-    Paramteters
-    -----------
-
-    sal :array-like
-         Practical Salinity (PSS-78)
-
-    PT :array-like
-        Potential Temperature
+    Inputs
+    ------
+    oxy_mL_L : array-like
+        Dissolved oxygen in units of [mL/L]
+    sigma0 : array-like
+        Potential density anomaly (i.e. sigma - 1000) referenced to 0 dbar [kg/m^3]
 
     Returns
     -------
+    oxy_umol_kg : array-like
+        Dissolved oxygen in units of [umol/kg]
 
-    O2sol_umol :array_like
-                Oxygen Solubility in mirco-moles per kilogram (µmol/kg)
-
+    Notes
+    -----
+    Conversion value 44660 is exact for oxygen gas and derived from the ideal gas law.
+    (c.f. Sea-Bird Application Note 64, pg. 6)
     """
 
+    oxy_umol_kg = oxy_mL_L * 44660 / (sigma0 + 1000)
 
-
-    a0 = 5.80871
-    a1 = 3.20291
-    a2 = 4.17887
-    a3 = 5.10006
-    a4 = -9.86643e-2
-    a5 = 3.80369
-    b0 = -7.01577e-3
-    b1 = -7.70028e-3
-    b2 = -1.13864e-2
-    b3 = -9.51519e-3
-    c0 = -2.75915e-7
-
-
-    # Calculate potential temp
-
-    PT68 = PT * 1.00024 # the 1968 International Practical Temperature Scale IPTS-68.
-
-    y = np.log((298.15 - PT68) / (273.15 + PT))
-
-    O2sol_umol = np.exp(a0 + y * (a1 + y * (a2 + y * (a3 + y * (a4 + a5 * y)))) + sal * (b0 + y * (b1 + y * (b2 + b3 * y)) + c0 * sal))
-
-    return O2sol_umol
-
-def oxy_ml_to_umolkg(oxy_mlL,sigma0):
-
-    oxy_uMolkg = oxy_mlL * 44660 / (sigma0 + 1000)
-
-    return oxy_uMolkg
+    return oxy_umol_kg
 
 def calculate_dVdT(oxyvolts, time):
 #
@@ -677,6 +643,8 @@ def calculate_weights(pressure):
 
     return weights
 
+"""code_pruning: no calls, seems related to PMEL oxygen code?
+likely can remove in favor of current code, then refactor"""
 def interpolate_sigma(ctd_sigma,btl_sigma):
 
 #    all_sigma0 = time_data_clean['sigma0_time'].append(btl_data_clean['sigma0_btl'])
@@ -703,6 +671,8 @@ def interpolate_sigma(ctd_sigma,btl_sigma):
 
     return new_sigma
 
+"""code_pruning: no calls, seems related to PMEL oxygen code?
+likely can remove in favor of current code, then refactor"""
 def interpolate_pressure(ctd_pres,btl_pres):
 
     all_press = ctd_pres.append(btl_pres)
@@ -715,6 +685,8 @@ def interpolate_pressure(ctd_pres,btl_pres):
 
     return new_pres
 
+"""code_pruning: no calls, seems related to PMEL oxygen code?
+likely can remove in favor of current code, then refactor"""
 def interpolate_param(param):
     """
     First extends
@@ -1237,13 +1209,6 @@ def flag_oxy_data(df,oxy_col='OXYGEN',ctd_oxy_col='CTDOXY',p_col ='CTDPRS',flag_
     df.loc[(df[p_col] < 2000) & (df[p_col] >= 500) & (df[flag_col]==2) & (np.abs(df['res_sbe43']) >= (std_shal * 2.8)),flag_col] = 3
 
     return df
-
-"""code_pruning: no calls to this function"""
-def least_squares_resid(coef0,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):
-
-    coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef0,
-                                     args=(oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch))
-    return coef
 
 """code_pruning: only call is from above fn"""
 def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):#temp,dvdt,os,

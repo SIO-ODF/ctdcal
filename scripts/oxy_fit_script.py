@@ -55,10 +55,10 @@ for cast in range(len(ssscc)):
     time_file = time_dir+stn_cst+'_time.pkl'
     btl_file = btl_dir+stn_cst+'_btl_mean.pkl'
 
-    time_data = process_ctd.dataToNDarray(time_file,float,True,',',1)
+    time_data = pd.read_pickle(time_file).to_records()
     time_data = pd.DataFrame.from_records(time_data)
 
-    btl_data = process_ctd.dataToNDarray(btl_file,float,True,',',0)
+    btl_data = pd.read_pickle(btl_file).to_records()
     btl_data = pd.DataFrame.from_records(btl_data)
 
 

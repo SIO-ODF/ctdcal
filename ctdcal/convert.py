@@ -31,14 +31,6 @@ short_lookup = {
 }
 
 
-def debugPrint(*args, **kwargs):
-    if DEBUG:
-        errPrint(*args, **kwargs)
-
-
-def errPrint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-
 def hex_to_ctd(ssscc_list, debug=False):
     # TODO: add (some) error handling from odf_convert_sbe.py
     """
@@ -115,14 +107,11 @@ def convertFromSBEReader(sbeReader, debug=False):
     raw_df.index.name = 'index'
     raw_df = raw_df.apply(pd.to_numeric, errors="ignore")
 
-    #debugPrint("Raw Data Types:", raw_df.dtypes)
-    #debugPrint("Raw Data:", raw_df.head)
-
     # Retrieve Config data
     rawConfig = sbeReader.parsed_config()
 
     # The meta data field needs to be processed seperately and then joined with the converted_df
-    debugPrint("Building meta data dataframe... ", end='')
+    print("Building meta data dataframe... ")
     metaArray = [line.split(',') for line in sbeReader._parse_scans_meta().tolist()]
     metaArrayheaders = sbeReader._breakdown_header()
     meta_df = pd.DataFrame(metaArray)
@@ -132,14 +121,12 @@ def convertFromSBEReader(sbeReader, debug=False):
     meta_df.index.name = 'index'
 
     for i, x in enumerate(metaArrayheaders[0]):
-        #debugPrint('Set', metaArrayheaders[0][i], 'to', metaArrayheaders[1][i])
         if not metaArrayheaders[1][i] == 'bool_':
             meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].astype(metaArrayheaders[1][i])
         else:
             meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].str.match('True', na=False)
-            #debugPrint(meta_df[metaArrayheaders[0][i]].head())
 
-    debugPrint('Success!')
+    print('Success!')
 
     pressure_temp = meta_df['pressure_temp_int'].tolist()
     #needs to search sensor dictionary, and compute in order:
@@ -215,7 +202,6 @@ def convertFromSBEReader(sbeReader, debug=False):
     #queue sorting forces it to be in order, so we don't worry about order here
     #assumes first channel for each sensor is primary for computing following data, rework to accept file to determine which is primary
     queue_metadata = sorted(queue_metadata, key = lambda sensor: sensor['ranking'])
-    #debugPrint("Queue Metadata:", json.dumps(queue_metadata, indent = 2))
 
     #empty converted dataframs
     converted_df = pd.DataFrame()
@@ -226,68 +212,68 @@ def convertFromSBEReader(sbeReader, debug=False):
 
         ###Temperature block
         if temp_meta['sensor_id'] == '55':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             if temp_meta['list_id'] == 0:
                 t_array = converted_df[column_name].astype(float)
                 k_array = [273.15+celcius for celcius in t_array]
-                debugPrint('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                print('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Pressure block
         elif temp_meta['sensor_id'] == '45':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
             if temp_meta['list_id'] == 2:
                 p_array = converted_df[column_name].astype(float)
-                debugPrint('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                print('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Conductivity block
         elif temp_meta['sensor_id'] == '3':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
             if temp_meta['list_id'] == 1:
                 c_array = converted_df[column_name].astype(float)
-                debugPrint('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                print('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Oxygen block
         elif temp_meta['sensor_id'] == '38':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
             converted_df['CTDOXYVOLTS'] = raw_df[temp_meta['column']]
             #processed_data.append(temp_meta)
 
         ### Fluorometer Seapoint block
         elif temp_meta['sensor_id'] == '11':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             #processed_data.append(temp_meta)
 
         ###Salinity block
         elif temp_meta['sensor_id'] == '1000':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = gsw.SP_from_C(c_array, t_array, p_array)
             #processed_data.append(temp_meta)
 
         ###Altimeter block
         elif temp_meta['sensor_id'] == '0':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.altimeter_voltage(temp_meta['sensor_info'], raw_df[temp_meta['column']])
 
         ### Aux block
         else:
-            debugPrint('Passing along Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Passing along Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = raw_df[temp_meta['column']]
             #processed_data.append(temp_meta)
 
     # Set the column name for the index
     converted_df.index.name = 'index'
 
-    debugPrint("Joining meta data dataframe with converted data... ", end='')
+    print("Joining meta data dataframe with converted data... ")
     converted_df = converted_df.join(meta_df)
-    debugPrint('Success!')
+    print('Success!')
 
     # return the converted data as a dataframe
     return converted_df
