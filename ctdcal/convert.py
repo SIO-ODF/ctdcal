@@ -1,12 +1,13 @@
-import sys
-import csv
-import pandas as pd
-import ctdcal.sbe_reader as sbe_rd
-import ctdcal.sbe_equations_dict as sbe_eq
-import gsw
 from pathlib import Path
-import ctdcal.process_bottle as btl
+
 import config as cfg
+import gsw
+import pandas as pd
+
+import ctdcal.process_bottle as btl
+import ctdcal.process_ctd as process_ctd
+import ctdcal.sbe_equations_dict as sbe_eq
+import ctdcal.sbe_reader as sbe_rd
 
 DEBUG = False
 
@@ -29,29 +30,6 @@ short_lookup = {
     '51':{'short_name':'REF_PAR', 'long_name':'Surface PAR/Irradiance, Biospherical/Licor', 'units':'0-5VDC', 'type':'float64'},
     '70':{'short_name': 'CTDBACKSCATTER', 'long_name': 'WetlabECO_BB_Sensor', 'units':'0-5VDC', 'type':'float64'}
 }
-
-
-def debugPrint(*args, **kwargs):
-    if DEBUG:
-        errPrint(*args, **kwargs)
-
-
-def errPrint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-
-"""code_pruning: no calls to this function"""
-def convertFromFiles(hex_file, xmlcon_file, debug=False):
-    """Handler to convert engineering data to sci units automatically.
-    Takes the full path and filename of the .hex and .XMLCON as arguments.
-    Optionally takes a boolean debug flag to specify whether or not to display
-    verbose messages to stderr
-    """
-    global DEBUG
-    DEBUG = debug
-
-    sbeReader = sbe_rd.SBEReader.from_paths(hex_file, xmlcon_file)
-
-    return convertFromSBEReader(sbeReader, DEBUG)
 
 
 def hex_to_ctd(ssscc_list, debug=False):
@@ -83,6 +61,50 @@ def hex_to_ctd(ssscc_list, debug=False):
     return True
 
 
+def make_time_files(ssscc_list):
+    print("Generating time.pkl files")
+    for ssscc in ssscc_list:
+        if not Path(cfg.directory["time"] + ssscc + "_time.pkl").exists():
+            converted_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
+
+            # Trim to times when rosette is in water
+            trimmed_df = process_ctd.ondeck_pressure_2(
+                converted_df,
+                ssscc,
+                log_file=cfg.directory["logs"] + "ondeck_pressure.csv",
+            )
+
+            # # TODO: switch to loop instead, e.g.:
+            # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
+
+            # if not c1_col in raw_data.dtype.names:
+            #     print('c1_col data not found, skipping')
+            # else:
+            #     raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
+            # if not c2_col in raw_data.dtype.names:
+            #     print('c2_col data not found, skipping')
+            # else:
+            #     raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
+            # if not dopl_col in raw_data.dtype.names:
+            #     print('do_col data not found, skipping')
+            # else:
+            #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
+
+            # TODO: add despike/wild edit filter (optional?)
+
+            # Filter data
+            filter_data = process_ctd.raw_ctd_filter(
+                trimmed_df, window="triangle", parameters=cfg.filter_cols,
+            )
+
+            # Trim to downcast
+            cast_data = process_ctd.cast_details(
+                filter_data, ssscc, log_file=cfg.directory["logs"] + "cast_details.csv",
+            )
+
+            cast_data.to_pickle(cfg.directory["time"] + ssscc + "_time.pkl")
+
+
 def make_btl_mean(ssscc_list, debug=False):
     # TODO: add (some) error handling from odf_process_bottle.py
     """
@@ -103,13 +125,12 @@ def make_btl_mean(ssscc_list, debug=False):
     print('Generating btl_mean.pkl files')
     for ssscc in ssscc_list:
         if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
-            imported_df = importConvertedFile(cfg.directory["converted"] + ssscc + ".pkl", False)
+            imported_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
             mean_df = btl.bottle_mean(bottle_df)
-            saveConvertedDataToFile(mean_df, cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
+            mean_df.to_pickle(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
-
 
 
 def convertFromSBEReader(sbeReader, debug=False):
@@ -130,14 +151,11 @@ def convertFromSBEReader(sbeReader, debug=False):
     raw_df.index.name = 'index'
     raw_df = raw_df.apply(pd.to_numeric, errors="ignore")
 
-    #debugPrint("Raw Data Types:", raw_df.dtypes)
-    #debugPrint("Raw Data:", raw_df.head)
-
     # Retrieve Config data
     rawConfig = sbeReader.parsed_config()
 
     # The meta data field needs to be processed seperately and then joined with the converted_df
-    debugPrint("Building meta data dataframe... ", end='')
+    print("Building meta data dataframe... ")
     metaArray = [line.split(',') for line in sbeReader._parse_scans_meta().tolist()]
     metaArrayheaders = sbeReader._breakdown_header()
     meta_df = pd.DataFrame(metaArray)
@@ -147,14 +165,12 @@ def convertFromSBEReader(sbeReader, debug=False):
     meta_df.index.name = 'index'
 
     for i, x in enumerate(metaArrayheaders[0]):
-        #debugPrint('Set', metaArrayheaders[0][i], 'to', metaArrayheaders[1][i])
         if not metaArrayheaders[1][i] == 'bool_':
             meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].astype(metaArrayheaders[1][i])
         else:
             meta_df[metaArrayheaders[0][i]] = meta_df[metaArrayheaders[0][i]].str.match('True', na=False)
-            #debugPrint(meta_df[metaArrayheaders[0][i]].head())
 
-    debugPrint('Success!')
+    print('Success!')
 
     pressure_temp = meta_df['pressure_temp_int'].tolist()
     #needs to search sensor dictionary, and compute in order:
@@ -230,7 +246,6 @@ def convertFromSBEReader(sbeReader, debug=False):
     #queue sorting forces it to be in order, so we don't worry about order here
     #assumes first channel for each sensor is primary for computing following data, rework to accept file to determine which is primary
     queue_metadata = sorted(queue_metadata, key = lambda sensor: sensor['ranking'])
-    #debugPrint("Queue Metadata:", json.dumps(queue_metadata, indent = 2))
 
     #empty converted dataframs
     converted_df = pd.DataFrame()
@@ -241,158 +256,68 @@ def convertFromSBEReader(sbeReader, debug=False):
 
         ###Temperature block
         if temp_meta['sensor_id'] == '55':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             if temp_meta['list_id'] == 0:
                 t_array = converted_df[column_name].astype(float)
                 k_array = [273.15+celcius for celcius in t_array]
-                debugPrint('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                print('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Pressure block
         elif temp_meta['sensor_id'] == '45':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
             if temp_meta['list_id'] == 2:
                 p_array = converted_df[column_name].astype(float)
-                debugPrint('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                print('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Conductivity block
         elif temp_meta['sensor_id'] == '3':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
             if temp_meta['list_id'] == 1:
                 c_array = converted_df[column_name].astype(float)
-                debugPrint('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
+                print('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
             #processed_data.append(temp_meta)
 
         ### Oxygen block
         elif temp_meta['sensor_id'] == '38':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
             converted_df['CTDOXYVOLTS'] = raw_df[temp_meta['column']]
             #processed_data.append(temp_meta)
 
         ### Fluorometer Seapoint block
         elif temp_meta['sensor_id'] == '11':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             #processed_data.append(temp_meta)
 
         ###Salinity block
         elif temp_meta['sensor_id'] == '1000':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = gsw.SP_from_C(c_array, t_array, p_array)
             #processed_data.append(temp_meta)
 
         ###Altimeter block
         elif temp_meta['sensor_id'] == '0':
-            debugPrint('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.altimeter_voltage(temp_meta['sensor_info'], raw_df[temp_meta['column']])
 
         ### Aux block
         else:
-            debugPrint('Passing along Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            print('Passing along Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = raw_df[temp_meta['column']]
             #processed_data.append(temp_meta)
 
     # Set the column name for the index
     converted_df.index.name = 'index'
 
-    debugPrint("Joining meta data dataframe with converted data... ", end='')
+    print("Joining meta data dataframe with converted data... ")
     converted_df = converted_df.join(meta_df)
-    debugPrint('Success!')
+    print('Success!')
 
     # return the converted data as a dataframe
     return converted_df
-
-"""code_pruning: this func is effectively just pd.read_pickle()
-with outdated error handling, can likely remove"""
-def importConvertedFile(file_name, debug=False):
-
-    """Handler to import converted data from a csv-formatted file created by run.py
-    """
-    try:
-        output_df = pd.read_pickle(file_name)
-    except FileNotFoundError:
-        global DEBUG
-        DEBUG = debug
-
-        debugPrint("Importing data from:", file_name + '... ', end='')
-        output_df = pd.read_csv(file_name, index_col=0, skiprows=[1], parse_dates=False)
-        #debugPrint(output_df.head())
-        header_raw = output_df.columns.values.tolist()
-        header_type = []
-
-        with open(file_name) as csvfile:
-            dtypeReader = csv.reader(csvfile, delimiter=',')
-            dtypeReader.__next__() # skip first row
-            dtype_header = dtypeReader.__next__() #second row
-            dtype_header.pop(0) #remove 'index' from left of dtype list
-            #debugPrint(dtype_header)
-
-        for i, x in enumerate(dtype_header):
-            #debugPrint('Set', header_raw[i], 'to', dtype_header[i])
-            if dtype_header[i] == 'bool_':
-                d = {'True': True, 'False': False}
-                output_df[header_raw[i]].map(d)
-            elif dtype_header[i] == 'datetime_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('datetime64')
-            elif dtype_header[i] == 'int_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('int64')
-            elif dtype_header[i] == 'float_':
-                output_df[header_raw[i]] = output_df[header_raw[i]].astype('float64')
-
-        debugPrint("Done!")
-
-        # return the imported data as a dataframe
-    return output_df
-
-"""code_pruning: this func is effectively just pd.to_pickle()
-with outdated error handling, can likely remove"""
-def saveConvertedDataToFile(converted_df, filename, debug=False):
-    try:
-        converted_df.to_pickle(filename)
-    except:
-        # Save the bottle fire dataframe to file.
-        column_names = ['index']
-        column_names += converted_df.columns.tolist()
-        #debugPrint("Column Names:", ','.join(column_names))
-
-        datatype_names = ['index']
-        for column in converted_df.columns:
-
-            if converted_df[column].dtype.name == 'float64':
-                datatype_names.append('float_')
-            elif converted_df[column].dtype.name == 'datetime64[ns]':
-                datatype_names.append('datetime_')
-            elif converted_df[column].dtype.name == 'bool':
-                datatype_names.append('bool_')
-            elif converted_df[column].dtype.name == 'int64':
-                datatype_names.append('int_')
-            else:
-                datatype_names.append(converted_df[column].dtype.name)
-        #debugPrint("Datatypes Names:", ','.join(datatype_names))
-
-        # write the header and dtype rows to file
-        try:
-            with open(filename, 'w') as f:
-                f.write(','.join(column_names) + '\n')
-                f.write(','.join(datatype_names) + '\n')
-        except:
-            errPrint('ERROR: Could not save bottle fire data header to file')
-            return False
-        else:
-            debugPrint('Success!')
-
-        # write the contents of the dataframe to file
-        try:
-            converted_df.to_csv(filename, mode='a', header=False)
-        except:
-            errPrint('ERROR: Could not save bottle fire data to file')
-            return False
-        else:
-            debugPrint('Success!')
-
-    return True

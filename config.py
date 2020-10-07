@@ -100,6 +100,12 @@ column = {
     "lon_btl": "GPSLON",
 }
 
+# List of columns to filter
+filter_cols = [
+    column[x]
+    for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]
+]
+
 # List of bottle columns to be read during calibration
 btl_cols = [
     "index",

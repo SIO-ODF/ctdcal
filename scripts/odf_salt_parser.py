@@ -1,8 +1,9 @@
 import csv
-import pandas as pd
-import gsw
 import os
 from collections import OrderedDict
+
+import gsw
+import pandas as pd
 
 # MK: depreciated 04/22/20
 # functions have been exported to ctdcal.odf_io

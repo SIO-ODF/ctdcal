@@ -1,8 +1,10 @@
 from collections import namedtuple
+
 import numpy as np
-import oxy_fitting
 import pandas as pd
 import scipy
+
+import ctdcal.oxy_fitting as oxy_fitting
 
 RinkoO2Cal = namedtuple("RinkoO2Cal", [*"ABCDEFGH"])
 RinkoTMPCal = namedtuple("RinkoTMPCal", [*"ABCD"])

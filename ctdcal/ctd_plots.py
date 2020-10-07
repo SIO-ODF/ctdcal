@@ -1,12 +1,10 @@
-import matplotlib
-#matplotlib.use('agg')
+from pathlib import Path
 
-import pandas as pd
-import numpy as np
+import cmocean
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import cmocean
-from pathlib import Path
+import numpy as np
+import pandas as pd
 
 #####
 # The following section is a little brittle due to hardcoded names, but we'll fix

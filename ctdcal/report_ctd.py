@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-import numpy as np
-import scipy.signal as sig
-import scipy.stats as st
 import datetime
-import pandas as pd
-import math
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
 
 def report_pressure_details(stacast, log_file, start, end):
     """

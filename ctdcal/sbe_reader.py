@@ -5,13 +5,14 @@ takes the xml config and extracts the useful settings used during a CTD cast,
 and uses that to check and parse the hex file.
 '''
 
-import xml.etree.cElementTree as ET
-import struct
-import re
-import sys
 import datetime
-from pytz import timezone
+import re
+import struct
+import xml.etree.cElementTree as ET
+
 import numpy as np
+from pytz import timezone
+
 
 class SBEReader():
     """Code originally written by Andrew Barna, January-March 2016."""

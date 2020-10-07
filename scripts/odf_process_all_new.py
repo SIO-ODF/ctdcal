@@ -6,17 +6,18 @@ Created on Sun Mar  4 03:55:51 2018
 @author: k3jackson
 """
 
+import configparser
 import os
 import subprocess
-import time
 import sys
-import configparser
+import time
+
+import ctdcal.fit_ctd as fit_ctd
+import ctdcal.process_ctd as process_ctd
+import ctdcal.rinko as rinko
+import numpy as np
 #sys.path.append('ctdcal/')
 import pandas as pd
-import numpy as np
-import ctdcal.process_ctd as process_ctd
-import ctdcal.fit_ctd as fit_ctd
-import ctdcal.rinko as rinko
 
 # MK: deprecated 04/29/20, use odf_process_all_MK.py instead
 
@@ -320,10 +321,9 @@ def process_all_new():
     # look over this code again, maybe refence matlab scripts from PMEL
 
     import ctdcal.oxy_fitting as oxy_fitting
-    import gsw
-
     # definitions
     import ctdcal.settings as settings
+    import gsw
     hex_prefix = settings.ctd_processing_dir['hex_prefix']
     hex_postfix = settings.ctd_processing_dir['hex_postfix']
     xml_prefix = settings.ctd_processing_dir['xml_prefix']

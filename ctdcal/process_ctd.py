@@ -1,118 +1,109 @@
 #!/usr/bin/env python
-from scipy import interpolate
-import numpy as np
-from numpy.lib.recfunctions import append_fields
-import scipy.signal as sig
-import scipy.stats as st
-import time, os
-import pandas as pd
-import math
-#import report_ctd
-import ctdcal.report_ctd as report_ctd
-import warnings
-import ctdcal.fit_ctd as fit_ctd
-from datetime import datetime, timezone
-from decimal import Decimal
-import config as cfg
-
-import sys
-sys.path.append('ctdcal/')
-import settings
-import oxy_fitting
-import gsw
 import csv
+import math
+import warnings
 from collections import OrderedDict
+from datetime import datetime, timezone
 from pathlib import Path
+
+import config as cfg
+import gsw
+import numpy as np
+import pandas as pd
+import scipy.signal as sig
+
+import ctdcal.oxy_fitting as oxy_fitting
+import ctdcal.report_ctd as report_ctd
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
 
-def cast_details(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
-    '''
+def cast_details(df, ssscc, log_file=None):
+    """
     We determine the cast details using pandas magic.
     First find alternating periods of pumps on and pumps off, then select the
     pumps on period with the highest pressure. Get values from the row with the
     highest pressure, and return all values to be sent to log.
 
-    Input:
-    stacast - integer, the station and cast, as SSSCC format
-    log_file - file handle or string, log_file
-    p_col - string, name of the pressure column
-    time_col - string, name of the time column
-    b_lat_col - string, name of the latitude column
-    b_lon_col - string, name of the longitude column
-    alt_col - string, name of the altimeter column
-    inMat - pandas dataframe, the dataframe to come in
+    Parameters
+    ----------
+    df : DataFrame
+        Filtered CTD data
+    ssscc : integer
+        The station and cast, as SSSCC format
+    log_file : file handle or string
+        File destination for cast details
 
-    Output:
-    start_cast_time - float, unix epoch seconds?, start of cast time, to be reported to log file
-    end_cast_time - float, unix epoch seconds?, end of cast time, to be reported to log file
-    bottom_cast_time - float, unix epoch seconds?, bottom of cast time, to be reported to log file
-    start_pressure - float, pressure at which cast started, to be reported to log file
-    max_pressure - float, bottom of the cast pressure, to be reported to log file
-    b_lat - float, latitude at bottom of cast
-    b_lon - float, longitude at bottom of cast
-    b_alti - float, altimeter reading at bottom of cast - volts only!
-    inMat - the dataframe that came in, with soak period trimmed off
+    Returns
+    -------
+    df_downcast : DataFrame
+        CTD data with the soak period and upcast trimmed off
 
-    don't need end_cast_time, max_pressure
-    inMat is trimmed to start and end of cast
-    '''
+    Notes
+    -----
+    The following (float) variables are output to log_file:
+    time_start : Time at start of cast (in unix epoch time)
+    time_end : Time at end of cast (in unix epoch time)
+    time_bottom : Time at bottom of cast (in unix epoch time)
+    p_start : Pressure at which cast started
+    p_max : Bottom of the cast pressure
+    b_lat : Latitude at bottom of cast
+    b_lon : Longitude at bottom of cast
+    b_alt : Altimeter reading at bottom of cast
+    """
+    df_cast = _trim_soak_period(df)
 
-    df_test = pd.DataFrame.from_records(inMat)
+    # TODO: call parameters from config file instead
+    p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))
+    p_max_ind = df_cast["CTDPRS"].argmax()
+    p_max = float(np.around(df_cast["CTDPRS"].max(), 4))
+    time_start = float(df_cast["scan_datetime"].head(1))
+    time_end = float(df_cast["scan_datetime"].tail(1))
+    time_bottom = float(df_cast["scan_datetime"][p_max_ind])
+    b_lat = float(np.around(df_cast["GPSLAT"][p_max_ind], 4))
+    b_lon = float(np.around(df_cast["GPSLON"][p_max_ind], 4))
+    b_alt = float(np.around(df_cast["ALT"][p_max_ind], 4))
 
-    dfs = find_pump_on_off_dfs(df_test)
-    dfs_1 = find_pumps_on_dfs(dfs)
-    df_cast = find_max_pressure_df(dfs_1)
-    df_cast1 = find_last_soak_period(df_cast)
-    df_cast2 = trim_soak_period_from_df(df_cast1)
+    report_ctd.report_cast_details(
+        ssscc,
+        log_file,
+        time_start,
+        time_end,
+        time_bottom,
+        p_start,
+        p_max,
+        b_alt,
+        b_lat,
+        b_lon,
+    )
 
-    start_cast_time = float(df_cast2['scan_datetime'].head(1))
-    start_pressure = float(df_cast2['CTDPRS'].head(1))
-    end_cast_time = float(df_cast2['scan_datetime'].tail(1))
-    max_pressure = float(df_cast2['CTDPRS'].max())
-    bottom_cast_time = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['scan_datetime'])
-    b_lat = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['GPSLAT'])
-    b_lon = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['GPSLON'])
-    b_alti = float(df_cast2.loc[df_cast2['CTDPRS'].idxmax()]['ALT'])
+    # remove upcast
+    df_downcast = df_cast[: p_max_ind].copy()
 
-    #last two lines must be in to return the same as old - change to slices of df later
-    report_ctd.report_cast_details(stacast, log_file, start_cast_time, end_cast_time,
-                                   bottom_cast_time, start_pressure, max_pressure, b_alti,
-                                   b_lat, b_lon)
-    #reconvert to ndarray - might need to be altered to remove second index
-    # inMat = df_cast2.loc[:df_cast2['CTDPRS'].idxmax()].to_records(index=False)
-    inMat = df_cast2.loc[:df_cast2['CTDPRS'].idxmax()]
+    return df_downcast
 
-    return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
-#Move next four functions to a library or class(?) Clean up module
-def find_pump_on_off_dfs(df):
-    '''Find pump_on patterns of dataframes, and return a list(?) of dataframes to iterate over.
-    '''
-    return [g for i,g in df.groupby(df['pump_on'].ne(df['pump_on'].shift()).cumsum())]
 
-def find_max_pressure_df(dfs):
-    '''Giving a list of data frames, return a reference to the frame with which contians the highest pressure value
-    '''
-    max_pressure_df = dfs[0]
-    max_pressure = max_pressure_df['CTDPRS'].max() #TODO make into config var
-    for df in dfs:
-        if df['CTDPRS'].max() > max_pressure:
-            max_pressure_df = df
-            max_pressure = df['CTDPRS'].max()
-    return max_pressure_df
+def _trim_soak_period(df=None):
+    """
+    1) Find pump on/off patterns
+    2) Select pump_on=True group with largest pressure recording
+    3) Find soak period before start of downcast
+    4) Trim cast, return everything after top of cast (i.e. minimum pressure)
+    """
+    df_list = [
+        g for i, g in df.groupby(df["pump_on"].ne(df["pump_on"].shift()).cumsum())
+    ]
+    df_pump_on_list = [df for df in df_list if df["pump_on"].all()]
+    df_cast = df_pump_on_list[np.argmax([df["CTDPRS"].max() for df in df_pump_on_list])]
+    df_cast = df_cast.reset_index(drop=True)
+    # next fn deals w/ edge cases, leave as is for now
+    df_cast = _find_last_soak_period(df_cast)
+    start_ind = df_cast.loc[: len(df) // 4, "CTDPRS"].argmin()
+    df_trimmed = df_cast[start_ind:].reset_index(drop=True).copy()
 
-def find_pumps_on_dfs(dfs):
-    '''given a list of dataframes, remove all the frames with one or more rows containing a "false" pump on flag
-    '''
-    return list(filter(lambda df: df['pump_on'].all(), dfs))
+    return df_trimmed
 
-def trim_soak_period_from_df(df):
-    '''Look for minimum pressure in dataframe, then return everything after minimum pressure/top of cast.
-    '''
-    test = int(df.iloc[1:int((len(df)/4))]['CTDPRS'].idxmin())
-    return df.loc[test:]
 
-def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
+def _find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
     """Find the soak period before the downcast starts.
 
     The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
@@ -201,84 +192,6 @@ def find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pres
     df_cast = df_cast.loc[int(start_index):,:]
     df_cast_ret = df_cast.reset_index()
     return df_cast_ret
-
-'''code_pruning: can remove at this point'''
-#End move four functions
-# def cast_details_old(stacast, log_file, p_col, time_col, b_lat_col, b_lon_col, alt_col, inMat=None):
-#     """cast_details function
-#
-#     Function takes full NUMPY ndarray with predefined dtype array
-#     and adjusts ndarray to remove all extraneous surface data.
-#     Function returns cast start time, end time, bottom time and
-#     cleaned up matrix.
-#
-#     Args:
-#         param1 (str): stacast, station cast input
-#         param2 (str): log_file, log file to write cast data.
-#         param3 (str): p_col, pressure data column name
-#         param4 (str): time_col, time data column name
-#         param5 (ndarray): inMat, numpy ndarray with dtype array
-#
-#     Returns:
-#         Narray: The return value is ndarray with adjusted time of parameter
-#           specified.
-#
-#     """
-#
-#
-#     if inMat is None:
-#        print("In cast_details: No data")
-#        return
-#     else:
-#         # Top of cast time, bottom of cast time, end of cast time,
-#         start_cast_time = 0.0
-#         bottom_cast_time = 0.0
-#         end_cast_time = 0.0
-#         # Test cycle time constant
-#         fl = 24
-#         # starting P
-#         start_pressure = 2.0
-#         # Max P
-#         max_pressure = 10000.0
-#         lm = len(inMat)-1
-#         rev = np.arange(int(lm/4),0,-1)
-#
-#         # Find starting top of cast
-#         # Smallest P from reverse array search
-#         for i in rev:
-#             if start_pressure < inMat[p_col][i]:
-#                tmp = i
-#             elif start_pressure > inMat[p_col][i]:
-#                start_pressure = inMat[p_col][i]
-#                tmp = abs(i - 24) #patched to not break through the c(sea)-floor, can be made cleaner
-#                break
-#         start_cast_time = inMat[time_col][tmp]
-#
-#         # Remove everything before cast start
-#         inMat = inMat[tmp:]
-#
-#         # Max P and bottom time
-#         max_pressure = max(inMat[p_col])
-#         tmp = np.argmax((inMat[p_col]))
-#         bottom_cast_time = inMat[time_col][tmp]
-#         b_lat = inMat[b_lat_col][tmp]
-#         b_lon = inMat[b_lon_col][tmp]
-#         b_alti = inMat[alt_col][tmp]
-#
-#         tmp = len(inMat)
-#         # Find ending top of cast time
-#         for i in range(int(tmp/2),tmp):
-#             if start_pressure > inMat[p_col][i]:
-#                 end_cast_time = inMat[time_col][i]
-#                 if i < tmp: tmp = i + 24
-#                 break
-#
-#         # Remove everything after cast end
-#         inMat = inMat[:tmp]
-#
-#     report_ctd.report_cast_details(stacast, log_file, start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_alti, b_lat, b_lon)
-#
-#     return start_cast_time, end_cast_time, bottom_cast_time, start_pressure, max_pressure, b_lat, b_lon, b_alti, inMat
 
 def ctd_align(inMat=None, col=None, time=0.0):
     """ctd_align function
@@ -369,58 +282,6 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
             epoch_time[i] = int(time.mktime(time.strptime(str(input_time[i], "utf-8"), time_pattern)))
 
     return epoch_time'''
-
-#code_pruning: no usage, should be removed in favor of the raw call itself
-'''def dataToDataFrame(inFile):
-    """dataToDataFrame function
-
-    Function takes full file path to csv type data file and returns a
-    PANDAS dataframe for data treatment with a two row header.
-
-    Data file should have a two row header. The first row being the column
-    title and the second row are the units for each column.
-    Args:
-        param1 (str): Full path to data file.
-
-    Returns:
-        DataFrame: The return value is a full dataframe with header.
-
-    .. REF PAGE:
-       http://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html#pandas.read_csv
-    """
-    #df = pd.read_csv(inFile, header=[0,2])
-    df = pd.read_csv(inFile)
-    return df'''
-
-#code_pruning: should be looked at to see if we can remove this in favor of raw call
-def dataToNDarray(inFile, dtype=None, names=None, separator=',', skip=None):
-    """dataToNDarray function
-
-    Function takes full file path to csv type data file and returns NUMPY
-    ndarray type ndarray for data manipulation with a two row header.
-
-    Data file should have a two row header. The first row being the column
-    title and the second row are the units for each column.
-    Args:
-        param1 (str): inFile, full path to csv file
-        param2 (arr): dtype list
-        param3 (str): separator, default comma ','
-
-    Returns:
-        Narray: The return value is a full data ndarray with two row header.
-
-    Reference Page:
-        https://scipy.github.io/old-wiki/pages/Cookbook/InputOutput.html
-    """
-    try:
-        return pd.read_pickle(inFile).to_records()
-    except:
-        if skip is None:
-            arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names)
-        else:
-            arr = np.genfromtxt(inFile, delimiter=separator, dtype=dtype, names=names, skip_header=skip)
-
-    return arr
 
 '''code_pruning: do timing exercises to see if this is vectorized or not'''
 def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
@@ -520,50 +381,39 @@ def oxy_to_umolkg(df_sal, df_pressure, df_lat, df_lon, df_temp, df_oxy):
     series = df_oxy * 44660 / (s0 + 1000)
     return series
 
-def raw_ctd_filter(input_array=None, filter_type='triangle', win_size=24, parameters=None):
-    """raw_ctd_filter function
+def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
+    """
+    Filter raw CTD data using one of three window types (boxcar, hanning, triangle).
 
-    Function takes NUMPY array
-    of raw ctd data and returns filtered data. This function also needs
-    one of three filter types (boxcar, gaussian, triangle) as well as
-    window size.
+    Parameters
+    ----------
+    df : DataFrame
+        Raw CTD data
+    window : str, optional
+        Type of filter window
+    win_size : int, optional
+        Length of window in number of samples
+    parameters : list of str, optional
+        List of DataFrame columns to be filtered
 
-    Args:
-        param1 (ndarray): Numpy ndarray with predefined header with at
-        param2 (str): One of three tested filter types
-          boxcar, gaussian_std, triangle.
-          default is triangle
-        param3 (int): A window size for the filter. Default is 24, which
-          is the number of frames per second from a SBE9+/11 CTD/Dech unit.
-        param4 (ndarray): parameters the dtype names used in filtering the
-          analytical inputs.
-
-    Returns:
-        Narray: The return value is a matrix of filtered ctd data with
-          the above listed header values.
-
+    Returns
+    -------
+    filtered_df : DataFrame
+        CTD data with filtered parameters
     """
 
-    if input_array is None:
-        print("In raw_ctd_filter: No data array.")
-        return
-    else:
-        return_array = input_array
-        if parameters is None:
-            print("In raw_ctd_filter: Empty parameter list.")
-        else:
-            for p in parameters:
-                if filter_type == 'boxcar':
-                    win = sig.boxcar(win_size)
-                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/len(win)
-                elif filter_type == 'gaussian':
-                    sigma = np.std(arr)
-                    win = sig.general_gaussian(win_size, 1.0, sigma)
-                    return_array[str(p)] = sig.convolve(input_array[str(p)], win, mode='same')/(len(win))
-                elif filter_type == 'triangle':
-                    win = sig.triang(win_size)
-                    return_array[p] = 2*sig.convolve(input_array[p], win, mode='same')/len(win)
-    return return_array
+    filter_df = df.copy()
+    if parameters is not None:
+        for p in parameters:
+            if window == "boxcar":
+                win = sig.boxcar(win_size)
+            elif window == "hanning":
+                win = sig.hann(win_size)
+            elif window == "triangle":
+                win = sig.triang(win_size)
+            filter_df[p] = sig.convolve(filter_df[p], win, mode="same") / np.sum(win)
+
+    return filter_df
 
 #try to depreciate for method below
 def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
@@ -653,24 +503,28 @@ def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conduc
 
     return outMat
 
-#try to swap this in instead of function above, maybe. i don't remember anymore
-def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=20.0, log_file=None):
-    """ondeck_pressure function
-    Function takes pandas Dataframe of filtered ctd raw data the stores, analizes and removes ondeck
-    values from data.
-    Args:
-        param1 (str): stacast, station cast info
-        param1 (str): p_col, pressure data column name
-        param2 (str): c1_col, cond1 data column name
-        param3 (str): c2_col, cond2 data column name
-        param4 (str): time_col, time data column name
-        param5 (ndarray): numpy ndarray with dtype array
-        param6 (float): conductivity_startup, threshold value
-        param7 (str): log_file, log file name
-    Returns:
-        Narray: The return ndarray with ondeck data removed.
-        Also output start/end ondeck pressure.
+def ondeck_pressure_2(df, stacast, cond_startup=20.0, log_file=None):
     """
+    Find and remove times when rosette is on deck.
+    Optionally log average pressure at start and end of cast.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Raw CTD data
+    stacast : str
+        Station/cast name
+    cond_startup : float, optional
+        Minimum conductivity (units?) threshold indicating rosette is in water
+    log_file : str, optional
+        Path and filename to save start/end deck pressure values
+
+    Returns
+    -------
+    trimmed_df : DataFrame
+        Raw CTD data trimmed to times when rosette is in water
+    """
+    # TODO: move these to config file
     # Frequency
     fl = 24
     fl2 = fl*2
@@ -680,45 +534,47 @@ def ondeck_pressure_2(df, stacast, p_col, c1_col, c2_col, conductivity_startup=2
     ms = 30
     time_delay = fl*ms
 
-    #split dataframe into upcast/downcast
+    # split dataframe into upcast/downcast
+    downcast = df.iloc[:(df["CTDPRS"].argmax() + 1)]
+    upcast = df.iloc[(df["CTDPRS"].argmax() + 1):]
 
-    down, up = df.split(p_col=p_col)
-
-
-    # Searches each half of df, uses conductivity
-    # threshold min to capture startup pressure
-
-    start_df = down.loc[(down[c1_col] < 20) & (down[c2_col] < 20)]
-    end_df = up.loc[(up[c1_col] < 20) & (up[c2_col] < 20)]
+    # Search each half of df for minimum conductivity
+    # threshold to identify when rosette is out of water
+    start_df = downcast.loc[
+        (downcast[cfg.column["c1"]] < cond_startup)
+        & (downcast[cfg.column["c2"]] < cond_startup),
+        cfg.column["p"],
+    ]
+    end_df = upcast.loc[
+        (upcast[cfg.column["c1"]] < cond_startup)
+        & (upcast[cfg.column["c2"]] < cond_startup),
+        cfg.column["p"],
+    ]
 
     # Evaluate starting and ending pressures
-    sp = len(start_df)
-
-    if (sp > time_delay):
-        start_p = np.average(start_df.iloc[fl2:sp-(time_delay)][p_col])
+    start_samples = len(start_df)
+    if (start_samples > time_delay):
+        start_p = np.average(start_df.iloc[fl2:(start_samples - time_delay)])
     else:
-        start_p = np.average(start_df[fl2:sp])
+        start_p = np.average(start_df.iloc[fl2:start_samples])
 
-    ep = len(end_df)
-
-    ep = len(end_df)
-
-    if (ep > time_delay):
+    end_samples = len(end_df)
+    if (end_samples > time_delay):
         end_p = np.average(end_df.iloc[(time_delay):])
     else:
         try:
-            end_p = np.average(end_df.iloc[(ep):])
+            end_p = np.average(end_df.iloc[(end_samples):])
         except ZeroDivisionError:
             end_p = np.NaN
 
     # Remove ondeck start and end pressures
+    trimmed_df = df.iloc[start_df.index.max():end_df.index.min()].copy()
 
-    df.iloc[start_df.index.max():end_df.index.min()][p_col].max().copy()
-        # Store ending on-deck pressure
+    # Log ondeck pressures
     if log_file != None:
         report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
-    return outMat
+    return trimmed_df
 
 '''code_pruning: since default pressure_column is set to 'CTDPRS', error handling code is redundant?'''
 #a mix is used between _roll_filter and roll_filter, settle on one
@@ -1027,23 +883,12 @@ def _load_btl_data(btl_file, cols=None):
     cols is specified (as a list of column names)
     """
 
-    '''code_pruning: the following three lines are redundant, just go straight to df. should go to netCDF in future'''
-    btl_data = dataToNDarray(btl_file,float,True,',',0)
-    btl_data = pd.DataFrame.from_records(btl_data)
+    btl_data = pd.read_pickle(btl_file)
     if cols != None:
         btl_data = btl_data[cols]
     btl_data["SSSCC"] = Path(btl_file).stem.split("_")[0]
 
     return btl_data
-
-
-# MK: deprecated 04/28/20, use load_all_ctd_files
-# def load_time_data(time_file):
-
-#     time_data = dataToNDarray(time_file,float,True,',',1)
-#     time_data = pd.DataFrame.from_records(time_data)
-
-#     return time_data
 
 
 # def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
@@ -1090,11 +935,11 @@ def calibrate_param(param,ref_param,press,ssscc,btl_num,xRange=None,):
 def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
     '''Jackson code'''
 
-    param = fit_ctd.array_like_to_series(param)
-    param_2 = fit_ctd.array_like_to_series(param_2)
-    press = fit_ctd.array_like_to_series(press)
-    ssscc = fit_ctd.array_like_to_series(ssscc)
-    btl_num = fit_ctd.array_like_to_series(btl_num)
+    param = pd.Series(param).reset_index(drop=True, inplace=True)
+    param_2 = pd.Series(param_2).reset_index(drop=True, inplace=True)
+    press = pd.Series(press).reset_index(drop=True, inplace=True)
+    ssscc = pd.Series(ssscc).reset_index(drop=True, inplace=True)
+    btl_num = pd.Series(btl_num).reset_index(drop=True, inplace=True)
 
     diff = param_2 - param
 
@@ -1151,58 +996,6 @@ def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0
 
     return df
 
-"""code_pruning: not used anymore. delete in favor of fit_ctd._get_(T/C)_coefs"""
-def get_param_coef(calib_param,diff,order,calib):
-    '''Jackson code'''
-
-    cf1 = np.polyfit(calib_param, diff, order)
-
-
-    if 'T' in calib:
-        coef = np.zeros(shape=5)
-
-        if order == 0:
-            coef[4] = cf1[0]
-
-        elif (order == 1) and (calib == 'TP'):
-            coef[1] = cf1[0]
-            coef[4] = cf1[1]
-
-        elif (order == 2) and (calib == 'TP'):
-            coef[0] = cf1[0]
-            coef[1] = cf1[1]
-            coef[4] = cf1[2]
-
-        elif (order == 1) and (calib == 'T'):
-            coef[3] = cf1[0]
-            coef[4] = cf1[1]
-
-        elif (order == 2) and (calib == 'T'):
-            coef[2] = cf1[0]
-            coef[3] = cf1[1]
-            coef[4] = cf1[2]
-
-    if 'C' in calib:
-        coef = np.zeros(shape=7)
-        if order == 0:
-            coef[6] = cf1[0]
-        elif (order == 1) and (calib == 'CP'):
-            coef[1] = cf1[0]
-            coef[6] = cf1[1]
-        elif (order == 2) and (calib == 'CP'):
-            coef[0] = cf1[0]
-            coef[1] = cf1[1]
-            coef[6] = cf1[2]
-        elif (order == 1) and (calib == 'C'):
-            coef[5] = cf1[0]
-            coef[6] = cf1[1]
-        elif (order == 2) and (calib == 'C'):
-            coef[4] = cf1[0]
-            coef[5] = cf1[1]
-            coef[6] = cf1[2]
-
-    return coef
-
 """code_pruning: only used in old versions of process_all"""
 def combine_quality_flags(df_list):
 
@@ -1215,157 +1008,6 @@ def combine_quality_flags(df_list):
 
     #Combine these three into a dataframe and write out to a csv
     #Sort by sta/cast, bottle number, rev. press
-
-
-# MK: deprecated 05/12/20
-# use fit_ctd.calibrate_cond() instead
-"""code_pruning: not used anywhere, flagged for removal"""
-def calibrate_conductivity(df,order,calib_param,sensor,xRange=None,
-                           refc_col='BTLCOND',cond_col_1='CTDCOND1',cond_col_2='CTDCOND2',
-                           p_col='CTDPRS'):#refc_data
-### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION
-    if sensor == 1:
-        postfix = 'c1'
-        cond_col = 'CTDCOND1'
-        t_col = 'CTDTMP1'
-    elif sensor ==2:
-        postfix = 'c2'
-        cond_col = 'CTDCOND2'
-        t_col = 'CTDTMP2'
-    else:
-        print('No sensor name supplied, difference column name will be: diff')
-
-    if calib_param == 'P':
-        calib_col = p_col
-    elif calib_param == 'T':
-        calib_col = t_col
-    elif calib_param == 'C':
-        calib_col = cond_col
-    else:
-        print('No calib_param supplied')
-
-    diff = 'd_'+postfix #Difference between ref and prim sensor
-
-    # Calculate absolute differences between sensors and salt sample data
-
-    #df[diff] = refc_data[refc_col] - df[cond_col]
-    df[diff] = df[refc_col] - df[cond_col]
-
-    #df['primary_diff'] = refc_data[refc_col] - df[cond_col_1]
-    df['primary_diff'] = df[refc_col] - df[cond_col_1]
-
-    #df['secondary_diff'] = refc_data[refc_col] - df[cond_col_2]
-    df['secondary_diff'] = df[refc_col] - df[cond_col_2]
-
-    df['P-S'] = df[cond_col_1] - df[cond_col_2]
-
-
-    '''code_pruning: copy pasted code is a bad code smell that should be abstracted to a reusable function'''
-    #Greater than 2000 dBar
-    lower_lim = 2000
-    upper_lim = df[p_col].max()
-    threshold = 0.002
-
-
-    df_deep_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_deep_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_deep_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-
-
-    #Between 2000 and 1000
-    lower_lim = 1000
-    upper_lim = 2000
-    threshold = 0.005
-
-
-    df_lmid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_lmid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_lmid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-
-
-    #Between 1000 and 500
-    lower_lim = 500
-    upper_lim = 1000
-    threshold = 0.010
-
-
-
-    df_umid_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_umid_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_umid_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-
-
-    #Less than 500
-    lower_lim = df[p_col].min() - 1
-    upper_lim = 500
-    threshold = 0.020
-
-    df_shal_good = quality_check(df,diff,lower_lim,upper_lim,threshold)
-    df_shal_ques = quality_check(df,diff,lower_lim,upper_lim,threshold,find='quest')
-    df_shal_ref = quality_check(df,diff,lower_lim,upper_lim,threshold,find='ref')
-
-    '''code_pruning: if the dfs made before are simply concat into a bigger ones, why not do it earlier?'''
-    #concat dataframes into two main dfs
-    df_good = pd.concat([df_deep_good,df_lmid_good,df_umid_good,df_shal_good])
-    df_ques = pd.concat([df_deep_ques,df_lmid_ques,df_umid_ques,df_shal_ques])
-    df_ref = pd.concat([df_deep_ref,df_lmid_ref,df_umid_ref,df_shal_ref])
-
-    if sensor == 1:
-        df_ques['Parameter'] = 'C1'
-        df_ques['Flag'] = 3
-
-        df_ref['Parameter'] = 'C'
-        df_ref['Flag'] = 3
-
-    elif sensor == 2:
-        df_ques['Parameter'] = 'C2'
-        df_ques['Flag'] = 3
-
-        df_ref['Flag'] = 3
-
-    if xRange != None:
-        x0 = int(xRange.split(":")[0])
-        x1 = int(xRange.split(":")[1])
-
-        df_good_cons = df_good[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
-
-
-    else:
-        #Take full range of temperature values
-#        x0 = df_good[t_col].min()
-#        x1 = df_good[t_col].max()
-
-        df_good_cons = df_good#[(df_good[calib_col] >= x0) & (df_good[calib_col] <= x1)]
-
-    cf = np.polyfit(df_good_cons[calib_col], df_good_cons[diff], order)
-
-    sensor = '_c'+str(sensor)
-    coef = np.zeros(shape=7)
-
-    if order == 0:
-        coef[6] = cf[0]
-    elif (order == 1) and (calib_param == 'P'):
-        coef[1] = cf[0]
-        coef[6] = cf[1]
-    elif (order == 2) and (calib_param == 'P'):
-        coef[0] = cf[0]
-        coef[1] = cf[1]
-        coef[6] = cf[2]
-    elif (order == 1) and (calib_param == 'T'):
-        coef[3] = cf[0]
-        coef[6] = cf[1]
-    elif (order == 2) and (calib_param == 'T'):
-        coef[2] = cf[0]
-        coef[3] = cf[1]
-        coef[6] = cf[2]
-    elif (order == 1) and (calib_param == 'C'):
-        coef[5] = cf[0]
-        coef[6] = cf[1]
-    elif (order == 2) and (calib_param == 'C'):
-        coef[4] = cf[0]
-        coef[5] = cf[1]
-        coef[6] = cf[2]
-    return coef,df_ques,df_ref
 
 # MK: moved to fit_ctd
 # all calls to this are from deprecated (or soon to be deprecated) functions
@@ -1705,12 +1347,6 @@ def merge_temp_flags(btl_data, qual_flag_temp, parameter):
     return btl_data
 
 """code_pruning: no calls to this function"""
-def merge_oxy_flags(btl_data):
-
-    mask = (btl_data['OXYGEN'].isna())
-    btl_data.loc[mask,'OXYGEN_FLAG_W'] = 9
-
-"""code_pruning: no calls to this function"""
 def format_time_data(df):
 
     format_columns = settings.pressure_series_output['column_names'].copy()
@@ -1736,37 +1372,6 @@ def add_btlnbr_cols(df,btl_num_col):
     df['BTLNBR_FLAG_W'] = 2
     return df
 
-"""code_pruning: no calls, also just a one liner really"""
-def castno_from_ssscc(ssscc):
-    # ssscc: column (pandas series) containing station and cast numbers in the SSSCC format
-    ssscc = pd.Series(ssscc)
-    castno = ssscc.str[3:].astype(int)
-    return castno
-
-"""code_pruning: no calls, also just a one liner really"""
-def stnnbr_from_ssscc(ssscc):
-    # ssscc: column (pandas series) containing station and cast numbers in the SSSCC format
-    ssscc = pd.Series(ssscc)
-    stnno = ssscc.str[0:3].astype(int)
-    return stnno
-
-"""code_pruning: no calls, also just a one liner really"""
-def add_sampno_col(df,btl_num_col):
-    df['SAMPNO'] = df[btl_num_col].astype(int)
-    return df
-
-"""code_pruning: no calls except old processing script; use next func instead"""
-def get_btl_time(df,btl_num_col,time_col):
-    # Get time for first btl fire
-    time = df[df[btl_num_col]== df[btl_num_col].min()][time_col].values
-    ts = pd.to_datetime(time,unit='s')
-    date = ts.strftime('%Y%m%d')
-    hour= ts.strftime('%H%M')
-    df['DATE'] = date[0]
-    df['TIME'] = hour[0]
-
-    return df
-
 def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', decimals=4):
     cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
     cast_details = cast_details[cast_details["SSSCC"] == cast]
@@ -1780,9 +1385,7 @@ def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', deci
     df['TIME'] = hour
     return df
 
-"""code_pruning: duplicate of flag_missing_values(), pick one to keep
-only need one func for continuous and btl; missing data is flagged 9 regardless"""
-def flag_missing_btl_values(df,flag_columns,flag_suffix='_FLAG_W'):
+def flag_missing_values(df,flag_columns,flag_suffix='_FLAG_W'):
     for column in flag_columns:
         flag_name = column + flag_suffix
         df.loc[df[column].isna(),flag_name] = 9
@@ -1842,53 +1445,6 @@ def flag_backfill_data(df,p_col='CTDPRS',flag_bol_col='interp_bol',flag_suffix='
         if flag_suffix in column:
             df.loc[df[flag_bol_col] == 1, column] = 6
     return df
-
-"""code_pruning: duplicate of flag_missing_btl_values(), pick one to keep"""
-def flag_missing_values(df,flag_suffix='_FLAG_W'):
-    full_col_list = df.columns.tolist()
-    col_list = full_col_list
-
-    for column in full_col_list:
-        if flag_suffix in column:
-            col_list.remove(column)
-    for column in col_list:
-        flag_name = column + flag_suffix
-
-        df.loc[df[column].isna(),flag_name] = 9
-        df.loc[df[column].astype(int) == -999, flag_name] = 9
-    return df
-
-"""code_pruning: no calls to this function. delete and use export_btl_data()"""
-def export_bin_data(df, ssscc, sample_rate, search_time, p_column_names, p_col='CTDPRS', ssscc_col='SSSCC', bin_size=2, direction='down'):
-    # remove
-    df_binned = pd.DataFrame()
-    for cast in ssscc:
-        time_data = df.loc[df[ssscc_col] == cast].copy()
-        time_orig = time_data.copy()
-        time_data = pressure_sequence(time_data,p_col,2.0,-1.0,0.0,'down',sample_rate,search_time)
-        if time_data[p_col].hasnans:
-            time_orig['CTDOXY'] = pd.to_numeric(time_orig['CTDOXY'])
-            time_data = binning_df(time_orig, bin_size=2)
-            time_data['interp_bol'] = 0
-            time_data.loc[time_data['CTDPRS'].isnull(),'interp_bol'] = 1
-            time_data['CTDPRS'] = time_data.index.astype('float')
-        time_data = flag_backfill_data(time_data)
-        time_data = fill_surface_data(time_data)
-        time_data = time_data[p_column_names]
-        time_data = time_data.round(4)
-        try:
-            time_data = flag_missing_values(time_data)
-        except KeyError:
-            raise KeyError('missing columns: ',missing_list)
-        for i in time_data.columns:
-            if '_FLAG_W' in i:
-                time_data[i] = time_data[i].astype(int)
-            else:
-                time_data[i] = time_data[i].round(4)
-        time_data[ssscc_col] = cast
-
-        df_binned = pd.concat([df_binned,time_data])
-    return df_binned
 
 def export_ct1(df, ssscc_list):
     """ 

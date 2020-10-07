@@ -6,24 +6,20 @@ Created on Mon Jan  8 10:04:19 2018
 @author: k3jackson
 """
 
-
-
-import scipy
-import numpy as np
-#import sys
-#sys.path.append('ctdcal/')
-import ctdcal.process_ctd as process_ctd
-import ctdcal.ctd_plots as ctd_plots
-import ctdcal.fit_ctd as fit_ctd
-import ctdcal.sbe_reader as sbe_rd
-import ctdcal.sbe_equations_dict as sbe_eq
-import gsw
-import pandas as pd
 import csv
 from pathlib import Path
-import config as cfg
 
-#Line 342 module isopycnals
+import config as cfg
+import gsw
+import numpy as np
+import pandas as pd
+import scipy
+
+import ctdcal.ctd_plots as ctd_plots
+import ctdcal.process_ctd as process_ctd
+import ctdcal.sbe_equations_dict as sbe_eq
+import ctdcal.sbe_reader as sbe_rd
+
 
 def oxy_loader(oxyfile):
 
@@ -108,6 +104,20 @@ def flask_load(flaskfile=cfg.directory["oxy"] + 'o2flasks.vol', skip_rows=12):
 
 #    return df
 
+
+# code formerly in fit_ctd, need to sort out this vs match_flask
+def get_flask_vol(flask, o2flasks, t=20, glass="borosilicate"):
+    _coef = {
+            "borosilicate": 0.00001,
+            "soft": 0.000025,
+            }
+    _t = 20
+    flasks = flask_load()
+    fv = flasks[flask]
+    coef = _coef[glass]
+    return fv * (1.0 + coef * (t - _t));
+
+
 def match_flask(flask_nums, flask_list, flask_vols, t=20, glass="borosilicate"):
     """
     flask_nums = flasks used in winkler titrations
@@ -135,6 +145,12 @@ def match_flask(flask_nums, flask_list, flask_vols, t=20, glass="borosilicate"):
 
     coef = _coef[glass]
     merge_df = flask_num_df.merge(flask_list_vols, how='left')
+
+    # code formerly in fit_ctd, need to sort this out w/ above NOTE
+    # flasks = flask_load()
+    # fv = flasks[flask]
+    # coef = _coef[glass]
+    # return fv * (1.0 + coef * (t - _t));
 
     volumes = merge_df['FLASK_VOL'].values
     #volumes = merge_df['FLASK_VOL']
@@ -268,24 +284,23 @@ def thio_n_calc(params,ssscc):#(titr, blank, kio3_n, kio3_v, kio3_t, thio_t):
     kio3_v = params[3]
     kio3_t = params[4]
     thio_t = params[5]
-    """code_pruning: these rho_t calls can be replaced with gsw (see fit_ctd)"""
-    rho_stp  = fit_ctd.rho_t(20)
-    rho_kio  = fit_ctd.rho_t(kio3_t)
-    rho_thio = fit_ctd.rho_t(thio_t)
+
+    rho_stp  = gsw.rho_t_exact(0, 20, 0)
+    rho_kio  = gsw.rho_t_exact(0, kio3_t, 0)
+    rho_thio = gsw.rho_t_exact(0, thio_t, 0)
 
     kio3_v_20c = kio3_v * (rho_kio/rho_stp)
     thio_v_20c = titr * (rho_thio/rho_stp) - blank
 
     thio_n = kio3_v_20c * kio3_n / thio_v_20c
-    thio_n = thio_n.values
 
-    return thio_n
+    return thio_n.values
 
 def titr_20_calc(titr, titr_temp):
 
 
-    rho_titr = fit_ctd.rho_t(titr_temp)
-    rho_stp = fit_ctd.rho_t(20)
+    rho_titr = gsw.rho_t_exact(0, titr_temp, 0)
+    rho_stp = gsw.rho_t_exact(0, 20, 0)
 
     #convert the titr ammount to 20c equivalent
     titr_20c = titr * rho_titr/rho_stp
@@ -495,64 +510,30 @@ def sigma_from_CTD(sal, temp, press, lon, lat, ref=0):
 
     return sigma
 
-# this function now exists as gsw.O2sol()
-def os_umol_kg( sal, PT):
-    """
-    Calculates oxygen solubility in umol/kg as found in Gordon and Garcia 1992
-    (Taken from GSW, use this until gsw releases a version in their toolbox)
+def oxy_ml_to_umolkg(oxy_mL_L, sigma0):
+    """Convert dissolved oxygen from units of mL/L to micromol/kg.
 
-    From GSW:
-    Note that this algorithm has not been approved by IOC and is not work
-    from SCOR/IAPSO Working Group 127. It is included in the GSW
-    Oceanographic Toolbox as it seems to be oceanographic best practice.
-
-    Paramteters
-    -----------
-
-    sal :array-like
-         Practical Salinity (PSS-78)
-
-    PT :array-like
-        Potential Temperature
+    Parameters
+    ----------
+    oxy_mL_L : array-like
+        Dissolved oxygen in units of [mL/L]
+    sigma0 : array-like
+        Potential density anomaly (i.e. sigma - 1000) referenced to 0 dbar [kg/m^3]
 
     Returns
     -------
+    oxy_umol_kg : array-like
+        Dissolved oxygen in units of [umol/kg]
 
-    O2sol_umol :array_like
-                Oxygen Solubility in mirco-moles per kilogram (µmol/kg)
-
+    Notes
+    -----
+    Conversion value 44660 is exact for oxygen gas and derived from the ideal gas law.
+    (c.f. Sea-Bird Application Note 64, pg. 6)
     """
 
+    oxy_umol_kg = oxy_mL_L * 44660 / (sigma0 + 1000)
 
-
-    a0 = 5.80871
-    a1 = 3.20291
-    a2 = 4.17887
-    a3 = 5.10006
-    a4 = -9.86643e-2
-    a5 = 3.80369
-    b0 = -7.01577e-3
-    b1 = -7.70028e-3
-    b2 = -1.13864e-2
-    b3 = -9.51519e-3
-    c0 = -2.75915e-7
-
-
-    # Calculate potential temp
-
-    PT68 = PT * 1.00024 # the 1968 International Practical Temperature Scale IPTS-68.
-
-    y = np.log((298.15 - PT68) / (273.15 + PT))
-
-    O2sol_umol = np.exp(a0 + y * (a1 + y * (a2 + y * (a3 + y * (a4 + a5 * y)))) + sal * (b0 + y * (b1 + y * (b2 + b3 * y)) + c0 * sal))
-
-    return O2sol_umol
-
-def oxy_ml_to_umolkg(oxy_mlL,sigma0):
-
-    oxy_uMolkg = oxy_mlL * 44660 / (sigma0 + 1000)
-
-    return oxy_uMolkg
+    return oxy_umol_kg
 
 def calculate_dVdT(oxyvolts, time):
 #
@@ -658,6 +639,8 @@ def calculate_weights(pressure):
 
     return weights
 
+"""code_pruning: no calls, seems related to PMEL oxygen code?
+likely can remove in favor of current code, then refactor"""
 def interpolate_sigma(ctd_sigma,btl_sigma):
 
 #    all_sigma0 = time_data_clean['sigma0_time'].append(btl_data_clean['sigma0_btl'])
@@ -684,6 +667,8 @@ def interpolate_sigma(ctd_sigma,btl_sigma):
 
     return new_sigma
 
+"""code_pruning: no calls, seems related to PMEL oxygen code?
+likely can remove in favor of current code, then refactor"""
 def interpolate_pressure(ctd_pres,btl_pres):
 
     all_press = ctd_pres.append(btl_pres)
@@ -696,6 +681,8 @@ def interpolate_pressure(ctd_pres,btl_pres):
 
     return new_pres
 
+"""code_pruning: no calls, seems related to PMEL oxygen code?
+likely can remove in favor of current code, then refactor"""
 def interpolate_param(param):
     """
     First extends
@@ -1218,13 +1205,6 @@ def flag_oxy_data(df,oxy_col='OXYGEN',ctd_oxy_col='CTDOXY',p_col ='CTDPRS',flag_
     df.loc[(df[p_col] < 2000) & (df[p_col] >= 500) & (df[flag_col]==2) & (np.abs(df['res_sbe43']) >= (std_shal * 2.8)),flag_col] = 3
 
     return df
-
-"""code_pruning: no calls to this function"""
-def least_squares_resid(coef0,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):
-
-    coef,flag=scipy.optimize.leastsq(oxygen_cal_ml,coef0,
-                                     args=(oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch))
-    return coef
 
 """code_pruning: only call is from above fn"""
 def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):#temp,dvdt,os,

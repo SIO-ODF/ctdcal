@@ -6,14 +6,8 @@ Created on Tue Dec  5 11:36:32 2017
 @author: k3jackson
 """
 
-#import matplotlib
-#matplotlib.use('TkAgg')
-#import matplotlib.pyplot as plt
-import ctdcal.process_ctd as process_ctd
-import pandas as pd
 import ctdcal.oxy_fitting as oxy_fitting
-
-
+import pandas as pd
 
 method = 3
 
@@ -55,10 +49,10 @@ for cast in range(len(ssscc)):
     time_file = time_dir+stn_cst+'_time.pkl'
     btl_file = btl_dir+stn_cst+'_btl_mean.pkl'
 
-    time_data = process_ctd.dataToNDarray(time_file,float,True,',',1)
+    time_data = pd.read_pickle(time_file).to_records()
     time_data = pd.DataFrame.from_records(time_data)
 
-    btl_data = process_ctd.dataToNDarray(btl_file,float,True,',',0)
+    btl_data = pd.read_pickle(btl_file).to_records()
     btl_data = pd.DataFrame.from_records(btl_data)
 
 

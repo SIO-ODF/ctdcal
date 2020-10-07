@@ -2,8 +2,9 @@
 This script will initialize the data directory for ctdcal according to ODF usage.
 Joseph Gum, January 22, 2019
 '''
-import sys
 import pathlib
+import sys
+
 
 def build_dirs():
     data_directory = './data/'

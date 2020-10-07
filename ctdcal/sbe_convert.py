@@ -8,15 +8,19 @@ Created on Mon Sep 10 10:53:36 2018
 
 import os
 import sys
+
 sys.path.append('ctdcal/')
-import settings
-import ctdcal.process_ctd as process_ctd
+import warnings
+
 import pandas as pd
-import ctdcal.report_ctd as report_ctd
+
 import ctdcal.convert as cnv
 import ctdcal.process_bottle as btl
+import ctdcal.process_ctd as process_ctd
+import ctdcal.report_ctd as report_ctd
 import ctdcal.sbe_reader as sbe_reader
-import warnings
+import settings
+
 #import ctd
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -154,7 +158,7 @@ def sbe_metadata_2(ssscc):
 def process_bottle(ssscc):
     
     cnv_file = converted_directory + ssscc + '.pkl'
-    imported_df = cnv.importConvertedFile(cnv_file, False)
+    imported_df = pd.read_pickle(cnv_file)
     bottle_df = btl.retrieveBottleData(imported_df, False)
     if bottle_df.empty:
         #errPrint("Bottle fire data not found in converted file")
@@ -169,7 +173,7 @@ def process_bottle(ssscc):
     mean_df = btl.bottle_mean(bottle_df)
     
     meanfilePath = btl_data_prefix + ssscc + btl_data_postfix
-    cnv.saveConvertedDataToFile(mean_df, meanfilePath)
+    mean_df.to_pickle(meanfilePath)
     
     return 
 

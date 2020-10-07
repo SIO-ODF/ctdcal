@@ -14,8 +14,9 @@ not via an official document, and may change according to SBE wishes.
 '''code_pruning: calls to the math library/module should be removed in favor of faster numpy (does that work with xarray/dask, or does code need to be rewritten for that?)'''
 
 import math
-import gsw
+
 import numpy as np
+
 
 def temp_its90_dict(calib, freq, verbose = 0):
     """SBE equation for converting engineering units to Celcius according to ITS-90.

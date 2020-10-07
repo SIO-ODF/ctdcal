@@ -1,7 +1,5 @@
-import pandas as pd
 import ctdcal.merge_codes as merge
-import numpy as np
-import io
+import pandas as pd
 
 qual_codes_filepath = f'/Users/jgum/work_code/cruises/P06_2017/quality_codes/'
 cruise_dir = f'/Users/jgum/work_code/cruises/P06_2017/'

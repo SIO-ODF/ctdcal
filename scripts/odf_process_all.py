@@ -8,8 +8,8 @@ Mass processing script to run everything.
 
 import os
 import subprocess
-import time
 import sys
+import time
 
 ### need to fix this section later to handle plots, etc
 #import odf_bottle_combine as btl_combine

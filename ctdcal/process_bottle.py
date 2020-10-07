@@ -7,16 +7,11 @@ Joseph Gum SIO/ODF
 Nov 7, 2016
 '''
 
-import io
-import numpy as np
-import sys
 import csv
-import datetime
 import statistics
-import ctdcal.convert as cnv
-import pandas as pd
-import time
+import sys
 
+import pandas as pd
 
 BOTTLE_FIRE_COL = 'btl_fire'
 BOTTLE_FIRE_NUM_COL = 'btl_fire_num'
@@ -33,7 +28,7 @@ def errPrint(*args, **kwargs):
 # Retrieve the bottle data from a converted file.
 def retrieveBottleDataFromFile(converted_file, debug=False):
 
-    converted_df = cnv.importConvertedFile(converted_file, DEBUG)
+    converted_df = pd.read_pickle(converted_file)
 
     return retrieveBottleData(converted_df, debug)
 

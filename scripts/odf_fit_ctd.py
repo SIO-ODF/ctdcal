@@ -1,17 +1,14 @@
 #! /usr/bin/env python
-import sys
-import os
 import argparse
-import numpy as np
-import pandas as pd
-import json
-from ctdcal import process_ctd
-import ctdcal.report_ctd as report_ctd
-import ctdcal.fit_ctd as fit_ctd
 import configparser
-#import matplotlib.pyplot as plt
-from scipy.optimize import leastsq
+import os
+import sys
+
+import ctdcal.fit_ctd as fit_ctd
+import ctdcal.report_ctd as report_ctd
 import gsw
+import pandas as pd
+from ctdcal import process_ctd
 
 DEBUG = False
 
@@ -177,12 +174,12 @@ def main(argv):
     btlfilePath = os.path.join(btl_directory, btlfileName)
 
     # Get bottle data
-    btl_data = process_ctd.dataToNDarray(btlfilePath,float,True,',',0)
+    btl_data = pd.read_pickle(btlfilePath).to_records()
     #import pdb; pdb.set_trace()
     #btl_data = btl_data[:][1:]
 
     # Get procesed time data
-    time_data = process_ctd.dataToNDarray(args.timeFile,float,True,',',1)
+    time_data = pd.read_pickle(args.timeFile).to_records()
     #btm = np.argmax(time_data[p_col][1:])
     #time_data = time_data[:][1:btm]
     time_data = pd.DataFrame.from_records(time_data)
@@ -194,7 +191,7 @@ def main(argv):
         print(filename_base)
         pfileName = str('poffset' + '.' + FILE_EXT)
         pfilePath = os.path.join(log_directory, pfileName)
-        poff_data = process_ctd.dataToNDarray(pfilePath,str,None,',',None)
+        poff_data = pd.read_pickle(pfilePath).to_records()
 
         for line in poff_data:
             if filename_base in line[0]:
@@ -216,7 +213,7 @@ def main(argv):
         # Get descrete ref temp data
         t1fileName = str('fitting_t1' + '.' + FILE_EXT)
         t1filePath = os.path.join(log_directory, t1fileName)
-        t1_coef = process_ctd.dataToNDarray(t1filePath,str,None,',',None)
+        t1_coef = pd.read_pickle(t1filePath).to_records()
 
         for line in t1_coef:
             if filename_base in line[0]:
@@ -232,7 +229,7 @@ def main(argv):
 
         t2fileName = str('fitting_t2' + '.' + FILE_EXT)
         t2filePath = os.path.join(log_directory, t2fileName)
-        t2_coef = process_ctd.dataToNDarray(t2filePath,str,None,',',None)
+        t2_coef = pd.read_pickle(t2filePath).to_records()
 
         for line in t2_coef:
             if filename_base in line[0]:
@@ -257,7 +254,7 @@ def main(argv):
         c1fileName = str('fitting_c1' + '.' + FILE_EXT)
         c1filePath = os.path.join(log_directory, c1fileName)
         if os.path.exists(c1filePath):
-            c1_coef = process_ctd.dataToNDarray(c1filePath,str,None,',',None)
+            c1_coef = pd.read_pickle(c1filePath).to_records()
 
             for line in c1_coef:
                 if filename_base in line[0]:
@@ -274,7 +271,7 @@ def main(argv):
         c2fileName = str('fitting_c2' + '.' + FILE_EXT)
         c2filePath = os.path.join(log_directory, c2fileName)
         if os.path.exists(c2filePath):
-            c2_coef = process_ctd.dataToNDarray(c2filePath,str,None,',',None)
+            c2_coef = pd.read_pickle(c2filePath).to_records()
 
             for line in c2_coef:
                 if filename_base in line[0]:
@@ -327,7 +324,7 @@ def main(argv):
     logfileName = str('cast_details' + '.' + FILE_EXT)
     logfilePath = os.path.join(log_directory, logfileName)
 
-    cast_details = process_ctd.dataToNDarray(logfilePath,str,None,',',0)
+    cast_details = pd.read_pickle(logfilePath).to_records()
     for line in cast_details:
         if filename_base in line[0]:
             for val in line:

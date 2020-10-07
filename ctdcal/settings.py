@@ -2,8 +2,6 @@
 import os
 import pathlib
 
-
-
 cruise = dict(
     cruise_title = 'GO-SHIP NBP1802',
     cruise_name = 'nbp1802',

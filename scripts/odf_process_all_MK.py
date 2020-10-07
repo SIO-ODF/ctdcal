@@ -3,16 +3,13 @@ Attempt to write a cleaner processing script from scratch.
 """
 
 # import necessary packages
-import os
 import sys
-import subprocess
-import ctdcal.process_ctd as process_ctd
-import ctdcal.fit_ctd as fit_ctd
-import ctdcal.oxy_fitting as oxy_fitting
-import ctdcal.rinko as rinko
-import ctdcal.odf_io as odf_io
+
 import ctdcal.convert as convert
-import scripts.odf_sbe_metadata as odf_sbe_metadata
+import ctdcal.fit_ctd as fit_ctd
+import ctdcal.odf_io as odf_io
+import ctdcal.oxy_fitting as oxy_fitting
+import ctdcal.process_ctd as process_ctd
 
 
 def process_all():
@@ -28,22 +25,14 @@ def process_all():
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
     #####
-
     # load station/cast list from file
     ssscc_list = process_ctd.get_ssscc_list()
 
     # convert raw .hex files
     convert.hex_to_ctd(ssscc_list)
 
-    # first half of CTD data processing
-    # TODO: clean up and document better
-    # TODO: export to odf_io instead of standalone script?
-    # this produces #_ct1.csv (preliminary), #_time.pkl, and "ondeck_pressure.csv"
-    time_dir_list = os.listdir("data/time/")
-    for ssscc in ssscc_list:
-        if "{}_time.pkl".format(ssscc) not in time_dir_list:
-            odf_sbe_metadata.main(cfg.directory["converted"] + ssscc + ".pkl")
-            print("odf_sbe_metadata.py SSSCC: " + ssscc + " done")
+    # process time files
+    convert.make_time_files(ssscc_list)
 
     # process bottle file
     convert.make_btl_mean(ssscc_list)

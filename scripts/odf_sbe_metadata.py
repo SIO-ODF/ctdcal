@@ -1,19 +1,13 @@
 #! /usr/bin/env python
+#remove and streamline imports below later
+import configparser
 import sys
-import os
-
-import ctdcal.sbe_reader as sbe_reader
-import numpy as np
-import pandas as pd
-import ctdcal.convert as cnv
-import ctdcal.process_ctd as process_ctd
-import ctdcal.report_ctd as report_ctd
-import pickle
 from pathlib import PurePosixPath
 
-#remove and streamline imports below later
-import argparse
-import configparser
+import ctdcal.process_ctd as process_ctd
+import ctdcal.report_ctd as report_ctd
+import pandas as pd
+
 #import matplotlib.pyplot as plt
 
 DEBUG = False
@@ -114,7 +108,6 @@ def main(pkl_path):
     converted_df = pd.read_pickle(pkl_path)
 
     # Construct NDarray - fix this serialization asap
-    #raw_data = process_ctd.dataToNDarray(convertedfilePath,None,list(converted_df.columns.insert(0,'index')),',',2)
     raw_data = converted_df.to_records()
     #import pdb; pdb.set_trace()
 
