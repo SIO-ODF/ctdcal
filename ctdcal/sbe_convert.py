@@ -8,15 +8,19 @@ Created on Mon Sep 10 10:53:36 2018
 
 import os
 import sys
+
 sys.path.append('ctdcal/')
-import settings
-import ctdcal.process_ctd as process_ctd
+import warnings
+
 import pandas as pd
-import ctdcal.report_ctd as report_ctd
+
 import ctdcal.convert as cnv
 import ctdcal.process_bottle as btl
+import ctdcal.process_ctd as process_ctd
+import ctdcal.report_ctd as report_ctd
 import ctdcal.sbe_reader as sbe_reader
-import warnings
+import settings
+
 #import ctd
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 

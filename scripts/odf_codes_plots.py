@@ -1,12 +1,9 @@
 import matplotlib
+
 matplotlib.use('ps')
 
-import ctdcal.merge_codes as merge
 import ctdcal.ctd_plots as ctd_plots
-
-import pandas as pd
-#import numpy as np
-import matplotlib.pyplot as plt
+import ctdcal.merge_codes as merge
 
 expocode = f'320620180309'
 

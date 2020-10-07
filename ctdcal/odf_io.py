@@ -1,13 +1,14 @@
-import pandas as pd
-import numpy as np
-import datetime as dt
-import gsw
 import csv
+import datetime as dt
+import sys
 from collections import OrderedDict
 from pathlib import Path
-import config as cfg
 
-import sys
+import config as cfg
+import gsw
+import numpy as np
+import pandas as pd
+
 
 def salts_time_indexer(time_string):
     '''Take in string time, then change it to seconds relative to a 0 point.'''

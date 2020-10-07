@@ -6,14 +6,8 @@ Created on Tue Dec  5 11:36:32 2017
 @author: k3jackson
 """
 
-#import matplotlib
-#matplotlib.use('TkAgg')
-#import matplotlib.pyplot as plt
-import ctdcal.process_ctd as process_ctd
-import pandas as pd
 import ctdcal.oxy_fitting as oxy_fitting
-
-
+import pandas as pd
 
 method = 3
 

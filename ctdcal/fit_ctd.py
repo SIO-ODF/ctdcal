@@ -1,21 +1,16 @@
 #!/usr/bin/env python
-import math
-import scipy
+from pathlib import Path
+
+import config as cfg
+import gsw
 import numpy as np
 import pandas as pd
-import ctdcal.ctd_plots as ctd_plots
-import ctdcal.sbe_reader as sbe_rd
-import ctdcal.sbe_equations_dict as sbe_eq
-import ctdcal.process_ctd as process_ctd
-from scipy.optimize import leastsq
-import gsw
-import csv
+import scipy
 from scipy.ndimage.interpolation import shift
-#import requests
-import os
-import json
-from pathlib import Path
-import config as cfg
+
+import ctdcal.ctd_plots as ctd_plots
+import ctdcal.process_ctd as process_ctd
+import ctdcal.sbe_equations_dict as sbe_eq
 
 # TODO: clean up oxygen fitting things, they should be in ctdcal.oxy_fitting
 
@@ -904,14 +899,6 @@ def write_calib_coef(ssscc,coef,param):
     return df
 
 '''
-
-"""code_pruning: only called by deprecated code and not useful... marked for removal"""
-def array_like_to_series(array):
-    
-    series = pd.Series(array)
-    series.reset_index(drop=True,inplace=True)
-    
-    return series
   
 ##
 #            key = (station, cast, bottle, "o2")

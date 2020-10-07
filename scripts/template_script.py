@@ -7,16 +7,17 @@ Created on Tue Jul 31 11:42:27 2018
 """
 
 import os
-import time
 import sys
+
 sys.path.append('ctdcal/')
-import settings
-import ctdcal.process_ctd as process_ctd
 import ctdcal.fit_ctd as fit_ctd
-import pandas as pd
-import gsw
 import ctdcal.oxy_fitting as oxy_fitting
+import ctdcal.process_ctd as process_ctd
+import gsw
+import pandas as pd
 import sbe_convert
+import settings
+
 
 def process_all_new():
 

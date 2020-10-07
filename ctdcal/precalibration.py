@@ -1,5 +1,5 @@
-import pandas as pd
 import numpy as np
+
 
 def simple_filter(df, **kwargs):
     '''Recreate simple filter for pressure/residual ranges.

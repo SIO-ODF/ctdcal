@@ -7,16 +7,11 @@ Joseph Gum SIO/ODF
 Nov 7, 2016
 '''
 
-import io
-import numpy as np
-import sys
 import csv
-import datetime
 import statistics
-import ctdcal.convert as cnv
-import pandas as pd
-import time
+import sys
 
+import pandas as pd
 
 BOTTLE_FIRE_COL = 'btl_fire'
 BOTTLE_FIRE_NUM_COL = 'btl_fire_num'

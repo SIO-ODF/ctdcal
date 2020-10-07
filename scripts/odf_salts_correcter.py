@@ -1,7 +1,6 @@
-import pandas as pd
-import numpy as np
-
 import ctdcal.odf_io as odf_io
+import pandas as pd
+
 #import libODF_precalibration as precal
 
 std_dir = f'/Users/jgum/work_code/cruises/'

@@ -1,4 +1,3 @@
-import pandas as pd
 import ctdcal.merge_codes as merge_codes
 
 std_dir = f'/Users/jgum/work_code/ctdcal/'

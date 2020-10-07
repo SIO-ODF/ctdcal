@@ -5,8 +5,9 @@ Created on Mon Jan 22 15:10:39 2018
 
 @author: k3jackson
 """
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 def pressure_offset(ondeck_file):
     """ Calculates average pressure offset

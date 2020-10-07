@@ -1,13 +1,11 @@
 #! /usr/bin/env python
-import sys
-import os
 import argparse
-import numpy as np
-import pandas as pd
 import configparser
+import os
+import sys
+
 import ctdcal.process_ctd as process_ctd
-import ctdcal.sbe_reader as sbe_reader
-import ctdcal.convert as cnv
+import pandas as pd
 
 DEBUG = False
 

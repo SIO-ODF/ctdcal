@@ -1,10 +1,10 @@
 #! /usr/bin/env python
-import sys
-import os
 import argparse
-import pandas as pd
-import ctdcal.convert as cnv
+import os
+import sys
+
 import ctdcal.process_bottle as btl
+import pandas as pd
 
 #File extension to use for output files (csv-formatted)
 FILE_EXT = 'csv'

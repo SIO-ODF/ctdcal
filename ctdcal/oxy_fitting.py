@@ -6,24 +6,20 @@ Created on Mon Jan  8 10:04:19 2018
 @author: k3jackson
 """
 
-
-
-import scipy
-import numpy as np
-#import sys
-#sys.path.append('ctdcal/')
-import ctdcal.process_ctd as process_ctd
-import ctdcal.ctd_plots as ctd_plots
-import ctdcal.fit_ctd as fit_ctd
-import ctdcal.sbe_reader as sbe_rd
-import ctdcal.sbe_equations_dict as sbe_eq
-import gsw
-import pandas as pd
 import csv
 from pathlib import Path
-import config as cfg
 
-#Line 342 module isopycnals
+import config as cfg
+import gsw
+import numpy as np
+import pandas as pd
+import scipy
+
+import ctdcal.ctd_plots as ctd_plots
+import ctdcal.process_ctd as process_ctd
+import ctdcal.sbe_equations_dict as sbe_eq
+import ctdcal.sbe_reader as sbe_rd
+
 
 def oxy_loader(oxyfile):
 
@@ -517,8 +513,8 @@ def sigma_from_CTD(sal, temp, press, lon, lat, ref=0):
 def oxy_ml_to_umolkg(oxy_mL_L, sigma0):
     """Convert dissolved oxygen from units of mL/L to micromol/kg.
 
-    Inputs
-    ------
+    Parameters
+    ----------
     oxy_mL_L : array-like
         Dissolved oxygen in units of [mL/L]
     sigma0 : array-like

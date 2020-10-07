@@ -1,13 +1,13 @@
-import sys
-import csv
-import pandas as pd
-import ctdcal.sbe_reader as sbe_rd
-import ctdcal.sbe_equations_dict as sbe_eq
-import gsw
 from pathlib import Path
+
+import config as cfg
+import gsw
+import pandas as pd
+
 import ctdcal.process_bottle as btl
 import ctdcal.process_ctd as process_ctd
-import config as cfg
+import ctdcal.sbe_equations_dict as sbe_eq
+import ctdcal.sbe_reader as sbe_rd
 
 DEBUG = False
 

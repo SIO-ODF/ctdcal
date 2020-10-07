@@ -1,19 +1,13 @@
 #! /usr/bin/env python
+#remove and streamline imports below later
+import configparser
 import sys
-import os
-
-import ctdcal.sbe_reader as sbe_reader
-import numpy as np
-import pandas as pd
-import ctdcal.convert as cnv
-import ctdcal.process_ctd as process_ctd
-import ctdcal.report_ctd as report_ctd
-import pickle
 from pathlib import PurePosixPath
 
-#remove and streamline imports below later
-import argparse
-import configparser
+import ctdcal.process_ctd as process_ctd
+import ctdcal.report_ctd as report_ctd
+import pandas as pd
+
 #import matplotlib.pyplot as plt
 
 DEBUG = False

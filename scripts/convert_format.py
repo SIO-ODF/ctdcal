@@ -1,11 +1,10 @@
-#%pylab inline
-import xml.etree.ElementTree as ET
-import struct
-import numpy as np
-import re
-import sys
 import math
-#import ipdb
+import struct
+import sys
+import xml.etree.ElementTree as ET
+
+import numpy as np
+
 
 def parse_frequency_hex(s):
     #return int(s[0:2], 16) * 256 + int(s[2:4], 16) + int(s[4:6], 16)/256

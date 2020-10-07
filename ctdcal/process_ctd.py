@@ -1,28 +1,19 @@
 #!/usr/bin/env python
-from scipy import interpolate
-import numpy as np
-from numpy.lib.recfunctions import append_fields
-import scipy.signal as sig
-import scipy.stats as st
-import time, os
-import pandas as pd
-import math
-#import report_ctd
-import ctdcal.report_ctd as report_ctd
-import warnings
-import ctdcal.fit_ctd as fit_ctd
-from datetime import datetime, timezone
-from decimal import Decimal
-import config as cfg
-
-# import sys
-# sys.path.append('ctdcal/')
-# import ctdcal.settings
-import ctdcal.oxy_fitting as oxy_fitting
-import gsw
 import csv
+import math
+import warnings
 from collections import OrderedDict
+from datetime import datetime, timezone
 from pathlib import Path
+
+import config as cfg
+import gsw
+import numpy as np
+import pandas as pd
+import scipy.signal as sig
+
+import ctdcal.oxy_fitting as oxy_fitting
+import ctdcal.report_ctd as report_ctd
 
 warnings.filterwarnings("ignore", 'Mean of empty slice.')
 
@@ -944,11 +935,11 @@ def calibrate_param(param,ref_param,press,ssscc,btl_num,xRange=None,):
 def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
     '''Jackson code'''
 
-    param = fit_ctd.array_like_to_series(param)
-    param_2 = fit_ctd.array_like_to_series(param_2)
-    press = fit_ctd.array_like_to_series(press)
-    ssscc = fit_ctd.array_like_to_series(ssscc)
-    btl_num = fit_ctd.array_like_to_series(btl_num)
+    param = pd.Series(param).reset_index(drop=True, inplace=True)
+    param_2 = pd.Series(param_2).reset_index(drop=True, inplace=True)
+    press = pd.Series(press).reset_index(drop=True, inplace=True)
+    ssscc = pd.Series(ssscc).reset_index(drop=True, inplace=True)
+    btl_num = pd.Series(btl_num).reset_index(drop=True, inplace=True)
 
     diff = param_2 - param
 
