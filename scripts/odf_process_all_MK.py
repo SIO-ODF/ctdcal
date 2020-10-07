@@ -35,15 +35,8 @@ def process_all():
     # convert raw .hex files
     convert.hex_to_ctd(ssscc_list)
 
-    # first half of CTD data processing
-    # TODO: clean up and document better
-    # TODO: export to odf_io instead of standalone script?
-    # this produces #_ct1.csv (preliminary), #_time.pkl, and "ondeck_pressure.csv"
-    time_dir_list = os.listdir("data/time/")
-    for ssscc in ssscc_list:
-        if "{}_time.pkl".format(ssscc) not in time_dir_list:
-            odf_sbe_metadata.main(cfg.directory["converted"] + ssscc + ".pkl")
-            print("odf_sbe_metadata.py SSSCC: " + ssscc + " done")
+    # process time files
+    convert.make_time_files(ssscc_list)
 
     # process bottle file
     convert.make_btl_mean(ssscc_list)

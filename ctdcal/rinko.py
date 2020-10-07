@@ -1,6 +1,6 @@
 from collections import namedtuple
 import numpy as np
-import oxy_fitting
+import ctdcal.oxy_fitting as oxy_fitting
 import pandas as pd
 import scipy
 
