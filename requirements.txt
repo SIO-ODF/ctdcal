@@ -5,6 +5,7 @@ matplotlib==2.0.1
 numpy==1.12.1
 packaging==16.8
 pandas==1.0.3
+pre-commit==2.7.1
 pyparsing==2.2.0
 python-dateutil==2.6.0
 pytz==2017.2
