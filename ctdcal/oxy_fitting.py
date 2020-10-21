@@ -639,73 +639,6 @@ def calculate_weights(pressure):
 
     return weights
 
-"""code_pruning: no calls, seems related to PMEL oxygen code?
-likely can remove in favor of current code, then refactor"""
-def interpolate_sigma(ctd_sigma,btl_sigma):
-
-#    all_sigma0 = time_data_clean['sigma0_time'].append(btl_data_clean['sigma0_btl'])
-#    fsg = pd.Series(np.min(all_sigma0)-1e-4)
-#    lsg = pd.Series(np.max(all_sigma0)+1e-4)
-#    new_sigma0 = fsg.append(time_data_clean['sigma0_time'])
-#    new_sigma0 = new_sigma0.append(lsg)
-
-    all_sigma = ctd_sigma.append(btl_sigma)
-    fsg = pd.Series(np.min(all_sigma)-1e-4)
-    lsg = pd.Series(np.max(all_sigma)+1e-4)
-    new_sigma = fsg.append(ctd_sigma)
-    new_sigma = new_sigma.append(lsg)
-    new_sigma = new_sigma.reset_index()
-    new_sigma = new_sigma[0]
-
-
-    #x = np.arange(np.size(ctd_sigma))
-#    x_inter = np.arange(np.size(new_sigma0))
-#    inter_sigma2 = scipy.interpolate.interp1d(x_inter,new_sigma0)
-#    new_x = np.linspace(0,np.max(x_inter),np.size(ctd_sigma))
-#    new_sigma0=inter_sigma2(new_x)
-#    new_sigma0 = pd.Series(new_sigma0)
-
-    return new_sigma
-
-"""code_pruning: no calls, seems related to PMEL oxygen code?
-likely can remove in favor of current code, then refactor"""
-def interpolate_pressure(ctd_pres,btl_pres):
-
-    all_press = ctd_pres.append(btl_pres)
-    fsg = pd.Series(np.min(all_press) - 1)
-    lsg = pd.Series(np.max(all_press) + 1)
-    new_pres = fsg.append(ctd_pres)
-    new_pres = new_pres.append(lsg)
-    new_pres = new_pres.reset_index()
-    new_pres = new_pres[0]
-
-    return new_pres
-
-"""code_pruning: no calls, seems related to PMEL oxygen code?
-likely can remove in favor of current code, then refactor"""
-def interpolate_param(param):
-    """
-    First extends
-    Generates function using x_inter
-    calculates values over a new range "new_x"
-    x_inter is the x-range of the extended parameter
-    new_x is the x-range of the "interpolated-down" parameter
-
-    """
-    ex_param = pd.Series(param.iloc[0])
-    ex_param = ex_param.append(param)#,index=[])
-    ex_param = ex_param.append(pd.Series(param.iloc[-1]))
-    ex_param = ex_param.reset_index()
-    ex_param = ex_param[0]
-
-#    x_inter = np.arange(len(ex_param))
-#
-#    inter_param = scipy.interpolate.interp1d(x_inter,ex_param)
-#
-#    new_x = np.arange(len(param))
-#    dparam = inter_param(new_x)
-
-    return ex_param
 
 def oxy_equation(X, Soc, Voffset, A, B, C, E, Tau20):
     # eq (3) in Uchida CTD manual
@@ -737,6 +670,12 @@ def _PMEL_oxy_eq(coefs,inputs,cc=[1.92634e-4,-4.64803e-2]):
 
     return o2
 
+# TODO: optionally include other residual types
+# (abstracted from PMEL code oxygen_cal_ml.m)
+# unweighted L2: sum((ref - oxy)^2)  # if weighted fails
+# unweighted L4: sum((ref - oxy)^4)  # unsure of use case
+# unweighted L1: sum(abs(ref - oxy))  # very far from ideal
+# anything else? genericize with integer "norm" function input?
 def PMEL_oxy_weighted_residual(coefs,weights,inputs,refoxy):
     return np.sum((weights*(refoxy-_PMEL_oxy_eq(coefs, inputs))**2))/np.sum(weights**2)
 
@@ -1120,143 +1059,3 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_coefs.to_csv(cfg.directory["logs"] + "sbe43_coefs.csv")
     
     return True
-
-"""code_pruning: only called from old processing script template_script.py"""
-def apply_oxygen_coef_ctd(df, coef_df, ssscc, ssscc_col='SSSCC',oxyvo_col='CTDOXYVOLTS',
-                          time_col='scan_datetime',prs_col='CTDPRS',tmp_col='CTDTMP1',
-                          os_col='OS_ctd'):
-
-    df['CTDOXY'] = -999
-    for station in ssscc:
-        coef = coef_df.loc[station[0:3]].values
-        mask = (df[ssscc_col] == station)
-        time_mask = df[mask].copy()
-        time_mask['dv_dt'] = calculate_dVdT(time_mask[oxyvo_col],time_mask[time_col])
-        df.loc[mask, 'CTDOXY'] = oxy_equation((time_mask[oxyvo_col],time_mask[prs_col],time_mask[tmp_col],
-                                              time_mask['dv_dt'],time_mask[os_col]),coef[0],coef[1],coef[2],
-                                                coef[3],coef[4],coef[5],coef[6])
-
-    df['CTDOXY_FLAG_W'] = 2
-
-    return df
-
-"""code_pruning: only called from old processing script template_script.py"""
-def merge_oxy_df(df,oxy_df,btl_stn_col='SSSCC',btl_prs_col='CTDPRS',
-                 oxy_stn_col='SSSCC',oxy_prs_col='CTDPRS_btl'):
-
-    df = df.merge(oxy_df,left_on=[btl_stn_col, btl_prs_col], right_on=[oxy_stn_col, oxy_prs_col],how='outer')
-
-    mask = (df['CTDOXY_y'].notna())
-    df.loc[mask,'CTDOXY_x']= df['CTDOXY_y'][mask]
-
-    mask = (df['CTDOXY_FLAG_W_y'].notna())
-    df.loc[mask,'CTDOXY_FLAG_W_x']= df['CTDOXY_FLAG_W_y'][mask]
-
-    #Rename Columns
-
-    df.rename(columns={'CTDPRS_x':'CTDPRS','OXYGEN_x':'OXYGEN','CTDOXY_x':'CTDOXY','CTDOXY_FLAG_W_x':'CTDOXY_FLAG_W'},inplace=True)
-
-    drop_list = []
-    for key in df.keys():
-        if '_x'in key:
-            drop_list.append(key)
-        elif '_y' in key:
-            drop_list.append(key)
-
-
-    df.drop(columns=drop_list, inplace=True)
-
-    return df
-
-"""code_pruning: only called from old processing script odf_process_all_new.py"""
-def clean_oxygen_df(df):
-
-    df.rename(columns={'CTDPRS_x':'CTDPRS','OXYGEN_x':'OXYGEN','CTDOXYVOLTS_y':'CTDOXYVOLTS'},inplace=True)
-
-    drop_list = []
-    for key in df.keys():
-        if '_x'in key:
-            drop_list.append(key)
-        elif '_y' in key:
-                drop_list.append(key)
-
-    df.drop(columns=drop_list, inplace=True)
-
-    return df
-
-"""code_pruning: only called from old processing scripts"""
-def create_coef_df(coef_dict):
-
-    coef_df = pd.DataFrame(coef_dict)
-    coef_df = coef_df.transpose()
-    coef_df.rename(columns={0:'Soc',1:'Voffset',2:'A',3:'B',4:'C',5:'E',6:'Tau20'})
-
-    return coef_df
-
-"""code_pruning: only called from old processing scripts"""
-def flag_oxy_data(df,oxy_col='OXYGEN',ctd_oxy_col='CTDOXY',p_col ='CTDPRS',flag_col='CTDOXY_FLAG_W'):
-    df['res_sbe43'] = df[oxy_col] - df[ctd_oxy_col]
-    df_deep = df.loc[(df[p_col] >= 2000) & (df[flag_col]==2)]
-    std = df_deep['res_sbe43'].std()
-    df.loc[(df[p_col] >= 2000) & (df[flag_col]==2) & (np.abs(df['res_sbe43']) >= (std * 2.8)),flag_col] = 3
-
-    df_shallow = df.loc[(df[p_col] < 2000) & (df[p_col] >= 500) & (df[flag_col]==2)]
-    std_shal = df_shallow['res_sbe43'].std()
-    df.loc[(df[p_col] < 2000) & (df[p_col] >= 500) & (df[flag_col]==2) & (np.abs(df['res_sbe43']) >= (std_shal * 2.8)),flag_col] = 3
-
-    return df
-
-"""code_pruning: only call is from above fn"""
-def oxygen_cal_ml(coef,oxyvolts,pressure,temp,dvdt,os,ref_oxy,switch,cc=[1.92634e-4,-4.64803e-2]):#temp,dvdt,os,
-
-    """"
-
-    NOAA's oxygen fitting routine using the equation:
-    OXY(ml/L) = SOC * (doxy_volts+Voffset+Tau20*exp(cc1*PRES+cc2*TEMP)*dvdt) \
-                *os*exp(Tcorr*TEMP)*exp(E*PRESS/TEMP_K)
-
-    coef0s:
-    coef[0] = Soc
-    coef[1] = Voffset
-    coef[2] = Tau20
-    coef[3] = Tcorr
-    coef[4] = E
-
-    cc[0] = D1
-    cc[1] = D2
-
-    """
-#
-#    ctd_oxy_mlL = apply_oxy_coef(time_data,coef,cc=[1.92634e-4,-4.64803e-2],oxyvo_col='CTDOXYVOLTS',p_col='CTDPRS',t_col='CTDTMP1',sal_col='CTDSAL')
-    ctd_oxy_mlL = oxy_from_ctd_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc)
-#    ctd_oxy_mlL = SB_oxy_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc)
-    #Weight Determination
-    if switch == 1:
-
-        #weights = calculate_weights(pressure)
-        weights = 1/(np.power(pressure,1))
-        #resid = ((weights * (ref_oxy - ctd_oxy_mlL))**2) / (np.sum(weights)**2) #Original way (np.sum(weights)**2)
-        resid = ((weights * (ref_oxy - ctd_oxy_mlL))**2) #/ #(np.sum(weights)**2) #Original way (np.sum(weights)**2)
-    elif switch == 2:
-        #L2 Norm
-        resid = (ref_oxy - ctd_oxy_mlL)**2
-
-    elif switch == 3:
-        #ODF residuals
-
-        resid = np.sqrt(((ref_oxy - ctd_oxy_mlL)**2) / (np.std(ctd_oxy_mlL)**2))
-
-    elif switch == 4:
-        # Weighted ODF residuals
-
-        #weights = calculate_weights(pressure)
-        weights = 1/(np.power(pressure,1))
-        resid = np.sqrt(weights * ((ref_oxy - ctd_oxy_mlL)**2) / (np.sum(weights)**2))#(np.std(ctd_oxy_mlL)**2))
-
-    elif switch == 5:
-
-        #weights = calculate_weights(pressure)
-        weights = 1/(np.power(pressure,1))
-        resid = ((weights * (ref_oxy - ctd_oxy_mlL))**2) / (np.sum(weights**2))
-
-    return resid

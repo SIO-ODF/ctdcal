@@ -256,32 +256,6 @@ def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, 
 
     return q_df.values  # ndarray format
 
-#code_pruning: not appears to be used
-'''def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
-    """formatTimeEpoc function
-
-    Function takes pattern of time input, relative time zone, and
-    date time data array and returns array of epoc time.
-
-    title and the second row are the units for each column.
-    Args:
-        param1 (str): relative time zone for data.
-        param2 (str): pattern of incoming data.
-        param3 (ndarray): input_time, numpy 1d ndarray time array
-
-    Returns:
-        1D ndarray: The return array of epoch time
-    """
-    if input_time is None:
-        print("In formatTimeEpoc: No data entered.")
-        return
-    else:
-        os.environ['TZ'] = 'UTC'
-        epoch_time = input_time
-        for i in range(0,len(input_time)):
-            epoch_time[i] = int(time.mktime(time.strptime(str(input_time[i], "utf-8"), time_pattern)))
-
-    return epoch_time'''
 
 '''code_pruning: do timing exercises to see if this is vectorized or not'''
 def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
@@ -996,60 +970,6 @@ def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0
 
     return df
 
-"""code_pruning: only used in old versions of process_all"""
-def combine_quality_flags(df_list):
-
-    combined_df = pd.concat(df_list)
-    combined_df = combined_df.sort_values(['SSSCC','Bottle'])
-
-    combined_df = combined_df.round(4)
-
-    return combined_df
-
-    #Combine these three into a dataframe and write out to a csv
-    #Sort by sta/cast, bottle number, rev. press
-
-# MK: moved to fit_ctd
-# all calls to this are from deprecated (or soon to be deprecated) functions
-"""code_pruning: only used in following 3 funcs and old process_all scripts"""
-def prepare_fit_data(df,ref_col):
-
-    good_data = df.copy()
-    good_data = good_data[np.isfinite(good_data[ref_col])]
-
-    return good_data
-
-
-
-"""code_pruning: no calls to this function"""
-def prepare_conductivity_data(ssscc,df,refc,ssscc_col = 'SSSCC',index_col = 'btl_fire_num'):
-
-    btl_concat = pd.DataFrame()
-    for x in ssscc:
-        btl_data = df[df[ssscc_col] == x]
-        refc_data = refc[refc[ssscc_col] == x]
-        btl_data_clean = prepare_fit_data(btl_data,refc_data,'C')
-        btl_concat = pd.concat([btl_concat,btl_data_clean])
-    refc = refc[refc[index_col] != 0]
-    refc = refc.reset_index(drop=True)
-    btl_concat = btl_concat.reset_index(drop=True)
-
-    return btl_concat, refc
-
-"""code_pruning: no calls to this function"""
-def prepare_all_fit_data(ssscc,df,ref_data,param):
-
-    data_concat = pd.DataFrame()
-
-
-    for x in ssscc:
-        btl_data = df[df['SSSCC']==x]
-        ref_data_stn= ref_data[ref_data['SSSCC']==x]
-        btl_data_good = prepare_fit_data(btl_data,ref_data_stn,param)
-        data_concat = pd.concat([data_concat,btl_data_good])
-
-    return data_concat
-
 
 def _get_pressure_offset(start_vals, end_vals):
     """
@@ -1276,95 +1196,6 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
 
     return df_data_all
 
-"""code_pruning: the following four merge flag functions are only used in old scripts"""
-def merge_refcond_flags(btl_data, qual_flag_cond):
-    # Merge df
-    mask = qual_flag_cond[qual_flag_cond['Parameter'] == 'REF_COND'].copy()
-    mask['SSSCC'] = mask['SSSCC'].astype(str)
-    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
-    # Rename Columns
-    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'SALNTY_FLAG_W'},inplace=True)
-    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
-    btl_data['SALNTY_FLAG_W'].fillna(value=2,inplace=True)
-    try:
-        btl_data.loc[btl_data['BTLCOND'].isna(),'SALNTY_FLAG_W'] = 9
-    except:
-        btl_data[btl_data['SALNTY'].isna(),'SALNTY_FLAG_W'] = 9
-    btl_data['SALNTY_FLAG_W'] = btl_data['SALNTY_FLAG_W'].astype(int)
-
-    return btl_data
-
-"""code_pruning: only used in old processing scripts"""
-def merge_cond_flags(btl_data, qual_flag_cond,parameter):
-    # Merge df
-    #if sensor == 1:
-    #    parameter = 'CTDCOND1'
-    #elif sensor == 2:
-    #    parameter = 'CTDCOND2'
-    mask = qual_flag_cond[qual_flag_cond['Parameter'] == parameter].copy()
-    mask['SSSCC'] = mask['SSSCC'].astype(str)
-    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
-    # Rename Columns
-    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'CTDSAL_FLAG_W'},inplace=True)
-    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
-    btl_data['CTDSAL_FLAG_W'].fillna(value=2,inplace=True)
-    btl_data.loc[btl_data[parameter].isna(),'CTDSAL_FLAG_W'] = 9
-    btl_data['CTDSAL_FLAG_W'] = btl_data['CTDSAL_FLAG_W'].astype(int)
-
-    return btl_data
-
-"""code_pruning: only used in old processing scripts"""
-def merged_reftemp_flags(btl_data, qual_flag_temp):
-
-    mask = qual_flag_temp[qual_flag_temp['Parameter'] == 'REF_TEMP'].copy()
-    mask['SSSCC'] = mask['SSSCC'].astype(str)
-    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
-    # Rename Columns
-    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'REFTMP_FLAG_W'},inplace=True)
-    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
-    btl_data['REFTMP_FLAG_W'].fillna(value=2,inplace=True)
-    try:
-        btl_data.loc[btl_data['T90'].isna(),'REFTMP_FLAG_W'] = 9
-    except:
-        btl_data.loc[btl_data['REFTMP'].isna(),'REFTMP_FLAG_W'] = 9
-        btl_data.loc[btl_data['REFTMP'].isna(),'REFTMP'] = -999
-    #btl_data['REFTMP_FLAG_W'] = btl_data['REFTMP_FLAG_W'].astype(int)
-
-    return btl_data
-
-"""code_pruning: only used in old processing scripts"""
-def merge_temp_flags(btl_data, qual_flag_temp, parameter):
-
-    mask = qual_flag_temp[qual_flag_temp['Parameter'] == parameter].copy()
-    mask['SSSCC'] = mask['SSSCC'].astype(str)
-    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
-    # Rename Columns
-    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'CTDTMP_FLAG_W'},inplace=True)
-    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
-    btl_data['CTDTMP_FLAG_W'] = btl_data['CTDTMP_FLAG_W'].fillna(value=2)
-    btl_data['CTDTMP_FLAG_W'] = btl_data['CTDTMP_FLAG_W'].astype(int)
-
-    return btl_data
-
-"""code_pruning: no calls to this function"""
-def format_time_data(df):
-
-    format_columns = settings.pressure_series_output['column_names'].copy()
-    if 'SSSCC' not in format_columns:
-        print('Adding SSSCC')
-        format_columns.append('SSSCC')
-    if 'DEPTH' not in format_columns:
-        print('Adding DEPTH')
-        format_columns.append('DEPTH')
-    try:
-        df = df[format_columns]
-    except:
-        print('missing required pressure series output columns!')
-        df_columns = list(df.keys())
-        missing_list = list(np.setdiff1d(format_columns,df_columns))
-        raise KeyError('missing columns: ',missing_list)
-
-    return df
 
 def add_btlnbr_cols(df,btl_num_col):
     df['BTLNBR'] = df[btl_num_col].astype(int)
@@ -1393,37 +1224,8 @@ def flag_missing_values(df,flag_columns,flag_suffix='_FLAG_W'):
         df.loc[df[column].astype(int) == -999, flag_name] = 9
     return df
 
-"""code_pruning: no calls to this function"""
-def format_btl_data(df,data_cols, prcn=4):
-    """
-    data_cols :(list) list containing the "numerical" columns to be rounded to prcn decimal places
-    """
-    # Choose correct sensors
-    #df['CTDTMP'] = df[settings.bottle_inputs['t']]
-    format_columns = settings.btl_series_output['btl_column_names'].copy()
-#    if 'SSSCC' not in format_columns:
-#        print('Adding SSSCC')
-#        format_columns.append('SSSCC')
-    if 'DEPTH' not in format_columns:
-        print('Adding DEPTH')
-        format_columns.append('DEPTH')
-    try:
-        df = df[format_columns].copy()
-    except:
-        print('missing required pressure series output columns!')
-        df_columns = list(df.keys())
-        missing_list = list(np.setdiff1d(format_columns,df_columns))
-        raise KeyError('missing columns: ',missing_list)
-        #print('missing columns: ',missing_list)
 
-    for i in df.columns:
-        if '_FLAG_W' in i:
-            df[i] = df[i].astype(int)
-        elif i in data_cols:
-            df[i] = df[i].round(prcn)
-    return df
-
-"""code_pruning: no calls, fill_surface_data() above is used instead"""
+"""code_pruning: no calls, compare with fill_surface_data() above and choose one"""
 def manual_backfill_values(df,bfill_prs,p_col='CTDPRS',flag_suffix='_FLAG_W'):
     col_list = df.columns.tolist()
     col_list.remove(p_col)
@@ -1484,7 +1286,8 @@ def export_ct1(df, ssscc_list):
     # renames
     df = df.rename(columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"})
     # check that all columns are there
-    # TODO: make this better... (see process_ctd.format_time_data())
+    # TODO: make this better... 
+    # #should it fail and return list of bad cols or just use fill values?
     try:
         df[p_column_names];  # this is lazy, do better
     except KeyError:

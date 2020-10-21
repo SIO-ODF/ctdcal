@@ -12,114 +12,6 @@ import ctdcal.ctd_plots as ctd_plots
 import ctdcal.process_ctd as process_ctd
 import ctdcal.sbe_equations_dict as sbe_eq
 
-# TODO: clean up oxygen fitting things, they should be in ctdcal.oxy_fitting
-
-M = 31.9988   #Molecular weight of O2
-R = 831.432    #/* Gas constant, X 10 J Kmole-1 K-1 */
-D = 1.42905481 #  /* density O2 g/l @ 0 C */
-
-
-# Find nearest value to argument in array
-# Return the index of that value
-"""code_pruning: only used in old processing script odf_calibrate_ctd.py"""
-def find_isopycnals(p_btl_col, t_btl_col, sal_btl_col, dov_btl_col, lat_btl_col, lon_btl_col, btl_data, p_col, t_col, sal_col, dov_col, lat_col, lon_col, time_data):
-    """find_iscopycnals
-
-    p_btl_col:   Pressure column for bottle data
-    t_btl_col:   Temperature column for bottle data
-    sal_btl_col: Salinity column for bottle data
-    dov_btl_col: Oxygen voltage column for bottle data
-    lat_btl_col: Latitude bottle column for bottle data
-    lon_btl_col: Longitude bottle column for bottle data
-    btl_data:    Bottle data ndarray
-    p_col:       Pressure column for bottle data
-    t_col:       Temperature column for bottle data
-    sal_col:     Salinity column for bottle data
-    dov_col:     Oxygen voltage column for bottle data
-    lat_col:     Latitude column for bottle data
-    lon_col:     Longitude column for bottle data
-    time_data:   Time data ndarray
-
-    """
-
-    time_sigma = []
-    CT = gsw.CT_from_t(time_data[sal_col],time_data[t_col],time_data[p_col])
-    SA = gsw.SA_from_SP(time_data[sal_col],time_data[p_col],time_data[lon_col],time_data[lat_col])
-    time_sigma = gsw.sigma0(SA,CT)
-
-    # Pressure-bounded isopycnal search.
-    # Based on maximum decent rate and package size.
-    CT = gsw.CT_from_t(btl_data[sal_btl_col],btl_data[t_btl_col],btl_data[p_btl_col])
-    SA = gsw.SA_from_SP(btl_data[sal_btl_col],btl_data[p_btl_col],btl_data[lon_btl_col],btl_data[lat_btl_col])
-    btl_sigma = gsw.sigma0(SA,CT)
-    for i in range(0,len(btl_data[p_btl_col])):
-        #CT = gsw.CT_from_t(btl_data[sal_btl_col][i],btl_data[t_btl_col][i],btl_data[p_btl_col][i])
-        #SA = gsw.SA_from_SP(btl_data[sal_btl_col][i],btl_data[p_btl_col][i],btl_data[lon_btl_col][i],btl_data[lat_btl_col][i])
-        #btl_sigma = gsw.sigma0(SA,CT)
-        p_indx = find_nearest(time_data[p_col], btl_data[p_btl_col][i])
-        indx = find_nearest(time_sigma[p_indx-int(24*1.5):p_indx+int(24*1.5)], btl_sigma[i])
-
-        #print('Bottle:')
-        #print('Sigma: '+str(btl_sigma))
-        #print('Pres: '+str(btl_data[p_btl_col][i]))
-        #print('Temp: '+str(btl_data[t_btl_col][i]))
-        #print('Salt: '+str(btl_data[sal_btl_col][i]))
-        #print('Pressure: '+str(p_indx)+' '+str(indx+p_indx))
-        #print('Sigma: '+str(time_sigma[indx+p_indx]))
-        #print('Pres: '+str(time_data[p_col][indx+p_indx]))
-        #print('Temp: '+str(time_data[t_col][indx+p_indx]))
-        #print('Salt: '+str(time_data[sal_col][indx+p_indx]))
-        '''code_pruning: code is identical except for input passed, could be turned to function (but not necessary)'''
-        if indx+p_indx > len(time_sigma):
-            btl_data[t_btl_col][i] = time_data[t_col][len(time_data)-1]
-            btl_data[sal_btl_col][i] = time_data[sal_col][len(time_data)-1]
-            btl_data[dov_btl_col][i] = time_data[dov_col][len(time_data)-1]
-        else:
-            btl_data[t_btl_col][i] = time_data[t_col][indx+p_indx]
-            btl_data[sal_btl_col][i] = time_data[sal_col][indx+p_indx]
-            btl_data[dov_btl_col][i] = time_data[dov_col][indx+p_indx]
-
-    return btl_data
-
-
-# Find nearest value to argument in array
-# Return the index of that value
-"""code_pruning: only used in find_isopycnals"""
-def find_nearest(yarr, val):
-    """find_nearest
-
-    """
-    indx = (np.abs(yarr-val)).argmin()
-    return indx
-
-"""code_pruning: only called by outdated oxy fitting routine.. marked for removal"""
-# Residual calculation
-def residualO2(calib, o2pl, P, K, T, S, V):
-    """residual weighted difference of dissolved oxygen bottle data
-       vs dissolved oxygen CTD data.
-
-    This conversion is included for least squares fitting routine.
-
-    calib is a dict holding Soc, Voffset, Tau20, A, B, C, E
-    The following are single or list/tuple:
-    calib is a list of oxy_dict coefficients to be optimized
-    o2pl is dissolved oxygen winkler titrated data
-    P is pressure in decibars
-    K is temperature in Kelvin
-    T is temperature in Celcius
-    S is Practical Salinity Units
-    V is Voltage from instrument
-    """
-    weight = []
-    ctd_o2pl = sbe_eq.oxy_dict(calib, P, K, T, S, V)
-    sig = np.std(ctd_o2pl)
-
-    # Least sq residual
-    for i in range(0, len(o2pl)):
-        if o2pl[i] > 0:
-            weight.append(scipy.sqrt((o2pl[i] - sbe_eq.oxy_dict(calib, P[i], K[i], T[i], S[i], V[i]))**2/sig**2))
-    return weight
-
 
 def _conductivity_polyfit(cond,temp,press,coef):
 
@@ -133,8 +25,8 @@ def _conductivity_polyfit(cond,temp,press,coef):
         + coef[6]
     )
     fitted_cond = fitted_cond.round(4)
-     #fitted_sal =  gsw.SP_from_C(fitted_cond, temp, press)
-    return fitted_cond#, fitted_sal
+
+    return fitted_cond
 
 
 def cell_therm_mass_corr(temp, cond, sample_int=1/24, alpha=0.03, beta=1/7):
@@ -808,32 +700,9 @@ def calibrate_cond(btl_df, time_df):
     )
 
     return btl_df, time_df
-        
 
-#def load_qual(path):
-#    comment_dict = {}
-#    with open(path) as f:
-#        reader = csv.reader(f)
-#        # ignore first line
-#        next(reader)
-#        for line in reader:
-#            sta = int(line[0])
-#            cast = int(line[1])
-#            bottle = int(line[2])
-#            param = line[3]
-#            flag = int(line[4])
-#            comment = line[5]
-#
-#            comment_dict[(sta, cast, bottle, param)] = [flag, comment]
-#
-#    return comment_dict
-#
-#
-#
-#salts = requests.get("http://go-ship.rrevelle.sio.ucsd.edu/api/salt").json()
-#def o2_calc(path, o2_payload, thio_ns):
 
-    
+
 def CR_to_cond(cr,bath_t,ref_t,btl_p):
 
     """
@@ -866,67 +735,3 @@ def CR_to_cond(cr,bath_t,ref_t,btl_p):
         cond[cond <= 1] = np.nan
     
     return cond
-
-
-'''code_pruning: looks like not used. marked for removal
-def write_calib_coef(ssscc,coef,param):
-    """ Write coef to csv
-    
-    
-    """
-    df = pd.DataFrame()
-    df['SSSCC'] = ssscc  
-    
-    if param == 'T':
-
-        df['coef_0'] = coef[0]
-        df['coef_1'] = coef[1]
-        df['coef_2'] = coef[2]
-        df['coef_3'] = coef[3]
-        df['coef_4'] = coef[4]
-        df['coef_5'] = coef[5]
-        df['coef_6'] = coef[6]
-        
-    if param == 'C':
-       
-        df['coef_0'] = coef[0]
-        df['coef_1'] = coef[1]
-        df['coef_2'] = coef[2]
-        df['coef_3'] = coef[3]
-        df['coef_4'] = coef[4]
-        
-
-    return df
-
-'''
-  
-##
-#            key = (station, cast, bottle, "o2")
-#            if key in qual:
-#                flag, comment = qual[key]
-#                row_dict["o2_qual"] = flag
-#                row_dict["comment"] = comment
-#
-#            o2_payload.append(row_dict)
-#
-#
-#            # stoichiometric relation between mols of thio and mols of o2
-#            #print(station, cast, bottle, o2ml, o2kg)
-#            print("{:>2}, {:8.1f}".format(bottle, o2kg))
-#
-#        thio_ns.append([station, thio_n])
-#
-#o2_payload = []
-#thio_ns = []
-#for root, dirs, files in os.walk("/Volumes/public/O2Backup/O2/"):
-#    for file in files:
-#        if file.startswith("9") or file.startswith("8") or file.startswith("."):
-#            continue
-#        path = os.path.join(root, file)
-#        o2_calc(path, o2_payload, thio_ns)
-#    break
-#
-#with open("o2kg.json", "w") as f:
-#    json.dump(o2_payload,f, indent=2)
-#with open("thios.json", "w") as f:
-#    json.dump(thio_ns, f)
