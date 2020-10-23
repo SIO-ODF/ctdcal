@@ -567,32 +567,6 @@ def calculate_dVdT(oxyvolts, time):
 
      return dv_dt#filtered_dvdt
 
-def merge_parameters(btl_df,time_df,l_param='sigma0_btl',r_param='sigma0_ctd'):
-
-    merge_df = pd.merge_asof(btl_df,time_df,left_on=l_param,right_on=r_param,direction='nearest')
-
-    # Clean up merged dataframe
-    # These column names can be taken as a variable from the ini file
-    keep_columns = ['CTDTMP1_y','CTDTMP2_y', 'CTDPRS_y', 'CTDCOND1_y', 'CTDCOND2_y', 'CTDSAL_y',
-       'CTDOXY1_y', 'CTDOXYVOLTS_y', 'FREE1_y', 'FREE2_y', 'FREE3_y',
-       'FREE4_y', 'FLUOR_y', 'CTDBACKSCATTER_y', 'CTDXMISS_y', 'ALT_y',
-       'REF_PAR_y', 'GPSLAT_y', 'GPSLON_y', 'new_fix_y', 'pressure_temp_int_y',
-       'pump_on_y', 'btl_fire_y', 'scan_datetime_y', 'SSSCC_y',
-       'master_index_y','OS_y','dv_dt_y','CTDOXY',r_param]
-
-    merge_df = merge_df[keep_columns]
-
-    col_names = ['CTDTMP1','CTDTMP2', 'CTDPRS', 'CTDCOND1', 'CTDCOND2','CTDSAL',
-       'CTDOXY1', 'CTDOXYVOLTS', 'FREE1', 'FREE2', 'FREE3',
-       'FREE4', 'FLUOR', 'CTDBACKSCATTER', 'CTDXMISS', 'ALT',
-       'REF_PAR', 'GPSLAT', 'GPSLON', 'new_fix', 'pressure_temp_int',
-       'pump_on', 'btl_fire', 'scan_datetime', 'SSSCC',
-       'master_index','OS','dv_dt','CTDOXY', r_param]
-
-    merge_df.columns = [col_names]
-
-
-    return merge_df
 
 def _get_sbe_coef(idx=0):
     """

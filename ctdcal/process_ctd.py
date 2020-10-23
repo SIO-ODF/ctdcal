@@ -226,36 +226,6 @@ def ctd_align(inMat=None, col=None, time=0.0):
 
     return inMat
 
-def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, p_qual_col=None, qual_one=None, inMat=None):
-    """ctd_quality_codes function
-
-    Function takes full NUMPY ndarray with predefined dtype array
-
-    Args:
-        param1 (ndarray):
-        param2 (float):
-
-    Returns:
-        Narray: The return value is ndarray with adjusted time of parameter
-          specified.
-
-    """
-    #If p_range set apply qual codes to part of array and return
-    if p_range is not None:
-        print("Some algoirythm for formatting qual codes per pressure range")
-        return
-    else:
-        q_df = pd.DataFrame(index=np.arange(len(inMat)), columns=p_qual_col)
-        for pq in p_qual_col:
-            if pq in list(qual_one):
-                q_df[pq] = q_df[pq].fillna(1)
-            elif oxy_fit and pq is column:
-                q_df[pq] = q_df[pq].fillna(2)
-            else:
-                q_df[pq] = q_df[pq].fillna(2)
-
-    return q_df.values  # ndarray format
-
 
 '''code_pruning: do timing exercises to see if this is vectorized or not'''
 def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
@@ -292,68 +262,6 @@ def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
         inMat['o1_mll'][:] = Oxnewconc[:]
     return inMat
 
-#not used, should use raw call instead
-'''def data_interpolater(inArr):
-    """data_interpolater to handle indices and logical indices of NaNs.
-
-    Input:
-        - inArr, 1d numpy array with return True np.isnans()
-    Output:
-        - nans, logical indices of NaNs
-        - index, a function, with signature indices= index(logical_indices),
-          to convert logical indices of NaNs to 'equivalent' indices
-        - interpolated array
-    Example:
-        >>> # linear interpolation of NaNs
-        >>> outArray = data_interpolater(inArr)
-    """
-    nans, tmp= np.isnan(inArr), lambda z: z.nonzero()[0]
-    inArr[nans] = np.interp(tmp(nans), tmp(~nans), inArr[~nans])
-    return inArr'''
-
-#Courtney version, should be replaced with versions below and check that it works
-def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat):
-    """o2pl2pkg convert ml/l dissolved oxygen to umol/kg
-
-    Input:
-        - t_col, temperature column header deg c.
-        - sal_col, salinity column header psu.
-        - dopl_col, dissolved column header ml/l.
-        - dopkg_col, dissolved column header umol/kg
-        - lat_col, latitude for entire cast deg.
-        - lon_col, longitude for entire cast deg.
-        - inMat, dtype ndarray processed ctd time data.
-    Output:
-        - Converted Oxygen column umol/kg
-    Example:
-        >>> # linear interpolation of NaNs
-        >>> outArray = o2pl2kg(inArr)
-    """
-    pkg = np.ndarray(shape=len(inMat), dtype=[(dopkg_col, np.float)])
-    # Absolute sailinity from Practical salinity.
-    SA = gsw.SA_from_SP(inMat[sal_col], inMat[p_col], inMat[lat_col], inMat[lon_col])
-
-    # Conservative temperature from insitu temperature.
-    CT = gsw.CT_from_t(SA, inMat[t_col], inMat[p_col])
-    s0 = gsw.sigma0(SA, CT) # Potential density from Absolute Salinity g/Kg Conservative temperature deg C.
-
-    # Convert DO ml/l to umol/kg
-    for i in range(0,len(inMat[dopl_col])):
-        pkg[i] = inMat[dopl_col][i] * 44660 / (s0[i] + 1000)
-    return pkg
-
-#cleaned version of above but not used, should be checked that it works
-def oxy_to_umolkg(df_sal, df_pressure, df_lat, df_lon, df_temp, df_oxy):
-    '''Rewritten from Courtney's method to use array-likes (aka use dataframes and ndarrays).
-    '''
-    # Absolute salinity from Practical salinity.
-    SA = gsw.SA_from_SP(df_sal, df_pressure, df_lat, df_lon)
-
-    # Conservative temperature from insitu temperature.
-    CT = gsw.CT_from_t(SA, df_temp, df_pressure)
-    s0 = gsw.sigma0(SA, CT) # Potential density from Absolute Salinity g/Kg Conservative temperature deg C.
-    series = df_oxy * 44660 / (s0 + 1000)
-    return series
 
 def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
     """
@@ -389,95 +297,8 @@ def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
 
     return filter_df
 
-#try to depreciate for method below
-def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
-    """ondeck_pressure function
-    Function takes full NUMPY ndarray with predefined dtype array
-    of filtered ctd raw data the stores, analizes and removes ondeck
-    values from data.
-    Args:
-        param1 (str): stacast, station cast info
-        param1 (str): p_col, pressure data column name
-        param2 (str): c1_col, cond1 data column name
-        param3 (str): c2_col, cond2 data column name
-        param4 (str): time_col, time data column name
-        param5 (ndarray): numpy ndarray with dtype array
-        param6 (float): conductivity_startup, threshold value
-        param7 (str): log_file, log file name
-    Returns:
-        Narray: The return ndarray with ondeck data removed.
-        Also output start/end ondeck pressure.
-    """
-    start_pressure = []
-    tmpMat = []
-    outMat = []
-    tmp = 0
-    start_p = 0.0
-    n = 0
-    ep = []
-    end_p = 0.0
 
-    # Frequency
-    fl = 24
-    fl2 = fl*2
-    # One minute
-    mt = 60
-    # Half minute
-    ms = 30
-    time_delay = fl*ms
-
-    if inMat is None:
-        print("Ondeck_pressure function: No data.")
-        return
-    else:
-        # Searches first quarter of matrix, uses conductivity
-        # threshold min to capture startup pressure
-        for j in range(0,int(len(inMat)/4)):
-            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
-                tmp = j
-                start_pressure.append(inMat[p_col][j])
-
-        # Evaluate starting pressures
-        if not start_pressure: start_p = "Started in Water"
-        else:
-            n = len(start_pressure)
-            if (n > time_delay): start_p = np.average(start_pressure[fl2:n-(time_delay)])
-            else: start_p = np.average(start_pressure[fl2:n])
-
-        # Remove on-deck startup
-        inMat = inMat[tmp:]
-
-        tmp = len(inMat);
-        # Searches last half of NDarray for conductivity threshold
-        if len(inMat) % 2 == 0:
-            inMat_2 = inMat.copy()
-        else:
-            inMat_2 = inMat[1:].copy()
-
-        inMat_half1, inMat_half2 = np.split(inMat_2,2)
-        ep = inMat_half2[(inMat_half2[c1_col] < conductivity_startup) & (inMat_half2[c2_col] < conductivity_startup)][p_col]
-
-#        for j in range(int(len(inMat)*0.5), len(inMat)):
-#            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
-#                ep.append(inMat[p_col][j])
-#                if (tmp > j): tmp = j
-
-        # Evaluate ending pressures
-        if (len(ep) > (time_delay)):
-            end_p = np.average(ep[(time_delay):])
-        else:
-            end_p = np.average(ep[(len(ep)):])
-
-        # Remove on-deck ending
-        outMat = inMat[:tmp]
-
-        # Store ending on-deck pressure
-        if log_file != None:
-            report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
-
-    return outMat
-
-def ondeck_pressure_2(df, stacast, cond_startup=20.0, log_file=None):
+def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     """
     Find and remove times when rosette is on deck.
     Optionally log average pressure at start and end of cast.
@@ -545,12 +366,12 @@ def ondeck_pressure_2(df, stacast, cond_startup=20.0, log_file=None):
     trimmed_df = df.iloc[start_df.index.max():end_df.index.min()].copy()
 
     # Log ondeck pressures
-    if log_file != None:
+    if log_file is not None:
         report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
     return trimmed_df
 
-#a mix is used between _roll_filter and roll_filter, settle on one
+
 def roll_filter(df, p_col="CTDPRS", direction="down"):
     """
     Filter out heaving in CTD data due to ship rolls.

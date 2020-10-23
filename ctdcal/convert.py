@@ -68,7 +68,7 @@ def make_time_files(ssscc_list):
             converted_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
 
             # Trim to times when rosette is in water
-            trimmed_df = process_ctd.ondeck_pressure_2(
+            trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
                 ssscc,
                 log_file=cfg.directory["logs"] + "ondeck_pressure.csv",
