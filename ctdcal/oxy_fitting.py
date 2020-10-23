@@ -17,7 +17,6 @@ import scipy
 
 import ctdcal.ctd_plots as ctd_plots
 import ctdcal.process_ctd as process_ctd
-import ctdcal.sbe_equations_dict as sbe_eq
 import ctdcal.sbe_reader as sbe_rd
 
 
@@ -440,25 +439,6 @@ def get_SB_coef(hexfile,xmlfile):
     return coef
 
 
-def apply_oxy_coef(oxyvolts, press, temp, sal, time, lon, lat, coef, cc=[1.92634e-4,-4.64803e-2]):
-
-    sigma0 = sigma_from_CTD(sal, temp, press, lon, lat)
-
-    os = sbe_eq.OxSol(temp, sal)
-    dv_dt = calculate_dVdT(oxyvolts, time)
-
-    new_OXY = coef[0] * (oxyvolts + coef[1] + coef[2] \
-            * np.exp(cc[0] * press + cc[0] \
-            * temp) \
-            * dv_dt) * os \
-            * np.exp(coef[3] * temp) \
-            * np.exp((coef[4] * press) \
-            / (temp + 273.15))
-
-    oxy_uMolkg = oxy_ml_to_umolkg(new_OXY,sigma0)
-
-    return oxy_uMolkg
-
 def sigma_from_CTD(sal, temp, press, lon, lat, ref=0):
     """
     Calculates potential density from CTD parameters at various reference pressures
@@ -534,6 +514,31 @@ def oxy_ml_to_umolkg(oxy_mL_L, sigma0):
     oxy_umol_kg = oxy_mL_L * 44660 / (sigma0 + 1000)
 
     return oxy_umol_kg
+
+def oxy_umolkg_to_ml(oxy_umol_kg, sigma0):
+    """Convert dissolved oxygen from units of micromol/kg to mL/L.
+
+    Parameters
+    ----------
+    oxy_umol_kg : array-like
+        Dissolved oxygen in units of [umol/kg]
+    sigma0 : array-like
+        Potential density anomaly (i.e. sigma - 1000) referenced to 0 dbar [kg/m^3]
+
+    Returns
+    -------
+    oxy_mL_L : array-like
+        Dissolved oxygen in units of [mL/L]
+
+    Notes
+    -----
+    Conversion value 44660 is exact for oxygen gas and derived from the ideal gas law.
+    (c.f. Sea-Bird Application Note 64, pg. 6)
+    """
+
+    oxy_mL_L = oxy_umol_kg * (sigma0 + 1000) / 44660
+
+    return oxy_mL_L
 
 def calculate_dVdT(oxyvolts, time):
 #

@@ -185,13 +185,11 @@ def convertFromSBEReader(sbeReader, debug=False):
     oxygen_counter = 0
     u_def_counter = 0
     empty_counter = 0
-    processed_data = []
 
     #Temporary arrays to hold sci_data in order to compute following sci_data (pressure, cond, temp, etc)
     t_array = []
     p_array = []
     c_array = []
-    k_array = []
 
     ######
     # The following are definitions for every key in the dict below:
@@ -254,54 +252,47 @@ def convertFromSBEReader(sbeReader, debug=False):
 
         column_name = '{0}{1}'.format(short_lookup[temp_meta['sensor_id']]['short_name'], temp_meta['channel_pos'])
 
-        ###Temperature block
+        ### Temperature block
         if temp_meta['sensor_id'] == '55':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.temp_its90_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            converted_df[column_name] = sbe_eq.temp_its90(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             if temp_meta['list_id'] == 0:
                 t_array = converted_df[column_name].astype(float)
-                k_array = [273.15+celcius for celcius in t_array]
                 print('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
-            #processed_data.append(temp_meta)
 
         ### Pressure block
         elif temp_meta['sensor_id'] == '45':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.pressure_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
+            converted_df[column_name] = sbe_eq.sbe9(temp_meta['sensor_info'], raw_df[temp_meta['column']], pressure_temp)
             if temp_meta['list_id'] == 2:
                 p_array = converted_df[column_name].astype(float)
                 print('\tPressure first reading:', p_array[0], short_lookup[temp_meta['sensor_id']]['units'])
-            #processed_data.append(temp_meta)
 
         ### Conductivity block
         elif temp_meta['sensor_id'] == '3':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.cond_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
+            converted_df[column_name] = sbe_eq.sbe4c(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
             if temp_meta['list_id'] == 1:
                 c_array = converted_df[column_name].astype(float)
                 print('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
-            #processed_data.append(temp_meta)
 
         ### Oxygen block
         elif temp_meta['sensor_id'] == '38':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.oxy_dict(temp_meta['sensor_info'], p_array, k_array, t_array, c_array, raw_df[temp_meta['column']])
+            converted_df[column_name] = sbe_eq.sbe43(temp_meta['sensor_info'], p_array, t_array, c_array, raw_df[temp_meta['column']])
             converted_df['CTDOXYVOLTS'] = raw_df[temp_meta['column']]
-            #processed_data.append(temp_meta)
 
         ### Fluorometer Seapoint block
         elif temp_meta['sensor_id'] == '11':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
-            #processed_data.append(temp_meta)
 
-        ###Salinity block
+        ### Salinity block
         elif temp_meta['sensor_id'] == '1000':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = gsw.SP_from_C(c_array, t_array, p_array)
-            #processed_data.append(temp_meta)
 
-        ###Altimeter block
+        ### Altimeter block
         elif temp_meta['sensor_id'] == '0':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = sbe_eq.altimeter_voltage(temp_meta['sensor_info'], raw_df[temp_meta['column']])
@@ -310,7 +301,6 @@ def convertFromSBEReader(sbeReader, debug=False):
         else:
             print('Passing along Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
             converted_df[column_name] = raw_df[temp_meta['column']]
-            #processed_data.append(temp_meta)
 
     # Set the column name for the index
     converted_df.index.name = 'index'

@@ -11,352 +11,182 @@ not via an official document, and may change according to SBE wishes.
 
 '''code_pruning: this module really needs a new name, and all functions inside it as well.'''
 '''code_pruning: Also all functions should be checked to work with vectorized versions and possibly remove single datapoint version.'''
-'''code_pruning: calls to the math library/module should be removed in favor of faster numpy (does that work with xarray/dask, or does code need to be rewritten for that?)'''
 
-import math
-
+import gsw
 import numpy as np
+from ctdcal.oxy_fitting import oxy_umolkg_to_ml
 
 
-def temp_its90_dict(calib, freq, verbose = 0):
-    """SBE equation for converting engineering units to Celcius according to ITS-90.
-
-    TO BE DEPRECIATED
+def temp_its90(coefs, freq):
+    """
+    SBE equation for converting engineering units to Celsius according to ITS-90.
     SensorID: 55
 
     Parameters
     ----------
-    calib : dict
-        calib is a dict holding G, H, I, J, F0
-        G, H, I, J, F0: coefficients given in calibration.
-    freq : float
-        freq = frequency sampled by sensor, either as a single value or a list or tuple.
+    coefs : dict
+        Dictionary of calibration coefficients (G, H, I, J, F0)
+    freq : array-like
+        Raw frequency (Hz)
 
     Returns
     -------
-    ITS90: arrylike or float
-        A float depicting ITS90 temperature.
-
-    Original form from calib sheet dated 2012:
-    Temperature ITS-90 = 1/{g+h[ln(f0/f )]+i[ln2(f0/f)]+j[ln3(f0/f)]} - 273.15 (°C)
-
+    t_ITS90 : array-like
+        Converted temperature (ITS-90)
     """
-    f = freq
-    #array mode
-    try:
-        ITS90 = []
-        for i, f_x in enumerate(f):
-            #Hack for dealing with 0 frequencies, needs additional reporting later
-            if f_x == 0:
-                f_x = 1
-                if verbose > 0:
-                    print("Zero (0) frequency temperature record being processed as 1. Record: ", i)
-            temp = 1/(calib['G']
-                      + calib['H'] * (math.log(calib['F0']/f_x))
-                      + calib['I'] * math.pow((math.log(calib['F0']/f_x)),2)
-                      + calib['J'] * math.pow((math.log(calib['F0']/f_x)),3)
-                     ) - 273.15
-            temp = round(temp,4)
-            ITS90.append(temp)
-    #single mode
-    except:
-        if f == 0:
-            f = 1
-            if verbose > 0:
-                print("Zero (0) frequency temperature record [singleton] being processed.")
-        ITS90 = 1/(calib['G']
-                   + calib['H'] * (math.log(calib['F0']/f))
-                   + calib['I'] * math.pow((math.log(calib['F0']/f)),2)
-                   + calib['J'] * math.pow((math.log(calib['F0']/f)),3)
-                  ) - 273.15
-        ITS90 = round(ITS90,4)
-    return ITS90
+    freq = np.array(freq)
 
-def temp_its90(calib, f):
-    """SBE equation for converting engineering units to Celcius according to ITS-90.
+    if freq.dtype != float:  # can sometimes come in as object
+        freq = freq.astype(float)
+        # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
 
-    SensorID: 55
+    if 0 in freq: # TODO: is this actually needed? what about for other conversion funcs?
+        freq[freq == 0] = np.nan  # nan out zero frequencies
+        # TODO: (logger) e.g. "warning: converting zero frequency found in {} to nan"
 
-    Parameters
-    ----------
-    calib : dict
-        calib is a dict holding G, H, I, J, F0
-        G, H, I, J, F0: coefficients given in calibration.
-    f : float
-        f = frequency sampled by sensor, either as a single value or a list or tuple.
+    t_ITS90 = (
+        1
+        / (
+            coefs["G"]
+            + coefs["H"] * (np.log(coefs["F0"] / freq))
+            + coefs["I"] * np.power((np.log(coefs["F0"] / freq)), 2)
+            + coefs["J"] * np.power((np.log(coefs["F0"] / freq)), 3)
+        )
+        - 273.15
+    )
+    return np.around(t_ITS90, 4)
 
-    Returns
-    -------
-    ITS90 : arraylike or float
-        A float depicting ITS90 temperature.
 
-    Original form from calib sheet dated 2012:
-    Temperature ITS-90 = 1/{g+h[ln(f0/f )]+i[ln2(f0/f)]+j[ln3(f0/f)]} - 273.15 (°C)
-
+def sbe9(coefs, freq, t_probe):
     """
-    # The array might come in as type=object, which throws AttributeError. Maybe this should be in try/except?
-    f = f.astype(float)
-
-    ITS90 = np.around(
-            (1/(calib['G']
-              + calib['H'] * (np.log(calib['F0']/f))
-              + calib['I'] * np.power((np.log(calib['F0']/f)),2)
-              + calib['J'] * np.power((np.log(calib['F0']/f)),3)
-            ) - 273.15
-            ),4)
-#     Was used when using raw python and not numpy. Need to figure out how to handle 0s now, it defaults
-#     to not producing a value where 0 is used, ending in a -273.15 value being output
-    return ITS90
-
-def sbe9(calib, f, t):
-    """NOT TESTED
-
-    SBE/STS(?) equation for converting SBE9 pressure frequency to pressure.
+    SBE/STS(?) equation for converting SBE9 frequency to pressure.
     SensorID: 45
 
     Parameters
     ----------
-    calib : dict
-        T1: coefficient
-        T2: coefficient
-        T3: coefficient
-        T4: coefficient
-        T5: not used
-        C1: coefficient
-        C2: coefficient
-        C3: coefficient
-        D1: coefficient
-        D2: coefficient
-        AD590M: used in digiquartz temeperature correction
-        AD590B: used in digiquartz temperature correction
-
-    f : array-like
-        f is sensor frequency (usually between 30kHz and 42kHz)
-    t : array-like
-        t is sensor integer from the digiquartz temperature probe
+    coefs : dict
+        Dictionary of calibration coefficients
+        (T1, T2, T3, T4, T5, C1, C2, C3, D1, D2, AD590M, AD590B)
+    freq : array-like
+        Raw frequency (Hz)
+    t_probe : array-like
+        Raw integer measurement from the Digiquartz temperature probe
 
     Returns
     -------
-    p : array-like
-        p is pressure in decibar
+    p_dbar : array-like
+        Converted pressure (dbar)
     """
-    #Equation expecting pressure period in microseconds, so divide f by 1,000,000.
-    uf = f / 1000000
-    t = (calib['AD590M'] * int(t)) + calib['AD590B']
-    T0 = calib['T1'] + calib['T2']*t + calib['T3']*np.power(t,2) + calib['T4']*np.power(t,3)
-    w = 1-T0*T0*f*f
-    pressure = (0.6894759*((calib['C1']+calib['C2']*t+calib['C3']*t*t)*w*(1-(calib['D1']+calib['D2']*t)*w)-14.7))
-    return np.around(pressure,4)
+    freq = np.array(freq)
+    t_probe = np.array(t_probe).astype(int)
+    freq_MHz = freq * 1e-6  # equation expects MHz
+    t_probe = (coefs["AD590M"] * t_probe) + coefs["AD590B"]
+    T0 = (
+        coefs["T1"]
+        + coefs["T2"] * t_probe
+        + coefs["T3"] * np.power(t_probe, 2)
+        + coefs["T4"] * np.power(t_probe, 3)
+    )
+    w = 1 - T0 * T0 * freq_MHz * freq_MHz
+    p_dbar = 0.6894759 * (
+        (coefs["C1"] + coefs["C2"] * t_probe + coefs["C3"] * t_probe * t_probe)
+        * w
+        * (1 - (coefs["D1"] + coefs["D2"] * t_probe) * w)
+        - 14.7
+    )
+    return np.around(p_dbar, 4)
 
-def sbe4c(calib, F, t, p):
-    """NOT TESTED
 
-    SBE equation for converting SBE4C frequency to conductivity. Calculates mS/cm
-
+def sbe4c(coefs, freq, t, p):
+    """
+    SBE equation for converting SBE4C frequency to conductivity.
     SensorID: 3
 
     Parameters
     ----------
-    calib : dict
-        G : coefficient
-        H : coefficient
-        I : coefficient
-        J : coefficient
-        CPcor : coefficient (nominal)
-        CTcor : coefficient (nominal)
-    F : array-like
-        F is instrument frequency
+    coefs : dict
+        Dictionary of calibration coefficients (G, H, I, J, CPcor, CTcor)
+    freq : array-like
+        Raw frequency (Hz)
     t : array-like
-        t is temperature (ITS-90 degrees C)
+        Converted temperature (ITS-90 degrees C)
     p : array-like
-        p is pressure (decibars)
+        Converted pressure (dbar)
 
     Returns
     -------
-    c : array-like
-        c is conductivity in mS/cm
+    c_mS_cm : array-like
+        Converted conductivity (mS/cm)
     """
-    f = F/1000
-    c = ((calib['G'] + calib['H'] * np.power(f,2)
-                     + calib['I'] * np.power(f,3)
-                     + calib['J'] * np.power(f,4))
-                    / (1 + calib['CTcor'] * t + calib['CPcor'] * p))
-    #S/m to mS/cm
-    c = c * 0.1
-    c = round(c,5)
-    return c
+    freq_kHz = freq * 1e-3  # equation expects kHz
+    c_S_m = (
+        coefs["G"]
+        + coefs["H"] * np.power(freq_kHz, 2)
+        + coefs["I"] * np.power(freq_kHz, 3)
+        + coefs["J"] * np.power(freq_kHz, 4)
+    ) / (10 * (1 + coefs["CTcor"] * t + coefs["CPcor"] * p))
+    c_mS_cm = c_S_m * 10  # S/m to mS/cm
 
-def sbe43(calib, P, K, T, S, V):
-    """NOT TESTED
-    IS THIS IN ITS-90? DOES IT MATTER?
+    return np.around(c_mS_cm, 5)
+
+
+def sbe43(coefs, p, t, c, V, lat=0., lon=0.):
+    """
     SBE equation for converting SBE43 engineering units to oxygen (ml/l).
-
     SensorID: 38
 
     Parameters
     ----------
-
-    calib : dictionary
-        calib is a dict holding Soc, Voffset, Tau20, A, B, C, E
-    P : array-like
-        P is pressure in decibars
-    K : array-like
-        K is temperature in Kelvin
-    T : array-like
-        T is temperature in Celcius
-    S : array-like
-        S is Practical Salinity Units, PSS-78
+    coefs : dict
+        Dictionary of calibration coefficients (Soc, Voffset, Tau20, A, B, C, E)
+    p : array-like
+        Converted pressure (dbar)
+    t : array-like
+        Converted temperature (Celsius)
+    c : array-like
+        Converted conductivity (mS/cm)
     V : array-like
-        V is voltage from instrument
+        Raw voltage
+    lat : array-like, optional
+        Latitude (decimal degrees north)
+    lon : array-like, optional
+        Longitude (decimal degrees)
 
     Returns
     -------
     oxygen : array-like
-        oxygen is the oxygen measurement in ml/l
-
-    Original equation from calib sheet dated 2014:
-    Oxygen (ml/l) = Soc * (V + Voffset) * (1.0 + A * T + B * T + C * T ) * OxSol(T,S) * exp(E * P / K)
+        Converted oxygen (mL/L)
     """
+    # TODO: is there any reason for this to output mL/L? if oxygen eq uses o2sol
+    # in umol/kg, result is in umol/kg... which is what we use at the end anyway?
 
-    oxygen = np.around(calib['Soc'] * (V + calib['offset'])
-              * (1.0 + calib['A'] * T + calib['B'] * np.power(T,2) + calib['C'] * np.power(T,3) )
-              * OxSol(T,S)
-              * np.exp(calib['E'] * P / K),4)
-    return oxygen
+    t_Kelvin = t + 273.15
 
-def OxSol_New(T,S):
-    """Should work with sbe43(), should be depreciated in favor of gsw in the future
+    SP = gsw.SP_from_C(c, t, p)
+    SA = gsw.SA_from_SP(SP, p, lat, lon)
+    CT = gsw.CT_from_t(SA, t, p)
+    sigma0 = gsw.sigma0(SA, CT)
+    o2sol = gsw.O2sol(SA, CT, p, lon, lat)  # umol/kg
+    o2sol_ml_l = oxy_umolkg_to_ml(o2sol, sigma0)  # equation expects mL/L (see TODO)
 
-    Eq. 8 from Garcia and Gordon, 1992.
-    Harded coded to do ml/l for now. If requeste, add in new mode for ug/l.
+    # NOTE: lat/lon always required to get o2sol (and need SA/CT for sigma0 anyway)
+    # the above is equivalent to:
+    # pt = gsw.pt0_from_t(SA, t, p)
+    # o2sol = gsw.O2sol_SP_pt(s, pt)
 
-    Parameters
-    ----------
-    T : array-like
-        T is the ITS-90 temperature in Celcius
-    S : array-like
-        S is the Practical Salinity, PSS-78
-    """
-
-    x = S
-    y = np.log((298.15 - T)/(273.15 + T))
-
-    """umol/kg coefficients
-    a0 =  5.80871
-    a1 =  3.20291
-    a2 =  4.17887
-    a3 =  5.10006
-    a4 = -9.86643e-2
-    a5 =  3.80369
-    b0 = -7.01577e-3
-    b1 = -7.70028e-3
-    b2 = -1.13864e-2
-    b3 = -9.51519e-3
-    c0 = -2.75915e-7
-    """
-
-    """ml/l coefficients"""
-    a0 = 2.00907
-    a1 = 3.22014
-    a2 = 4.05010
-    a3 = 4.94457
-    a4 = -2.56847e-1
-    a5 = 3.88767
-    b0 = -6.24523e-3
-    b1 = -7.37614e-3
-    b2 = -1.03410e-2
-    b3 = -8.17083e-3
-    c0 = -4.88682e-7
-
-    O2sol = np.exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
-    return O2sol
-
-
-def OxSol(T,S):
-    """Eq. 8 from Garcia and Gordon, 1992.
-    Harded coded to do ml/l for now. If requeste, add in new mode for ug/l.
-
-    Parameters
-    ----------
-    T : Temperature
-    S : Practical Salinity
-    """
-
-    x = S
-    y = np.log((298.15 - T)/(273.15 + T))
-
-    """umol/kg coefficients
-    a0 =  5.80871
-    a1 =  3.20291
-    a2 =  4.17887
-    a3 =  5.10006
-    a4 = -9.86643e-2
-    a5 =  3.80369
-    b0 = -7.01577e-3
-    b1 = -7.70028e-3
-    b2 = -1.13864e-2
-    b3 = -9.51519e-3
-    c0 = -2.75915e-7
-    """
-
-    """ml/l coefficients"""
-    a0 = 2.00907
-    a1 = 3.22014
-    a2 = 4.05010
-    a3 = 4.94457
-    a4 = -2.56847e-1
-    a5 = 3.88767
-    b0 = -6.24523e-3
-    b1 = -7.37614e-3
-    b2 = -1.03410e-2
-    b3 = -8.17083e-3
-    c0 = -4.88682e-7
-
-    O2sol = np.exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
-    return O2sol
-
-def OxSol_umolkg(T,S):
-    
-    """Eq. 8 from Garcia and Gordon, 1992.
-    Harded coded to do ml/l for now. If requeste, add in new mode for ug/l.
-
-    Inputs:
-    T = Potential Temperau
-    S = Practical Salinity
-    """
-
-    x = S
-    y = np.log((298.15 - T)/(273.15 + T))
-
-    """umol/kg coefficients"""
-    a0 =  5.80871
-    a1 =  3.20291
-    a2 =  4.17887
-    a3 =  5.10006
-    a4 = -9.86643e-2
-    a5 =  3.80369
-    b0 = -7.01577e-3
-    b1 = -7.70028e-3
-    b2 = -1.13864e-2
-    b3 = -9.51519e-3
-    c0 = -2.75915e-7
-    
-
-    """ml/l coefficients"""
-#    a0 = 2.00907
-#    a1 = 3.22014
-#    a2 = 4.05010
-#    a3 = 4.94457
-#    a4 = -2.56847e-1
-#    a5 = 3.88767
-#    b0 = -6.24523e-3
-#    b1 = -7.37614e-3
-#    b2 = -1.03410e-2
-#    b3 = -8.17083e-3
-#    c0 = -4.88682e-7
-
-    O2sol = np.exp(a0 + y*(a1 + y*(a2 + y*(a3 + y*(a4 + a5*y)))) + x*(b0 + y*(b1 + y*(b2 + b3*y)) + c0*x))
-    return O2sol
+    oxygen = (
+        coefs["Soc"]
+        * (V + coefs["offset"])
+        * (
+            1.0
+            + coefs["A"] * t
+            + coefs["B"] * np.power(t, 2)
+            + coefs["C"] * np.power(t, 3)
+        )
+        * o2sol_ml_l
+        * np.exp(coefs["E"] * p / t_Kelvin)
+    )
+    return np.around(oxygen, 4)
 
 
 def oxy_hysteresis_voltage(calib, voltage, scan_window=48):
@@ -409,135 +239,6 @@ def sbe43_hysteresis_voltage(calib, voltage):
         C = exp(-1 * ())
 
     return output
-
-
-def oxy_dict(calib, P, K, T, S, V):
-    """SBE equation for converting engineering units to oxygen (ml/l).
-    SensorID: 38
-
-    calib is a dict holding Soc, Voffset, Tau20, A, B, C, E
-    The following are single or list/tuple:
-    P is pressure in decibars
-    K is temperature in Kelvin
-    T is temperature in Celcius
-    S is Practical Salinity Units
-    V is Voltage from instrument
-
-    Original equation from calib sheet dated 2014:
-    Oxygen (ml/l) = Soc * (V + Voffset) * (1.0 + A * T + B * T + C * T ) * OxSol(T,S) * exp(E * P / K)
-
-    """
-
-    #array mode
-    try:
-        oxygen = []
-        for P_x, K_x, T_x, S_x, V_x in zip(P, K, T, S, V):
-            #print(T_x)
-            temp = (calib['Soc'] * (V_x + calib['offset'])
-                    * (1.0 + calib['A'] * T_x + calib['B'] * math.pow(T_x,2) + calib['C'] * math.pow(T_x,3) )
-                    * OxSol(T_x,S_x)
-                    * math.exp(calib['E'] * P_x / K_x)) #foo
-            temp = round(temp,4)
-            oxygen.append(temp)
-    #Single mode.
-    except:
-        oxygen = (calib['Soc'] * (V + calib['offset'])
-                  * (1.0 + calib['A'] * T + calib['B'] * math.pow(T,2) + calib['C'] * math.pow(T,3) )
-                  * OxSol(T,S)
-                  * math.exp(calib['E'] * P / K))
-    return oxygen
-
-
-def cond_dict(calib, F, t, p, units='mS'):
-    """SBE equation for converting frequency to conductivity. Calculates mS/cm
-    SensorID: 3
-
-    Inputs:
-    calib:
-        G: coefficient
-        H: coefficient
-        I: coefficient
-        J: coefficient
-        CPcor: coefficient (nominal)
-        CTcor: coefficient (nominal)
-
-    F: instrument frequency
-    t: temperature (ITS-90 degrees C)
-    p: pressure (decibars)
-
-    Output:
-    sequence or float of mS/cm
-    """
-    try:
-        Conductivity = []
-        f = [x/1000 for x in F]
-        for F_0, t_0, p_0 in zip(f, t, p):
-            temp = ((calib['G'] + calib['H'] * math.pow(F_0,2)
-                     + calib['I'] * math.pow(F_0,3)
-                     + calib['J'] * math.pow(F_0,4))
-                    / (1 + calib['CTcor'] * t_0 + calib['CPcor'] * p_0))
-            #S/m to mS/cm
-            if units == 'mS':
-                temp = temp * 1
-            elif units == 'S':
-                temp = temp * 0.1
-            temp = round(temp, 5)
-            Conductivity.append(temp)
-    #single mode
-    except:
-        f = F/1000
-        Conductivity = ((calib['G'] + calib['H'] * math.pow(f,2)
-                         + calib['I'] * math.pow(f,3)
-                         + calib['J'] * math.pow(f,4))
-                        / (1 + calib['CTcor'] * t + calib['CPcor'] * p))
-        #S/m to mS/cm
-        Conductivity = Conductivity * 0.1
-        Conductivity = round(Conductivity,5)
-    return Conductivity
-
-def pressure_dict(calib, f, t):
-    """SBE/STS(?) equation for converting pressure frequency to temperature.
-    SensorID: 45
-
-    Inputs:
-    calib is a dictionary of coefficients
-    T1: coefficient
-    T2: coefficient
-    T3: coefficient
-    T4: coefficient
-    T5: not used
-    C1: coefficient
-    C2: coefficient
-    C3: coefficient
-    D1: coefficient
-    D2: coefficient
-    AD590M: used in digiquartz temeperature correction
-    AD590B: used in digiquartz temperature correction
-
-    f: sensor frequency (usually between 30kHz and 42kHz)
-    t: sensor integer from the digiquartz temperature probe
-
-    """
-    #array mode
-    try:
-        t_converted = []
-        for x in t:
-            t_converted.append((calib['AD590M'] * int(x)) + calib['AD590B'])
-        pressure = []
-        """Equation expecting pressure period in microseconds, so divide f by 1,000,000. """
-        uf = [x/1000000 for x in f]
-        for f_x, t_x in zip(uf, t_converted):
-            T0 = calib['T1'] + calib['T2']*t_x + calib['T3']*math.pow(t_x,2) + calib['T4']*math.pow(t_x,3)
-            w = 1-T0*T0*f_x*f_x
-            temp = (0.6894759*((calib['C1']+calib['C2']*t_x+calib['C3']*t_x*t_x)*w*(1-(calib['D1']+calib['D2']*t_x)*w)-14.7))
-            pressure.append(round(temp,4))
-    #single mode
-    except:
-        t = (calib['AD590M'] * int(t)) + calib['AD590B']
-        T0 = calib['T1'] + calib['T2']*t + calib['T3']*math.pow(t,2) + calib['T4']*math.pow(t,3)
-        w = 1-T0*T0*f*f
-        pressure = (0.6894759*((calib['C1']+calib['C2']*t+calib['C3']*t*t)*w*(1-(calib['D1']+calib['D2']*t)*w)-14.7))
-    return pressure
 
 
 def wetlabs_flrtd_chl_dict(calib, counts):

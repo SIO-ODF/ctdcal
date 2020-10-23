@@ -10,7 +10,6 @@ from scipy.ndimage.interpolation import shift
 
 import ctdcal.ctd_plots as ctd_plots
 import ctdcal.process_ctd as process_ctd
-import ctdcal.sbe_equations_dict as sbe_eq
 
 
 def _conductivity_polyfit(cond,temp,press,coef):
