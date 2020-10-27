@@ -189,65 +189,95 @@ def sbe43(coefs, p, t, c, V, lat=0., lon=0.):
     return np.around(oxygen, 4)
 
 
-def oxy_hysteresis_voltage(calib, voltage, scan_window=48):
-    '''SBE equation for computing hysteresis from raw voltage.
-    Must be run before oxy_dict.
-    Because of looking backwards, must skip i = 0.
+def sbe43_hysteresis_voltage(
+    coefs, volts, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
+):
+    """NOT TESTED
 
-    Input:
-    calib: a dict holding H1, H2, H3, Voffset
-    voltage: a sequence of engineering voltages
-    scan_window: an int for scans to skip between, default 48 scans at 24Hz OR 2 seconds
-    '''
-    output = []
+    SBE equation for removing hysteresis from raw voltage values. This function must
+    be run before the sbe43 conversion function above.
 
-    for i, x in enumerate(voltage):
-        if i == 0:
-            continue
-
-        D = 1 + calib['H1']*(exp(P(i)/calib['H2']) - 1)
-        C = exp(-1 * ())
-
-    return output
-
-def sbe43_hysteresis_voltage(calib, voltage):
-    '''NOT TESTED NOT FINISHED
-
-    SBE equation for computing hysteresis from raw voltage in relation to SBE43.
-    Must be run before oxy_dict.
-    Because of looking backwards, must skip i = 0.
+    Oxygen hysteresis can be corrected after conversion from volts to oxygen
+    concentration, see oxy_fitting.hysteresis_correction()
 
     Parameters
     ----------
-    calib : dict
-        calib is a dict holding H1, H2, H3, Voffset
-    voltage : array-like
-        voltage is a sequence of engineering voltages
+    coefs : dict
+        Dictionary of calibration coefficients (H1, H2, H3, Voffset)
+    volts : array-like
+        Raw voltage
+    pressure : array-like
+        CTD pressure values (dbar)
+    H1 : scalar, optional
+        Amplitude of hysteresis correction function (range: -0.02 to -0.05)
+    H2 : scalar, optional
+        Function constant or curvature function for hysteresis
+    H3 : scalar, optional
+        Time constant for hysteresis (seconds) (range: 1200 to 2000)
+    freq : scalar, optional
+        CTD sampling frequency (Hz)
 
     Returns
     -------
-    output : array-like
-        output is the
-    '''
-    output = []
+    oxy_volts_final : array-like
+        Hysteresis-corrected voltage
 
-    for i, x in enumerate(voltage):
-        if i == 0:
-            continue
+    Notes
+    -----
+    The hysteresis algorithm is backward-looking so scan 0 must be skipped (as no
+    information is available before the first scan).
 
-        D = 1 + calib['H1']*(exp(P(i)/calib['H2']) - 1)
-        C = exp(-1 * ())
-
-    return output
-
-
-def wetlabs_flrtd_chl_dict(calib, counts):
-    """Wetlabs
-
-    UNFINISHED
-
+    See Application Note 64-3 for more information.
     """
-    chl = calib['scale_factor'] * (output - calib['darkcounts'])
+    # TODO: vectorize (if possible)
+    dt = 1 / freq
+    D = 1 + coefs["H1"] * (np.exp(pressure[1:] / coefs["H2"]) - 1)
+    C = np.exp(-1 * dt / coefs["H3"])
+
+    oxy_volts = volts[1:] + coefs["Voffset"]
+    oxy_volts_new = np.zeros(volts.shape)
+    oxy_volts_new[0] = volts[0]
+    for i in np.arange(1, len(volts)):
+        oxy_volts_new[i] = (
+            (oxy_volts[i] + (volts[i - 1] * C * D)) - (oxy_volts[i - 1] * C)
+        ) / D
+
+    oxy_volts_final = np.zeros(volts.shape)
+    oxy_volts_final = volts[0]
+    oxy_volts_final[1:] = oxy_volts_new - coefs["Voffset"]
+
+    return oxy_volts_final
+
+
+def wetlabs_flrtd_chl_dict(coefs, volts):
+    """
+    SBE equation for converting ECO-FL fluorometer voltage to concentration.
+    SensorID: 20
+
+    Parameters
+    ----------
+    coefs : dict
+        Dictionary of calibration coefficients (ScaleFactor, DarkOutput/Vblank)
+    volts : array-like
+        Raw voltage
+
+    Returns
+    -------
+    chl : array-like
+        Converted chlorophyll concentration
+
+    Notes
+    -----
+    Chlorophyll units depend on scale factor (e.g. ug/L-volt, ug/L-counts, ppb/volts),
+    see Application Note 62 for more information.
+    """
+    if "DarkOutput" in coefs.keys():
+        chl = coefs["ScaleFactor"] * (volts - coefs["DarkOutput"])
+    elif "Vblank" in coefs.keys():  # from older calibration sheets
+        chl = coefs["ScaleFactor"] * (volts - coefs["Vblank"])
+    else:
+        print("No dark cast info in calibration coefficients, returning raw voltage.")
+        chl = volts
     return chl
 
 
@@ -280,87 +310,65 @@ def wetlabs_transmissometer_cstar_dict(calib, signal):
     return tx
 
 
-def benthos_psa916_dict(calib, signal):
-    """Equation for determining altitude from a Benthos PSA-916 altimeter.
-    Equation provided by SBE as AN95, or here: http://www.seabird.com/document/an95-setting-teledyne-benthos-altimeter-sea-bird-profiling-ctd
-    Equation stated as: altimeter height = [300 * voltage / scale factor] + offset
-    SensorID: 0
-
-    Inputs:
-    calib is a dictionary of coefficients
-        calib['ScaleFactor']: scaling factor to be applied
-        calib['Offset']: offset to be applied
-
-    signal: signal voltage
-    """
-
-    #array mode
-    try:
-        altitude = []
-        for signal_x in signal:
-            temp = (300 * signal_x / calib['ScaleFactor']) + calib['Offset']
-            altitude.append(temp)
-    #single mode
-    except:
-        altitude = (300 * signal / calib['ScaleFactor']) + calib['Offset']
-    return altitude
-
-
-def fluoro_seapoint_dict(calib, signal):
+def fluoro_seapoint_dict(calib, volts):
     """
     Raw voltage supplied from fluorometer right now, after looking at xmlcon.
     The method will do nothing but spit out the exact values that came in.
     SensorID: 11
 
-    Inputs:
-    calib is a dictionary of coefficients(?)
-        GainSetting: the gain applied. according to xmlcon,
-            "<!-- The following is an array index, not the actual gain setting. -->"
-        Offset: offset applied
+    Parameters
+    ----------
+    calib : dict
+        Dictionary of calibration coefficients (GainSetting,  Offset)
+    volts : array-like
+        Raw voltage
 
-    signal: signal voltage
+    Returns
+    -------
+    fluoro : array-like
+        Raw voltage
+
+    Notes
+    -----
+    According to .xmlcon, GainSetting "is an array index, not the actual gain setting."
     """
-    try:
-        fluoro = []
-        for signal_x in signal:
-            temp = signal_x
-            fluoro.append(round(temp,6))
-    #single mode
-    except:
-        fluoro = round(signal,6)
+    # TODO: acutal calibration/conversion/something?
+    volts = np.array(volts)
+    fluoro = np.around(volts, 6)
+
     return fluoro
 
-def altimeter_voltage(calib, volts):
+
+def altimeter_voltage(coefs, volts):
     """
-    SBE Equation for converting voltages from an altimeter to meters.
-
-    While the SBE documentation refers to a Teledyne Benthos altimeter, the equation
-    works for all altimeters typically found in the wild.
-
+    SBE equation for converting altimeter voltages to meters.
     Sensor ID: 0
 
     Parameters
     ----------
     calib : dict
-        calib is a dict holding SerialNumber, CalibrationDate, ScaleFactor, and Offset
+        Dictionary of calibration coefficients (ScaleFactor, Offset)
     volts : array-like
-        volts is the voltage from the altimeter
+        Raw voltages
 
     Returns
     -------
     bottom_distance : array-like
-        bottom_distance is the distance from the altimeter to an object below it, in meters.
+        Distance from the altimeter to an object below it (meters)
 
-    Equation provided by SBE as AN95, or here:
-    http://www.seabird.com/document/an95-setting-teledyne-benthos-altimeter-sea-bird-profiling-ctd
-    Equation stated as: altimeter height = [300 * voltage / scale factor] + offset
+    Notes
+    -----
+    Equation provdided by SBE in Application Note 95, page 1.
+
+    While the SBE documentation refers to a Teledyne Benthos or Valeport altimeter,
+    the equation works for all altimeters typically found in the wild.
     """
+    volts = np.array(volts)
+    if volts.dtype != float:  # can sometimes come in as object
+        volts = volts.astype(float)
+        # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
 
-    # The array might come in as type=object, which throws AttributeError. Maybe this should be in try/except?
-    volts = volts.astype(float)
-
-    bottom_distance = np.around((
-                                (300 * volts / calib['ScaleFactor'])
-                                + calib['Offset']
-                                ),1)
+    bottom_distance = np.around(
+        ((300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]), 1
+    )
     return bottom_distance

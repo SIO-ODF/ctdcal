@@ -227,42 +227,6 @@ def ctd_align(inMat=None, col=None, time=0.0):
     return inMat
 
 
-'''code_pruning: do timing exercises to see if this is vectorized or not'''
-def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
-    """Hysteresis Correction function
-
-    Function takes data ndarray and hysteresis coefficiants
-    and returns hysteresis corrected oxygen data.
-
-    Args:
-        param1 (float): H1, hysteresis correction coefficiant 1
-        param2 (float): H2, hysteresis correction coefficiant 2
-        param3 (float): H3, hysteresis correction coefficiant 3
-        param5 (array): inMat, raw ctd data.
-
-    Returns:
-        array: Return dissolved oxygen hysteresis corrected data.
-
-    .. REF PAGE:
-       http://http://www.seabird.com/document/an64-3-sbe-43-dissolved-oxygen-do-sensor-hysteresis-corrections
-    """
-    Oxnewconc = np.arange(0,len(inMat),1)
-
-    Oxnewconc[0] = inMat['o1_mll'][1]
-
-    if inMat is None:
-       print("Hysteresis Correction function: No data")
-       return
-    else:
-        for i in range(1,len(inMat)-1):
-            D = 1 + H1 * (math.exp(inMat['p_dbar'][i] / H2) - 1)
-            C = math.exp(-1 * 0.04167/ H3)
-            Oxnewconc[i] = ((inMat['o1_mll'][i] + (Oxnewconc[i-1] * C * D)) - (inMat['o1_mll'][i-1] * C)) / D
-
-        inMat['o1_mll'][:] = Oxnewconc[:]
-    return inMat
-
-
 def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
     """
     Filter raw CTD data using one of three window types (boxcar, hanning, triangle).

@@ -351,6 +351,53 @@ def flag_winkler_oxygen(oxygen):
     flag = flag.astype(int)
     return flag
 
+
+def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24):
+    """NOT TESTED
+
+    Remove hysteresis effects from oxygen concentration values.
+
+    Oxygen hysteresis can be corrected before conversion from volts to oxygen
+    concentration, see sbe_equations_dict.sbe43_hysteresis_voltage()
+
+    Parameters
+    ----------
+    oxygen : array-like
+        Oxygen concentration values
+    pressure : array-like
+        CTD pressure values (dbar)
+    H1 : scalar, optional
+        Amplitude of hysteresis correction function (range: -0.02 to -0.05)
+    H2 : scalar, optional
+        Function constant or curvature function for hysteresis
+    H3 : scalar, optional
+        Time constant for hysteresis (seconds) (range: 1200 to 2000)
+    freq : scalar, optional
+        CTD sampling frequency (Hz)
+
+    Returns
+    -------
+    oxy_corrected : array-like
+        Hysteresis-corrected oxygen concentration values (with same units as input)
+
+    Notes
+    -----
+    See Application Note 64-3 for more information.
+    """
+    # TODO: vectorize (if possible)
+    dt = 1 / freq
+    oxy_corrected = np.zeros(np.shape(oxygen))
+    oxy_corrected[0] = oxygen[0]
+    D = 1 + H1 * (np.exp(pressure[1:] / H2) - 1)
+    C = np.exp(-1 * dt / H3)
+    for i in np.arange(1, len(oxygen)):
+        oxy_corrected[i] = (
+            oxygen[i] + (oxy_corrected[i - 1] * C * D) - (oxygen[i - 1] * C)
+        ) / D
+
+    return oxy_corrected
+
+
 def oxygen_eq(titr,blank,thio_n,flask_vol):
 
     oxy_mlL = (((titr - blank) * thio_n * 5.598 - 0.0017) / ((flask_vol - 2.0) * 0.001))
