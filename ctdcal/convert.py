@@ -6,7 +6,7 @@ import pandas as pd
 
 import ctdcal.process_bottle as btl
 import ctdcal.process_ctd as process_ctd
-import ctdcal.sbe_equations_dict as sbe_eq
+import ctdcal.equations_sbe as sbe_eq
 import ctdcal.sbe_reader as sbe_rd
 
 DEBUG = False
@@ -255,7 +255,7 @@ def convertFromSBEReader(sbeReader, debug=False):
         ### Temperature block
         if temp_meta['sensor_id'] == '55':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.temp_its90(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            converted_df[column_name] = sbe_eq.sbe3(temp_meta['sensor_info'], raw_df[temp_meta['column']])
             if temp_meta['list_id'] == 0:
                 t_array = converted_df[column_name].astype(float)
                 print('\tPrimary temperature first reading:', t_array[0], short_lookup[temp_meta['sensor_id']]['units'])
@@ -271,7 +271,7 @@ def convertFromSBEReader(sbeReader, debug=False):
         ### Conductivity block
         elif temp_meta['sensor_id'] == '3':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.sbe4c(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
+            converted_df[column_name] = sbe_eq.sbe4(temp_meta['sensor_info'], raw_df[temp_meta['column']], t_array, p_array)
             if temp_meta['list_id'] == 1:
                 c_array = converted_df[column_name].astype(float)
                 print('\tPrimary cond first reading:', c_array[0], short_lookup[temp_meta['sensor_id']]['units'])
@@ -286,7 +286,7 @@ def convertFromSBEReader(sbeReader, debug=False):
         ### Fluorometer Seapoint block
         elif temp_meta['sensor_id'] == '11':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.fluoro_seapoint_dict(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            converted_df[column_name] = sbe_eq.seapoint_fluoro(temp_meta['sensor_info'], raw_df[temp_meta['column']])
 
         ### Salinity block
         elif temp_meta['sensor_id'] == '1000':
@@ -296,7 +296,7 @@ def convertFromSBEReader(sbeReader, debug=False):
         ### Altimeter block
         elif temp_meta['sensor_id'] == '0':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
-            converted_df[column_name] = sbe_eq.altimeter_voltage(temp_meta['sensor_info'], raw_df[temp_meta['column']])
+            converted_df[column_name] = sbe_eq.sbe_altimeter(temp_meta['sensor_info'], raw_df[temp_meta['column']])
 
         ### Aux block
         else:

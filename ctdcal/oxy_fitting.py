@@ -357,7 +357,7 @@ def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
     Remove hysteresis effects from oxygen concentration values.
 
     Oxygen hysteresis can be corrected before conversion from volts to oxygen
-    concentration, see sbe_equations_dict.sbe43_hysteresis_voltage()
+    concentration, see equations_sbe.sbe43_hysteresis_voltage()
 
     # TODO: should this just be a wrapper that calls sbe43_hysteresis_voltage()?
 

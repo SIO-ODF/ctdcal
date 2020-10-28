@@ -1,25 +1,19 @@
-"""A module for SBE conversion equations and related helper equations.
-
-Eventual goal is to convert all outputs to numpy arrays to make compatible with
-gsw libraries, and remove written wrappers.
+"""
+A module for SBE conversion equations and related helper equations.
 
 SBE internally references each sensor with an assigned SensorID for indexing. The
 given sensor numbers are determined empirically from .XMLCON files in 2016-2017 and
 not via an official document, and may change according to SBE wishes.
-
 """
-
-'''code_pruning: this module really needs a new name, and all functions inside it as well.'''
-'''code_pruning: Also all functions should be checked to work with vectorized versions and possibly remove single datapoint version.'''
 
 import gsw
 import numpy as np
 from ctdcal.oxy_fitting import oxy_umolkg_to_ml
 
 
-def temp_its90(coefs, freq):
+def sbe3(coefs, freq):
     """
-    SBE equation for converting engineering units to Celsius according to ITS-90.
+    SBE equation for converting SBE3 frequency to temperature.
     SensorID: 55
 
     Parameters
@@ -40,7 +34,7 @@ def temp_its90(coefs, freq):
         freq = freq.astype(float)
         # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
 
-    if 0 in freq: # TODO: is this actually needed? what about for other conversion funcs?
+    if 0 in freq:  # TODO: is this actually needed? what about other conversion funcs?
         freq[freq == 0] = np.nan  # nan out zero frequencies
         # TODO: (logger) e.g. "warning: converting zero frequency found in {} to nan"
 
@@ -55,6 +49,40 @@ def temp_its90(coefs, freq):
         - 273.15
     )
     return np.around(t_ITS90, 4)
+
+
+def sbe4(coefs, freq, t, p):
+    """
+    SBE equation for converting SBE4 frequency to conductivity. This conversion
+    is valid for both SBE4C (profiling) and SBE4M (mooring).
+    SensorID: 3
+
+    Parameters
+    ----------
+    coefs : dict
+        Dictionary of calibration coefficients (G, H, I, J, CPcor, CTcor)
+    freq : array-like
+        Raw frequency (Hz)
+    t : array-like
+        Converted temperature (ITS-90 degrees C)
+    p : array-like
+        Converted pressure (dbar)
+
+    Returns
+    -------
+    c_mS_cm : array-like
+        Converted conductivity (mS/cm)
+    """
+    freq_kHz = freq * 1e-3  # equation expects kHz
+    c_S_m = (
+        coefs["G"]
+        + coefs["H"] * np.power(freq_kHz, 2)
+        + coefs["I"] * np.power(freq_kHz, 3)
+        + coefs["J"] * np.power(freq_kHz, 4)
+    ) / (10 * (1 + coefs["CTcor"] * t + coefs["CPcor"] * p))
+    c_mS_cm = c_S_m * 10  # S/m to mS/cm
+
+    return np.around(c_mS_cm, 5)
 
 
 def sbe9(coefs, freq, t_probe):
@@ -97,40 +125,43 @@ def sbe9(coefs, freq, t_probe):
     return np.around(p_dbar, 4)
 
 
-def sbe4c(coefs, freq, t, p):
+def sbe_altimeter(coefs, volts):
     """
-    SBE equation for converting SBE4C frequency to conductivity.
-    SensorID: 3
+    SBE equation for converting altimeter voltages to meters. This conversion
+    is valid for altimeters integrated with any Sea-Bird CTD (e.g. 9+, 19, 25).
+    Sensor ID: 0
 
     Parameters
     ----------
     coefs : dict
-        Dictionary of calibration coefficients (G, H, I, J, CPcor, CTcor)
-    freq : array-like
-        Raw frequency (Hz)
-    t : array-like
-        Converted temperature (ITS-90 degrees C)
-    p : array-like
-        Converted pressure (dbar)
+        Dictionary of calibration coefficients (ScaleFactor, Offset)
+    volts : array-like
+        Raw voltages
 
     Returns
     -------
-    c_mS_cm : array-like
-        Converted conductivity (mS/cm)
+    bottom_distance : array-like
+        Distance from the altimeter to an object below it (meters)
+
+    Notes
+    -----
+    Equation provdided by SBE in Application Note 95, page 1.
+
+    While the SBE documentation refers to a Teledyne Benthos or Valeport altimeter,
+    the equation works for all altimeters typically found in the wild.
     """
-    freq_kHz = freq * 1e-3  # equation expects kHz
-    c_S_m = (
-        coefs["G"]
-        + coefs["H"] * np.power(freq_kHz, 2)
-        + coefs["I"] * np.power(freq_kHz, 3)
-        + coefs["J"] * np.power(freq_kHz, 4)
-    ) / (10 * (1 + coefs["CTcor"] * t + coefs["CPcor"] * p))
-    c_mS_cm = c_S_m * 10  # S/m to mS/cm
+    volts = np.array(volts)
+    if volts.dtype != float:  # can sometimes come in as object
+        volts = volts.astype(float)
+        # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
 
-    return np.around(c_mS_cm, 5)
+    bottom_distance = np.around(
+        ((300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]), 1
+    )
+    return bottom_distance
 
 
-def sbe43(coefs, p, t, c, V, lat=0., lon=0.):
+def sbe43(coefs, p, t, c, V, lat=0.0, lon=0.0):
     """
     SBE equation for converting SBE43 engineering units to oxygen (ml/l).
     SensorID: 38
@@ -154,7 +185,7 @@ def sbe43(coefs, p, t, c, V, lat=0., lon=0.):
 
     Returns
     -------
-    oxygen : array-like
+    oxy_ml_l : array-like
         Converted oxygen (mL/L)
     """
     # TODO: is there any reason for this to output mL/L? if oxygen eq uses o2sol
@@ -174,7 +205,7 @@ def sbe43(coefs, p, t, c, V, lat=0., lon=0.):
     # pt = gsw.pt0_from_t(SA, t, p)
     # o2sol = gsw.O2sol_SP_pt(s, pt)
 
-    oxygen = (
+    oxy_ml_l = (
         coefs["Soc"]
         * (V + coefs["offset"])
         * (
@@ -186,7 +217,7 @@ def sbe43(coefs, p, t, c, V, lat=0., lon=0.):
         * o2sol_ml_l
         * np.exp(coefs["E"] * p / t_Kelvin)
     )
-    return np.around(oxygen, 4)
+    return np.around(oxy_ml_l, 4)
 
 
 def sbe43_hysteresis_voltage(coefs, volts, pressure, freq=24):
@@ -210,7 +241,7 @@ def sbe43_hysteresis_voltage(coefs, volts, pressure, freq=24):
 
     Returns
     -------
-    oxy_volts_final : array-like
+    volts_corrected : array-like
         Hysteresis-corrected voltage
 
     Notes
@@ -233,12 +264,12 @@ def sbe43_hysteresis_voltage(coefs, volts, pressure, freq=24):
             (oxy_volts[i] + (oxy_volts_new[i - 1] * C * D[i])) - (oxy_volts[i - 1] * C)
         ) / D[i]
 
-    oxy_volts_final = oxy_volts_new - coefs["offset"]
+    volts_corrected = oxy_volts_new - coefs["offset"]
 
-    return oxy_volts_final
+    return volts_corrected
 
 
-def wetlabs_flrtd_chl_dict(coefs, volts):
+def wetlabs_eco_fl(coefs, volts):
     """
     SBE equation for converting ECO-FL fluorometer voltage to concentration.
     SensorID: 20
@@ -270,9 +301,9 @@ def wetlabs_flrtd_chl_dict(coefs, volts):
     return chl
 
 
-def wetlabs_transmissometer_cstar_dict(coefs, volts):
+def wetlabs_cstar(coefs, volts):
     """
-    SBE equation for converting C-Star Transmissometer from voltage to transmission %.
+    SBE equation for converting C-Star transmissometer voltage to light transmission.
     SensorID: 71
 
     Parameters
@@ -307,7 +338,7 @@ def wetlabs_transmissometer_cstar_dict(coefs, volts):
     return xmiss, c
 
 
-def fluoro_seapoint_dict(coefs, volts):
+def seapoint_fluor(coefs, volts):
     """
     Raw voltage supplied from fluorometer right now, after looking at xmlcon.
     The method will do nothing but spit out the exact values that came in.
@@ -316,7 +347,7 @@ def fluoro_seapoint_dict(coefs, volts):
     Parameters
     ----------
     coefs : dict
-        Dictionary of calibration coefficients (GainSetting,  Offset)
+        Dictionary of calibration coefficients (GainSetting, Offset)
     volts : array-like
         Raw voltage
 
@@ -329,43 +360,9 @@ def fluoro_seapoint_dict(coefs, volts):
     -----
     According to .xmlcon, GainSetting "is an array index, not the actual gain setting."
     """
-    # TODO: acutal calibration/conversion/something?
+    # TODO: actual calibration/conversion/something?
+    # TODO: move this to different module? edge case since it's the only Seapoint sensor
     volts = np.array(volts)
     fluoro = np.around(volts, 6)
 
     return fluoro
-
-
-def altimeter_voltage(coefs, volts):
-    """
-    SBE equation for converting altimeter voltages to meters.
-    Sensor ID: 0
-
-    Parameters
-    ----------
-    coefs : dict
-        Dictionary of calibration coefficients (ScaleFactor, Offset)
-    volts : array-like
-        Raw voltages
-
-    Returns
-    -------
-    bottom_distance : array-like
-        Distance from the altimeter to an object below it (meters)
-
-    Notes
-    -----
-    Equation provdided by SBE in Application Note 95, page 1.
-
-    While the SBE documentation refers to a Teledyne Benthos or Valeport altimeter,
-    the equation works for all altimeters typically found in the wild.
-    """
-    volts = np.array(volts)
-    if volts.dtype != float:  # can sometimes come in as object
-        volts = volts.astype(float)
-        # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
-
-    bottom_distance = np.around(
-        ((300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]), 1
-    )
-    return bottom_distance
