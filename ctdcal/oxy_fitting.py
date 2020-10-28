@@ -353,12 +353,13 @@ def flag_winkler_oxygen(oxygen):
 
 
 def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24):
-    """NOT TESTED
-
+    """
     Remove hysteresis effects from oxygen concentration values.
 
     Oxygen hysteresis can be corrected before conversion from volts to oxygen
     concentration, see sbe_equations_dict.sbe43_hysteresis_voltage()
+
+    # TODO: should this just be a wrapper that calls sbe43_hysteresis_voltage()?
 
     Parameters
     ----------
@@ -384,16 +385,17 @@ def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
     -----
     See Application Note 64-3 for more information.
     """
-    # TODO: vectorize (if possible)
+    # TODO: vectorize (if possible), will probably require matrix inversion
     dt = 1 / freq
-    oxy_corrected = np.zeros(np.shape(oxygen))
-    oxy_corrected[0] = oxygen[0]
-    D = 1 + H1 * (np.exp(pressure[1:] / H2) - 1)
+    D = 1 + H1 * (np.exp(pressure / H2) - 1)
     C = np.exp(-1 * dt / H3)
+
+    oxy_corrected = np.zeros(oxygen.shape)
+    oxy_corrected[0] = oxygen[0]
     for i in np.arange(1, len(oxygen)):
         oxy_corrected[i] = (
-            oxygen[i] + (oxy_corrected[i - 1] * C * D) - (oxygen[i - 1] * C)
-        ) / D
+            oxygen[i] + (oxy_corrected[i - 1] * C * D[i]) - (oxygen[i - 1] * C)
+        ) / D[i]
 
     return oxy_corrected
 

@@ -189,11 +189,8 @@ def sbe43(coefs, p, t, c, V, lat=0., lon=0.):
     return np.around(oxygen, 4)
 
 
-def sbe43_hysteresis_voltage(
-    coefs, volts, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
-):
-    """NOT TESTED
-
+def sbe43_hysteresis_voltage(coefs, volts, pressure, freq=24):
+    """
     SBE equation for removing hysteresis from raw voltage values. This function must
     be run before the sbe43 conversion function above.
 
@@ -203,17 +200,11 @@ def sbe43_hysteresis_voltage(
     Parameters
     ----------
     coefs : dict
-        Dictionary of calibration coefficients (H1, H2, H3, Voffset)
+        Dictionary of calibration coefficients (H1, H2, H3, offset)
     volts : array-like
         Raw voltage
     pressure : array-like
         CTD pressure values (dbar)
-    H1 : scalar, optional
-        Amplitude of hysteresis correction function (range: -0.02 to -0.05)
-    H2 : scalar, optional
-        Function constant or curvature function for hysteresis
-    H3 : scalar, optional
-        Time constant for hysteresis (seconds) (range: 1200 to 2000)
     freq : scalar, optional
         CTD sampling frequency (Hz)
 
@@ -229,22 +220,20 @@ def sbe43_hysteresis_voltage(
 
     See Application Note 64-3 for more information.
     """
-    # TODO: vectorize (if possible)
+    # TODO: vectorize (if possible), will probably require matrix inversion
     dt = 1 / freq
-    D = 1 + coefs["H1"] * (np.exp(pressure[1:] / coefs["H2"]) - 1)
+    D = 1 + coefs["H1"] * (np.exp(pressure / coefs["H2"]) - 1)
     C = np.exp(-1 * dt / coefs["H3"])
 
-    oxy_volts = volts[1:] + coefs["Voffset"]
-    oxy_volts_new = np.zeros(volts.shape)
-    oxy_volts_new[0] = volts[0]
-    for i in np.arange(1, len(volts)):
+    oxy_volts = volts + coefs["offset"]
+    oxy_volts_new = np.zeros(oxy_volts.shape)
+    oxy_volts_new[0] = oxy_volts[0]
+    for i in np.arange(1, len(oxy_volts)):
         oxy_volts_new[i] = (
-            (oxy_volts[i] + (volts[i - 1] * C * D)) - (oxy_volts[i - 1] * C)
-        ) / D
+            (oxy_volts[i] + (oxy_volts_new[i - 1] * C * D[i])) - (oxy_volts[i - 1] * C)
+        ) / D[i]
 
-    oxy_volts_final = np.zeros(volts.shape)
-    oxy_volts_final = volts[0]
-    oxy_volts_final[1:] = oxy_volts_new - coefs["Voffset"]
+    oxy_volts_final = oxy_volts_new - coefs["offset"]
 
     return oxy_volts_final
 
@@ -281,36 +270,44 @@ def wetlabs_flrtd_chl_dict(coefs, volts):
     return chl
 
 
-def wetlabs_transmissometer_cstar_dict(calib, signal):
-    """Wetlabs CStar Transmissiometer.
-    Equation from calib sheet for S/N#: CST-479-DR, Date: October 31, 2014
+def wetlabs_transmissometer_cstar_dict(coefs, volts):
+    """
+    SBE equation for converting C-Star Transmissometer from voltage to transmission %.
     SensorID: 71
 
-    Inputs:
-    calib is a dictionary of constants/coefficients
-        calib['dark'] = voltage when beam is blocked. V_d on calib sheet
-        calib['air'] = voltage with clear beam path in air. V_air on calib sheet
-        calib['reference'] = voltage with beam path in clean water. V_ref on calib sheet
-    signal: dict/single of signal voltage
+    Parameters
+    ----------
+    coefs : dict
+        Dictionary of calibration coefficients (M, B, PathLength)
+    volts : array-like
+        Raw voltage
 
-    Relationship of transmittance (Tr) to beam attenuation coefficient (c), and pathlength (x, in meters): Tr = e^-ex
-    beam attenuation coefficient is determined as: c = -1/x * ln (Tr)
+    Returns
+    -------
+    xmiss : array-like
+        Light transmission [%]
+    c : array-like
+        Beam attenuation coefficient
 
+    Notes
+    -----
+    M and B can be recalculated in the field by measuring voltage in air (A1) and
+    voltage with the path blocked (Y1):
+        M = (Tw / (W0 - Y0)) * (A0 - Y0) / (A1 - Y1)
+        B = -M * Y1
+    where A0, Y0, and W0 are factory values.
+    For transmission relative to water, set Tw = 100%.
+
+    See Application Note 91 for more information.
     """
 
-    #array mode
-    try:
-        tx = []
-        for signal_x in signal:
-            temp = (signal_x - calib['dark'])/(calib['reference'] - calib['dark'])
-            tx.append(temp)
-    #single mode
-    except:
-        tx = (signal - calib['dark'])/(calib['reference'] - calib['dark'])
-    return tx
+    xmiss = (coefs["M"] * volts) + coefs["B"]  # xmiss as a percentage
+    c = -(1 / coefs["PathLength"]) * np.log(xmiss * 100)  # needs xmiss as a decimal
+
+    return xmiss, c
 
 
-def fluoro_seapoint_dict(calib, volts):
+def fluoro_seapoint_dict(coefs, volts):
     """
     Raw voltage supplied from fluorometer right now, after looking at xmlcon.
     The method will do nothing but spit out the exact values that came in.
@@ -318,7 +315,7 @@ def fluoro_seapoint_dict(calib, volts):
 
     Parameters
     ----------
-    calib : dict
+    coefs : dict
         Dictionary of calibration coefficients (GainSetting,  Offset)
     volts : array-like
         Raw voltage
@@ -346,7 +343,7 @@ def altimeter_voltage(coefs, volts):
 
     Parameters
     ----------
-    calib : dict
+    coefs : dict
         Dictionary of calibration coefficients (ScaleFactor, Offset)
     volts : array-like
         Raw voltages

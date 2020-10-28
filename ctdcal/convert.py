@@ -279,6 +279,7 @@ def convertFromSBEReader(sbeReader, debug=False):
         ### Oxygen block
         elif temp_meta['sensor_id'] == '38':
             print('Processing Sensor ID:', temp_meta['sensor_id'] + ',', short_lookup[temp_meta['sensor_id']]['long_name'])
+            sbe_eq.sbe43_hysteresis_voltage(temp_meta['sensor_info'], raw_df[temp_meta['column']], p_array)
             converted_df[column_name] = sbe_eq.sbe43(temp_meta['sensor_info'], p_array, t_array, c_array, raw_df[temp_meta['column']])
             converted_df['CTDOXYVOLTS'] = raw_df[temp_meta['column']]
 
