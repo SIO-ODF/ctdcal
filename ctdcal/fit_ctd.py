@@ -8,6 +8,7 @@ import pandas as pd
 import scipy
 from scipy.ndimage.interpolation import shift
 
+import ctdcal.convert as convert
 import ctdcal.ctd_plots as ctd_plots
 import ctdcal.process_ctd as process_ctd
 
@@ -508,7 +509,7 @@ def calibrate_cond(btl_df, time_df):
     """
     print("Calibrating conductivity")
     # calculate BTLCOND values from autosal data
-    btl_df[cfg.column["refc"]] = CR_to_cond(
+    btl_df[cfg.column["refc"]] = convert.CR_to_cond(
         btl_df["CRavg"],
         btl_df["BathTEMP"],
         btl_df[cfg.column["t1_btl"]],
@@ -699,38 +700,3 @@ def calibrate_cond(btl_df, time_df):
     )
 
     return btl_df, time_df
-
-
-
-def CR_to_cond(cr,bath_t,ref_t,btl_p):
-
-    """
-    Convert AutoSal double conductivity ratio (CR) to conductivity using
-    GSW conversion routines.
-
-    Parameters
-    ----------
-    cr : array-like
-        Double conductivity ratio from AutoSal, unitless
-    bath_t : array-like
-        AutoSal water bath temperature, degrees C
-    ref_t : array-like
-        CTD temperature at bottle stop, degrees C
-    btl_p : array-like
-        CTD pressure at bottle stop, dbar
-
-    Returns
-    -------
-    cond : array-like
-        Converted reference conductivity, mS/cm
-
-    """
-    
-    salinity = gsw.SP_salinometer((cr / 2.0),bath_t)
-    cond = gsw.C_from_SP(salinity,ref_t,btl_p)  
-    
-    # ignore RunTimeWarning from (np.nan <= 1)
-    with np.errstate(invalid="ignore"):
-        cond[cond <= 1] = np.nan
-    
-    return cond

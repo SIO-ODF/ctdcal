@@ -2,6 +2,7 @@ from pathlib import Path
 
 import config as cfg
 import gsw
+import numpy as np
 import pandas as pd
 
 import ctdcal.process_bottle as btl
@@ -312,3 +313,76 @@ def convertFromSBEReader(sbeReader, debug=False):
 
     # return the converted data as a dataframe
     return converted_df
+
+
+def to_temperature(raw, manufacturer, sensor, coefs):
+    """
+    Wrapper to convert raw temperature output to scientific units using appropriate
+    conversion function.
+
+    Parameters
+    ----------
+    raw : array-like
+        Raw temperature output
+    manufacturer : str
+        Name of sensor manufacturer (e.g. "seabird", "RBR")
+    sensor : str
+        Name of sensor (e.g. for SBE "3", "4", "9")
+    coefs : dict
+        Dictionary of calibration coefficient from cal sheet
+
+    Returns
+    -------
+    temperature : array-like
+        Converted temperature (ITS-90)
+
+    """
+    # potential example of flexible/user-friendly conversion function
+
+    if manufacturer.lower() in ["sbe", "seabird", "sea-bird"]:
+        if sensor == "3":
+            # sbe_eq.sbe3()
+            pass
+        elif sensor == "35":
+            # ?
+            pass
+
+    elif manufacturer.lower() == "rbr":
+        # will need to create equations_rbr module
+        if sensor.lower() == "duo":
+            pass
+        elif sensor.lower() == "concerto":
+            pass
+
+
+def CR_to_cond(cr, bath_t, ref_t, btl_p):
+    """
+    Convert AutoSal double conductivity ratio (CR) to conductivity using
+    GSW conversion routines.
+
+    Parameters
+    ----------
+    cr : array-like
+        Double conductivity ratio from AutoSal, unitless
+    bath_t : array-like
+        AutoSal water bath temperature, degrees C
+    ref_t : array-like
+        CTD temperature at bottle stop, degrees C
+    btl_p : array-like
+        CTD pressure at bottle stop, dbar
+
+    Returns
+    -------
+    cond : array-like
+        Converted reference conductivity, mS/cm
+
+    """
+
+    salinity = gsw.SP_salinometer((cr / 2.0), bath_t)
+    cond = gsw.C_from_SP(salinity, ref_t, btl_p)
+
+    # ignore RunTimeWarning from (np.nan <= 1)
+    with np.errstate(invalid="ignore"):
+        cond[cond <= 1] = np.nan
+
+    return cond

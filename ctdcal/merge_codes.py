@@ -4,6 +4,8 @@ import gsw
 import numpy as np
 import pandas as pd
 
+"""code_pruning: is there anything worth keeping in this module?
+only imported in outdated scripts"""
 
 def string_converter(value):
     '''To deal with Courtney CTD codes'''
