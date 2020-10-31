@@ -1,14 +1,11 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Mon Jan  8 10:04:19 2018
-
-@author: k3jackson
+Module for processing oxygen from CTD and bottle samples.
 """
 
 import csv
 from pathlib import Path
 
+from collections import OrderedDict
 import config as cfg
 import gsw
 import numpy as np
@@ -20,292 +17,204 @@ import ctdcal.process_ctd as process_ctd
 import ctdcal.sbe_reader as sbe_rd
 
 
-def oxy_loader(oxyfile):
-
-    f = open(oxyfile,newline='')
-    oxyF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
-    oxy_Array = []
-
-    for row in oxyF:
-        if len(row) > 9:
-            row = row[:9]
-        oxy_Array.append(row)
-
-    params = oxy_Array[0]
-
-    del oxy_Array[0]
-
-    header = ['STNNO_OXY','CASTNO_OXY','BOTTLENO_OXY','FLASKNO','TITR_VOL','TITR_TEMP','DRAW_TEMP','TITR_TIME','END_VOLTS']
-
-    O2 = np.array(oxy_Array)
-    df = pd.DataFrame(O2,columns=header)
-
-    f.close()
-
-    df = df.apply(pd.to_numeric, errors='ignore')
-
-    # Remove "Dummy Data"
-    #df['BOTTLENO_OXY'] = df['BOTTLENO_OXY'].astype(int,errors='ignore')
-    df = df[df['BOTTLENO_OXY']!=99]
-
-    # Remove "ABORTED DATA"
-
-    df = df[df['TITR_VOL'] > 0]
-
-    # Sort and reindex
-    df = df.sort_values('BOTTLENO_OXY')
-    #df = df.reset_index()
-
-    # Get necessary columns for output
-    df['STNNO_OXY'] = df['STNNO_OXY'].astype(str)
-    df['CASTNO_OXY'] = df['CASTNO_OXY'].astype(str)
-    df['FLASKNO']= df['FLASKNO'].astype(str)
-
-    df['SSSCC_OXY'] = df['STNNO_OXY']+'0'+df['CASTNO_OXY']
-
-    return df ,params #DF
-
-def flask_load(flaskfile=cfg.directory["oxy"] + 'o2flasks.vol', skip_rows=12):
-    """Load information from flask.vol file
-
+def load_winkler_oxy(oxy_file):
     """
-## Convert to Dataframe
-    with open(flaskfile, 'r') as f:
-        flasks = {}
-        for l in f:
-            if 'Volume' not in l:
-                if l.strip().startswith("#"):
-                    continue
-                row = l.strip().split()
-                flasks[str(row[0])] = float(row[1])
+    Load Winkler oxygen titration data file.
 
-    flasks = pd.DataFrame.from_dict(flasks,orient='index')
-    flasks = flasks.rename(columns={0:'FLASK_VOL'})
-    flasks['FLASKNO'] = flasks.index.values
-    flasks = flasks[['FLASKNO','FLASK_VOL']]
+    Parameters
+    ----------
+    oxy_file : str or Path
+        Path to oxygen file
+
+    Returns
+    -------
+    df : DataFrame
+        Oxygen data
+    params : list of str
+        List of oxygen parameters used in titration
+    """
+
+    with open(oxy_file, newline="") as f:
+        oxyF = csv.reader(
+            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
+        )
+        oxy_array = []
+        for row in oxyF:
+            if len(row) > 9:
+                row = row[:9]
+            oxy_array.append(row)
+
+    # TODO turn params into a dict with useful labels
+    params = oxy_array.pop(0)  # save file header info for later (Winkler values)
+    cols = OrderedDict(
+        [
+            ("STNNO_OXY", int),
+            ("CASTNO_OXY", int),
+            ("BOTTLENO_OXY", int),
+            ("FLASKNO", int),
+            ("TITR_VOL", float),
+            ("TITR_TEMP", float),
+            ("DRAW_TEMP", float),
+            ("TITR_TIME", int),
+            ("END_VOLTS", float),
+        ]
+    )
+
+    df = pd.DataFrame(oxy_array, columns=cols.keys()).astype(cols)
+    df = df[df["BOTTLENO_OXY"] != 99]  # remove "Dummy Data"
+    df = df[df["TITR_VOL"] > 0]  # remove "ABORTED DATA"
+    df = df.sort_values("BOTTLENO_OXY").reset_index(drop=True)
+    df["FLASKNO"] = df["FLASKNO"].astype(str)
+
+    return df, params
+
+
+def load_flasks(flask_file=cfg.directory["oxy"] + "o2flasks.vol", comment="#"):
+    """
+    Load oxygen flask information from .vol file.
+
+    Parameters
+    ----------
+    flask_file : str or Path, optional
+        Path to flask file
+    comment : str, optional
+        Identifier signifying line is a comment and should be skipped
+
+    Returns
+    -------
+    flasks : DataFrame
+        Flask numbers and volumes
+    """
+    with open(flask_file, "r") as f:
+        flasks = []
+        for l in f:
+            is_comment = l.strip().startswith(comment)
+            if ("Volume" in l) or is_comment:
+                continue
+            num, vol = l.strip().split()[:2]  # only need first two cols (# and volume)
+            flasks.append([str(num), float(vol)])
+
+    flasks = pd.DataFrame(flasks, columns=["FLASKNO", "FLASK_VOL"])
+
     return flasks
 
-#    f = open(flaskfile,newline='')
-#    flaskF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
-#
-#    flask_array = []
-#    for row in flaskF:
-#        flask_array.append(row)
-#
-#    f.close
-#    del flask_array[0:skip_rows]
-#
-#    df = pd.DataFrame(flask_array)
-#    df['FLASKNO'] = df[0]
-#    df['FLASK_VOL'] = df[1]
-#    df = df[['FLASKNO','FLASK_VOL']]
-#    df['FLASKNO'] = df['FLASKNO'].astype(float,errors='ignore')
 
-#    return df
-
-
-# code formerly in fit_ctd, need to sort out this vs match_flask
-def get_flask_vol(flask, o2flasks, t=20, glass="borosilicate"):
-    _coef = {
-            "borosilicate": 0.00001,
-            "soft": 0.000025,
-            }
-    _t = 20
-    flasks = flask_load()
-    fv = flasks[flask]
-    coef = _coef[glass]
-    return fv * (1.0 + coef * (t - _t));
-
-
-def match_flask(flask_nums, flask_list, flask_vols, t=20, glass="borosilicate"):
+def correct_flask_vol(flask_vol, t=20.0, glass="borosilicate"):
     """
-    flask_nums = flasks used in winkler titrations
-    flasks_list = entire list of flask numbers from .vol file
-    flasks_vols = entire list of flask volumes from .vol file
-
-    """
-
-
-    ### NOTE: LOOK AT ANDREW DICKSON'S SOP 13: GRAVIMETRIC CALIBRATION OF A VOLUME CONTAINED USING WATER!!!
-    ### These formulas/values may be out of date
-    _coef = {
-            "borosilicate": 0.00001,
-            "soft": 0.000025,
-            }
-    _t = 20
-
-    # Make flask_nums into DataFrame for merging
-
-    #flask_num_df = pd.DataFrame({'BOTTLENO_OXY':sample_nums, 'FLASKNO':flask_nums})
-    flask_num_df = pd.DataFrame({'FLASKNO':flask_nums})
-    flask_list_vols = pd.DataFrame({'FLASKNO':flask_list,'FLASK_VOL':flask_vols})
-
-
-
-    coef = _coef[glass]
-    merge_df = flask_num_df.merge(flask_list_vols, how='left')
-
-    # code formerly in fit_ctd, need to sort this out w/ above NOTE
-    # flasks = flask_load()
-    # fv = flasks[flask]
-    # coef = _coef[glass]
-    # return fv * (1.0 + coef * (t - _t));
-
-    volumes = merge_df['FLASK_VOL'].values
-    #volumes = merge_df['FLASK_VOL']
-
-    #bottle_num = merge_df['BOTTLENO_OXY'].values
-#    merge_df = merge_df[merge_df[ssscc_col].notnull()]
-
-#    merge_df = merge_df.sort_values(by='master_index')
-#    merge_df = merge_df.set_index(df.index.values)
-
-    return volumes #bottle_num
-
-def gather_oxy_params(oxyfile):
-
-    """
-    Collects winkler oxygen measurement parameters into a DataFrame (First line
-    of output from Labview program)
+    Correct flask volume for changes from thermal expansion of glass.
 
     Parameters
     ----------
-
-    oxyfile :string
-             Path to labview output file for winkler titration
+    flask_vol : array-like
+        Flask volumes at standard temperature (20C)
+    t : float, optional
+        New temperature to calculate volume
+    glass : str, optional
+        Type of glass ("borosilicate" or "soft)
 
     Returns
     -------
+    corrected_vol : array-like
+        Flask volumes are new temperature
 
-    df :dataframe
-        DataFrame containing oxygen measurement parameters: TITR, BLANK, KIO3_N
-        KIO3_V, KIO3_T, and THIO_T
+    Notes
+    -----
+    Flask volume equation from 2007 Best Practices for Ocean CO2 Measurements,
+    SOP 13 - Gravimetric calibration of volume contained using water
     """
+    alpha = {  # thermal expansion coefficient
+        "borosilicate": 0.00001,
+        "soft": 0.000025,
+    }
+    if glass not in alpha.keys():
+        raise KeyError(f"Glass type not found, must be one of {list(alpha.keys())}")
+    standard_t = 20.0
+    corrected_vol = flask_vol * (1.0 + alpha[glass] * (t - standard_t))
 
-    f = open(oxyfile,newline='')
-    oxyF = csv.reader(f,delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace='True')
-    oxy_Array = []
+    return corrected_vol
 
-    for row in oxyF:
-        oxy_Array.append(row)
 
-    f.close()
-
-    params = oxy_Array[0]
-    df = pd.DataFrame(params)
-    df = df.transpose()
-
-    df = df[[0,1,2,3,4,5]]
-
-# If column names are needed later on for the parameters DF
-#    cols = ['TITR','BLANK','KIO3_N','KIO3_V','KIO3_T','THIO_T']
-#
-#    df.rename(columns={0:cols[0],1:cols[1],2:cols[2],3:cols[3],4:cols[4],5:cols[5]})
-
-    return df
-
-def gather_all_oxy_params(ssscc,oxyfile_prefix=cfg.directory["oxy"],oxyfile_postfix=''):
+def gather_oxy_params(oxy_file):
     """
-    Collects all oxygen parameters for a given SSSCC (multiple stations)
+    Collect Winkler oxygen measurement parameters from LabVIEW data file headers.
 
     Parameters
     ----------
-
-    ssscc :list
-           List containing the station/casts to have parameters collected from.
-
-    oxyfile_prefix :string
-                    Path string prefix to file
-    oxyfile_postfix :string
-                     Postfix for oxygen_file (any extensions)
+    oxy_file : str or Path
+        Path to oxygen file
 
     Returns
     -------
-
-    df_data_all :Pandas DataFrame
-                 DataFrame containing all of the oxygen parameters for each
-                 station.
+    df : DataFrame
+        Oxygen measurement parameters
     """
+    with open(oxy_file, newline="") as f:
+        header = f.readline()
 
-    df_data_all = pd.DataFrame()
+    param_list = header.split()[:6]
+    params = pd.DataFrame(param_list, dtype=float).transpose()
+    params.columns = ["TITR", "BLANK", "KIO3_N", "KIO3_V", "KIO3_T", "THIO_T"]
 
-    for x in ssscc:
-        oxyfile = oxyfile_prefix + x + oxyfile_postfix
-        params = gather_oxy_params(oxyfile)
-        params['SSSCC'] = x
+    return params
 
-        df_data_all = pd.concat([df_data_all,params])
 
-    df_data_all = df_data_all.reset_index()
-    df_data_all = df_data_all.set_index('SSSCC')
-    df_data_all.drop('index', axis=1, inplace=True)
-    return df_data_all
-
-def thio_n_calc(params,ssscc):#(titr, blank, kio3_n, kio3_v, kio3_t, thio_t):
-
+def calculate_thio_norm(params, ssscc):
     """
-    Calculates normality of thiosulfate used in Winkler oxygen titrations
+    Calculate normality of thiosulfate used in Winkler oxygen titrations.
 
     Parameters
     ----------
-
-    params :DataFrame
-            Table listing calibration parameters used for each station winkler
-            titrations:
-                Titr, Blank, KIO3_Norm, KIO3_Vol, KIO3_Temp, and Thio temp
-            ex:
-                         0         1          2        3      4      5
-                SSSCC
-                14402  0.53388  -0.00012  0.0123631  10.0019  22.69  22.64
-                14501  0.53388  -0.00012  0.0123631  10.0019  22.69  22.64
-                14601  0.53378  -0.00011  0.0123631  10.0019  21.56  22.08
-                14701  0.53378  -0.00011  0.0123631  10.0019  21.56  22.08
-
-    ssscc :array-like
-           Column of station/cast values FOR EACH measurement taken:
-           (The length of ssscc should be the same as the amount of oxygen
-           titrations taken)
+    params : DataFrame
+        Calibration parameters used for each station
+    ssscc : Series
+        Column of station/cast values FOR EACH measurement taken
+        (i.e. length of ssscc should equal the total number of oxygen titrations)
 
     Returns
     -------
-
-    thio_n :array-like
-            Thiosulfate normality
-
+    thio_n : array-like
+        Thiosulfate normality
     """
+    # TODO: arraylike inputs instead of df? is this a function worth exposing?
+    params = pd.merge(ssscc, params, how="left")
 
-    params = params.loc[ssscc]
-    params = params.apply(pd.to_numeric)
+    rho_stp = gsw.rho_t_exact(0, 20, 0)
+    rho_kio = gsw.rho_t_exact(0, params["KIO3_T"], 0)
+    rho_thio = gsw.rho_t_exact(0, params["THIO_T"], 0)
 
-    titr   = params[0]
-    blank  = params[1]
-    kio3_n = params[2]
-    kio3_v = params[3]
-    kio3_t = params[4]
-    thio_t = params[5]
+    kio3_v_20c = params["KIO3_V"] * (rho_kio / rho_stp)
+    thio_v_20c = params["TITR"] * (rho_thio / rho_stp) - params["BLANK"]
 
-    rho_stp  = gsw.rho_t_exact(0, 20, 0)
-    rho_kio  = gsw.rho_t_exact(0, kio3_t, 0)
-    rho_thio = gsw.rho_t_exact(0, thio_t, 0)
-
-    kio3_v_20c = kio3_v * (rho_kio/rho_stp)
-    thio_v_20c = titr * (rho_thio/rho_stp) - blank
-
-    thio_n = kio3_v_20c * kio3_n / thio_v_20c
+    thio_n = kio3_v_20c * params["KIO3_N"] / thio_v_20c
 
     return thio_n.values
 
-def titr_20_calc(titr, titr_temp):
 
+def calculate_20C_vol(titr_vol, titr_temp):
+    """
+    Calculate the 20degC equivalent titration volume.
 
+    Parameters
+    ----------
+    titr_vol : array-like
+        Titration volume
+    titr_temp : array-like
+        Temperature of titration
+
+    Returns
+    -------
+    titr_vol_20c : array-like
+        Titration volume equivalent at 20degC
+    """
+    # TODO: is this func useful beyond titrations?
     rho_titr = gsw.rho_t_exact(0, titr_temp, 0)
     rho_stp = gsw.rho_t_exact(0, 20, 0)
+    titr_vol_20c = titr_vol * rho_titr / rho_stp
 
-    #convert the titr ammount to 20c equivalent
-    titr_20c = titr * rho_titr/rho_stp
-    return titr_20c
+    return titr_vol_20c
 
-def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nums, d_temp='DRAW_TEMP'):
+
+def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nums):
     """
     Calculates oxygen values from Winkler titrations
 
@@ -317,30 +226,20 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
 
 
     """
+    params = pd.DataFrame()
+    for ssscc in ssscc_list:
+        df = gather_oxy_params(cfg.directory["oxy"] + ssscc)
+        df["SSSCC"] = ssscc
+        params = pd.concat([params, df])
 
+    thio_n = calculate_thio_norm(params, ssscc_col)
+    titr_20C = calculate_20C_vol(titr_vol, titr_temp)
 
+    flask_df = load_flasks()
+    volumes = pd.merge(flask_nums, flask_df, how="left")["FLASK_VOL"].values
+    params = pd.merge(ssscc_col, params, how="left")
 
-    params = gather_all_oxy_params(ssscc_list)
-
-    thio_n = thio_n_calc(params, ssscc_col)
-
-    titr_20C = titr_20_calc(titr_vol, titr_temp)
-
-    flask_df = flask_load()
-    flask_list = flask_df['FLASKNO']
-    flask_vols = flask_df['FLASK_VOL']
-
-    volumes = match_flask(flask_nums, flask_list, flask_vols)
-
-    params = params.loc[ssscc_col]
-    params = params.apply(pd.to_numeric)
-
-    blank  = params[1]
-
-    blank = blank.reset_index()
-    blank = blank[1].apply(pd.to_numeric)
-
-    oxy_mlL = oxygen_eq(titr_20C, blank.values, thio_n, volumes)
+    oxy_mlL = oxygen_eq(titr_20C, params["BLANK"].values, thio_n, volumes)
 
     return oxy_mlL
 
@@ -400,8 +299,16 @@ def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
     return oxy_corrected
 
 
-def oxygen_eq(titr,blank,thio_n,flask_vol):
+def oxygen_eq(titr, blank, thio_n, flask_vol):
+    E = 5.598  # L O2 equivalent (?)
+    DO_rgts = 0.0017  # correction for oxygen added by reagents
+    V_rgts = 2e-3  # volume of reagents (L)
+    KIO3_V = 10.0  # volume of KIO3 standard (mL)
+    KIO3_N = 0.01  # normality of KIO3 standard (N)
+    oxyMl_L = ((titr - blank) * KIO3_V * KIO3_N * E) / ((flask_vol * 1e-3) - V_rgts) - DO_rgts
+    breakpoint()
 
+    # TODO: where does this eq come from? what are the magic numbers?
     oxy_mlL = (((titr - blank) * thio_n * 5.598 - 0.0017) / ((flask_vol - 2.0) * 0.001))
 
     return oxy_mlL

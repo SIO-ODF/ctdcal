@@ -729,7 +729,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
             ### load OXY data
             oxy_file = cfg.directory["oxy"] + ssscc
             try:
-                oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
+                oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
             except FileNotFoundError:
                 print('Missing (or misnamed) REFO Data Station: ' + ssscc + '...filling with NaNs')
                 oxy_data = pd.DataFrame(
