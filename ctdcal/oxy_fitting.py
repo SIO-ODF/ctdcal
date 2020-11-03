@@ -313,126 +313,37 @@ def oxygen_eq(titr, blank, thio_n, flask_vol):
 
     return oxy_mlL
 
-def oxy_from_ctd_eq(coef, oxyvolts, pressure, temp, dvdt, os, cc=[1.92634e-4,-4.64803e-2]):
+
+"""code_pruning: is this wrapper actually useful? only calls to just use
+ref=0... and SA/CT are calculated right before the call (see prepare_oxy below)"""
+def calculate_sigma(sal, temp, press, lon, lat, ref=0):
     """
-    Modified oxygen equation for SBE 43 used by NOAA/PMEL
-
-    coef[0] = Soc
-    coef[1] = Voffset
-    coef[2] = Tau20
-    coef[3] = Tcorr
-    coef[4] = E
-    """
-
-
-   # ox=c(1)*(doxvo+c(2)+c(3)*exp(cc(1)*dpres+cc(2)*dtepr).*dsdvdt).*os.*exp(c(4)*dtepr).*exp(c(5)*dpres./(273.15+dtepr));
-    oxy_mlL = coef[0] * (oxyvolts + coef[1] + coef[2] * np.exp(cc[0] * pressure + cc[1] * temp) * dvdt) * os \
-            * np.exp(coef[3] * temp) \
-            * np.exp((coef[4] * pressure) \
-            / (temp + 273.15))
-
-
-    return oxy_mlL
-
-def SB_oxy_eq(coef,oxyvolts,pressure,temp,dvdt,os,cc=[1.92634e-4,-4.64803e-2]):
-    """
-    Oxygen (ml/l) = Soc * (V + Voffset) * (1.0 + A * T + B * T^2 + C * T^3 ) * OxSol(T,S) * exp(E * P / K)
-    Original equation from calib sheet dated 2014:
-
-    coef[0] = Soc
-    coef[1] = Voffset
-    coef[2] = A
-    coef[3] = B
-    coef[4] = C
-    coef[5] = E
-    coef[6] = Tau20
-
-    """
-
-    oxygen = (coef[0]) * ((oxyvolts + coef[1] + (coef[6] * np.exp(cc[0] * pressure + cc[1] * temp) * dvdt))
-                 * (1.0 + coef[2] * temp + coef[3] * np.power(temp,2) + coef[4] * np.power(temp,3) )
-                 * os
-                 * np.exp((coef[5] * pressure) / (temp + 273.15)))
-
-    return oxygen
-
-def get_SB_coef(hexfile,xmlfile):
-
-    sbeReader = sbe_rd.SBEReader.from_paths(hexfile, xmlfile)
-    rawConfig = sbeReader.parsed_config()
-    for i, x in enumerate(rawConfig['Sensors']):
-        sensor_id = rawConfig['Sensors'][i]['SensorID']
-        if str(sensor_id) == '38':
-            oxy_meta = {'sensor_id': '38', 'list_id': 0, 'channel_pos': 1,
-                        'ranking': 5, 'column': 'CTDOXYVOLTS',
-                        'sensor_info': rawConfig['Sensors'][i]}
-
-
-    Soc = oxy_meta['sensor_info']['Soc'] # Oxygen slope
-    Voff = oxy_meta['sensor_info']['offset'] # Sensor output offset voltage
-    Tau20 = oxy_meta['sensor_info']['Tau20'] #Sensor time constant at 20 deg C and 1 Atm
-    Tcorr = oxy_meta['sensor_info']['Tcor'] # Temperature correction
-    E  = oxy_meta['sensor_info']['E'] #Compensation Coef for pressure effect on membrane permeability (Atkinson et al)
-    A = oxy_meta['sensor_info']['A'] # Compensation Coef for temp effect on mem perm
-    B = oxy_meta['sensor_info']['B'] # Compensation Coef for temp effect on mem perm
-    C = oxy_meta['sensor_info']['C'] # Compensation Coef for temp effect on mem perm
-    D = [oxy_meta['sensor_info']['D0'],oxy_meta['sensor_info']['D1'],oxy_meta['sensor_info']['D2']] # Press effect on time constant Usually not fitted for.
-
-    #coef = {'Soc':Soc,'Voff':Voff,'Tau20':Tau20,'Tcorr':Tcorr,'E':E,'A':A,'B':B,'C':C,'D':D}
-
-    # Make into an array in order to do keast squares fitting easier
-#        coef0s:
-#    coef[0] = Soc
-#    coef[1] = Voffset
-#    coef[2] = Tau20
-#    coef[3] = Tcorr
-#    coef[4] = E
-#
-#    cc[0] = D1
-#    cc[1] = D2
-    coef = [Soc,Voff,A,B,C,E,Tau20]
-
-    return coef
-
-
-def sigma_from_CTD(sal, temp, press, lon, lat, ref=0):
-    """
-    Calculates potential density from CTD parameters at various reference pressures
+    Calculate potential density anomaly at a specific reference pressure.
 
     Parameters
     ----------
-
-    sal :array-like
-         Salinity in PSU (PSS-78)
-
-    temp :array_like
-          In-situ temperature in deg C
-
-    press :array_like
-           Pressure in dbar
-
-    lon :array_like
-         longitude in decimal degrees
-
-    lat :array_like
-         latitute in decimal degrees
-
-    ref :int
-         reference pressure point for caluclateing sigma0 (in ref * 1000 dBar ref[0-4])
+    sal : array-like
+        Salinity in PSU (PSS-78)
+    temp : array-like
+        In-situ temperature in deg C
+    press : array-like
+        Pressure in dbar
+    lon : array-like
+        longitude in decimal degrees
+    lat : array-like
+        latitute in decimal degrees
+    ref : int, optional
+        Reference pressure [0-4] (* 1000 dbar)
 
     Returns
     -------
-
-    simga :array-like
-           Potential density calculated at a reference pressure of ref * 1000 dBar
-
+    sigma : array-like
+        Potential density anomaly at reference pressure
     """
 
     CT = gsw.CT_from_t(sal, temp, press)
-
     SA = gsw.SA_from_SP(sal, press, lon, lat)
 
-    # Reference pressure in ref*1000 dBars
     if ref == 0:
         sigma = gsw.sigma0(SA, CT)
     elif ref == 1:
@@ -575,19 +486,7 @@ def calculate_weights(pressure):
     return weights
 
 
-def oxy_equation(X, Soc, Voffset, A, B, C, E, Tau20):
-    # eq (3) in Uchida CTD manual
-    cc=[1.92634e-4,-4.64803e-2]
-    oxyvolts, pressure, temp, dvdt, os = X
-
-    oxygen = (Soc * ((oxyvolts + Voffset + (Tau20 * np.exp(cc[0] * pressure + cc[1] * temp) * dvdt))
-                 * (1.0 + A * temp + B * np.power(temp,2) + C * np.power(temp,3) )
-                 * os
-                 * np.exp((E * pressure) / (temp + 273.15))))
-
-    return oxygen
-
-
+"""code_pruning: should this be here or in equations_sbe? somewhere else?"""
 def _PMEL_oxy_eq(coefs,inputs,cc=[1.92634e-4,-4.64803e-2]):
     """
     Modified oxygen equation for SBE 43 used by NOAA/PMEL
@@ -802,14 +701,14 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         time_df[cfg.column["p"]],
     )
     # calculate sigma
-    btl_df["sigma_btl"] = sigma_from_CTD(
+    btl_df["sigma_btl"] = calculate_sigma(
         btl_df[cfg.column["sal"]],
         btl_df[cfg.column["t1_btl"]],  # oxygen sensor is on primary line (ie t1)
         btl_df[cfg.column["p_btl"]],
         btl_df[cfg.column["lon_btl"]],
         btl_df[cfg.column["lat_btl"]],
     )
-    time_df["sigma_ctd"] = sigma_from_CTD(
+    time_df["sigma_ctd"] = calculate_sigma(
         time_df[cfg.column["sal"]],
         time_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
         time_df[cfg.column["p"]],
