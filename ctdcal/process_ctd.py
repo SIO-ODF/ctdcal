@@ -776,7 +776,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
             time_file = cfg.directory["time"] + ssscc + '_time.pkl'
             time_data = pd.read_pickle(time_file)
             time_data['SSSCC'] = str(ssscc)
-            time_data['dv_dt'] = oxy_fitting.calculate_dVdT(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
+            time_data['dv_dt'] = oxy_fitting.calculate_dV_dt(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
             df_data_all.append(time_data)
             print('** Finished TIME data station: ' + ssscc + ' **')
         df_data_all = pd.concat(df_data_all, axis=0, sort=False)

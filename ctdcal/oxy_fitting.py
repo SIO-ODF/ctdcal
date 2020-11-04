@@ -243,6 +243,7 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
 
     return oxy_mlL
 
+
 def flag_winkler_oxygen(oxygen):
     flag = pd.Series(oxygen).copy()
     flag.loc[flag.notnull()] = 2
@@ -305,7 +306,7 @@ def oxygen_eq(titr, blank, thio_n, flask_vol):
     V_rgts = 2e-3  # volume of reagents (L)
     KIO3_V = 10.0  # volume of KIO3 standard (mL)
     KIO3_N = 0.01  # normality of KIO3 standard (N)
-    oxyMl_L = ((titr - blank) * KIO3_V * KIO3_N * E) / ((flask_vol * 1e-3) - V_rgts) - DO_rgts
+    oxy_mL_L = ((titr - blank) * KIO3_V * KIO3_N * E) / ((flask_vol * 1e-3) - V_rgts) - DO_rgts
     breakpoint()
 
     # TODO: where does this eq come from? what are the magic numbers?
@@ -313,49 +314,6 @@ def oxygen_eq(titr, blank, thio_n, flask_vol):
 
     return oxy_mlL
 
-
-"""code_pruning: is this wrapper actually useful? only calls to just use
-ref=0... and SA/CT are calculated right before the call (see prepare_oxy below)"""
-def calculate_sigma(sal, temp, press, lon, lat, ref=0):
-    """
-    Calculate potential density anomaly at a specific reference pressure.
-
-    Parameters
-    ----------
-    sal : array-like
-        Salinity in PSU (PSS-78)
-    temp : array-like
-        In-situ temperature in deg C
-    press : array-like
-        Pressure in dbar
-    lon : array-like
-        longitude in decimal degrees
-    lat : array-like
-        latitute in decimal degrees
-    ref : int, optional
-        Reference pressure [0-4] (* 1000 dbar)
-
-    Returns
-    -------
-    sigma : array-like
-        Potential density anomaly at reference pressure
-    """
-
-    CT = gsw.CT_from_t(sal, temp, press)
-    SA = gsw.SA_from_SP(sal, press, lon, lat)
-
-    if ref == 0:
-        sigma = gsw.sigma0(SA, CT)
-    elif ref == 1:
-        sigma = gsw.sigma1(SA, CT)
-    elif ref == 2:
-        sigma = gsw.sigma2(SA, CT)
-    elif ref == 3:
-        sigma = gsw.sigma3(SA, CT)
-    elif ref == 4:
-        sigma = gsw.sigma4(SA, CT)
-
-    return sigma
 
 def oxy_ml_to_umolkg(oxy_mL_L, sigma0):
     """Convert dissolved oxygen from units of mL/L to micromol/kg.
@@ -382,6 +340,7 @@ def oxy_ml_to_umolkg(oxy_mL_L, sigma0):
 
     return oxy_umol_kg
 
+
 def oxy_umolkg_to_ml(oxy_umol_kg, sigma0):
     """Convert dissolved oxygen from units of micromol/kg to mL/L.
 
@@ -407,39 +366,51 @@ def oxy_umolkg_to_ml(oxy_umol_kg, sigma0):
 
     return oxy_mL_L
 
-def calculate_dVdT(oxyvolts, time):
-#
-     doxyv = np.diff(oxyvolts)
+
+def calculate_dV_dt(oxy_volts, time, nan_replace=True):
+    """
+    Calculate the time derivative of oxygen voltage.
+
+    Parameters
+    ----------
+    oxy_volts : array-like
+        Oxygen sensor voltage output
+    time : array-like
+        Time from oxygen sensor (must be same length as oxy_volts)
+    nan_replace : bool, optional
+        Replace nans in time derivative with the mean value
+
+    Returns
+    -------
+    dV_dt : array-like
+        Time derivative of oxygen voltage
+    """
+    # TODO: experiment with dt, filtering
+    # Uchida (2008): dV/dt "estimated by linear fits over 2 second intervals"
+    # should dt just be 1 / freq? i.e. 1/24 Hz
+
+    dV = np.diff(oxy_volts)  # central differences shorten vectors by 1
+    dt = np.diff(time)
+    dt[dt == 0] = np.median(dt[dt > 0])  # replace with median to avoid dividing by zero
+
+    dV_dt = dV / dt
+    dV_dt = np.insert(dV_dt, 0, 0)  # add zero in front to match original length
+    dV_dt[np.isinf(dV_dt)] = np.nan  # this check is probably unnecessary
+
+    if nan_replace:
+        dV_dt = np.nan_to_num(np.nanmean(dV_dt))
+
+    # TODO: should we do some kind of filtering? e.g.:
+    # (PMEL does this calculation on binned data already so filtering is not the same)
+    # a = 1
+    # windowsize = 5
+    # b = (1 / windowsize) * np.ones(windowsize)
+    # filtered_dvdt = scipy.signal.filtfilt(b, a, dv_dt)
+
+    return dV_dt  # filtered_dvdt
 
 
-     dt = np.diff(time)
-
-     # Replace 0 values with median value
-     m = np.median(dt[dt > 0])
-     dt[dt == 0] = m
-
-
-     dv_dt = doxyv/dt
-     dv_dt = np.insert(dv_dt,0,0)
-     dv_dt_mean = np.mean(dv_dt[(dv_dt != np.inf) & (dv_dt !=-np.inf)])
-     dv_dt[(dv_dt == np.inf) | (dv_dt == -np.inf)] = np.NaN
-     #dv_dt = dv_dt.replace([np.inf,-np.inf],np.NaN)
-     #dv_dt = dv_dt.fillna(dv_dt_mean)
-
-     np.nan_to_num(dv_dt_mean)
-
-     #dv_dt_conv = np.convolve(dv_dt,[0.5,0.5])
-
-#     a = 1
-#     windowsize = 5
-#     b = (1/windowsize)*np.ones(windowsize)
-#     #filtered_dvdt = scipy.signal.filtfilt(b,a,dv_dt_conv)
-#     filtered_dvdt = scipy.signal.filtfilt(b,a,dv_dt)
-
-
-     return dv_dt#filtered_dvdt
-
-
+"""code_pruning: most of this is ripped from equations_sbe... sort this out"""
 def _get_sbe_coef(idx=0):
     """
     Get SBE oxygen coefficients from raw data files.
@@ -474,14 +445,45 @@ def _get_sbe_coef(idx=0):
 
     return coef
 
+
 def calculate_weights(pressure):
+    """
+    Calculate weights (as a function of pressure) for weighted least squares fitting.
+    Deep measurements are weighted higher than shallow.
 
-    eps=1e-5
-    wrow1 = [0,100,100+eps,300,300+eps,500,500+eps,1200,1200+eps,2000,2000+eps,7000]
-    wrow2 = [20,20,25,25,50,50,100,100,200,200,500,500]#[20,20,25,25,50,50,100,100,200,200,500,500]
-    wgt = scipy.interpolate.interp1d(wrow1,wrow2)
+    Parameters
+    ----------
+    presssure : array-like
+        Pressure values of oxygen measurements [dbar]
 
-    weights = wgt(pressure)
+    Returns
+    -------
+    weights : array-like
+        Weight factor for each pressure value
+    """
+    # TODO: automatic weight calculation rather than hardcoded (machine learning?)
+
+    epsilon = 1e-5  # small offset to avoid interpolation issues
+
+    # define piecewise weight function dependent on pressure
+    p_bins = [
+        0,
+        100,
+        100 + epsilon,
+        300,
+        300 + epsilon,
+        500,
+        500 + epsilon,
+        1200,
+        1200 + epsilon,
+        2000,
+        2000 + epsilon,
+        7000,
+    ]
+    w_bins = [20, 20, 25, 25, 50, 50, 100, 100, 200, 200, 500, 500]
+    wgt = scipy.interpolate.interp1d(p_bins, w_bins)
+
+    weights = wgt(pressure)  # get weights from piecewise function
 
     return weights
 
@@ -504,14 +506,21 @@ def _PMEL_oxy_eq(coefs,inputs,cc=[1.92634e-4,-4.64803e-2]):
 
     return o2
 
-# TODO: optionally include other residual types
-# (abstracted from PMEL code oxygen_cal_ml.m)
-# unweighted L2: sum((ref - oxy)^2)  # if weighted fails
-# unweighted L4: sum((ref - oxy)^4)  # unsure of use case
-# unweighted L1: sum(abs(ref - oxy))  # very far from ideal
-# anything else? genericize with integer "norm" function input?
-def PMEL_oxy_weighted_residual(coefs,weights,inputs,refoxy):
-    return np.sum((weights*(refoxy-_PMEL_oxy_eq(coefs, inputs))**2))/np.sum(weights**2)
+
+def PMEL_oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
+    # TODO: optionally include other residual types
+    # (abstracted from PMEL code oxygen_cal_ml.m)
+    # unweighted L2: sum((ref - oxy)^2)  # if weighted fails
+    # unweighted L4: sum((ref - oxy)^4)  # unsure of use case
+    # unweighted L1: sum(abs(ref - oxy))  # very far from ideal
+    # anything else? genericize with integer "norm" function input?
+
+    residuals = np.sum(
+        (weights * (refoxy - _PMEL_oxy_eq(coefs, inputs)) ** 2)
+    ) / np.sum(weights ** 2)
+
+    return residuals
+
 
 def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ctd_SA, ctd_oxyvolts, ctd_time):
 
@@ -530,7 +539,7 @@ def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ct
         "CTDOXYVOLTS": ctd_oxyvolts,
         "CTDTIME": ctd_time,
     })
-    time_data["dv_dt"] = calculate_dVdT(time_data["CTDOXYVOLTS"], time_data["CTDTIME"])
+    time_data["dv_dt"] = calculate_dV_dt(time_data["CTDOXYVOLTS"], time_data["CTDTIME"])
 
     # Merge DF
     merged_df = pd.DataFrame(
@@ -700,21 +709,11 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         time_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
         time_df[cfg.column["p"]],
     )
+
     # calculate sigma
-    btl_df["sigma_btl"] = calculate_sigma(
-        btl_df[cfg.column["sal"]],
-        btl_df[cfg.column["t1_btl"]],  # oxygen sensor is on primary line (ie t1)
-        btl_df[cfg.column["p_btl"]],
-        btl_df[cfg.column["lon_btl"]],
-        btl_df[cfg.column["lat_btl"]],
-    )
-    time_df["sigma_ctd"] = calculate_sigma(
-        time_df[cfg.column["sal"]],
-        time_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
-        time_df[cfg.column["p"]],
-        time_df[cfg.column["lon_btl"]],
-        time_df[cfg.column["lat_btl"]],
-    )
+    btl_df["sigma_btl"] = gsw.sigma0(btl_df["SA"], btl_df["CT"])
+    time_df["sigma_btl"] = gsw.sigma0(time_df["SA"], time_df["CT"])
+
     # Calculate oxygen solubility in µmol/kg
     btl_df["OS"] = gsw.O2sol(
         btl_df["SA"],
