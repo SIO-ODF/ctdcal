@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
+import ctdcal.flagging as flagging
 import ctdcal.oxy_fitting as oxy_fitting
 import ctdcal.report_ctd as report_ctd
 
@@ -805,14 +806,6 @@ def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', deci
     df['TIME'] = hour
     return df
 
-def flag_missing_values(df,flag_columns,flag_suffix='_FLAG_W'):
-    for column in flag_columns:
-        flag_name = column + flag_suffix
-        df.loc[df[column].isna(),flag_name] = 9
-        df[column].fillna(value=int(-999), inplace=True)
-        df.loc[df[column].astype(int) == -999, flag_name] = 9
-    return df
-
 
 def manual_backfill(df, p_cutoff, p_col="CTDPRS", flag_suffix="_FLAG_W"):
     """
@@ -1064,13 +1057,8 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
     btl_data.loc[diff.abs()*100 > btl_data["CTDOXY"], "CTDOXY_FLAG_W"] = 3
 
     # flag CTDSAL using stepped filter
-    thresh = [0.002, 0.005, 0.010, 0.020]
-    btl_data["CTDSAL_FLAG_W"] = 2
-    diff = btl_data["CTDSAL"] - btl_data["SALNTY"]
-    btl_data.loc[(btl_data["CTDPRS"] > 2000) & (diff.abs() > thresh[0]), "CTDSAL_FLAG_W"] = 3
-    btl_data.loc[(btl_data["CTDPRS"] <= 2000) & (btl_data["CTDPRS"] > 1000) & (diff.abs() > thresh[1]), "CTDSAL_FLAG_W"] = 3
-    btl_data.loc[(btl_data["CTDPRS"] <= 1000) & (btl_data["CTDPRS"] > 500) & (diff.abs() > thresh[2]), "CTDSAL_FLAG_W"] = 3
-    btl_data.loc[(btl_data["CTDPRS"] <= 500) & (diff.abs() > thresh[3]), "CTDSAL_FLAG_W"] = 3
+    sal_diff = btl_data["CTDSAL"] - btl_data["SALNTY"]
+    btl_data["CTDSAL_FLAG_W"] = flagging.stepped_filter(sal_diff, btl_data["CTDPRS"])
 
     # check columns
     try:

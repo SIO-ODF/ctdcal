@@ -13,6 +13,7 @@ import pandas as pd
 import scipy
 
 import ctdcal.ctd_plots as ctd_plots
+import ctdcal.flagging as flagging
 import ctdcal.process_ctd as process_ctd
 import ctdcal.sbe_reader as sbe_rd
 
@@ -242,14 +243,6 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
     oxy_mlL = oxygen_eq(titr_20C, params["BLANK"].values, thio_n, volumes)
 
     return oxy_mlL
-
-
-def flag_winkler_oxygen(oxygen):
-    flag = pd.Series(oxygen).copy()
-    flag.loc[flag.notnull()] = 2
-    flag.loc[flag.isnull()] = 9
-    flag = flag.astype(int)
-    return flag
 
 
 def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24):
@@ -742,7 +735,7 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     btl_df[cfg.column["oxy_btl"]] = oxy_ml_to_umolkg(
         btl_df[cfg.column["oxy_btl"]], btl_df["sigma_btl"]
     )
-    btl_df["OXYGEN_FLAG_W"] = flag_winkler_oxygen(btl_df[cfg.column["oxy_btl"]])
+    btl_df["OXYGEN_FLAG_W"] = flagging.flag_nan_values(btl_df[cfg.column["oxy_btl"]])
     # Load manual OXYGEN flags
     if Path("data/oxygen/manual_oxy_flags.csv").exists():
         manual_flags = pd.read_csv(
