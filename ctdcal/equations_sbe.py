@@ -11,17 +11,17 @@ import numpy as np
 from ctdcal.oxy_fitting import oxy_umolkg_to_ml
 
 
-def sbe3(coefs, freq):
+def sbe3(freq, coefs):
     """
     SBE equation for converting SBE3 frequency to temperature.
     SensorID: 55
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients (G, H, I, J, F0)
     freq : array-like
         Raw frequency (Hz)
+    coefs : dict
+        Dictionary of calibration coefficients (G, H, I, J, F0)
 
     Returns
     -------
@@ -51,7 +51,7 @@ def sbe3(coefs, freq):
     return np.around(t_ITS90, 4)
 
 
-def sbe4(coefs, freq, t, p):
+def sbe4(freq, t, p, coefs):
     """
     SBE equation for converting SBE4 frequency to conductivity. This conversion
     is valid for both SBE4C (profiling) and SBE4M (mooring).
@@ -59,14 +59,14 @@ def sbe4(coefs, freq, t, p):
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients (G, H, I, J, CPcor, CTcor)
     freq : array-like
         Raw frequency (Hz)
     t : array-like
         Converted temperature (ITS-90 degrees C)
     p : array-like
         Converted pressure (dbar)
+    coefs : dict
+        Dictionary of calibration coefficients (G, H, I, J, CPcor, CTcor)
 
     Returns
     -------
@@ -85,20 +85,20 @@ def sbe4(coefs, freq, t, p):
     return np.around(c_mS_cm, 5)
 
 
-def sbe9(coefs, freq, t_probe):
+def sbe9(freq, t_probe, coefs):
     """
     SBE/STS(?) equation for converting SBE9 frequency to pressure.
     SensorID: 45
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients
-        (T1, T2, T3, T4, T5, C1, C2, C3, D1, D2, AD590M, AD590B)
     freq : array-like
         Raw frequency (Hz)
     t_probe : array-like
         Raw integer measurement from the Digiquartz temperature probe
+    coefs : dict
+        Dictionary of calibration coefficients
+        (T1, T2, T3, T4, T5, C1, C2, C3, D1, D2, AD590M, AD590B)
 
     Returns
     -------
@@ -125,7 +125,7 @@ def sbe9(coefs, freq, t_probe):
     return np.around(p_dbar, 4)
 
 
-def sbe_altimeter(coefs, volts):
+def sbe_altimeter(volts, coefs):
     """
     SBE equation for converting altimeter voltages to meters. This conversion
     is valid for altimeters integrated with any Sea-Bird CTD (e.g. 9+, 19, 25).
@@ -133,10 +133,10 @@ def sbe_altimeter(coefs, volts):
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients (ScaleFactor, Offset)
     volts : array-like
         Raw voltages
+    coefs : dict
+        Dictionary of calibration coefficients (ScaleFactor, Offset)
 
     Returns
     -------
@@ -161,23 +161,23 @@ def sbe_altimeter(coefs, volts):
     return bottom_distance
 
 
-def sbe43(coefs, p, t, c, V, lat=0.0, lon=0.0):
+def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
     """
     SBE equation for converting SBE43 engineering units to oxygen (ml/l).
     SensorID: 38
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients (Soc, Voffset, Tau20, A, B, C, E)
+    volts : array-like
+        Raw voltage
     p : array-like
         Converted pressure (dbar)
     t : array-like
         Converted temperature (Celsius)
     c : array-like
         Converted conductivity (mS/cm)
-    V : array-like
-        Raw voltage
+    coefs : dict
+        Dictionary of calibration coefficients (Soc, Voffset, Tau20, A, B, C, E)
     lat : array-like, optional
         Latitude (decimal degrees north)
     lon : array-like, optional
@@ -207,7 +207,7 @@ def sbe43(coefs, p, t, c, V, lat=0.0, lon=0.0):
 
     oxy_ml_l = (
         coefs["Soc"]
-        * (V + coefs["offset"])
+        * (volts + coefs["offset"])
         * (
             1.0
             + coefs["A"] * t
@@ -220,7 +220,7 @@ def sbe43(coefs, p, t, c, V, lat=0.0, lon=0.0):
     return np.around(oxy_ml_l, 4)
 
 
-def sbe43_hysteresis_voltage(coefs, volts, pressure, freq=24):
+def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
     """
     SBE equation for removing hysteresis from raw voltage values. This function must
     be run before the sbe43 conversion function above.
@@ -230,13 +230,13 @@ def sbe43_hysteresis_voltage(coefs, volts, pressure, freq=24):
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients (H1, H2, H3, offset)
     volts : array-like
         Raw voltage
-    pressure : array-like
+    p : array-like
         CTD pressure values (dbar)
-    freq : scalar, optional
+    coefs : dict
+        Dictionary of calibration coefficients (H1, H2, H3, offset)
+    sample_freq : scalar, optional
         CTD sampling frequency (Hz)
 
     Returns
@@ -252,8 +252,8 @@ def sbe43_hysteresis_voltage(coefs, volts, pressure, freq=24):
     See Application Note 64-3 for more information.
     """
     # TODO: vectorize (if possible), will probably require matrix inversion
-    dt = 1 / freq
-    D = 1 + coefs["H1"] * (np.exp(pressure / coefs["H2"]) - 1)
+    dt = 1 / sample_freq
+    D = 1 + coefs["H1"] * (np.exp(p / coefs["H2"]) - 1)
     C = np.exp(-1 * dt / coefs["H3"])
 
     oxy_volts = volts + coefs["offset"]
@@ -269,17 +269,17 @@ def sbe43_hysteresis_voltage(coefs, volts, pressure, freq=24):
     return volts_corrected
 
 
-def wetlabs_eco_fl(coefs, volts):
+def wetlabs_eco_fl(volts, coefs):
     """
     SBE equation for converting ECO-FL fluorometer voltage to concentration.
     SensorID: 20
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients (ScaleFactor, DarkOutput/Vblank)
     volts : array-like
         Raw voltage
+    coefs : dict
+        Dictionary of calibration coefficients (ScaleFactor, DarkOutput/Vblank)
 
     Returns
     -------
@@ -301,17 +301,17 @@ def wetlabs_eco_fl(coefs, volts):
     return chl
 
 
-def wetlabs_cstar(coefs, volts):
+def wetlabs_cstar(volts, coefs):
     """
     SBE equation for converting C-Star transmissometer voltage to light transmission.
     SensorID: 71
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients (M, B, PathLength)
     volts : array-like
         Raw voltage
+    coefs : dict
+        Dictionary of calibration coefficients (M, B, PathLength)
 
     Returns
     -------
@@ -338,7 +338,7 @@ def wetlabs_cstar(coefs, volts):
     return xmiss, c
 
 
-def seapoint_fluor(coefs, volts):
+def seapoint_fluor(volts, coefs):
     """
     Raw voltage supplied from fluorometer right now, after looking at xmlcon.
     The method will do nothing but spit out the exact values that came in.
@@ -346,10 +346,10 @@ def seapoint_fluor(coefs, volts):
 
     Parameters
     ----------
-    coefs : dict
-        Dictionary of calibration coefficients (GainSetting, Offset)
     volts : array-like
         Raw voltage
+    coefs : dict
+        Dictionary of calibration coefficients (GainSetting, Offset)
 
     Returns
     -------
