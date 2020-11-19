@@ -294,13 +294,13 @@ def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
 
 
 def oxygen_eq(titr, blank, thio_n, flask_vol):
-    E = 5.598  # L O2 equivalent (?)
-    DO_rgts = 0.0017  # correction for oxygen added by reagents
-    V_rgts = 2e-3  # volume of reagents (L)
-    KIO3_V = 10.0  # volume of KIO3 standard (mL)
-    KIO3_N = 0.01  # normality of KIO3 standard (N)
-    oxy_mL_L = ((titr - blank) * KIO3_V * KIO3_N * E) / ((flask_vol * 1e-3) - V_rgts) - DO_rgts
-    breakpoint()
+    # E = 5.598  # L O2 equivalent (?)
+    # DO_rgts = 0.0017  # correction for oxygen added by reagents
+    # V_rgts = 2e-3  # volume of reagents (L)
+    # KIO3_V = 10.0  # volume of KIO3 standard (mL)
+    # KIO3_N = 0.01  # normality of KIO3 standard (N)
+    # oxy_mL_L = ((titr - blank) * KIO3_V * KIO3_N * E) / ((flask_vol * 1e-3) - V_rgts) - DO_rgts
+    # breakpoint()
 
     # TODO: where does this eq come from? what are the magic numbers?
     oxy_mlL = (((titr - blank) * thio_n * 5.598 - 0.0017) / ((flask_vol - 2.0) * 0.001))

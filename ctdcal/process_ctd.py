@@ -713,7 +713,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 print('Missing (or misnamed) REFT Data Station: ' + ssscc + '...filling with NaNs')
                 reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
                 reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
-                reft_data["SSSCC_TEMP"] = ssscc
+                reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
             ### load REFC data
             refc_file = cfg.directory["salt"] + ssscc + '_salts.csv'
@@ -724,6 +724,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 refc_data = pd.DataFrame(
                     index=btl_data.index,
                     columns=["CRavg", "BathTEMP", "BTLCOND"],
+                    dtype=float,
                 )
                 refc_data['SAMPNO_SALT'] = btl_data['btl_fire_num'].astype(int)
 
@@ -736,8 +737,6 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 oxy_data = pd.DataFrame(
                     index=btl_data.index,
                     columns=[
-                        "STNNO_OXY",
-                        "CASTNO_OXY",
                         "FLASKNO",
                         "TITR_VOL",
                         "TITR_TEMP",
@@ -745,7 +744,10 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                         "TITR_TIME",
                         "END_VOLTS",
                     ],
+                    dtype=float,
                 )
+                oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
+                oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
                 oxy_data['BOTTLENO_OXY'] = btl_data['btl_fire_num'].astype(int)
 
             ### clean up dataframe
@@ -921,7 +923,12 @@ def export_ct1(df, ssscc_list):
         time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  #replace NaNs with -999
 
-        depth = full_depth_df.loc[full_depth_df['SSSCC'] == ssscc,'DEPTH'].iloc[0]
+        try:
+            depth = full_depth_df.loc[full_depth_df['SSSCC'] == ssscc,'DEPTH'].iloc[0]
+        except IndexError:
+            print(f"No depth logged for {ssscc}, setting to -999")  # TODO: logger
+            depth = -999
+
         # get cast_details for current SSSCC
         cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("records")[0]
         b_datetime = datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc).strftime('%Y%m%d %H%M').split(" ")
