@@ -124,8 +124,8 @@ def correct_flask_vol(flask_vol, t=20.0, glass="borosilicate"):
     SOP 13 - Gravimetric calibration of volume contained using water
     """
     alpha = {  # thermal expansion coefficient
-        "borosilicate": 0.00001,
-        "soft": 0.000025,
+        "borosilicate": 1.0e-5,
+        "soft": 2.5e-3,
     }
     if glass not in alpha.keys():
         raise KeyError(f"Glass type not found, must be one of {list(alpha.keys())}")
@@ -154,77 +154,38 @@ def gather_oxy_params(oxy_file):
 
     param_list = header.split()[:6]
     params = pd.DataFrame(param_list, dtype=float).transpose()
-    params.columns = ["TITR", "BLANK", "KIO3_N", "KIO3_V", "KIO3_T", "THIO_T"]
+    params.columns = ["V_std", "V_blank", "N_KIO3", "V_KIO3", "T_KIO3", "T_thio"]
 
     return params
 
 
-def calculate_thio_norm(params, ssscc):
-    """
-    Calculate normality of thiosulfate used in Winkler oxygen titrations.
-
-    Parameters
-    ----------
-    params : DataFrame
-        Calibration parameters used for each station
-    ssscc : Series
-        Column of station/cast values FOR EACH measurement taken
-        (i.e. length of ssscc should equal the total number of oxygen titrations)
-
-    Returns
-    -------
-    thio_n : array-like
-        Thiosulfate normality
-    """
-    # TODO: arraylike inputs instead of df? is this a function worth exposing?
-    params = pd.merge(ssscc, params, how="left")
-
-    rho_stp = gsw.rho_t_exact(0, 20, 0)
-    rho_kio = gsw.rho_t_exact(0, params["KIO3_T"], 0)
-    rho_thio = gsw.rho_t_exact(0, params["THIO_T"], 0)
-
-    kio3_v_20c = params["KIO3_V"] * (rho_kio / rho_stp)
-    thio_v_20c = params["TITR"] * (rho_thio / rho_stp) - params["BLANK"]
-
-    thio_n = kio3_v_20c * params["KIO3_N"] / thio_v_20c
-
-    return thio_n.values
-
-
-def calculate_20C_vol(titr_vol, titr_temp):
-    """
-    Calculate the 20degC equivalent titration volume.
-
-    Parameters
-    ----------
-    titr_vol : array-like
-        Titration volume
-    titr_temp : array-like
-        Temperature of titration
-
-    Returns
-    -------
-    titr_vol_20c : array-like
-        Titration volume equivalent at 20degC
-    """
-    # TODO: is this func useful beyond titrations?
-    rho_titr = gsw.rho_t_exact(0, titr_temp, 0)
-    rho_stp = gsw.rho_t_exact(0, 20, 0)
-    titr_vol_20c = titr_vol * rho_titr / rho_stp
-
-    return titr_vol_20c
-
-
 def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nums):
     """
-    Calculates oxygen values from Winkler titrations
+    Wrapper function for collecting parameters and calculating oxygen values from
+    Winkler titrations.
 
     Parameters
     ----------
+    ssscc_list : list of str
+        List of stations to process
+    ssscc_col : array-like
+        Station/cast for each sample taken
+    titr_vol : array-like
+        Titration volume [mL]
+    titr_temp : array-like
+        Temperature of titration [degC]
+    flask_nums : array-like
+        Oxygen flask used for each sample
 
-    ssscc_list :array-like
-                list containing all of the stations to be calculated
+    Returns
+    -------
+    oxy_mL_L : array-like
+        Oxygen concentration [mL/L]
 
+    Notes
+    -----
+    Titration equation comes from WHP Operations and Methods, Culberson (1991):
+    https://cchdo.github.io/hdo-assets/documentation/manuals/pdf/91_1/culber2.pdf
 
     """
     params = pd.DataFrame()
@@ -233,16 +194,33 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
         df["SSSCC"] = ssscc
         params = pd.concat([params, df])
 
-    thio_n = calculate_thio_norm(params, ssscc_col)
-    titr_20C = calculate_20C_vol(titr_vol, titr_temp)
-
-    flask_df = load_flasks()
+    # get flask volumes and merge with titration parameters
+    flask_df = load_flasks()  # TODO: volume correction from thermal expansion?
     volumes = pd.merge(flask_nums, flask_df, how="left")["FLASK_VOL"].values
     params = pd.merge(ssscc_col, params, how="left")
 
-    oxy_mlL = oxygen_eq(titr_20C, params["BLANK"].values, thio_n, volumes)
+    # find 20degC equivalents
+    rho_20C = gsw.rho_t_exact(0, 20, 0)
+    rho_T_KIO3 = gsw.rho_t_exact(0, params["T_KIO3"], 0)
+    N_KIO3_20C = params["N_KIO3"] * (rho_T_KIO3 / rho_20C)
 
-    return oxy_mlL
+    # TODO: does KIO3 volume get corrected? what is the recorded value?
+    # V_KIO3_20C = correct_flask_vol(params["V_KIO3"], t=params["T_KIO3"])
+
+    # calculate O2 concentration (in mL/L)
+    E = 5598  # stoichiometric relationship between thio_n and DO
+    DO_reg = 0.0017  # correction for oxygen added by reagents
+    V_reg = 2.0  # volume of reagents (mL)
+
+    oxy_mL_L = (
+        (
+            ((titr_vol.values - params["V_blank"]) * params["V_KIO3"] * N_KIO3_20C * E)
+            / (params["V_std"] - params["V_blank"])
+            - 1000 * DO_reg
+        )
+    ) / (volumes - V_reg)
+
+    return oxy_mL_L.values
 
 
 def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24):
@@ -291,21 +269,6 @@ def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
         ) / D[i]
 
     return oxy_corrected
-
-
-def oxygen_eq(titr, blank, thio_n, flask_vol):
-    # E = 5.598  # L O2 equivalent (?)
-    # DO_rgts = 0.0017  # correction for oxygen added by reagents
-    # V_rgts = 2e-3  # volume of reagents (L)
-    # KIO3_V = 10.0  # volume of KIO3 standard (mL)
-    # KIO3_N = 0.01  # normality of KIO3 standard (N)
-    # oxy_mL_L = ((titr - blank) * KIO3_V * KIO3_N * E) / ((flask_vol * 1e-3) - V_rgts) - DO_rgts
-    # breakpoint()
-
-    # TODO: where does this eq come from? what are the magic numbers?
-    oxy_mlL = (((titr - blank) * thio_n * 5.598 - 0.0017) / ((flask_vol - 2.0) * 0.001))
-
-    return oxy_mlL
 
 
 def oxy_ml_to_umolkg(oxy_mL_L, sigma0):
