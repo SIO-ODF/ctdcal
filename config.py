@@ -108,7 +108,6 @@ filter_cols = [
 
 # List of bottle columns to be read during calibration
 btl_cols = [
-    "index",
     "CTDTMP1",
     "CTDTMP2",
     "CTDPRS",

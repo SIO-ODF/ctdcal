@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
+import ctdcal.flagging as flagging
 import ctdcal.oxy_fitting as oxy_fitting
 import ctdcal.report_ctd as report_ctd
 
@@ -226,160 +227,6 @@ def ctd_align(inMat=None, col=None, time=0.0):
 
     return inMat
 
-def ctd_quality_codes(column=None, p_range=None, qual_code=None, oxy_fit=False, p_qual_col=None, qual_one=None, inMat=None):
-    """ctd_quality_codes function
-
-    Function takes full NUMPY ndarray with predefined dtype array
-
-    Args:
-        param1 (ndarray):
-        param2 (float):
-
-    Returns:
-        Narray: The return value is ndarray with adjusted time of parameter
-          specified.
-
-    """
-    #If p_range set apply qual codes to part of array and return
-    if p_range is not None:
-        print("Some algoirythm for formatting qual codes per pressure range")
-        return
-    else:
-        q_df = pd.DataFrame(index=np.arange(len(inMat)), columns=p_qual_col)
-        for pq in p_qual_col:
-            if pq in list(qual_one):
-                q_df[pq] = q_df[pq].fillna(1)
-            elif oxy_fit and pq is column:
-                q_df[pq] = q_df[pq].fillna(2)
-            else:
-                q_df[pq] = q_df[pq].fillna(2)
-
-    return q_df.values  # ndarray format
-
-#code_pruning: not appears to be used
-'''def formatTimeEpoc(time_zone='UTC', time_pattern='%Y-%m-%d %H:%M:%S', input_time = None):
-    """formatTimeEpoc function
-
-    Function takes pattern of time input, relative time zone, and
-    date time data array and returns array of epoc time.
-
-    title and the second row are the units for each column.
-    Args:
-        param1 (str): relative time zone for data.
-        param2 (str): pattern of incoming data.
-        param3 (ndarray): input_time, numpy 1d ndarray time array
-
-    Returns:
-        1D ndarray: The return array of epoch time
-    """
-    if input_time is None:
-        print("In formatTimeEpoc: No data entered.")
-        return
-    else:
-        os.environ['TZ'] = 'UTC'
-        epoch_time = input_time
-        for i in range(0,len(input_time)):
-            epoch_time[i] = int(time.mktime(time.strptime(str(input_time[i], "utf-8"), time_pattern)))
-
-    return epoch_time'''
-
-'''code_pruning: do timing exercises to see if this is vectorized or not'''
-def hysteresis_correction(H1=-0.033, H2=5000, H3=1450, inMat = None):
-    """Hysteresis Correction function
-
-    Function takes data ndarray and hysteresis coefficiants
-    and returns hysteresis corrected oxygen data.
-
-    Args:
-        param1 (float): H1, hysteresis correction coefficiant 1
-        param2 (float): H2, hysteresis correction coefficiant 2
-        param3 (float): H3, hysteresis correction coefficiant 3
-        param5 (array): inMat, raw ctd data.
-
-    Returns:
-        array: Return dissolved oxygen hysteresis corrected data.
-
-    .. REF PAGE:
-       http://http://www.seabird.com/document/an64-3-sbe-43-dissolved-oxygen-do-sensor-hysteresis-corrections
-    """
-    Oxnewconc = np.arange(0,len(inMat),1)
-
-    Oxnewconc[0] = inMat['o1_mll'][1]
-
-    if inMat is None:
-       print("Hysteresis Correction function: No data")
-       return
-    else:
-        for i in range(1,len(inMat)-1):
-            D = 1 + H1 * (math.exp(inMat['p_dbar'][i] / H2) - 1)
-            C = math.exp(-1 * 0.04167/ H3)
-            Oxnewconc[i] = ((inMat['o1_mll'][i] + (Oxnewconc[i-1] * C * D)) - (inMat['o1_mll'][i-1] * C)) / D
-
-        inMat['o1_mll'][:] = Oxnewconc[:]
-    return inMat
-
-#not used, should use raw call instead
-'''def data_interpolater(inArr):
-    """data_interpolater to handle indices and logical indices of NaNs.
-
-    Input:
-        - inArr, 1d numpy array with return True np.isnans()
-    Output:
-        - nans, logical indices of NaNs
-        - index, a function, with signature indices= index(logical_indices),
-          to convert logical indices of NaNs to 'equivalent' indices
-        - interpolated array
-    Example:
-        >>> # linear interpolation of NaNs
-        >>> outArray = data_interpolater(inArr)
-    """
-    nans, tmp= np.isnan(inArr), lambda z: z.nonzero()[0]
-    inArr[nans] = np.interp(tmp(nans), tmp(~nans), inArr[~nans])
-    return inArr'''
-
-#Courtney version, should be replaced with versions below and check that it works
-def o2pl2pkg(p_col, t_col, sal_col, dopl_col, dopkg_col, lat_col, lon_col, inMat):
-    """o2pl2pkg convert ml/l dissolved oxygen to umol/kg
-
-    Input:
-        - t_col, temperature column header deg c.
-        - sal_col, salinity column header psu.
-        - dopl_col, dissolved column header ml/l.
-        - dopkg_col, dissolved column header umol/kg
-        - lat_col, latitude for entire cast deg.
-        - lon_col, longitude for entire cast deg.
-        - inMat, dtype ndarray processed ctd time data.
-    Output:
-        - Converted Oxygen column umol/kg
-    Example:
-        >>> # linear interpolation of NaNs
-        >>> outArray = o2pl2kg(inArr)
-    """
-    pkg = np.ndarray(shape=len(inMat), dtype=[(dopkg_col, np.float)])
-    # Absolute sailinity from Practical salinity.
-    SA = gsw.SA_from_SP(inMat[sal_col], inMat[p_col], inMat[lat_col], inMat[lon_col])
-
-    # Conservative temperature from insitu temperature.
-    CT = gsw.CT_from_t(SA, inMat[t_col], inMat[p_col])
-    s0 = gsw.sigma0(SA, CT) # Potential density from Absolute Salinity g/Kg Conservative temperature deg C.
-
-    # Convert DO ml/l to umol/kg
-    for i in range(0,len(inMat[dopl_col])):
-        pkg[i] = inMat[dopl_col][i] * 44660 / (s0[i] + 1000)
-    return pkg
-
-#cleaned version of above but not used, should be checked that it works
-def oxy_to_umolkg(df_sal, df_pressure, df_lat, df_lon, df_temp, df_oxy):
-    '''Rewritten from Courtney's method to use array-likes (aka use dataframes and ndarrays).
-    '''
-    # Absolute salinity from Practical salinity.
-    SA = gsw.SA_from_SP(df_sal, df_pressure, df_lat, df_lon)
-
-    # Conservative temperature from insitu temperature.
-    CT = gsw.CT_from_t(SA, df_temp, df_pressure)
-    s0 = gsw.sigma0(SA, CT) # Potential density from Absolute Salinity g/Kg Conservative temperature deg C.
-    series = df_oxy * 44660 / (s0 + 1000)
-    return series
 
 def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
     """
@@ -415,95 +262,8 @@ def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
 
     return filter_df
 
-#try to depreciate for method below
-def ondeck_pressure(stacast, p_col, c1_col, c2_col, time_col, inMat=None, conductivity_startup=20.0, log_file=None):
-    """ondeck_pressure function
-    Function takes full NUMPY ndarray with predefined dtype array
-    of filtered ctd raw data the stores, analizes and removes ondeck
-    values from data.
-    Args:
-        param1 (str): stacast, station cast info
-        param1 (str): p_col, pressure data column name
-        param2 (str): c1_col, cond1 data column name
-        param3 (str): c2_col, cond2 data column name
-        param4 (str): time_col, time data column name
-        param5 (ndarray): numpy ndarray with dtype array
-        param6 (float): conductivity_startup, threshold value
-        param7 (str): log_file, log file name
-    Returns:
-        Narray: The return ndarray with ondeck data removed.
-        Also output start/end ondeck pressure.
-    """
-    start_pressure = []
-    tmpMat = []
-    outMat = []
-    tmp = 0
-    start_p = 0.0
-    n = 0
-    ep = []
-    end_p = 0.0
 
-    # Frequency
-    fl = 24
-    fl2 = fl*2
-    # One minute
-    mt = 60
-    # Half minute
-    ms = 30
-    time_delay = fl*ms
-
-    if inMat is None:
-        print("Ondeck_pressure function: No data.")
-        return
-    else:
-        # Searches first quarter of matrix, uses conductivity
-        # threshold min to capture startup pressure
-        for j in range(0,int(len(inMat)/4)):
-            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
-                tmp = j
-                start_pressure.append(inMat[p_col][j])
-
-        # Evaluate starting pressures
-        if not start_pressure: start_p = "Started in Water"
-        else:
-            n = len(start_pressure)
-            if (n > time_delay): start_p = np.average(start_pressure[fl2:n-(time_delay)])
-            else: start_p = np.average(start_pressure[fl2:n])
-
-        # Remove on-deck startup
-        inMat = inMat[tmp:]
-
-        tmp = len(inMat);
-        # Searches last half of NDarray for conductivity threshold
-        if len(inMat) % 2 == 0:
-            inMat_2 = inMat.copy()
-        else:
-            inMat_2 = inMat[1:].copy()
-
-        inMat_half1, inMat_half2 = np.split(inMat_2,2)
-        ep = inMat_half2[(inMat_half2[c1_col] < conductivity_startup) & (inMat_half2[c2_col] < conductivity_startup)][p_col]
-
-#        for j in range(int(len(inMat)*0.5), len(inMat)):
-#            if ((inMat[c1_col][j] < conductivity_startup) and (inMat[c2_col][j] < conductivity_startup)):
-#                ep.append(inMat[p_col][j])
-#                if (tmp > j): tmp = j
-
-        # Evaluate ending pressures
-        if (len(ep) > (time_delay)):
-            end_p = np.average(ep[(time_delay):])
-        else:
-            end_p = np.average(ep[(len(ep)):])
-
-        # Remove on-deck ending
-        outMat = inMat[:tmp]
-
-        # Store ending on-deck pressure
-        if log_file != None:
-            report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
-
-    return outMat
-
-def ondeck_pressure_2(df, stacast, cond_startup=20.0, log_file=None):
+def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     """
     Find and remove times when rosette is on deck.
     Optionally log average pressure at start and end of cast.
@@ -571,140 +331,61 @@ def ondeck_pressure_2(df, stacast, cond_startup=20.0, log_file=None):
     trimmed_df = df.iloc[start_df.index.max():end_df.index.min()].copy()
 
     # Log ondeck pressures
-    if log_file != None:
+    if log_file is not None:
         report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
 
     return trimmed_df
 
-'''code_pruning: since default pressure_column is set to 'CTDPRS', error handling code is redundant?'''
-#a mix is used between _roll_filter and roll_filter, settle on one
-def _roll_filter(df, pressure_column="CTDPRS", direction="down"):
-    #fix/remove try/except once serialization is fixed
-    try:
-        if direction == 'down':
-            monotonic_sequence = df[pressure_column].expanding().max()
-        elif direction == 'up':
-            monotonic_sequence = df[pressure_column].expanding().min()
-        else:
-            raise ValueError("direction must be one of (up, down)")
-    except KeyError:
-        pressure_column = 'CTDPRS'
-        if direction == 'down':
-            monotonic_sequence = df[pressure_column].expanding().max()
-        elif direction == 'up':
-            monotonic_sequence = df[pressure_column].expanding().min()
-        else:
-            raise ValueError("direction must be one of (up, down)")
 
-    return df[df[pressure_column] == monotonic_sequence]
-
-#this shouldn't be called, rather the pressureoffset.py should be the one called in the code
-def roll_filter(inMat, p_col, up='down', frames_per_sec=24, search_time=15, **kwargs):
-    """roll_filter function
-    Function takes full NUMPY ndarray with predefined dtype array
-    and subsample arguments to return a roll filtered ndarray.
-    Args:
-        param1 (str): stacast, station cast info
-        param2 (ndarray): inMat, numpy ndarray with dtype array
-        param3 (str): up, direction to filter cast (up vs down)
-        param4 (int): frames_per_sec, subsample selection rate
-        param5 (int): seach_time, search time past pressure inversion
-    Returns:
-        Narray: The return value ndarray of data with ship roll removed
+def roll_filter(df, p_col="CTDPRS", direction="down"):
     """
-    #When the "pressure sequence" code is fixed, uncomment and use this instead
-    start = kwargs.get("start", 0)
-    end = kwargs.get("end", -1)
-    full_matrix = kwargs.get("full_matrix", inMat)
-    tmp_df = pd.DataFrame.from_records(full_matrix[start:end])
-    tmp_df = _roll_filter(tmp_df)
-    #return tmp_df.to_records(index=False)
-    return tmp_df
-    '''code_pruning: the function basically ends here, nothing gets past this point. That means _roll_filter is the roll_filter actually used.'''
-    remove = []
-    frequency = 24 # Hz of package
+    Filter out heaving in CTD data due to ship rolls.
 
-    if (frames_per_sec > 0) & (frames_per_sec <= 24):
-        sample = int(frequency/frames_per_sec) # establish subsample rate to time ratio
-    else: sample = frequency
+    Parameters
+    ----------
+    df : DataFrame
+        CTD data
+    p_col : str, optional
+        Name of pressure column
+    direction : str, optional
+        Direction of cast (i.e. "down" or "up" cast)
 
-    # Adjusted search time with subsample rate
-    search_time = int(sample*frequency*int(search_time))
+    Returns
+    -------
+    var2 : dtype
+        var description
 
-    if inMat is None:
-        print("Roll filter function: No input data.")
-        return
+    """
+    if direction == 'down':
+        monotonic_sequence = df[p_col].expanding().max()
+    elif direction == 'up':
+        monotonic_sequence = df[p_col].expanding().min()
     else:
-        P = inMat[p_col]
-        dP = np.diff(P,1)
+        raise ValueError("direction must be one of (up, down)")
 
-        if up == 'down':
-            index_to_remove = np.where(dP < 0)[0] # Differential filter
-            subMat = np.delete(inMat, index_to_remove, axis=0)
+    return df[df[p_col] == monotonic_sequence]
 
-            P = subMat[p_col]
-            tmp = np.array([])
-            for i in range(0,len(P)-1):
-               if P[i] > P[i+1]:
-                   deltaP = P[i+1] + abs(P[i] - P[i+1])
-                   # Remove aliasing
-                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
-                   tmp = np.arange(i+1,k[0]+1,1)
-               remove = np.append(remove,tmp)
-               deltaP = 0
-        elif up == 'up':
-            index_to_remove = np.where(dP > 0)[0] # Differential filter
-            subMat = np.delete(inMat, index_to_remove, axis=0)
 
-            P = subMat[p_col]
-            tmp = np.array([])
-            for i in range(0,len(P)-1):
-               if P[i] < P[i+1]:
-                   deltaP = P[i+1] - abs(P[i] - P[i+1])
-                   # Remove aliasing
-                   k = np.where(P == min(P[i+1:i+search_time], key=lambda x:abs(x-deltaP)))[0]
-                   tmp = np.arange(i+1,k[0]+1,1)
-               remove = np.append(remove,tmp)
-               deltaP = 0
-
-        subMat = np.delete(subMat,remove,axis=0)
-
-    return subMat
-
-def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up='down', sample_rate=12, search_time=15):
-    """pressure_sequence function
-
-    Function takes a dataframe and several arguments to return a pressure
-    sequenced data ndarray.
-
-    Pressure sequencing includes rollfilter.
-
-    Necessary inputs are input Matrix (inMat) and pressure interval (intP).
-    The other inputs have default settings. The program will figure out
-    specifics for those settings if left blank.
-    Start time (startT), start pressure (startP) and up are mutually exclusive.
-    If sensors are not not fully functional when ctd starts down cast
-    analyst can select a later start time or start pressure but not both.
-    There is no interpolation to the surface for other sensor values.
-    'up' indicates direction for pressure sequence. If up is set startT and startP
-    are void.
-
-    Args:
-        param1 (Dataframe: Dataframe containing measurement data
-        param2 (str): p_col, pressure column name
-        param3 (float): starting pressure interval
-        param5 (float): start time (startT) for pressure sequence
-        param6 (float): start pressure (startP) for pressure sequence
-        param7 (str): pressure sequence direction (down/up)
-        param8 (int): sample_rate, sub sample rate for roll_filter. Cleans & speeds processing.
-        param9 (int): search_time, truncate search index for the aliasing part of ship roll.
-        param10 (ndarray): inMat, input data ndarray
-
-    Returns:
-        Narray: The return value is a matrix of pressure sequenced data
-
-    todo: deep data bin interpolation to manage empty slices
+def pressure_sequence(df, p_col='CTDPRS', direction='down'):
     """
+    Convert CTD time series to a pressure series.
+
+    Parameters
+    ----------
+    df : DataFrame
+        CTD time series data
+    p_col : str, optional
+        Name of pressure column
+    direction : str, optional
+        Direction to sequence data
+
+    Returns
+    -------
+    df_binned : DataFrame
+        Pressure binned CTD data
+    """
+    # TODO: optional start/end pressure values?
+
     # change to take dataframe with the following properties
     # * in water data only (no need to find cast start/end)
     # * The full down and up time series (not already split since this method will do it)
@@ -718,66 +399,55 @@ def pressure_sequence(df, p_col='CTDPRS', intP=2.0, startT=-1.0, startP=0.0, up=
     # That's basically all I (barna) have so far TODO Binning, etc...
     # pandas.cut() to do binning
 
-    #lenP, prvPrs not used
-    # Passed Time-Series, Create Pressure Series
+    df_filtered = roll_filter(df, p_col, direction=direction)
+    df_filled = _fill_surface_data(df_filtered, bin_size=2)
+    df_binned = binning_df(df_filled, bin_size=2)  # TODO: abstract bin_size in config
 
-    start = 0
+    return df_binned.reset_index(drop=True)
 
-    # Roll Filter
-    roll_filter_matrix = roll_filter(df, p_col, up, sample_rate, search_time, start=start)
 
-    df_roll_surface = fill_surface_data(roll_filter_matrix, bin_size=2)
-    #bin_size should be moved into config
-    binned_df = binning_df(df_roll_surface, bin_size=2)
-    binned_df = binned_df.reset_index(drop=True)
-    return binned_df
+def binning_df(df, p_column="CTDPRS", bin_size=2):
+    """Calculate the bin-mean of each column in input dataframe
 
-'''code_pruning: error handling code (KeyError) should only be called on the param name, not on the majority of the function. 
-Test and change name if necessary before calling body of code.
+    Parameters
+    ----------
+    df : DataFrame
+        Data to be bin-meaned
+    p_column : str, optional
+        Pressure column name to use for binning
+    bin_size : int, optional
+        Width of bins (in decibars)
 
-It looks like 'CTDPRS' is the value that should be kept, not CTDPRS_DBAR'''
-def binning_df(df, **kwargs):
-    '''Bins records according to bin_size, then finds the mean of each bin and returns a df.
-    '''
-    bin_size = kwargs.get("bin_size", 2)
-    try:
-        labels_in = [x for x in range(0,int(np.ceil(df['CTDPRS_DBAR'].max())),2)]
-        df['bins'] = pd.cut(df['CTDPRS_DBAR'], range(0,int(np.ceil(df['CTDPRS_DBAR'].max()))+bin_size,bin_size), right=False, include_lowest=True, labels=labels_in)
-        df['CTDPRS_DBAR'] = df['bins'].astype('float64')
-        df_out = df.groupby('bins').mean()
-        return df_out
-    except KeyError:
-        labels_in = [x for x in range(0,int(np.ceil(df['CTDPRS'].max())),2)]
-        df['bins'] = pd.cut(df['CTDPRS'], range(0,int(np.ceil(df['CTDPRS'].max()))+bin_size,bin_size), right=False, include_lowest=True, labels=labels_in)
-        df['CTDPRS'] = df['bins'].astype('float64')
-        df_out = df.groupby('bins').mean()
-        return df_out
+    Returns
+    -------
+    df_out : DataFrame
+        Bin-meaned data
 
-def fill_surface_data(df, **kwargs):
-    '''Copy first scan from top of cast, and propgate up to surface
-    '''
-    surface_values = []
-    bin_size = kwargs.get("bin_size", 2)
-    try:
-        for x in range(1, int(np.floor(df.iloc[0]['CTDPRS_DBAR'])), bin_size):
-            surface_values.append(x)
-        df_surface = pd.DataFrame({'CTDPRS_DBAR': surface_values})
-        df_surface['interp_bol'] = 1
-        df_merged = pd.merge(df_surface, df, on='CTDPRS_DBAR', how='outer')
-    except KeyError:
-        for x in range(1, int(np.floor(df.iloc[0]['CTDPRS'])), bin_size):
-            surface_values.append(x)
-        df_surface = pd.DataFrame({'CTDPRS': surface_values})
-        # Added by KJ to keep track of backfilled values
-        df_surface['interp_bol'] = 1
-        if len(df_surface['interp_bol']) == 1:
-            df_surface['interp_bol'] = 0
-        df_merged = pd.merge(df_surface.astype('float64'), df, on='CTDPRS', how='outer')
-    if 'interp_bol' not in df_merged.columns:
-        df_merged['interp_bol'] = np.NaN
-    df_merged['interp_bol'].fillna(0,inplace=True)
+    """
+    if p_column not in df.columns:
+        raise KeyError(f"{p_column} column missing from dataframe")
+    p_max = np.ceil(df[p_column].max())
+    labels = np.arange(0, p_max, bin_size)
+    bin_edges = np.arange(0, p_max + bin_size, bin_size)
+    df["bins"] = pd.cut(
+        df[p_column], bins=bin_edges, right=False, include_lowest=True, labels=labels
+    )
+    df[p_column] = df["bins"].astype(float)
+    df_out = df.groupby("bins").mean()
+    return df_out
 
-    return df_merged.fillna(method='bfill')
+
+def _fill_surface_data(df, bin_size=2):
+    """Copy first scan from top of cast and propagate up to surface at bin centers"""
+    df = df.copy(deep=True)
+    p_min = np.floor(df["CTDPRS"].iloc[0])
+    df_surface = pd.DataFrame({"CTDPRS": np.arange(bin_size / 2, p_min, bin_size)})
+    df_surface["interp_bool"] = True
+    df = df_surface.merge(df, on="CTDPRS", how="outer")
+    df["interp_bool"].fillna(False, inplace=True)
+    df = _flag_backfill_data(df).drop(columns="interp_bool")
+
+    return df.bfill()
 
 
 def _reft_loader(ssscc, reft_dir):
@@ -889,166 +559,6 @@ def _load_btl_data(btl_file, cols=None):
     btl_data["SSSCC"] = Path(btl_file).stem.split("_")[0]
 
     return btl_data
-
-
-# def calibrate_param(param,ref_param,press,calib,order,ssscc,btl_num,xRange=None,):
-def calibrate_param(param,ref_param,press,ssscc,btl_num,xRange=None,):
-### NOTE: REF VALUES DEEMED QUESTIONABLE ARE STILL BEING USED FOR CALIBRATION
-
-
-    df_good = quality_check(param,ref_param,press,ssscc,btl_num,find='good')
-    df_ques = quality_check(param,ref_param,press,ssscc,btl_num,find='quest')
-
-    df_ques['Parameter'] = param.name
-
-
-    #report questionable data to a csv file
-
-    #constrain pressure to within limits of xRange
-
-    if xRange != None:
-        x0 = int(xRange.split(":")[0])
-        x1 = int(xRange.split(":")[1])
-
-        df_good_cons = df_good[(df_good[press.name] >= x0) & (df_good[press.name] <= x1)]
-
-
-    else:
-        #Take full range of temperature values
-        x0 = df_good[param.name].min()
-        x1 = df_good[param.name].max()
-
-        df_good_cons = df_good[(df_good[param.name] >= x0) & (df_good[param.name] <= x1)]
-
-    return df_good_cons,df_ques
-    # if 'P' in calib:
-    #     coef = get_param_coef(df_good_cons[press.name],df_good_cons['Diff'],order,calib)
-    # elif 'T' or 'C' in calib:
-    #     coef = get_param_coef(df_good_cons[param.name],df_good_cons['Diff'],order,calib)
-    # else:
-    #     print('calib argument not valid, use CP TP T or C')
-
-    # return coef,df_ques
-
-# MK: deprecated 05/12/20
-# use fit_ctd._flag_btl_data() instead
-def quality_check(param,param_2,press,ssscc,btl_num,find,thresh=[0.002, 0.005, 0.010, 0.020]):
-    '''Jackson code'''
-
-    param = pd.Series(param).reset_index(drop=True, inplace=True)
-    param_2 = pd.Series(param_2).reset_index(drop=True, inplace=True)
-    press = pd.Series(press).reset_index(drop=True, inplace=True)
-    ssscc = pd.Series(ssscc).reset_index(drop=True, inplace=True)
-    btl_num = pd.Series(btl_num).reset_index(drop=True, inplace=True)
-
-    diff = param_2 - param
-
-    df = pd.concat([ssscc,btl_num.rename('Bottle'),param.rename('Param_1'),param_2.rename('Param_2'),press.rename('CTDPRS'),diff.rename('Diff')],axis=1)
-
-    if find == 'good':
-    # Find data values for each sensor that are below the threshold (good)
-        df['Flag'] = 1
-        #df_range_comp = df_range[(df_range[diff].abs() < threshold)]# & (df_range[d_2].abs() < threshold) & (df_range[d_12].abs() < threshold)]
-        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() < thresh[0]), 'Flag'] = 2
-        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() < thresh[1]), 'Flag'] = 2
-        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() < thresh[2]), 'Flag'] = 2
-        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() < thresh[3]), 'Flag'] = 2
-#
-        # Filter out bad values
-
-        df = df[df['Flag'] == 2]
-
-        # Rename Columns back to what they were
-
-        if param.name != None:
-            df.rename(columns = {'Param_1' : param.name}, inplace=True)
-
-        if param_2.name != None:
-            df.rename(columns = {'Param_2' : param_2.name},inplace=True)
-
-        if press.name != None:
-            df.rename(columns = {'CTDPRS' : press.name}, inplace=True )
-
-    elif find == 'quest':
-    # Find data values for each sensor that are above the threshold (questionable)
-
-        df['Flag'] = 1
-        df.loc[(df.CTDPRS > 2000) & (df.Diff.abs() > thresh[0]), 'Flag'] = 3
-        df.loc[(df.CTDPRS <= 2000) & (df.CTDPRS >1000) & (df.Diff.abs() > thresh[1]), 'Flag'] = 3
-        df.loc[(df.CTDPRS <= 1000) & (df.CTDPRS >500) & (df.Diff.abs() > thresh[2]), 'Flag'] = 3
-        df.loc[(df.CTDPRS <= 500)  & (df.Diff.abs() > thresh[3]), 'Flag'] = 3
-
-        # Filter out good values
-
-        df = df[df['Flag'] == 3]
-
-        # Remove unneeded columns
-
-        df = df.drop(['Param_1','Param_2'],axis=1)
-
-        # Re-Order Columns for better readability
-
-        df = df[[ssscc.name,'Bottle',press.name,'Flag','Diff']]
-
-
-    else:
-        print('Find argument not valid, please enter "good" or "quest" to find good or questionable values')
-
-    return df
-
-"""code_pruning: only used in old versions of process_all"""
-def combine_quality_flags(df_list):
-
-    combined_df = pd.concat(df_list)
-    combined_df = combined_df.sort_values(['SSSCC','Bottle'])
-
-    combined_df = combined_df.round(4)
-
-    return combined_df
-
-    #Combine these three into a dataframe and write out to a csv
-    #Sort by sta/cast, bottle number, rev. press
-
-# MK: moved to fit_ctd
-# all calls to this are from deprecated (or soon to be deprecated) functions
-"""code_pruning: only used in following 3 funcs and old process_all scripts"""
-def prepare_fit_data(df,ref_col):
-
-    good_data = df.copy()
-    good_data = good_data[np.isfinite(good_data[ref_col])]
-
-    return good_data
-
-
-
-"""code_pruning: no calls to this function"""
-def prepare_conductivity_data(ssscc,df,refc,ssscc_col = 'SSSCC',index_col = 'btl_fire_num'):
-
-    btl_concat = pd.DataFrame()
-    for x in ssscc:
-        btl_data = df[df[ssscc_col] == x]
-        refc_data = refc[refc[ssscc_col] == x]
-        btl_data_clean = prepare_fit_data(btl_data,refc_data,'C')
-        btl_concat = pd.concat([btl_concat,btl_data_clean])
-    refc = refc[refc[index_col] != 0]
-    refc = refc.reset_index(drop=True)
-    btl_concat = btl_concat.reset_index(drop=True)
-
-    return btl_concat, refc
-
-"""code_pruning: no calls to this function"""
-def prepare_all_fit_data(ssscc,df,ref_data,param):
-
-    data_concat = pd.DataFrame()
-
-
-    for x in ssscc:
-        btl_data = df[df['SSSCC']==x]
-        ref_data_stn= ref_data[ref_data['SSSCC']==x]
-        btl_data_good = prepare_fit_data(btl_data,ref_data_stn,param)
-        data_concat = pd.concat([data_concat,btl_data_good])
-
-    return data_concat
 
 
 def _get_pressure_offset(start_vals, end_vals):
@@ -1203,7 +713,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 print('Missing (or misnamed) REFT Data Station: ' + ssscc + '...filling with NaNs')
                 reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
                 reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
-                reft_data["SSSCC_TEMP"] = ssscc
+                reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
             ### load REFC data
             refc_file = cfg.directory["salt"] + ssscc + '_salts.csv'
@@ -1214,20 +724,19 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 refc_data = pd.DataFrame(
                     index=btl_data.index,
                     columns=["CRavg", "BathTEMP", "BTLCOND"],
+                    dtype=float,
                 )
                 refc_data['SAMPNO_SALT'] = btl_data['btl_fire_num'].astype(int)
 
             ### load OXY data
             oxy_file = cfg.directory["oxy"] + ssscc
             try:
-                oxy_data,params = oxy_fitting.oxy_loader(oxy_file)
+                oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
             except FileNotFoundError:
                 print('Missing (or misnamed) REFO Data Station: ' + ssscc + '...filling with NaNs')
                 oxy_data = pd.DataFrame(
                     index=btl_data.index,
                     columns=[
-                        "STNNO_OXY",
-                        "CASTNO_OXY",
                         "FLASKNO",
                         "TITR_VOL",
                         "TITR_TEMP",
@@ -1235,7 +744,10 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                         "TITR_TIME",
                         "END_VOLTS",
                     ],
+                    dtype=float,
                 )
+                oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
+                oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
                 oxy_data['BOTTLENO_OXY'] = btl_data['btl_fire_num'].astype(int)
 
             ### clean up dataframe
@@ -1267,7 +779,7 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
             time_file = cfg.directory["time"] + ssscc + '_time.pkl'
             time_data = pd.read_pickle(time_file)
             time_data['SSSCC'] = str(ssscc)
-            time_data['dv_dt'] = oxy_fitting.calculate_dVdT(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
+            time_data['dv_dt'] = oxy_fitting.calculate_dV_dt(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
             df_data_all.append(time_data)
             print('** Finished TIME data station: ' + ssscc + ' **')
         df_data_all = pd.concat(df_data_all, axis=0, sort=False)
@@ -1276,95 +788,6 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
 
     return df_data_all
 
-"""code_pruning: the following four merge flag functions are only used in old scripts"""
-def merge_refcond_flags(btl_data, qual_flag_cond):
-    # Merge df
-    mask = qual_flag_cond[qual_flag_cond['Parameter'] == 'REF_COND'].copy()
-    mask['SSSCC'] = mask['SSSCC'].astype(str)
-    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
-    # Rename Columns
-    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'SALNTY_FLAG_W'},inplace=True)
-    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
-    btl_data['SALNTY_FLAG_W'].fillna(value=2,inplace=True)
-    try:
-        btl_data.loc[btl_data['BTLCOND'].isna(),'SALNTY_FLAG_W'] = 9
-    except:
-        btl_data[btl_data['SALNTY'].isna(),'SALNTY_FLAG_W'] = 9
-    btl_data['SALNTY_FLAG_W'] = btl_data['SALNTY_FLAG_W'].astype(int)
-
-    return btl_data
-
-"""code_pruning: only used in old processing scripts"""
-def merge_cond_flags(btl_data, qual_flag_cond,parameter):
-    # Merge df
-    #if sensor == 1:
-    #    parameter = 'CTDCOND1'
-    #elif sensor == 2:
-    #    parameter = 'CTDCOND2'
-    mask = qual_flag_cond[qual_flag_cond['Parameter'] == parameter].copy()
-    mask['SSSCC'] = mask['SSSCC'].astype(str)
-    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
-    # Rename Columns
-    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'CTDSAL_FLAG_W'},inplace=True)
-    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
-    btl_data['CTDSAL_FLAG_W'].fillna(value=2,inplace=True)
-    btl_data.loc[btl_data[parameter].isna(),'CTDSAL_FLAG_W'] = 9
-    btl_data['CTDSAL_FLAG_W'] = btl_data['CTDSAL_FLAG_W'].astype(int)
-
-    return btl_data
-
-"""code_pruning: only used in old processing scripts"""
-def merged_reftemp_flags(btl_data, qual_flag_temp):
-
-    mask = qual_flag_temp[qual_flag_temp['Parameter'] == 'REF_TEMP'].copy()
-    mask['SSSCC'] = mask['SSSCC'].astype(str)
-    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
-    # Rename Columns
-    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'REFTMP_FLAG_W'},inplace=True)
-    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
-    btl_data['REFTMP_FLAG_W'].fillna(value=2,inplace=True)
-    try:
-        btl_data.loc[btl_data['T90'].isna(),'REFTMP_FLAG_W'] = 9
-    except:
-        btl_data.loc[btl_data['REFTMP'].isna(),'REFTMP_FLAG_W'] = 9
-        btl_data.loc[btl_data['REFTMP'].isna(),'REFTMP'] = -999
-    #btl_data['REFTMP_FLAG_W'] = btl_data['REFTMP_FLAG_W'].astype(int)
-
-    return btl_data
-
-"""code_pruning: only used in old processing scripts"""
-def merge_temp_flags(btl_data, qual_flag_temp, parameter):
-
-    mask = qual_flag_temp[qual_flag_temp['Parameter'] == parameter].copy()
-    mask['SSSCC'] = mask['SSSCC'].astype(str)
-    btl_data = btl_data.merge(mask,left_on=['SSSCC','btl_fire_num'], right_on=['SSSCC','Bottle'],how='left')
-    # Rename Columns
-    btl_data.rename(columns={'CTDPRS_x':'CTDPRS','SSSCC_x':'SSSCC','Flag':'CTDTMP_FLAG_W'},inplace=True)
-    btl_data.drop(columns=['Parameter','CTDPRS_y','Bottle','Diff'],inplace=True)
-    btl_data['CTDTMP_FLAG_W'] = btl_data['CTDTMP_FLAG_W'].fillna(value=2)
-    btl_data['CTDTMP_FLAG_W'] = btl_data['CTDTMP_FLAG_W'].astype(int)
-
-    return btl_data
-
-"""code_pruning: no calls to this function"""
-def format_time_data(df):
-
-    format_columns = settings.pressure_series_output['column_names'].copy()
-    if 'SSSCC' not in format_columns:
-        print('Adding SSSCC')
-        format_columns.append('SSSCC')
-    if 'DEPTH' not in format_columns:
-        print('Adding DEPTH')
-        format_columns.append('DEPTH')
-    try:
-        df = df[format_columns]
-    except:
-        print('missing required pressure series output columns!')
-        df_columns = list(df.keys())
-        missing_list = list(np.setdiff1d(format_columns,df_columns))
-        raise KeyError('missing columns: ',missing_list)
-
-    return df
 
 def add_btlnbr_cols(df,btl_num_col):
     df['BTLNBR'] = df[btl_num_col].astype(int)
@@ -1385,65 +808,43 @@ def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', deci
     df['TIME'] = hour
     return df
 
-def flag_missing_values(df,flag_columns,flag_suffix='_FLAG_W'):
-    for column in flag_columns:
-        flag_name = column + flag_suffix
-        df.loc[df[column].isna(),flag_name] = 9
-        df[column].fillna(value=int(-999), inplace=True)
-        df.loc[df[column].astype(int) == -999, flag_name] = 9
-    return df
 
-"""code_pruning: no calls to this function"""
-def format_btl_data(df,data_cols, prcn=4):
+def manual_backfill(df, p_cutoff, p_col="CTDPRS", flag_suffix="_FLAG_W"):
     """
-    data_cols :(list) list containing the "numerical" columns to be rounded to prcn decimal places
+    Overwrite values below cutoff pressure by backfilling the first data point past
+    threshold upward to the surface. Backfilled data are flagged 6.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Input data
+    p_cutoff : float
+        Cutoff pressure for backfilling
+    p_col : str, optional
+        Name of pressure column in df
+    flag_suffix : str, optional
+        Parameter suffix for data flags
+
+    Returns
+    -------
+    df : DataFrame
+        Input DataFrame with backfilled data
     """
-    # Choose correct sensors
-    #df['CTDTMP'] = df[settings.bottle_inputs['t']]
-    format_columns = settings.btl_series_output['btl_column_names'].copy()
-#    if 'SSSCC' not in format_columns:
-#        print('Adding SSSCC')
-#        format_columns.append('SSSCC')
-    if 'DEPTH' not in format_columns:
-        print('Adding DEPTH')
-        format_columns.append('DEPTH')
-    try:
-        df = df[format_columns].copy()
-    except:
-        print('missing required pressure series output columns!')
-        df_columns = list(df.keys())
-        missing_list = list(np.setdiff1d(format_columns,df_columns))
-        raise KeyError('missing columns: ',missing_list)
-        #print('missing columns: ',missing_list)
+    df = df.copy(deep=True)
+    cols = df.columns.drop(p_col)
+    df["interp_bool"] = df[p_col] < p_cutoff
+    df.loc[df["interp_bool"], cols] = np.nan
+    df = _flag_backfill_data(df).drop(columns="interp_bool")
 
-    for i in df.columns:
-        if '_FLAG_W' in i:
-            df[i] = df[i].astype(int)
-        elif i in data_cols:
-            df[i] = df[i].round(prcn)
-    return df
+    return df.bfill()
 
-"""code_pruning: no calls, fill_surface_data() above is used instead"""
-def manual_backfill_values(df,bfill_prs,p_col='CTDPRS',flag_suffix='_FLAG_W'):
-    col_list = df.columns.tolist()
-    col_list.remove(p_col)
-    df.loc[df[p_col] < bfill_prs,col_list] = np.nan
-    press_flag_column = p_col + flag_suffix
-    for column in col_list:
-        if flag_suffix in column:
-            if press_flag_column in column:
-                pass
-            else:
-                df.loc[df[p_col] < bfill_prs,column] = 6
-    df.bfill(inplace=True)
-    return df
 
-def flag_backfill_data(df,p_col='CTDPRS',flag_bol_col='interp_bol',flag_suffix='_FLAG_W'):
-    col_list = df.columns.tolist()
-    for column in col_list:
+def _flag_backfill_data(df,p_col='CTDPRS',flag_bool_col='interp_bool',flag_suffix='_FLAG_W'):
+    """Flag data columns which have been interpolated with flag 6."""
+    for col in df.columns:
+        if flag_suffix in col:
+            df.loc[df[flag_bool_col], col] = 6
 
-        if flag_suffix in column:
-            df.loc[df[flag_bol_col] == 1, column] = 6
     return df
 
 def export_ct1(df, ssscc_list):
@@ -1484,7 +885,8 @@ def export_ct1(df, ssscc_list):
     # renames
     df = df.rename(columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"})
     # check that all columns are there
-    # TODO: make this better... (see process_ctd.format_time_data())
+    # TODO: make this better... 
+    # #should it fail and return list of bad cols or just use fill values?
     try:
         df[p_column_names];  # this is lazy, do better
     except KeyError:
@@ -1517,15 +919,18 @@ def export_ct1(df, ssscc_list):
 
         time_data = df[df['SSSCC'] == ssscc].copy()
         time_data = pressure_sequence(time_data)
-        time_data = flag_backfill_data(time_data)
-        time_data = fill_surface_data(time_data)
         time_data = time_data[p_column_names]
         time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  #replace NaNs with -999
 
-        depth = full_depth_df.loc[full_depth_df['SSSCC'] == ssscc,'DEPTH'].iloc[0]
+        try:
+            depth = full_depth_df.loc[full_depth_df['SSSCC'] == ssscc,'DEPTH'].iloc[0]
+        except IndexError:
+            print(f"No depth logged for {ssscc}, setting to -999")  # TODO: logger
+            depth = -999
+
         # get cast_details for current SSSCC
-        cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("r")[0]
+        cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("records")[0]
         b_datetime = datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc).strftime('%Y%m%d %H%M').split(" ")
         # TODO: yo-yo casts are an edge case where this may be different
         btm_lat = cast_dict["latitude"]
@@ -1659,13 +1064,8 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
     btl_data.loc[diff.abs()*100 > btl_data["CTDOXY"], "CTDOXY_FLAG_W"] = 3
 
     # flag CTDSAL using stepped filter
-    thresh = [0.002, 0.005, 0.010, 0.020]
-    btl_data["CTDSAL_FLAG_W"] = 2
-    diff = btl_data["CTDSAL"] - btl_data["SALNTY"]
-    btl_data.loc[(btl_data["CTDPRS"] > 2000) & (diff.abs() > thresh[0]), "CTDSAL_FLAG_W"] = 3
-    btl_data.loc[(btl_data["CTDPRS"] <= 2000) & (btl_data["CTDPRS"] > 1000) & (diff.abs() > thresh[1]), "CTDSAL_FLAG_W"] = 3
-    btl_data.loc[(btl_data["CTDPRS"] <= 1000) & (btl_data["CTDPRS"] > 500) & (diff.abs() > thresh[2]), "CTDSAL_FLAG_W"] = 3
-    btl_data.loc[(btl_data["CTDPRS"] <= 500) & (diff.abs() > thresh[3]), "CTDSAL_FLAG_W"] = 3
+    sal_diff = btl_data["CTDSAL"] - btl_data["SALNTY"]
+    btl_data["CTDSAL_FLAG_W"] = flagging.stepped_filter(sal_diff, btl_data["CTDPRS"])
 
     # check columns
     try:
