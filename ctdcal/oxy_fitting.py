@@ -11,6 +11,7 @@ import gsw
 import numpy as np
 import pandas as pd
 import scipy
+import xml.etree.cElementTree as ET
 
 import ctdcal.ctd_plots as ctd_plots
 import ctdcal.flagging as flagging
@@ -354,7 +355,7 @@ def calculate_dV_dt(oxy_volts, time, nan_replace=True):
     dV_dt[np.isinf(dV_dt)] = np.nan  # this check is probably unnecessary
 
     if nan_replace:
-        dV_dt = np.nan_to_num(np.nanmean(dV_dt))
+        dV_dt = np.nan_to_num(dV_dt, nan=np.nanmean(dV_dt))
 
     # TODO: should we do some kind of filtering? e.g.:
     # (PMEL does this calculation on binned data already so filtering is not the same)
@@ -366,40 +367,27 @@ def calculate_dV_dt(oxy_volts, time, nan_replace=True):
     return dV_dt  # filtered_dvdt
 
 
-"""code_pruning: most of this is ripped from equations_sbe... sort this out"""
 def _get_sbe_coef(idx=0):
     """
-    Get SBE oxygen coefficients from raw data files.
+    Get SBE oxygen coefficients from raw .xmlcon files.
     Defaults to using first station in ssscc.csv file.
+
+    Returns the following tuple of coefficients: Soc, offset, Tau20, Tcor, E
     """
-    ssscc_list = process_ctd.get_ssscc_list()
-    station = ssscc_list[idx]
-    hexfile = cfg.directory["raw"] + station + ".hex"
+    # TODO: does scipy's minimize function needs a tuple? can this be improved further?
+
+    station = process_ctd.get_ssscc_list()[idx]
     xmlfile = cfg.directory["raw"] + station + ".XMLCON"
 
-    sbeReader = sbe_rd.SBEReader.from_paths(hexfile, xmlfile)
-    rawConfig = sbeReader.parsed_config()
-    for i, x in enumerate(rawConfig['Sensors']):
-        sensor_id = rawConfig['Sensors'][i]['SensorID']
-        if str(sensor_id) == '38':
-            oxy_meta = {'sensor_id': '38', 'list_id': 0, 'channel_pos': 1,
-                        'ranking': 5, 'column': 'CTDOXYVOLTS',
-                        'sensor_info': rawConfig['Sensors'][i]}
+    tree = ET.parse(xmlfile)
+    root_eq0 = tree.find(".//CalibrationCoefficients[@equation='0']")  # Owens-Millard
+    root_eq1 = tree.find(".//CalibrationCoefficients[@equation='1']")  # SBE equation
 
+    coefs = {c.tag: float(c.text) for c in root_eq1}
+    coefs["Tcor"] = float(root_eq0.find("Tcor").text)  # only coef needed from eq0
+    keep_keys = ["Soc", "offset", "Tau20", "Tcor", "E"]
 
-    Soc = oxy_meta['sensor_info']['Soc'] # Oxygen slope
-    Voff = oxy_meta['sensor_info']['offset'] # Sensor output offset voltage
-    Tau20 = oxy_meta['sensor_info']['Tau20'] #Sensor time constant at 20 deg C and 1 Atm
-    Tcorr = oxy_meta['sensor_info']['Tcor'] # Temperature correction
-    E  = oxy_meta['sensor_info']['E'] #Compensation Coef for pressure effect on membrane permeability (Atkinson et al)
-    A = oxy_meta['sensor_info']['A'] # Compensation Coef for temp effect on mem perm
-    B = oxy_meta['sensor_info']['B'] # Compensation Coef for temp effect on mem perm
-    C = oxy_meta['sensor_info']['C'] # Compensation Coef for temp effect on mem perm
-    D = [oxy_meta['sensor_info']['D0'],oxy_meta['sensor_info']['D1'],oxy_meta['sensor_info']['D2']] # Press effect on time constant Usually not fitted for.
-
-    coef = [Soc,Voff,Tau20,Tcorr,E]#,A,B,C,D]
-
-    return coef
+    return tuple(coefs[key] for key in keep_keys)
 
 
 def calculate_weights(pressure):
@@ -551,53 +539,59 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     # Plot data to be fit together
     f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual{f_suffix}_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
-        merged_df['REFOXY'] - merged_df['CTDOXY'],
+        merged_df["REFOXY"] - merged_df["CTDOXY"],
         merged_df["CTDPRS"],
         merged_df["SSSCC"],
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
-        xlim=(-10,10)
+        xlim=(-10, 10),
     )
 
-    # Create DF for good and questionable values
-    bad_df = pd.DataFrame()
-    good_df = pd.DataFrame()
+    bad_df = pd.DataFrame()  # initialize DF for questionable values
 
     if sbe_coef0 is None:
         sbe_coef0 = _get_sbe_coef()  # load initial coefficient guess
 
-    p0 = sbe_coef0[0], sbe_coef0[1], sbe_coef0[2], sbe_coef0[3], sbe_coef0[4]
-    
     # Curve fit (weighted)
-    weights = calculate_weights(merged_df['CTDPRS'])
-    res = scipy.optimize.minimize(PMEL_oxy_weighted_residual,x0=p0,args=(weights, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS']), merged_df['REFOXY']), bounds=[(None,None),(None,None),(0,None),(None,None),(None,None)])
+    weights = calculate_weights(merged_df["CTDPRS"])
+    fit_vars = ["CTDOXYVOLTS", "CTDPRS", "CTDTMP", "dv_dt", "OS"]
+    fit_data = tuple(merged_df[v] for v in fit_vars)
+    res = scipy.optimize.minimize(
+        PMEL_oxy_weighted_residual,
+        x0=sbe_coef0,
+        args=(weights, fit_data, merged_df["REFOXY"]),
+        bounds=[(None, None), (None, None), (0, None), (None, None), (None, None)],
+    )
+
     cfw_coefs = res.x
-    merged_df['CTDOXY'] = _PMEL_oxy_eq(cfw_coefs, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS']))        
-
-    merged_df['residual'] = merged_df['REFOXY'] - merged_df['CTDOXY']
-    stdres = np.std(merged_df['residual'])
-    cutoff = stdres * 2.8
-
-    thrown_values = merged_df[np.abs(merged_df['residual']) > cutoff]
+    merged_df["CTDOXY"] = _PMEL_oxy_eq(cfw_coefs, fit_data)
+    merged_df["residual"] = merged_df["REFOXY"] - merged_df["CTDOXY"]
+    cutoff = 2.8 * np.std(merged_df["residual"])
+    thrown_values = merged_df[np.abs(merged_df["residual"]) > cutoff]
     bad_df = pd.concat([bad_df, thrown_values])
-    merged_df = merged_df[np.abs(merged_df['residual']) <= cutoff]
+    merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
 
-    while not thrown_values.empty: # runs as long as there are thrown_values
+    while not thrown_values.empty:  # runs as long as there are thrown_values
 
-        p0 = cfw_coefs[0], cfw_coefs[1], cfw_coefs[2], cfw_coefs[3], cfw_coefs[4]
-        weights = calculate_weights(merged_df['CTDPRS'])
-        res = scipy.optimize.minimize(PMEL_oxy_weighted_residual,x0=p0,args=(weights, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS']), merged_df['REFOXY']), bounds=[(None,None),(None,None),(0,None),(None,None),(None,None)])
+        p0 = tuple(cfw_coefs)  # initialize coefficients with previous results
+        weights = calculate_weights(merged_df["CTDPRS"])
+        fit_data = tuple(merged_df[v] for v in fit_vars)  # merged_df changes each loop
+        res = scipy.optimize.minimize(
+            PMEL_oxy_weighted_residual,
+            x0=p0,
+            args=(weights, fit_data, merged_df["REFOXY"]),
+            bounds=[(None, None), (None, None), (0, None), (None, None), (None, None)],
+        )
+
         cfw_coefs = res.x
-        merged_df['CTDOXY'] = _PMEL_oxy_eq(cfw_coefs, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS']))
-
-        merged_df['residual'] = merged_df['REFOXY'] - merged_df['CTDOXY']
-        stdres = np.std(merged_df['residual'])
-        cutoff = stdres * 2.8
-        thrown_values = merged_df[np.abs(merged_df['residual']) > cutoff]
-        print(len(thrown_values))
-        print(p0)
+        merged_df["CTDOXY"] = _PMEL_oxy_eq(cfw_coefs, fit_data)
+        merged_df["residual"] = merged_df["REFOXY"] - merged_df["CTDOXY"]
+        cutoff = 2.8 * np.std(merged_df["residual"])
+        thrown_values = merged_df[np.abs(merged_df["residual"]) > cutoff]
+        # TODO: get some kind of logging in here in case things go awry
+        # e.g. count of thrown values, start/final stdev, failing to converge, etc.
         bad_df = pd.concat([bad_df, thrown_values])
-        merged_df = merged_df[np.abs(merged_df['residual']) <= cutoff]
+        merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
 
     # intermediate plots to diagnose data chunks goodness
     # TODO: implement into bokeh/flask dashboard
@@ -609,18 +603,12 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
             merged_df["SSSCC"],
             xlabel="CTDOXY Residual (umol/kg)",
             f_out=f_out,
-            xlim=(-10,10)
+            xlim=(-10, 10),
         )
 
-    # good_df = pd.concat([good_df, merged_df])
-    merged_df['CTDOXY_FLAG_W'] = 2
-    # bad_df = pd.concat([bad_df, bad_values])
-    bad_df['CTDOXY_FLAG_W'] = 3
-    df = pd.concat([merged_df,bad_df])
-
-    # df['SSSCC_int'] = df['SSSCC_sbe43'].astype(int)
-    # df.sort_values(by=['SSSCC_int','btl_fire_num'],ascending=[True,True],inplace=True)
-    # df.drop('SSSCC_int', axis=1, inplace=True)
+    merged_df["CTDOXY_FLAG_W"] = 2
+    bad_df["CTDOXY_FLAG_W"] = 3
+    df = pd.concat([merged_df, bad_df])
 
     return cfw_coefs, df
 
@@ -730,6 +718,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     -------
 
     """
+    print("Calibrating oxygen (SBE43)")
     # Plot all pre fit data
     f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
@@ -782,7 +771,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # Fit each cast individually
     for ssscc in ssscc_list:
         sbe_coef, sbe_df = sbe43_oxy_fit(
-            all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc],
+            all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
             sbe_coef0=sbe_coef0,
             f_suffix=f"_{ssscc}",
         )
