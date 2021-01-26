@@ -1,10 +1,10 @@
 #! /usr/bin/env python
-import sys
-import os
 import argparse
-import pandas as pd
-import ctdcal.convert as cnv
+import os
+import sys
+
 import ctdcal.process_bottle as btl
+import pandas as pd
 
 #File extension to use for output files (csv-formatted)
 FILE_EXT = 'csv'
@@ -72,7 +72,7 @@ def main(argv):
             sys.exit(1)
 
     debugPrint("Import converted data to dataframe... ", end='')
-    imported_df = cnv.importConvertedFile(args.cnv_file, False)
+    imported_df = pd.read_pickle(args.cnv_file)
     debugPrint("Success!")
 
     debugPrint(imported_df.head())
@@ -115,7 +115,7 @@ def main(argv):
 
     # Save the bottle fire mean dataframe to file.
     debugPrint('Saving mean data to:', meanfilePath + '... ', end='')
-    if not cnv.saveConvertedDataToFile(mean_df, meanfilePath, DEBUG):
+    if not mean_df.to_pickle(meanfilePath):
         errPrint('ERROR: Could not save mean fire data to file')
     else:
         debugPrint('Success!')

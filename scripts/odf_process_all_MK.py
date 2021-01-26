@@ -3,16 +3,13 @@ Attempt to write a cleaner processing script from scratch.
 """
 
 # import necessary packages
-import os
 import sys
-import subprocess
-import ctdcal.process_ctd as process_ctd
-import ctdcal.fit_ctd as fit_ctd
-import ctdcal.oxy_fitting as oxy_fitting
-import ctdcal.rinko as rinko
-import ctdcal.odf_io as odf_io
+
 import ctdcal.convert as convert
-import scripts.odf_sbe_metadata as odf_sbe_metadata
+import ctdcal.fit_ctd as fit_ctd
+import ctdcal.odf_io as odf_io
+import ctdcal.oxy_fitting as oxy_fitting
+import ctdcal.process_ctd as process_ctd
 
 
 def process_all():
@@ -28,7 +25,6 @@ def process_all():
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
     #####
-
     # load station/cast list from file
     ssscc_list = process_ctd.get_ssscc_list()
 
@@ -87,8 +83,6 @@ def process_all():
     process_ctd.export_btl_data(btl_data_all)
 
     # run: ctd_to_bottle.py
-
-    process_ctd.export_btl_data(btl_data_all)
 
 
 def main(argv):

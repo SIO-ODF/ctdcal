@@ -1,18 +1,11 @@
 #! /usr/bin/env python
-import sys
-import os
-
-import ctdcal.sbe_reader as sbe_reader
-import numpy as np
-import pandas as pd
-import ctdcal.convert as cnv
-
-import pickle
-
 #remove and streamline imports below later
 import argparse
-import configparser
-#import matplotlib.pyplot as plt
+import os
+import sys
+
+import ctdcal.convert as cnv
+import ctdcal.sbe_reader as sbe_reader
 
 DEBUG = False
 

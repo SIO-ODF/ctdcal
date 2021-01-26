@@ -1,7 +1,8 @@
-import pandas as pd
-import numpy as np
-import io
 import sys
+
+import numpy as np
+import pandas as pd
+
 
 def main(argv):
     '''Creates a bottle file with CTD downcast information.
