@@ -1035,8 +1035,10 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
     btl_data["SAMPNO"] = btl_data["btl_fire_num"].astype(int)
     btl_data = add_btlnbr_cols(btl_data, btl_num_col="btl_fire_num")
 
-    # sort by decreasing sample number (increasing pressure)
-    btl_data = btl_data.sort_values(by=["STNNBR", "SAMPNO"], ascending=[True, False])
+    # sort by decreasing sample number (increasing pressure) and reindex
+    btl_data = btl_data.sort_values(
+        by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
+    )
 
     # round data
     for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
@@ -1054,18 +1056,20 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
         btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
 
     # deal with nans
-    btl_data.loc[btl_data["REFTMP_FLAG_W"].isnull(), "REFTMP_FLAG_W"] = 9
-    btl_data["REFTMP_FLAG_W"] = btl_data["REFTMP_FLAG_W"].astype(int)
+    btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
+        btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
+    )
     btl_data = btl_data.where(~btl_data.isnull(), -999)
 
     # flag CTDOXY with more than 1% difference
-    btl_data["CTDOXY_FLAG_W"] = 2
-    diff = btl_data["CTDOXY"] - btl_data["OXYGEN"]
-    btl_data.loc[diff.abs()*100 > btl_data["CTDOXY"], "CTDOXY_FLAG_W"] = 3
+    btl_data["CTDOXY_FLAG_W"] = flagging.by_percent_diff(
+        btl_data["CTDOXY"], btl_data["OXYGEN"], percent_thresh=1
+    )
 
     # flag CTDSAL using stepped filter
-    sal_diff = btl_data["CTDSAL"] - btl_data["SALNTY"]
-    btl_data["CTDSAL_FLAG_W"] = flagging.stepped_filter(sal_diff, btl_data["CTDPRS"])
+    btl_data["CTDSAL_FLAG_W"] = flagging.by_residual(
+        btl_data["CTDSAL"], btl_data["SALNTY"], btl_data["CTDPRS"]
+    )
 
     # check columns
     try:

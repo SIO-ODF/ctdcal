@@ -10,6 +10,7 @@ from scipy.ndimage.interpolation import shift
 
 import ctdcal.convert as convert
 import ctdcal.ctd_plots as ctd_plots
+import ctdcal.flagging as flagging
 import ctdcal.process_ctd as process_ctd
 
 

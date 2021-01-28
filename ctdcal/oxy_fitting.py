@@ -686,7 +686,7 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     btl_df[cfg.column["oxy_btl"]] = oxy_ml_to_umolkg(
         btl_df[cfg.column["oxy_btl"]], btl_df["sigma_btl"]
     )
-    btl_df["OXYGEN_FLAG_W"] = flagging.flag_nan_values(btl_df[cfg.column["oxy_btl"]])
+    btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["oxy_btl"]])
     # Load manual OXYGEN flags
     if Path("data/oxygen/manual_oxy_flags.csv").exists():
         manual_flags = pd.read_csv(
