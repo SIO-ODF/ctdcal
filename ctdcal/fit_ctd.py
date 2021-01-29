@@ -108,21 +108,14 @@ def _flag_btl_data(
 
     # Remove extreme outliers and code bad
     df = df.reset_index(drop=True)
-    df, df_bad = _wild_edit(
-        df[param], df[ref], df[prs], df["SSSCC"], df["btl_fire_num"]
-    )
+    df["Diff"] = df[ref] - df[param]
+    df["Flag"] = flagging.outliers(df["Diff"])
 
     # Find values that are above the threshold and code questionable
-    df.loc[(df[prs] > 2000) & (df["Diff"].abs() > thresh[0]), "Flag"] = 3
-    df.loc[
-        (df[prs] <= 2000) & (df[prs] > 1000) & (df["Diff"].abs() > thresh[1]), "Flag",
-    ] = 3
-    df.loc[
-        (df[prs] <= 1000) & (df[prs] > 500) & (df["Diff"].abs() > thresh[2]), "Flag"
-    ] = 3
-    df.loc[(df[prs] <= 500) & (df["Diff"].abs() > thresh[3]), "Flag"] = 3
+    df["Flag"] = flagging.by_residual(df[param], df[ref], df[prs], old_flags=df["Flag"])
     df_good = df[df["Flag"] == 2].copy()
     df_ques = df[df["Flag"] == 3].copy()
+    df_bad = df[df["Flag"] == 4].copy()
 
     if f_out is not None:
         if param == cfg.column["t1_btl"]:
@@ -159,34 +152,18 @@ def _prepare_fit_data(df, param, ref_param, zRange=None):
     """Remove non-finite data, trim to desired zRange, and remove extreme outliers"""
 
     good_data = df[np.isfinite(df[ref_param]) & np.isfinite(df[param])].copy()
+
     if zRange is not None:
         zMin, zMax = zRange.split(":")
         good_data = good_data[
             (good_data["CTDPRS"] > int(zMin)) & (good_data["CTDPRS"] < int(zMax))
         ]
-    df_good, df_bad = _wild_edit(
-        good_data[param],
-        good_data[ref_param],
-        good_data["CTDPRS"],
-        good_data["SSSCC"],
-        good_data["btl_fire_num"],
-        n_sigma=5,
-    )
 
-    return df_good, df_bad
+    good_data["Diff"] = good_data[ref_param] - good_data[param]
+    good_data["Flag"] = flagging.outliers(good_data["Diff"])
 
-
-def _wild_edit(param, ref_param, prs, ssscc, btl_num, n_sigma=10):
-    """Calculate residual then find extreme outliers and flag as bad (code 4)"""
-
-    diff = ref_param - param
-    df = pd.concat([ssscc, btl_num, param, ref_param, prs], axis=1)
-    df["Diff"] = ref_param - param
-    outliers = (df["Diff"] - df["Diff"].mean()).abs() > (n_sigma * df["Diff"].std())
-    df_good = df[~outliers].copy()
-    df_good["Flag"] = 2
-    df_bad = df[outliers].copy()
-    df_bad["Flag"] = 4
+    df_good = good_data[good_data["Flag"] == 2].copy()
+    df_bad = good_data[good_data["Flag"] == 4].copy()
 
     return df_good, df_bad
 
