@@ -474,7 +474,8 @@ def _reft_loader(ssscc, reft_dir):
     )
     reftDF = reftDF.dropna(axis=1)
     reftDF[1] = reftDF[[1, 2, 3, 4]].agg(" ".join, axis=1)  # dd/mm/yy/time cols are
-    reftDF.drop(columns=[2, 3, 4], inplace=True)  # read separately; combine into one 
+    reftDF.drop(columns=[2, 3, 4], inplace=True)  # read separately; combine into one
+
     columns = OrderedDict(  # having this as a dict streamlines next steps
         [
             ("index_memory", int),
@@ -487,9 +488,11 @@ def _reft_loader(ssscc, reft_dir):
     )
     reftDF.columns = list(columns.keys())  # name columns
     reftDF = reftDF.astype(columns)  # force dtypes
-    # assign initial qality flags
-    reftDF.loc[:, "REFTMP_FLAG_W"] = 2
-    reftDF.loc[abs(reftDF["diff"]) >= 3000, "REFTMP_FLAG_W"] = 3
+
+    # assign initial flags (large "diff" = unstable reading, flag questionable)
+    reftDF["REFTMP_FLAG_W"] = 2
+    reftDF.loc[reftDF["diff"].abs() >= 3000, "REFTMP_FLAG_W"] = 3
+
     # add in STNNBR, CASTNO columns
     # TODO: should these be objects or floats? be consistent!
     # string prob better for other sta/cast formats (names, letters, etc.)
@@ -871,12 +874,8 @@ def export_ct1(df, ssscc_list):
     # clean up columns
     p_column_names = cfg.ctd_time_output["col_names"]
     p_column_units = cfg.ctd_time_output["col_units"]
+
     # initial flagging (some of this should be moved)
-    # TODO: actual CTDOXY flagging (oxy_fitting.calibrate_oxy)
-    df["CTDOXY_FLAG_W"] = 2
-    # TODO: flag bad based on cond/temp and handcoded salt
-    df["CTDSAL_FLAG_W"] = 2
-    df["CTDTMP_FLAG_W"] = 2
     # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
     # TODO: may not always have these channels so don't hardcode them in!
     df["CTDFLUOR_FLAG_W"] = 1
@@ -885,8 +884,9 @@ def export_ct1(df, ssscc_list):
     # renames
     df = df.rename(columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"})
     # check that all columns are there
-    # TODO: make this better... 
+    # TODO: make this better...
     # #should it fail and return list of bad cols or just use fill values?
+    breakpoint()
     try:
         df[p_column_names];  # this is lazy, do better
     except KeyError:
@@ -973,58 +973,34 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
     btl_data = df.copy()
     now = datetime.now()
     file_datetime = now.strftime("%Y%m%d")
-    btl_columns = [
-        "EXPOCODE",
-        "SECT_ID",
-        "STNNBR",
-        "CASTNO",
-        "SAMPNO",
-        "BTLNBR",
-        "BTLNBR_FLAG_W",
-        "DATE",
-        "TIME",
-        "LATITUDE",
-        "LONGITUDE",
-        "DEPTH",
-        "CTDPRS",
-        "CTDTMP",
-        "CTDSAL",
-        "CTDSAL_FLAG_W",
-        "SALNTY",
-        "SALNTY_FLAG_W",
-        "CTDOXY",
-        "CTDOXY_FLAG_W",
-        "OXYGEN",
-        "OXYGEN_FLAG_W",
-        "REFTMP",
-        "REFTMP_FLAG_W",
-    ]
-    btl_units = [
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "METERS",
-        "DBAR",
-        "ITS-90",
-        "PSS-78",
-        "",
-        "PSS-78",
-        "",
-        "UMOL/KG",
-        "",
-        "UMOL/KG",
-        "",
-        "ITS-90",
-        "",
-    ]
+
+    # TODO: move to config; integrate Barna's "params" package instead?
+    btl_columns = {
+        "EXPOCODE": "",
+        "SECT_ID": "",
+        "STNNBR": "",
+        "CASTNO": "",
+        "SAMPNO": "",
+        "BTLNBR": "",
+        "BTLNBR_FLAG_W": "",
+        "DATE": "",
+        "TIME": "",
+        "LATITUDE": "",
+        "LONGITUDE": "",
+        "DEPTH": "METERS",
+        "CTDPRS": "DBAR",
+        "CTDTMP": "ITS-90",
+        "CTDSAL": "PSS-78",
+        "CTDSAL_FLAG_W": "",
+        "SALNTY": "PSS-78",
+        "SALNTY_FLAG_W": "",
+        "CTDOXY": "UMOL/KG",
+        "CTDOXY_FLAG_W": "",
+        "OXYGEN": "UMOL/KG",
+        "OXYGEN_FLAG_W": "",
+        "REFTMP": "ITS-90",
+        "REFTMP_FLAG_W": "",
+    }
 
     # rename
     btl_data = btl_data.rename(columns={"CTDTMP2": "CTDTMP"})
@@ -1056,27 +1032,20 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
         btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
 
     # deal with nans
+    # TODO: missing REFTMP not obvious til loading data - where to put this?
+    # _reft_loader() is not the right place
+    # maybe during loading step flag missing OXYGEN, REFTMP, BTLCOND?
     btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
         btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
     )
     btl_data = btl_data.where(~btl_data.isnull(), -999)
 
-    # flag CTDOXY with more than 1% difference
-    btl_data["CTDOXY_FLAG_W"] = flagging.by_percent_diff(
-        btl_data["CTDOXY"], btl_data["OXYGEN"], percent_thresh=1
-    )
-
-    # flag CTDSAL using stepped filter
-    btl_data["CTDSAL_FLAG_W"] = flagging.by_residual(
-        btl_data["CTDSAL"], btl_data["SALNTY"], btl_data["CTDPRS"]
-    )
-
     # check columns
     try:
-        btl_data[btl_columns];  # this is lazy, do better
+        btl_data[btl_columns.keys()];  # this is lazy, do better
     except KeyError:
         print("Column names not configured properly... attempting to correct")
-        for col in btl_columns:
+        for col in btl_columns.keys():
             try:
                 btl_data[col];
             except KeyError:
@@ -1087,12 +1056,12 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
                     print(col + " missing, filling with -999s")
                     btl_data[col] = -999
 
-    btl_data = btl_data[btl_columns]
-    time_stamp = file_datetime+org
+    btl_data = btl_data[btl_columns.keys()]
+    time_stamp = file_datetime + org
     with open(out_dir + cfg.cruise["expocode"] + "_hy1.csv", mode="w+") as f:
         f.write("BOTTLE, %s\n" % (time_stamp))
-        f.write(",".join(btl_columns) + "\n")
-        f.write(",".join(btl_units) + "\n")
+        f.write(",".join(btl_columns.keys()) + "\n")
+        f.write(",".join(btl_columns.values()) + "\n")
         btl_data.to_csv(f, header=False, index=False)
         f.write("\n" + "END_DATA")
 

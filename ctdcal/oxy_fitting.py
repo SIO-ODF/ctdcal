@@ -817,7 +817,11 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         )
         print(ssscc + " time data fitting done")
 
-    # TODO: flag oxy data here? compare w/ T/C routines
+    # flag CTDOXY with more than 1% difference
+    time_df["CTDOXY_FLAG_W"] = 2  # TODO: actual flagging of some kind?
+    btl_df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(
+        btl_df["CTDOXY"], btl_df["OXYGEN"], percent_thresh=1
+    )
 
     # Plot all post fit data
     f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_postfit.pdf"

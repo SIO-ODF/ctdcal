@@ -397,6 +397,10 @@ def calibrate_temp(btl_df, time_df):
     coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
     coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
 
+    # flag temperature data
+    # TODO: CTDTMP_FLAG_W historically not included in hy1 file... should it be?
+    time_df[cfg.column["t1"] + "_FLAG_W_"] = 2  # TODO: flag using REFTMP?
+
     return True
 
 
@@ -508,12 +512,12 @@ def calibrate_cond(btl_df, time_df):
         btl_df = btl_df.merge(
             handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left"
         )
-        btl_df.loc[btl_df["SALNTY"].isnull(), "SALNTY_FLAG_W"] = 9
-        btl_df["SALNTY_FLAG_W"] = btl_df["SALNTY_FLAG_W"].fillna(
-            2, downcast="infer"  # fill remaining NaNs with 2s and cast to dtype int
+        # TODO: may be easier to try using flagging._merge_flags()?
+        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
+            btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
         )
     else:
-        btl_df["SALNTY_FLAG_W"] = 2
+        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
 
     ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob('ssscc_c*.csv'))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
@@ -675,6 +679,13 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["c1_btl"]],
         btl_df[cfg.column["t1_btl"]],
         btl_df[cfg.column["p_btl"]],
+    )
+
+    # flag salinity data
+    # TODO: flag time using handcoded salts somehow? discrete vs continuous
+    time_df[cfg.column["sal"] + "_FLAG_W"] = 2
+    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.by_residual(
+        btl_df[cfg.column["sal"]], btl_df["SALNTY"], btl_df[cfg.column["p"]],
     )
 
     return btl_df, time_df
