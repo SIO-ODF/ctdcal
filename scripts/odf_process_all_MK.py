@@ -9,6 +9,7 @@ import ctdcal.convert as convert
 import ctdcal.fit_ctd as fit_ctd
 import ctdcal.odf_io as odf_io
 import ctdcal.oxy_fitting as oxy_fitting
+import ctdcal.process_bottle as process_bottle
 import ctdcal.process_ctd as process_ctd
 
 
@@ -41,15 +42,15 @@ def process_all():
     odf_io.process_salts(ssscc_list)
 
     # generate reftemp .csv files
-    process_ctd.process_reft(ssscc_list)
+    process_bottle.process_reft(ssscc_list)
 
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
     #####
 
     # load in all bottle and time data into DataFrame
-    btl_data_all = process_ctd.load_all_ctd_files(ssscc_list, "bottle", cfg.btl_cols)
-    time_data_all = process_ctd.load_all_ctd_files(ssscc_list, "time", None)
+    time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
+    btl_data_all = process_bottle.load_all_btl_files(ssscc_list, cfg.btl_cols)
 
     # process pressure offset
     process_ctd.apply_pressure_offset(btl_data_all)
@@ -80,7 +81,7 @@ def process_all():
     # export time data to _ct1.csv format
     # TODO: clean this up more
     process_ctd.export_ct1(time_data_all, ssscc_list)
-    process_ctd.export_btl_data(btl_data_all)
+    process_bottle.export_hy1(btl_data_all)
 
     # run: ctd_to_bottle.py
 
