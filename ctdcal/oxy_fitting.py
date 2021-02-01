@@ -3,16 +3,16 @@ Module for processing oxygen from CTD and bottle samples.
 """
 
 import csv
+import xml.etree.cElementTree as ET
+from collections import OrderedDict
 from pathlib import Path
 
-from collections import OrderedDict
-import config as cfg
 import gsw
 import numpy as np
 import pandas as pd
 import scipy
-import xml.etree.cElementTree as ET
 
+import config as cfg
 import ctdcal.ctd_plots as ctd_plots
 import ctdcal.flagging as flagging
 import ctdcal.process_ctd as process_ctd
@@ -89,11 +89,11 @@ def load_flasks(flask_file=cfg.directory["oxy"] + "o2flasks.vol", comment="#"):
     """
     with open(flask_file, "r") as f:
         flasks = []
-        for l in f:
-            is_comment = l.strip().startswith(comment)
-            if ("Volume" in l) or is_comment:
+        for line in f:
+            is_comment = line.strip().startswith(comment)
+            if ("Volume" in line) or is_comment:
                 continue
-            num, vol = l.strip().split()[:2]  # only need first two cols (# and volume)
+            num, vol = line.strip().split()[:2]  # only need first two cols (#, volume)
             flasks.append([str(num), float(vol)])
 
     flasks = pd.DataFrame(flasks, columns=["FLASKNO", "FLASK_VOL"])
@@ -433,7 +433,9 @@ def calculate_weights(pressure):
 
 
 """code_pruning: should this be here or in equations_sbe? somewhere else?"""
-def _PMEL_oxy_eq(coefs,inputs,cc=[1.92634e-4,-4.64803e-2]):
+
+
+def _PMEL_oxy_eq(coefs, inputs, cc=[1.92634e-4, -4.64803e-2]):
     """
     Modified oxygen equation for SBE 43 used by NOAA/PMEL
     coef[0] = Soc
@@ -444,9 +446,17 @@ def _PMEL_oxy_eq(coefs,inputs,cc=[1.92634e-4,-4.64803e-2]):
     """
     Soc, Voff, Tau20, Tcorr, E = coefs
     oxyvolts, pressure, temp, dvdt, os = inputs
-    o2 = Soc * (oxyvolts + Voff + Tau20 * np.exp(cc[0] * pressure + cc[1] * (temp - 20)) * dvdt) * os \
-            * np.exp(Tcorr * temp) \
-            * np.exp((E * pressure) / (temp + 273.15))
+    o2 = (
+        Soc
+        * (
+            oxyvolts
+            + Voff
+            + Tau20 * np.exp(cc[0] * pressure + cc[1] * (temp - 20)) * dvdt
+        )
+        * os
+        * np.exp(Tcorr * temp)
+        * np.exp((E * pressure) / (temp + 273.15))
+    )
 
     return o2
 
@@ -466,23 +476,38 @@ def PMEL_oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
     return residuals
 
 
-def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ctd_SA, ctd_oxyvolts, ctd_time):
+def match_sigmas(
+    btl_prs,
+    btl_oxy,
+    btl_tmp,
+    btl_SA,
+    ctd_os,
+    ctd_prs,
+    ctd_tmp,
+    ctd_SA,
+    ctd_oxyvolts,
+    ctd_time,
+):
 
     # Construct Dataframe from bottle and ctd values for merging
-    btl_data = pd.DataFrame(data={
-        "CTDPRS": btl_prs,
-        "REFOXY": btl_oxy,
-        "CTDTMP": btl_tmp,
-        "SA": btl_SA,
-    })
-    time_data = pd.DataFrame(data={
-        "CTDPRS": ctd_prs,
-        "OS": ctd_os,
-        "CTDTMP": ctd_tmp,
-        "SA": ctd_SA,
-        "CTDOXYVOLTS": ctd_oxyvolts,
-        "CTDTIME": ctd_time,
-    })
+    btl_data = pd.DataFrame(
+        data={
+            "CTDPRS": btl_prs,
+            "REFOXY": btl_oxy,
+            "CTDTMP": btl_tmp,
+            "SA": btl_SA,
+        }
+    )
+    time_data = pd.DataFrame(
+        data={
+            "CTDPRS": ctd_prs,
+            "OS": ctd_os,
+            "CTDTMP": ctd_tmp,
+            "SA": ctd_SA,
+            "CTDOXYVOLTS": ctd_oxyvolts,
+            "CTDTIME": ctd_time,
+        }
+    )
     time_data["dv_dt"] = calculate_dV_dt(time_data["CTDOXYVOLTS"], time_data["CTDTIME"])
 
     # Merge DF
@@ -501,7 +526,7 @@ def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ct
                 p_ref,
             )
             - 1000  # subtract 1000 to get potential density *anomaly*
-        ) + 1e-8*np.random.standard_normal(btl_data["SA"].size)
+        ) + 1e-8 * np.random.standard_normal(btl_data["SA"].size)
         time_data[f"sigma{idx}"] = (
             gsw.pot_rho_t_exact(
                 time_data["SA"],
@@ -510,11 +535,17 @@ def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ct
                 p_ref,
             )
             - 1000  # subtract 1000 to get potential density *anomaly*
-        ) + 1e-8*np.random.standard_normal(time_data["SA"].size)
-        rows = (btl_data["CTDPRS"] > (p_ref - 500)) & (btl_data["CTDPRS"] < (p_ref + 500))
+        ) + 1e-8 * np.random.standard_normal(time_data["SA"].size)
+        rows = (btl_data["CTDPRS"] > (p_ref - 500)) & (
+            btl_data["CTDPRS"] < (p_ref + 500)
+        )
         time_sigma_sorted = time_data[f"sigma{idx}"].sort_values().to_numpy()
-        sigma_min = np.min([np.min(btl_data.loc[rows, f"sigma{idx}"]), np.min(time_sigma_sorted)])
-        sigma_max = np.max([np.max(btl_data.loc[rows, f"sigma{idx}"]), np.max(time_sigma_sorted)])
+        sigma_min = np.min(
+            [np.min(btl_data.loc[rows, f"sigma{idx}"]), np.min(time_sigma_sorted)]
+        )
+        sigma_max = np.max(
+            [np.max(btl_data.loc[rows, f"sigma{idx}"]), np.max(time_sigma_sorted)]
+        )
         time_sigma_sorted = np.insert(time_sigma_sorted, 0, sigma_min - 1e-4)
         time_sigma_sorted = np.append(time_sigma_sorted, sigma_max + 1e-4)
         # TODO: can this be vectorized?
@@ -528,8 +559,17 @@ def match_sigmas(btl_prs, btl_oxy, btl_tmp, btl_SA, ctd_os, ctd_prs, ctd_tmp, ct
             )
 
     # Apply coef and calculate CTDOXY
-    sbe_coef0 = _get_sbe_coef() # initial coefficient guess
-    merged_df['CTDOXY'] = _PMEL_oxy_eq(sbe_coef0, (merged_df['CTDOXYVOLTS'], merged_df['CTDPRS'], merged_df['CTDTMP'], merged_df['dv_dt'], merged_df['OS']))
+    sbe_coef0 = _get_sbe_coef()  # initial coefficient guess
+    merged_df["CTDOXY"] = _PMEL_oxy_eq(
+        sbe_coef0,
+        (
+            merged_df["CTDOXYVOLTS"],
+            merged_df["CTDPRS"],
+            merged_df["CTDTMP"],
+            merged_df["dv_dt"],
+            merged_df["OS"],
+        ),
+    )
 
     return merged_df
 
@@ -611,6 +651,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     df = pd.concat([merged_df, bad_df])
 
     return cfw_coefs, df
+
 
 def prepare_oxy(btl_df, time_df, ssscc_list):
     """
@@ -722,12 +763,12 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # Plot all pre fit data
     f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
-        btl_df['OXYGEN'] - btl_df['CTDOXY'],
+        btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
         btl_df["SSSCC"],
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
-        xlim=(-10,10)
+        xlim=(-10, 10),
     )
     # Prep vars, dfs, etc.
     all_sbe43_merged = pd.DataFrame()
@@ -757,7 +798,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             time_data["scan_datetime"],
         )
         sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
-        btl_df.loc[btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS","dv_dt","OS"]] = sbe43_merged[["CTDOXYVOLTS","dv_dt","OS"]]
+        btl_df.loc[
+            btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]
+        ] = sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
         sbe43_merged["SSSCC"] = ssscc
         all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
         print(ssscc + " density matching done")
@@ -826,12 +869,12 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # Plot all post fit data
     f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_postfit.pdf"
     ctd_plots._intermediate_residual_plot(
-        btl_df['OXYGEN'] - btl_df['CTDOXY'],
+        btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
         btl_df["SSSCC"],
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
-        xlim=(-10,10)
+        xlim=(-10, 10),
     )
 
     # export fitting coefs
@@ -839,5 +882,5 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
     )
     sbe43_coefs.to_csv(cfg.directory["logs"] + "sbe43_coefs.csv")
-    
+
     return True

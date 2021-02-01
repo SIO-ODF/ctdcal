@@ -3,32 +3,36 @@ import argparse
 import os
 import sys
 
-import ctdcal.process_bottle as btl
 import pandas as pd
 
-#File extension to use for output files (csv-formatted)
-FILE_EXT = 'csv'
-EXT_PKL = 'pkl'
+import ctdcal.process_bottle as btl
 
-#File extension to use for converted output
-CONVERTED_SUFFIX = '_cnv'
+# File extension to use for output files (csv-formatted)
+FILE_EXT = "csv"
+EXT_PKL = "pkl"
 
-#File extension to use for processed output
-BOTTLE_SUFFIX = '_btl'
-MEAN_SUFFIX = '_mean'
-MEDIAN_SUFFIX = '_median'
+# File extension to use for converted output
+CONVERTED_SUFFIX = "_cnv"
 
-#Column name for the bottle fire number
-BOTTLE_FIRE_NUM_COL = 'btl_fire_num'
+# File extension to use for processed output
+BOTTLE_SUFFIX = "_btl"
+MEAN_SUFFIX = "_mean"
+MEDIAN_SUFFIX = "_median"
+
+# Column name for the bottle fire number
+BOTTLE_FIRE_NUM_COL = "btl_fire_num"
 
 DEBUG = False
+
 
 def debugPrint(*args, **kwargs):
     if DEBUG:
         errPrint(*args, **kwargs)
 
+
 def errPrint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
+
 
 # -------------------------------------------------------------------------------------
 # Main function of the script should it be run as a stand-alone utility.
@@ -36,14 +40,22 @@ def errPrint(*args, **kwargs):
 def main(argv):
     # MK: depreciated 04/27/20, use ctdcal.convert.make_btl_mean instead
 
-    parser = argparse.ArgumentParser(description='Process bottle fire data from a converted, csv-formatted text file')
-    parser.add_argument('cnv_file', metavar='cnv_file', help='the converted data file to process')
+    parser = argparse.ArgumentParser(
+        description="Process bottle fire data from a converted, csv-formatted text file"
+    )
+    parser.add_argument(
+        "cnv_file", metavar="cnv_file", help="the converted data file to process"
+    )
 
     # debug messages
-    parser.add_argument('-d', '--debug', action='store_true', help='display debug messages')
+    parser.add_argument(
+        "-d", "--debug", action="store_true", help="display debug messages"
+    )
 
     # output directory
-    parser.add_argument('-o', metavar='dest_dir', dest='outDir', help='location to save output files')
+    parser.add_argument(
+        "-o", metavar="dest_dir", dest="outDir", help="location to save output files"
+    )
 
     args = parser.parse_args()
     if args.debug:
@@ -53,30 +65,30 @@ def main(argv):
 
     # Verify converted exists
     if not os.path.isfile(args.cnv_file):
-        errPrint('ERROR: Input converted file:', args.cnv_file, 'not found\n')
+        errPrint("ERROR: Input converted file:", args.cnv_file, "not found\n")
         sys.exit(1)
 
     # Set the default output directory to be the same directory as the hex file
     outputDir = os.path.dirname(args.cnv_file)
 
     # Used later for building output file names
-    filename_ext = os.path.basename(args.cnv_file) # original filename with ext
-    filename_base = os.path.splitext(filename_ext)[0] # original filename w/o ext
+    filename_ext = os.path.basename(args.cnv_file)  # original filename with ext
+    filename_base = os.path.splitext(filename_ext)[0]  # original filename w/o ext
 
     # Verify Output Directory exists
     if args.outDir:
         if os.path.isdir(args.outDir):
             outputDir = args.outDir
         else:
-            errPrint('ERROR: Output directory:', args.outDir, 'is unreachable.\n')
+            errPrint("ERROR: Output directory:", args.outDir, "is unreachable.\n")
             sys.exit(1)
 
-    debugPrint("Import converted data to dataframe... ", end='')
+    debugPrint("Import converted data to dataframe... ", end="")
     imported_df = pd.read_pickle(args.cnv_file)
     debugPrint("Success!")
 
     debugPrint(imported_df.head())
-    #debugPrint(imported_df.dtypes)
+    # debugPrint(imported_df.dtypes)
 
     # Retrieve the rows from the imported dataframe where the btl_fire_bool column == True
     # Returns a new dataframe
@@ -91,8 +103,10 @@ def main(argv):
         bottle_num = 1
 
         while bottle_num <= total_bottles_fired:
-            debugPrint('Bottle:', bottle_num)
-            debugPrint(bottle_df.loc[bottle_df[BOTTLE_FIRE_NUM_COL] == bottle_num].head())
+            debugPrint("Bottle:", bottle_num)
+            debugPrint(
+                bottle_df.loc[bottle_df[BOTTLE_FIRE_NUM_COL] == bottle_num].head()
+            )
             bottle_num += 1
 
     # # Build the filename for the bottle fire data
@@ -110,15 +124,21 @@ def main(argv):
 
     # Build the filename for the bottle fire mean data
     # meanfileName  = filename_base.replace(CONVERTED_SUFFIX,'') + BOTTLE_SUFFIX + MEAN_SUFFIX + '.' + FILE_EXT
-    meanfileName  = filename_base.replace(CONVERTED_SUFFIX,'') + BOTTLE_SUFFIX + MEAN_SUFFIX + '.' + EXT_PKL
+    meanfileName = (
+        filename_base.replace(CONVERTED_SUFFIX, "")
+        + BOTTLE_SUFFIX
+        + MEAN_SUFFIX
+        + "."
+        + EXT_PKL
+    )
     meanfilePath = os.path.join(outputDir, meanfileName)
 
     # Save the bottle fire mean dataframe to file.
-    debugPrint('Saving mean data to:', meanfilePath + '... ', end='')
+    debugPrint("Saving mean data to:", meanfilePath + "... ", end="")
     if not mean_df.to_pickle(meanfilePath):
-        errPrint('ERROR: Could not save mean fire data to file')
+        errPrint("ERROR: Could not save mean fire data to file")
     else:
-        debugPrint('Success!')
+        debugPrint("Success!")
 
     #### Statistical analysis later to see if mean or median is better for values
 
@@ -139,5 +159,5 @@ def main(argv):
 # -------------------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility
 # -------------------------------------------------------------------------------------
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(sys.argv[1:])

@@ -86,8 +86,7 @@ def process_all():
 
 
 def main(argv):
-    """Run everything.
-    """
+    """Run everything."""
     process_all()
 
 

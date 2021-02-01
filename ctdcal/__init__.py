@@ -4,9 +4,8 @@ data, and similar data types such as ARGO and moored CTD
 sensors.
 """
 
+from . import *
 from ._version import get_versions
 
-__version__ = get_versions()['version']
+__version__ = get_versions()["version"]
 del get_versions
-
-from . import *

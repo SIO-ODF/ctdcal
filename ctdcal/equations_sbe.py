@@ -8,6 +8,7 @@ not via an official document, and may change according to SBE wishes.
 
 import gsw
 import numpy as np
+
 from ctdcal.oxy_fitting import oxy_umolkg_to_ml
 
 

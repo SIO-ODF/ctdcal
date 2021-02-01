@@ -4,10 +4,11 @@ import sys
 from collections import OrderedDict
 from pathlib import Path
 
-import config as cfg
 import gsw
 import numpy as np
 import pandas as pd
+
+import config as cfg
 
 
 def _salt_loader(ssscc, salt_dir):
@@ -73,7 +74,9 @@ def remove_autosal_drift(saltDF, refDF):
     return saltDF
 
 
-def _salt_exporter(saltDF, outdir=cfg.directory["salt"], stn_col="STNNBR", cast_col="CASTNO"):
+def _salt_exporter(
+    saltDF, outdir=cfg.directory["salt"], stn_col="STNNBR", cast_col="CASTNO"
+):
     """
     Export salt DataFrame to .csv file. Extra logic is included in the event that
     multiple stations and/or casts are included in a single raw salt file.

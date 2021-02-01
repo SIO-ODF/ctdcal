@@ -1,20 +1,20 @@
 #!/usr/bin/env python
 from pathlib import Path
 
-import config as cfg
 import gsw
 import numpy as np
 import pandas as pd
 import scipy
 from scipy.ndimage.interpolation import shift
 
+import config as cfg
 import ctdcal.convert as convert
 import ctdcal.ctd_plots as ctd_plots
 import ctdcal.flagging as flagging
 import ctdcal.process_ctd as process_ctd
 
 
-def _conductivity_polyfit(cond,temp,press,coef):
+def _conductivity_polyfit(cond, temp, press, coef):
 
     fitted_cond = cond + (
         coef[0] * (press ** 2)
@@ -30,7 +30,7 @@ def _conductivity_polyfit(cond,temp,press,coef):
     return fitted_cond
 
 
-def cell_therm_mass_corr(temp, cond, sample_int=1/24, alpha=0.03, beta=1/7):
+def cell_therm_mass_corr(temp, cond, sample_int=1 / 24, alpha=0.03, beta=1 / 7):
     """Correct conductivity signal for effects of cell thermal mass.
 
     Parameters
@@ -77,7 +77,11 @@ def cell_therm_mass_corr(temp, cond, sample_int=1/24, alpha=0.03, beta=1/7):
 
 
 def _flag_btl_data(
-    df, param=None, ref=None, thresh=[0.002, 0.005, 0.010, 0.020], f_out=None,
+    df,
+    param=None,
+    ref=None,
+    thresh=[0.002, 0.005, 0.010, 0.020],
+    f_out=None,
 ):
     """
     Flag CTD "btl" data against reference measurement (e.g. SBE35, bottle salts).
@@ -168,8 +172,8 @@ def _prepare_fit_data(df, param, ref_param, zRange=None):
     return df_good, df_bad
 
 
-def _temperature_polyfit(temp,press,coef):
-    
+def _temperature_polyfit(temp, press, coef):
+
     fitted_temp = (
         temp
         + coef[0] * (press ** 2)
@@ -178,7 +182,7 @@ def _temperature_polyfit(temp,press,coef):
         + coef[3] * temp
         + coef[4]
     )
-    
+
     return fitted_temp.round(4)
 
 
@@ -187,7 +191,6 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None)
     if T_col is None:
         print("Parameter invalid, specify what temp sensor is being calibrated")
         return
-    P_col = cfg.column["p_btl"]
 
     # remove non-finite data and extreme outliers and trim to fit zRange
     df_good, df_bad = _prepare_fit_data(df, T_col, cfg.column["reft"], zRange)
@@ -253,7 +256,7 @@ def calibrate_temp(btl_df, time_df):
 
     """
     print("Calibrating temperature")
-    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob('ssscc_t*.csv'))
+    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_t*.csv"))
     if not ssscc_subsets:  # if no t-segments exists, write one from full list
         print("No CTDTMP grouping file found... creating ssscc_t1.csv with all casts")
         if not Path(cfg.directory["ssscc"]).exists():
@@ -367,8 +370,7 @@ def calibrate_temp(btl_df, time_df):
 
     # one more fig with all cuts
     ctd_plots._intermediate_residual_plot(
-        btl_df[cfg.column["reft"]]
-        - btl_df[cfg.column["t1_btl"]],
+        btl_df[cfg.column["reft"]] - btl_df[cfg.column["t1_btl"]],
         btl_df[cfg.column["p_btl"]],
         btl_df["SSSCC"],
         xlabel="T1 Residual (T90 C)",
@@ -376,8 +378,7 @@ def calibrate_temp(btl_df, time_df):
         f_out=f"{cfg.directory['t1_fit_figs']}residual_all_postfit.pdf",
     )
     ctd_plots._intermediate_residual_plot(
-        btl_df[cfg.column["reft"]]
-        - btl_df[cfg.column["t2_btl"]],
+        btl_df[cfg.column["reft"]] - btl_df[cfg.column["t2_btl"]],
         btl_df[cfg.column["p_btl"]],
         btl_df["SSSCC"],
         xlabel="T2 Residual (T90 C)",
@@ -387,7 +388,8 @@ def calibrate_temp(btl_df, time_df):
 
     # export temp quality flags
     qual_flag_t1.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_t1.csv", index=False,
+        cfg.directory["logs"] + "qual_flag_t1.csv",
+        index=False,
     )
     qual_flag_t2.sort_index().to_csv(
         cfg.directory["logs"] + "qual_flag_t2.csv", index=False
@@ -415,7 +417,6 @@ def _get_C_coefs(
         T_col = cfg.column["t1_btl"]
     elif C_col == cfg.column["c2_btl"]:
         T_col = cfg.column["t2_btl"]
-    P_col = cfg.column["p_btl"]
 
     df = df.reset_index().copy()
     # remove non-finite data and extreme outliers and trim to fit zRange
@@ -509,9 +510,7 @@ def calibrate_cond(btl_df, time_df):
         handcoded_salts = handcoded_salts.rename(
             columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
         ).drop(columns=["diff", "Comments"])
-        btl_df = btl_df.merge(
-            handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left"
-        )
+        btl_df = btl_df.merge(handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left")
         # TODO: may be easier to try using flagging._merge_flags()?
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
             btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
@@ -519,7 +518,7 @@ def calibrate_cond(btl_df, time_df):
     else:
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
 
-    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob('ssscc_c*.csv'))
+    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_c*.csv"))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
         print("No CTDCOND grouping file found... creating ssscc_c1.csv with all casts")
         ssscc_list = process_ctd.get_ssscc_list()
@@ -639,8 +638,7 @@ def calibrate_cond(btl_df, time_df):
 
     # one more fig with all cuts
     ctd_plots._intermediate_residual_plot(
-        btl_df[cfg.column["refc"]]
-        - btl_df[cfg.column["c1_btl"]],
+        btl_df[cfg.column["refc"]] - btl_df[cfg.column["c1_btl"]],
         btl_df[cfg.column["p_btl"]],
         btl_df["SSSCC"],
         xlabel="C1 Residual (mS/cm)",
@@ -648,8 +646,7 @@ def calibrate_cond(btl_df, time_df):
         f_out=f"{cfg.directory['c1_fit_figs']}residual_all_postfit.pdf",
     )
     ctd_plots._intermediate_residual_plot(
-        btl_df[cfg.column["refc"]]
-        - btl_df[cfg.column["c2_btl"]],
+        btl_df[cfg.column["refc"]] - btl_df[cfg.column["c2_btl"]],
         btl_df[cfg.column["p_btl"]],
         btl_df["SSSCC"],
         xlabel="C2 Residual (mS/cm)",
@@ -659,10 +656,12 @@ def calibrate_cond(btl_df, time_df):
 
     # export cond quality flags
     qual_flag_c1.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_c1.csv", index=False,
+        cfg.directory["logs"] + "qual_flag_c1.csv",
+        index=False,
     )
     qual_flag_c2.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_c2.csv", index=False,
+        cfg.directory["logs"] + "qual_flag_c2.csv",
+        index=False,
     )
 
     # export cond fit params
@@ -685,7 +684,9 @@ def calibrate_cond(btl_df, time_df):
     # TODO: flag time using handcoded salts somehow? discrete vs continuous
     time_df[cfg.column["sal"] + "_FLAG_W"] = 2
     btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.by_residual(
-        btl_df[cfg.column["sal"]], btl_df["SALNTY"], btl_df[cfg.column["p"]],
+        btl_df[cfg.column["sal"]],
+        btl_df["SALNTY"],
+        btl_df[cfg.column["p"]],
     )
 
     return btl_df, time_df

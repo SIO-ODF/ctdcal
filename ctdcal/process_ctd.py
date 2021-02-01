@@ -6,17 +6,18 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 
-import config as cfg
 import gsw
 import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
+import config as cfg
 import ctdcal.flagging as flagging
 import ctdcal.oxy_fitting as oxy_fitting
 import ctdcal.report_ctd as report_ctd
 
-warnings.filterwarnings("ignore", 'Mean of empty slice.')
+warnings.filterwarnings("ignore", "Mean of empty slice.")
+
 
 def cast_details(df, ssscc, log_file=None):
     """
@@ -78,7 +79,7 @@ def cast_details(df, ssscc, log_file=None):
     )
 
     # remove upcast
-    df_downcast = df_cast[: p_max_ind].copy()
+    df_downcast = df_cast[:p_max_ind].copy()
 
     return df_downcast
 
@@ -104,7 +105,9 @@ def _trim_soak_period(df=None):
     return df_trimmed
 
 
-def _find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50):
+def _find_last_soak_period(
+    df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50
+):
     """Find the soak period before the downcast starts.
 
     The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
@@ -143,56 +146,70 @@ def _find_last_soak_period(df_cast, surface_pressure=2, time_bin=8, downcast_pre
         * A cast where there are multiple stops on the downcast to the target depth
 
     """
-    #Validate user input
+    # Validate user input
     if time_bin <= 0:
-        raise ValueError('Time bin value should be positive whole seconds.')
-    if downcast_pressure <=0:
-        raise ValueError('Starting downcast pressure threshold must be positive integers.')
+        raise ValueError("Time bin value should be positive whole seconds.")
+    if downcast_pressure <= 0:
+        raise ValueError(
+            "Starting downcast pressure threshold must be positive integers."
+        )
     if downcast_pressure < surface_pressure:
-        raise ValueError(f'Starting downcast pressure threshold must be greater \
-                        than surface pressure threshold.')
+        raise ValueError(
+            "Starting downcast pressure threshold must be greater \
+                        than surface pressure threshold."
+        )
 
     # If pumps have not turned on until in water, return DataFrame
-    if df_cast.iloc[0]['CTDPRS'] > surface_pressure:
+    if df_cast.iloc[0]["CTDPRS"] > surface_pressure:
         return df_cast
 
-    '''code_pruning: variables should always have relevant names, even if it needs to be changed later with find/replace'''
-    #Bin the data by time, and compute the average rate of descent
-    df_blah = df_cast.loc[:,:]
-    df_blah['index'] = df_blah.index
-    df_blah['bin'] = pd.cut(df_blah.loc[:,'index'],
-                            range(df_blah.iloc[0]['index'],df_blah.iloc[-1]['index'],time_bin*24),
-                            labels=False, include_lowest=True)
-    df_blah2 = df_blah.groupby('bin').mean()
+    """code_pruning: variables should always have relevant names, even if it needs to be changed later with find/replace"""
+    # Bin the data by time, and compute the average rate of descent
+    df_blah = df_cast.loc[:, :]
+    df_blah["index"] = df_blah.index
+    df_blah["bin"] = pd.cut(
+        df_blah.loc[:, "index"],
+        range(df_blah.iloc[0]["index"], df_blah.iloc[-1]["index"], time_bin * 24),
+        labels=False,
+        include_lowest=True,
+    )
+    df_blah2 = df_blah.groupby("bin").mean()
 
-    #Compute difference of descent rates and label bins
-    df_blah2['prs_diff'] = df_blah2['CTDPRS'].diff().fillna(0).round(0)
-    df_blah2['movement'] = pd.cut(df_blah2['prs_diff'], [-1000,-0.5,0.5,1000], labels=['up','stop','down'])
+    # Compute difference of descent rates and label bins
+    df_blah2["prs_diff"] = df_blah2["CTDPRS"].diff().fillna(0).round(0)
+    df_blah2["movement"] = pd.cut(
+        df_blah2["prs_diff"], [-1000, -0.5, 0.5, 1000], labels=["up", "stop", "down"]
+    )
 
-    #Find all periods where the rosette is not moving
-    df_stop = df_blah2.groupby('movement').get_group('stop')
-    groupby_test = df_blah2.groupby(df_blah2['movement'].ne(df_blah2['movement'].shift()).cumsum())
-    list_test = [g for i,g in groupby_test]
+    # Find all periods where the rosette is not moving
+    # df_stop = df_blah2.groupby("movement").get_group("stop")
+    groupby_test = df_blah2.groupby(
+        df_blah2["movement"].ne(df_blah2["movement"].shift()).cumsum()
+    )
+    list_test = [g for i, g in groupby_test]
 
-    #Find a dataframe index of the last soak period before starting descent
+    # Find a dataframe index of the last soak period before starting descent
     def poop(list_obj, downcast_pressure):
-        """ Return dataframe index in the last soak period before starting
-            descent to target depth.
+        """Return dataframe index in the last soak period before starting
+        descent to target depth.
         """
-        for i, x in zip(range(len(list_test)),list_test):
-            if x['CTDPRS'].max() < downcast_pressure:
-                if x.max()['movement'] == 'stop':
+        for i, x in zip(range(len(list_test)), list_test):
+            if x["CTDPRS"].max() < downcast_pressure:
+                if x.max()["movement"] == "stop":
                     index = i
-            if x['CTDPRS'].max() > downcast_pressure:
+            if x["CTDPRS"].max() > downcast_pressure:
                 return index
         return index
 
-    #Truncate dataframe to new starting index : end of dataframe
-    start_index = np.around(list_test[poop(list_test, downcast_pressure)].head(1)['index'])
-    df_cast = df_cast.set_index('index')
-    df_cast = df_cast.loc[int(start_index):,:]
+    # Truncate dataframe to new starting index : end of dataframe
+    start_index = np.around(
+        list_test[poop(list_test, downcast_pressure)].head(1)["index"]
+    )
+    df_cast = df_cast.set_index("index")
+    df_cast = df_cast.loc[int(start_index) :, :]
     df_cast_ret = df_cast.reset_index()
     return df_cast_ret
+
 
 def ctd_align(inMat=None, col=None, time=0.0):
     """ctd_align function
@@ -217,13 +234,13 @@ def ctd_align(inMat=None, col=None, time=0.0):
     # Num of frames per second.
     fl = 24
 
-    if (inMat is not None) & (col is not None) & ( time > 0.0):
+    if (inMat is not None) & (col is not None) & (time > 0.0):
         # Time to advance
         advnc = int(fl * time)
         tmp = np.arange(advnc, dtype=np.float)
-        last = inMat[col][len(inMat)-1]
+        last = inMat[col][len(inMat) - 1]
         tmp.fill(float(last))
-        inMat[col] = np.concatenate((inMat[col][advnc:],tmp))
+        inMat[col] = np.concatenate((inMat[col][advnc:], tmp))
 
     return inMat
 
@@ -287,16 +304,14 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     # TODO: move these to config file
     # Frequency
     fl = 24
-    fl2 = fl*2
-    # One minute
-    mt = 60
+    fl2 = fl * 2
     # Half minute
     ms = 30
-    time_delay = fl*ms
+    time_delay = fl * ms
 
     # split dataframe into upcast/downcast
-    downcast = df.iloc[:(df["CTDPRS"].argmax() + 1)]
-    upcast = df.iloc[(df["CTDPRS"].argmax() + 1):]
+    downcast = df.iloc[: (df["CTDPRS"].argmax() + 1)]
+    upcast = df.iloc[(df["CTDPRS"].argmax() + 1) :]
 
     # Search each half of df for minimum conductivity
     # threshold to identify when rosette is out of water
@@ -313,13 +328,13 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
 
     # Evaluate starting and ending pressures
     start_samples = len(start_df)
-    if (start_samples > time_delay):
-        start_p = np.average(start_df.iloc[fl2:(start_samples - time_delay)])
+    if start_samples > time_delay:
+        start_p = np.average(start_df.iloc[fl2 : (start_samples - time_delay)])
     else:
         start_p = np.average(start_df.iloc[fl2:start_samples])
 
     end_samples = len(end_df)
-    if (end_samples > time_delay):
+    if end_samples > time_delay:
         end_p = np.average(end_df.iloc[(time_delay):])
     else:
         try:
@@ -328,7 +343,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
             end_p = np.NaN
 
     # Remove ondeck start and end pressures
-    trimmed_df = df.iloc[start_df.index.max():end_df.index.min()].copy()
+    trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
 
     # Log ondeck pressures
     if log_file is not None:
@@ -356,9 +371,9 @@ def roll_filter(df, p_col="CTDPRS", direction="down"):
         var description
 
     """
-    if direction == 'down':
+    if direction == "down":
         monotonic_sequence = df[p_col].expanding().max()
-    elif direction == 'up':
+    elif direction == "up":
         monotonic_sequence = df[p_col].expanding().min()
     else:
         raise ValueError("direction must be one of (up, down)")
@@ -366,7 +381,7 @@ def roll_filter(df, p_col="CTDPRS", direction="down"):
     return df[df[p_col] == monotonic_sequence]
 
 
-def pressure_sequence(df, p_col='CTDPRS', direction='down'):
+def pressure_sequence(df, p_col="CTDPRS", direction="down"):
     """
     Convert CTD time series to a pressure series.
 
@@ -524,16 +539,18 @@ def process_reft(ssscc_list, reft_dir=cfg.directory["reft"]):
                 print("refT file for cast " + ssscc + " does not exist... skipping")
                 return
 
+
 def _load_reft_data(reft_file, index_name="btl_fire_num"):
     """
     Loads reft_file to dataframe and reindexes to match bottle data dataframe
     """
     reft_data = pd.read_csv(reft_file, usecols=["btl_fire_num", "T90", "REFTMP_FLAG_W"])
     reft_data.set_index(index_name)
-    reft_data['SSSCC_TEMP'] = Path(reft_file).stem.split("_")[0]
-    reft_data['REFTMP'] = reft_data['T90']
+    reft_data["SSSCC_TEMP"] = Path(reft_file).stem.split("_")[0]
+    reft_data["REFTMP"] = reft_data["T90"]
 
     return reft_data
+
 
 def _load_salt_data(salt_file, index_name="SAMPNO"):
     """
@@ -549,7 +566,6 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
     return salt_data
 
 
-
 def _load_btl_data(btl_file, cols=None):
     """
     Loads "bottle mean" CTD data from .pkl file. Function will return all data unless
@@ -557,7 +573,7 @@ def _load_btl_data(btl_file, cols=None):
     """
 
     btl_data = pd.read_pickle(btl_file)
-    if cols != None:
+    if cols is not None:
         btl_data = btl_data[cols]
     btl_data["SSSCC"] = Path(btl_file).stem.split("_")[0]
 
@@ -587,16 +603,16 @@ def _get_pressure_offset(start_vals, end_vals):
     p_end = p_end[p_end.notnull()]
     p_off = p_start.mean() - p_end.mean()
 
-# JACKSON THINKS THIS METHOD SHOULD BE USED TO KEEP START END PAIRS
-#    p_df = pd.DataFrame()
-#    p_df['p_start'] = p_start
-#    p_df['p_end'] = p_end
-#    p_df = p_df[p_df['p_end'].notnull()]
-#    p_df = p_df[p_df['p_start'].notnull()]
-#    p_off = p_df['p_start'].mean() - p_df['p_end'].mean()
-##########################################################
+    # JACKSON THINKS THIS METHOD SHOULD BE USED TO KEEP START END PAIRS
+    #    p_df = pd.DataFrame()
+    #    p_df['p_start'] = p_start
+    #    p_df['p_end'] = p_end
+    #    p_df = p_df[p_df['p_end'].notnull()]
+    #    p_df = p_df[p_df['p_start'].notnull()]
+    #    p_off = p_df['p_start'].mean() - p_df['p_end'].mean()
+    ##########################################################
 
-    p_off = np.around(p_off,decimals=4)
+    p_off = np.around(p_off, decimals=4)
 
     return p_off
 
@@ -620,7 +636,11 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
         DataFrame containing updated pressure values and a new flag column
 
     """
-    p_log = pd.read_csv(cfg.directory["logs"] + "ondeck_pressure.csv", dtype={"SSSCC":str}, na_values="Started in Water")
+    p_log = pd.read_csv(
+        cfg.directory["logs"] + "ondeck_pressure.csv",
+        dtype={"SSSCC": str},
+        na_values="Started in Water",
+    )
     p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p)
     df[p_col] += p_offset
     df[p_col + "_FLAG_W"] = 2
@@ -646,12 +666,14 @@ def make_depth_log(time_df, threshold=80):
     df = time_df[["SSSCC", "CTDPRS", "GPSLAT", "ALT"]].copy().reset_index()
     df_group = df.groupby("SSSCC", sort=False)
     idx_p_max = df_group["CTDPRS"].idxmax()
-    bottom_df = pd.DataFrame(data={
-        "SSSCC": df["SSSCC"].unique(),
-        "max_p": df.loc[idx_p_max, "CTDPRS"],
-        "lat": df.loc[idx_p_max, "GPSLAT"],
-        "alt": df.loc[idx_p_max, "ALT"],
-    })
+    bottom_df = pd.DataFrame(
+        data={
+            "SSSCC": df["SSSCC"].unique(),
+            "max_p": df.loc[idx_p_max, "CTDPRS"],
+            "lat": df.loc[idx_p_max, "GPSLAT"],
+            "alt": df.loc[idx_p_max, "ALT"],
+        }
+    )
     bottom_df.loc[bottom_df["alt"] > threshold, "alt"] = np.nan
     bottom_df["DEPTH"] = (
         (bottom_df["alt"] + np.abs(gsw.z_from_p(bottom_df["max_p"], bottom_df["lat"])))
@@ -665,6 +687,7 @@ def make_depth_log(time_df, threshold=80):
 
     return True
 
+
 def get_ssscc_list():
     """
     Load in list of stations/casts to process.
@@ -675,10 +698,12 @@ def get_ssscc_list():
 
     return ssscc_list
 
+
 def load_hy_file(path_to_hyfile):
-    df = pd.read_csv(path_to_hyfile, comment='#', skiprows=[0])
-    df = df[df['EXPOCODE'] != 'END_DATA']
+    df = pd.read_csv(path_to_hyfile, comment="#", skiprows=[0])
+    df = df[df["EXPOCODE"] != "END_DATA"]
     return df
+
 
 def load_all_ctd_files(ssscc_list, series, cols=None):
     """
@@ -698,45 +723,59 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
     -------
     df_data_all : DataFrame
         Merged dataframe containing all loaded data
-    
+
     """
     df_data_all = pd.DataFrame()
 
-    if series == 'bottle':
+    if series == "bottle":
         for ssscc in ssscc_list:
-            print('Loading BTL data for station: ' + ssscc + '...')
-            btl_file = cfg.directory["bottle"] + ssscc + '_btl_mean.pkl'
-            btl_data = _load_btl_data(btl_file,cols)
+            print("Loading BTL data for station: " + ssscc + "...")
+            btl_file = cfg.directory["bottle"] + ssscc + "_btl_mean.pkl"
+            btl_data = _load_btl_data(btl_file, cols)
 
             ### load REFT data
-            reft_file = cfg.directory["reft"] + ssscc + '_reft.csv'
+            reft_file = cfg.directory["reft"] + ssscc + "_reft.csv"
             try:
                 reft_data = _load_reft_data(reft_file)
             except FileNotFoundError:
-                print('Missing (or misnamed) REFT Data Station: ' + ssscc + '...filling with NaNs')
-                reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
+                print(
+                    "Missing (or misnamed) REFT Data Station: "
+                    + ssscc
+                    + "...filling with NaNs"
+                )
+                reft_data = pd.DataFrame(
+                    index=btl_data.index, columns=["T90"], dtype=float
+                )
                 reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
                 reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
             ### load REFC data
-            refc_file = cfg.directory["salt"] + ssscc + '_salts.csv'
+            refc_file = cfg.directory["salt"] + ssscc + "_salts.csv"
             try:
-                refc_data = _load_salt_data(refc_file, index_name='SAMPNO')
+                refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
             except FileNotFoundError:
-                print('Missing (or misnamed) REFC Data Station: ' + ssscc + '...filling with NaNs')
+                print(
+                    "Missing (or misnamed) REFC Data Station: "
+                    + ssscc
+                    + "...filling with NaNs"
+                )
                 refc_data = pd.DataFrame(
                     index=btl_data.index,
                     columns=["CRavg", "BathTEMP", "BTLCOND"],
                     dtype=float,
                 )
-                refc_data['SAMPNO_SALT'] = btl_data['btl_fire_num'].astype(int)
+                refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
             ### load OXY data
             oxy_file = cfg.directory["oxy"] + ssscc
             try:
                 oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
             except FileNotFoundError:
-                print('Missing (or misnamed) REFO Data Station: ' + ssscc + '...filling with NaNs')
+                print(
+                    "Missing (or misnamed) REFO Data Station: "
+                    + ssscc
+                    + "...filling with NaNs"
+                )
                 oxy_data = pd.DataFrame(
                     index=btl_data.index,
                     columns=[
@@ -751,64 +790,87 @@ def load_all_ctd_files(ssscc_list, series, cols=None):
                 )
                 oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
                 oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
-                oxy_data['BOTTLENO_OXY'] = btl_data['btl_fire_num'].astype(int)
+                oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
 
             ### clean up dataframe
             # Horizontally concat DFs to have all data in one DF
-            btl_data = pd.merge(btl_data,reft_data,on='btl_fire_num',how='outer')
-            btl_data = pd.merge(btl_data,refc_data,left_on='btl_fire_num',right_on='SAMPNO_SALT',how='outer')
-            btl_data = pd.merge(btl_data,oxy_data,left_on='btl_fire_num',right_on='BOTTLENO_OXY',how='outer')
+            btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
+            btl_data = pd.merge(
+                btl_data,
+                refc_data,
+                left_on="btl_fire_num",
+                right_on="SAMPNO_SALT",
+                how="outer",
+            )
+            btl_data = pd.merge(
+                btl_data,
+                oxy_data,
+                left_on="btl_fire_num",
+                right_on="BOTTLENO_OXY",
+                how="outer",
+            )
 
             if len(btl_data) > 36:
-                print("***** Len of btl data for station: ",ssscc,' is > 36, check for multiple stations/casts in reference parameter files *****')
+                print(
+                    "***** Len of btl data for station: ",
+                    ssscc,
+                    " is > 36, check for multiple stations/casts in reference parameter files *****",
+                )
 
             # Add bottom of cast information (date,time,lat,lon,etc.)
             btl_data = _add_btl_bottom_data(btl_data, ssscc)
 
             # Merge cast into df_data_all
             try:
-                df_data_all = pd.concat([df_data_all,btl_data],sort=False)
+                df_data_all = pd.concat([df_data_all, btl_data], sort=False)
             except AssertionError:
-                raise AssertionError('Columns of ' + ssscc + ' do not match those of previous columns')
-            print('* Finished BTL data station: ' + ssscc + ' *')
+                raise AssertionError(
+                    "Columns of " + ssscc + " do not match those of previous columns"
+                )
+            print("* Finished BTL data station: " + ssscc + " *")
 
         # Drop duplicated columns generated by concatenation
-        df_data_all = df_data_all.loc[:,~df_data_all.columns.duplicated()]
-        
-    elif series == 'time':
+        df_data_all = df_data_all.loc[:, ~df_data_all.columns.duplicated()]
+
+    elif series == "time":
         df_data_all = []
         for ssscc in ssscc_list:
-            print('Loading TIME data for station: ' + ssscc + '...')
-            time_file = cfg.directory["time"] + ssscc + '_time.pkl'
+            print("Loading TIME data for station: " + ssscc + "...")
+            time_file = cfg.directory["time"] + ssscc + "_time.pkl"
             time_data = pd.read_pickle(time_file)
-            time_data['SSSCC'] = str(ssscc)
-            time_data['dv_dt'] = oxy_fitting.calculate_dV_dt(time_data['CTDOXYVOLTS'],time_data['scan_datetime'])
+            time_data["SSSCC"] = str(ssscc)
+            time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
+                time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
+            )
             df_data_all.append(time_data)
-            print('** Finished TIME data station: ' + ssscc + ' **')
+            print("** Finished TIME data station: " + ssscc + " **")
         df_data_all = pd.concat(df_data_all, axis=0, sort=False)
 
-    df_data_all['master_index'] = range(len(df_data_all))
+    df_data_all["master_index"] = range(len(df_data_all))
 
     return df_data_all
 
 
-def add_btlnbr_cols(df,btl_num_col):
-    df['BTLNBR'] = df[btl_num_col].astype(int)
+def add_btlnbr_cols(df, btl_num_col):
+    df["BTLNBR"] = df[btl_num_col].astype(int)
     # default to everything being good
-    df['BTLNBR_FLAG_W'] = 2
+    df["BTLNBR_FLAG_W"] = 2
     return df
 
-def _add_btl_bottom_data(df, cast, lat_col='LATITUDE', lon_col='LONGITUDE', decimals=4):
-    cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
-    cast_details = cast_details[cast_details["SSSCC"] == cast]
-    df[lat_col] = np.round(cast_details['latitude'].iat[0], decimals)
-    df[lon_col] = np.round(cast_details['longitude'].iat[0], decimals)
 
-    ts = pd.to_datetime(cast_details['bottom_time'].iat[0], unit="s")
-    date = ts.strftime('%Y%m%d')
-    hour= ts.strftime('%H%M')
-    df['DATE'] = date
-    df['TIME'] = hour
+def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
+    cast_details = pd.read_csv(
+        cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+    )
+    cast_details = cast_details[cast_details["SSSCC"] == cast]
+    df[lat_col] = np.round(cast_details["latitude"].iat[0], decimals)
+    df[lon_col] = np.round(cast_details["longitude"].iat[0], decimals)
+
+    ts = pd.to_datetime(cast_details["bottom_time"].iat[0], unit="s")
+    date = ts.strftime("%Y%m%d")
+    hour = ts.strftime("%H%M")
+    df["DATE"] = date
+    df["TIME"] = hour
     return df
 
 
@@ -842,7 +904,9 @@ def manual_backfill(df, p_cutoff, p_col="CTDPRS", flag_suffix="_FLAG_W"):
     return df.bfill()
 
 
-def _flag_backfill_data(df,p_col='CTDPRS',flag_bool_col='interp_bool',flag_suffix='_FLAG_W'):
+def _flag_backfill_data(
+    df, p_col="CTDPRS", flag_bool_col="interp_bool", flag_suffix="_FLAG_W"
+):
     """Flag data columns which have been interpolated with flag 6."""
     for col in df.columns:
         if flag_suffix in col:
@@ -850,11 +914,12 @@ def _flag_backfill_data(df,p_col='CTDPRS',flag_bool_col='interp_bool',flag_suffi
 
     return df
 
+
 def export_ct1(df, ssscc_list):
-    """ 
+    """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
-    
+
     Parameters
     ----------
     df : DataFrame
@@ -886,7 +951,8 @@ def export_ct1(df, ssscc_list):
 
     # check that all columns are there
     try:
-        df[p_column_names];  # this is lazy, do better
+        df[p_column_names]
+        # this is lazy, do better
     except KeyError as err:
         print("Column names not configured properly... attempting to correct")
         bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
@@ -899,43 +965,54 @@ def export_ct1(df, ssscc_list):
                 df[col] = -999
 
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
-    cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
-    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv', dtype={"SSSCC": str}, na_values=-999).dropna()
+    cast_details = pd.read_csv(
+        cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+    )
+    depth_df = pd.read_csv(
+        cfg.directory["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+    ).dropna()
     try:
-        manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv', dtype={"SSSCC": str})
+        manual_depth_df = pd.read_csv(
+            cfg.directory["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+        )
     except FileNotFoundError:
         # TODO: add logging; look into inheriting/extending a class to add features
         print("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
-        manual_depth_df.to_csv(cfg.directory["logs"] + 'manual_depth_log.csv', index=False)
-    full_depth_df = pd.concat([depth_df,manual_depth_df])
-    full_depth_df.drop_duplicates(subset='SSSCC', keep='first',inplace=True)
+        manual_depth_df.to_csv(
+            cfg.directory["logs"] + "manual_depth_log.csv", index=False
+        )
+    full_depth_df = pd.concat([depth_df, manual_depth_df])
+    full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
     for ssscc in ssscc_list:
 
-        time_data = df[df['SSSCC'] == ssscc].copy()
+        time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
         time_data = time_data[p_column_names]
         time_data = time_data.round(4)
-        time_data = time_data.where(~time_data.isnull(), -999)  #replace NaNs with -999
+        time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
         try:
-            depth = full_depth_df.loc[full_depth_df['SSSCC'] == ssscc,'DEPTH'].iloc[0]
+            depth = full_depth_df.loc[full_depth_df["SSSCC"] == ssscc, "DEPTH"].iloc[0]
         except IndexError:
             print(f"No depth logged for {ssscc}, setting to -999")  # TODO: logger
             depth = -999
 
         # get cast_details for current SSSCC
         cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("records")[0]
-        b_datetime = datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc).strftime('%Y%m%d %H%M').split(" ")
+        b_datetime = (
+            datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc)
+            .strftime("%Y%m%d %H%M")
+            .split(" ")
+        )
         # TODO: yo-yo casts are an edge case where this may be different
         btm_lat = cast_dict["latitude"]
         btm_lon = cast_dict["longitude"]
-        btm_alt = cast_dict["altimeter_bottom"]
 
         now = datetime.now(timezone.utc)
-        file_datetime = now.strftime("%Y%m%d") #%H:%M")
-        file_datetime = file_datetime + 'ODFSIO'
+        file_datetime = now.strftime("%Y%m%d")  # %H:%M")
+        file_datetime = file_datetime + "ODFSIO"
         # TODO: only "cast" needs to be int; "station" is explicitly allowed to incl.
         # letters/etc. Moving from SSSCC to station & cast fields will be beneficial
         with open(f"{cfg.directory['pressure']}{ssscc}_ct1.csv", "w+") as f:
@@ -956,15 +1033,15 @@ def export_ct1(df, ssscc_list):
                 f"DEPTH = {depth:.0f}\n"
             )
             f.write(ctd_header)
-            np.asarray(p_column_names).tofile(f, sep=',', format='%s')
-            f.write('\n')
-            np.asarray(p_column_units).tofile(f, sep=',', format='%s')
-            f.write('\n')
+            np.asarray(p_column_names).tofile(f, sep=",", format="%s")
+            f.write("\n")
+            np.asarray(p_column_units).tofile(f, sep=",", format="%s")
+            f.write("\n")
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")
 
 
-def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
+def export_btl_data(df, out_dir=cfg.directory["pressure"], org="ODF"):
 
     btl_data = df.copy()
     now = datetime.now()
@@ -1020,10 +1097,14 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
         btl_data[col] = btl_data[col].round(1)
 
     # add depth
-    depth_df = pd.read_csv(cfg.directory["logs"] + 'depth_log.csv', dtype={"SSSCC": str}, na_values=-999).dropna()
-    manual_depth_df = pd.read_csv(cfg.directory["logs"] + 'manual_depth_log.csv', dtype={"SSSCC": str})
-    full_depth_df = pd.concat([depth_df,manual_depth_df])
-    full_depth_df.drop_duplicates(subset='SSSCC', keep='first',inplace=True)
+    depth_df = pd.read_csv(
+        cfg.directory["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+    ).dropna()
+    manual_depth_df = pd.read_csv(
+        cfg.directory["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+    )
+    full_depth_df = pd.concat([depth_df, manual_depth_df])
+    full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
     btl_data["DEPTH"] = -999
     for index, row in full_depth_df.iterrows():
         btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
@@ -1039,7 +1120,8 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
 
     # check columns
     try:
-        btl_data[btl_columns.keys()];  # this is lazy, do better
+        btl_data[btl_columns.keys()]
+        # this is lazy, do better
     except KeyError as err:
         print("Column names not configured properly... attempting to correct")
         bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
