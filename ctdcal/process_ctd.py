@@ -883,24 +883,20 @@ def export_ct1(df, ssscc_list):
     df["CTDBACKSCATTER_FLAG_W"] = 1
     # renames
     df = df.rename(columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"})
+
     # check that all columns are there
-    # TODO: make this better...
-    # #should it fail and return list of bad cols or just use fill values?
-    breakpoint()
     try:
         df[p_column_names];  # this is lazy, do better
-    except KeyError:
+    except KeyError as err:
         print("Column names not configured properly... attempting to correct")
-        for col in p_column_names:
-            try:
-                df[col];
-            except KeyError:
-                if col.endswith("FLAG_W"):
-                    print(col + " missing, flagging with 9s")
-                    df[col] = 9
-                else:
-                    print(col + " missing, filling with -999s")
-                    df[col] = -999
+        bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
+        for col in bad_cols:
+            if col.endswith("FLAG_W"):
+                print(col + " missing, flagging with 9s")
+                df[col] = 9
+            else:
+                print(col + " missing, filling with -999s")
+                df[col] = -999
 
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str})
@@ -1003,7 +999,8 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
     }
 
     # rename
-    btl_data = btl_data.rename(columns={"CTDTMP2": "CTDTMP"})
+    # TODO: put in config file which line to use (primary vs. secondary)
+    btl_data = btl_data.rename(columns={"CTDTMP1": "CTDTMP"})
     btl_data["EXPOCODE"] = cfg.cruise["expocode"]
     btl_data["SECT_ID"] = cfg.cruise["sectionid"]
     btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
@@ -1043,18 +1040,16 @@ def export_btl_data(df, out_dir=cfg.directory["pressure"], org='ODF'):
     # check columns
     try:
         btl_data[btl_columns.keys()];  # this is lazy, do better
-    except KeyError:
+    except KeyError as err:
         print("Column names not configured properly... attempting to correct")
-        for col in btl_columns.keys():
-            try:
-                btl_data[col];
-            except KeyError:
-                if col.endswith("FLAG_W"):
-                    print(col + " missing, flagging with 9s")
-                    btl_data[col] = 9
-                else:
-                    print(col + " missing, filling with -999s")
-                    btl_data[col] = -999
+        bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
+        for col in bad_cols:
+            if col.endswith("FLAG_W"):
+                print(col + " missing, flagging with 9s")
+                btl_data[col] = 9
+            else:
+                print(col + " missing, filling with -999s")
+                btl_data[col] = -999
 
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org

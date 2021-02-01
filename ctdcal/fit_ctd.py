@@ -399,7 +399,7 @@ def calibrate_temp(btl_df, time_df):
 
     # flag temperature data
     # TODO: CTDTMP_FLAG_W historically not included in hy1 file... should it be?
-    time_df[cfg.column["t1"] + "_FLAG_W_"] = 2  # TODO: flag using REFTMP?
+    time_df["CTDTMP_FLAG_W"] = 2  # TODO: flag w/ REFT somehow? discrete vs continuous
 
     return True
 
