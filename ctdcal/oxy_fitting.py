@@ -686,7 +686,7 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     btl_df[cfg.column["oxy_btl"]] = oxy_ml_to_umolkg(
         btl_df[cfg.column["oxy_btl"]], btl_df["sigma_btl"]
     )
-    btl_df["OXYGEN_FLAG_W"] = flagging.flag_nan_values(btl_df[cfg.column["oxy_btl"]])
+    btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["oxy_btl"]])
     # Load manual OXYGEN flags
     if Path("data/oxygen/manual_oxy_flags.csv").exists():
         manual_flags = pd.read_csv(
@@ -817,7 +817,11 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         )
         print(ssscc + " time data fitting done")
 
-    # TODO: flag oxy data here? compare w/ T/C routines
+    # flag CTDOXY with more than 1% difference
+    time_df["CTDOXY_FLAG_W"] = 2  # TODO: actual flagging of some kind?
+    btl_df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(
+        btl_df["CTDOXY"], btl_df["OXYGEN"], percent_thresh=1
+    )
 
     # Plot all post fit data
     f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_postfit.pdf"

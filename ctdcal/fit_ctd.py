@@ -10,6 +10,7 @@ from scipy.ndimage.interpolation import shift
 
 import ctdcal.convert as convert
 import ctdcal.ctd_plots as ctd_plots
+import ctdcal.flagging as flagging
 import ctdcal.process_ctd as process_ctd
 
 
@@ -107,21 +108,14 @@ def _flag_btl_data(
 
     # Remove extreme outliers and code bad
     df = df.reset_index(drop=True)
-    df, df_bad = _wild_edit(
-        df[param], df[ref], df[prs], df["SSSCC"], df["btl_fire_num"]
-    )
+    df["Diff"] = df[ref] - df[param]
+    df["Flag"] = flagging.outliers(df["Diff"])
 
     # Find values that are above the threshold and code questionable
-    df.loc[(df[prs] > 2000) & (df["Diff"].abs() > thresh[0]), "Flag"] = 3
-    df.loc[
-        (df[prs] <= 2000) & (df[prs] > 1000) & (df["Diff"].abs() > thresh[1]), "Flag",
-    ] = 3
-    df.loc[
-        (df[prs] <= 1000) & (df[prs] > 500) & (df["Diff"].abs() > thresh[2]), "Flag"
-    ] = 3
-    df.loc[(df[prs] <= 500) & (df["Diff"].abs() > thresh[3]), "Flag"] = 3
+    df["Flag"] = flagging.by_residual(df[param], df[ref], df[prs], old_flags=df["Flag"])
     df_good = df[df["Flag"] == 2].copy()
     df_ques = df[df["Flag"] == 3].copy()
+    df_bad = df[df["Flag"] == 4].copy()
 
     if f_out is not None:
         if param == cfg.column["t1_btl"]:
@@ -158,34 +152,18 @@ def _prepare_fit_data(df, param, ref_param, zRange=None):
     """Remove non-finite data, trim to desired zRange, and remove extreme outliers"""
 
     good_data = df[np.isfinite(df[ref_param]) & np.isfinite(df[param])].copy()
+
     if zRange is not None:
         zMin, zMax = zRange.split(":")
         good_data = good_data[
             (good_data["CTDPRS"] > int(zMin)) & (good_data["CTDPRS"] < int(zMax))
         ]
-    df_good, df_bad = _wild_edit(
-        good_data[param],
-        good_data[ref_param],
-        good_data["CTDPRS"],
-        good_data["SSSCC"],
-        good_data["btl_fire_num"],
-        n_sigma=5,
-    )
 
-    return df_good, df_bad
+    good_data["Diff"] = good_data[ref_param] - good_data[param]
+    good_data["Flag"] = flagging.outliers(good_data["Diff"])
 
-
-def _wild_edit(param, ref_param, prs, ssscc, btl_num, n_sigma=10):
-    """Calculate residual then find extreme outliers and flag as bad (code 4)"""
-
-    diff = ref_param - param
-    df = pd.concat([ssscc, btl_num, param, ref_param, prs], axis=1)
-    df["Diff"] = ref_param - param
-    outliers = (df["Diff"] - df["Diff"].mean()).abs() > (n_sigma * df["Diff"].std())
-    df_good = df[~outliers].copy()
-    df_good["Flag"] = 2
-    df_bad = df[outliers].copy()
-    df_bad["Flag"] = 4
+    df_good = good_data[good_data["Flag"] == 2].copy()
+    df_bad = good_data[good_data["Flag"] == 4].copy()
 
     return df_good, df_bad
 
@@ -419,6 +397,10 @@ def calibrate_temp(btl_df, time_df):
     coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
     coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
 
+    # flag temperature data
+    # TODO: CTDTMP_FLAG_W historically not included in hy1 file... should it be?
+    time_df["CTDTMP_FLAG_W"] = 2  # TODO: flag w/ REFT somehow? discrete vs continuous
+
     return True
 
 
@@ -530,12 +512,12 @@ def calibrate_cond(btl_df, time_df):
         btl_df = btl_df.merge(
             handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left"
         )
-        btl_df.loc[btl_df["SALNTY"].isnull(), "SALNTY_FLAG_W"] = 9
-        btl_df["SALNTY_FLAG_W"] = btl_df["SALNTY_FLAG_W"].fillna(
-            2, downcast="infer"  # fill remaining NaNs with 2s and cast to dtype int
+        # TODO: may be easier to try using flagging._merge_flags()?
+        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
+            btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
         )
     else:
-        btl_df["SALNTY_FLAG_W"] = 2
+        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
 
     ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob('ssscc_c*.csv'))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
@@ -697,6 +679,13 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["c1_btl"]],
         btl_df[cfg.column["t1_btl"]],
         btl_df[cfg.column["p_btl"]],
+    )
+
+    # flag salinity data
+    # TODO: flag time using handcoded salts somehow? discrete vs continuous
+    time_df[cfg.column["sal"] + "_FLAG_W"] = 2
+    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.by_residual(
+        btl_df[cfg.column["sal"]], btl_df["SALNTY"], btl_df[cfg.column["p"]],
     )
 
     return btl_df, time_df
