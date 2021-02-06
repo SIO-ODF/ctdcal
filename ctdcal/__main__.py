@@ -17,9 +17,15 @@ def init():
 
     DEFAULT_DIRS = [
         "raw",
+        "converted",
+        "time",
+        "bottle",
         "reft",
         "salt",
         "oxygen",
+        "logs",
+        "ssscc",
+        "pressure",
     ]
 
     print(f"Building default data directories: \n {*DEFAULT_DIRS,}")
