@@ -27,7 +27,11 @@ def process_all():
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
     #####
     # load station/cast list from file
-    ssscc_list = process_ctd.get_ssscc_list()
+    try:
+        ssscc_list = process_ctd.get_ssscc_list()
+    except FileNotFoundError:
+        print("No ssscc.csv file found, generating from .hex file list")
+        ssscc_list = process_ctd.make_ssscc_list()
 
     # convert raw .hex files
     convert.hex_to_ctd(ssscc_list)

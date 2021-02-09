@@ -587,7 +587,7 @@ class SBEReader:
                 for y in children.iter():
                     try:
                         bulbasaur[y.tag] = float(y.text)
-                    except ValueError:
+                    except (TypeError, ValueError):
                         bulbasaur[y.tag] = (
                             str(y.text).replace("\n", "").replace(" ", "")
                         )
