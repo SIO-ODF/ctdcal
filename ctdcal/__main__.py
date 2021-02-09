@@ -36,5 +36,25 @@ def init():
         path.mkdir(parents=True)
 
 
+@cli.command("import")  # click workaround to get a command named 'import'
+def import_data():
+    """Import data from given folder into ctdcal for processing"""
+    # something like this?
+    # ctdcal import _path_
+
+    # TODO: smart imports based on file ext? .hex, .xmlcon, .cap
+    # NOTE: ODF file types vs. others (oxygen, salt)
+
+    pass
+
+
+@cli.command()
+def process():
+    """Process data using certain group's methodology"""
+    # something like this?
+    # ctdcal process -[odf / pmel / ...] -[bottle / ctd / all]
+    pass
+
+
 if __name__ == "__main__":
     cli()
