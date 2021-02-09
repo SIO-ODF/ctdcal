@@ -14,9 +14,9 @@ Change directories to the top-level ctdcal:
 cd ctdcal
 ```
 
-Create a new virtual environment with your preferred environment manager and run the setup script:
+Create a new virtual environment with your preferred environment manager and install with pip:
 ```
-python setup.py [install/develop]
+pip install .
 ```
 
 Note: there is an occasional (conda?) bug where CLI tools are not accessible after running `setup.py` – this can usually be remedied by deactivating and reactiving the virtual environment.
