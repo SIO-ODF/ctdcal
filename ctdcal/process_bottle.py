@@ -17,9 +17,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import config as cfg
+from . import get_ctdcal_config
 import ctdcal.flagging as flagging
 import ctdcal.oxy_fitting as oxy_fitting
+
+cfg = get_ctdcal_config()
 
 BOTTLE_FIRE_COL = "btl_fire"
 BOTTLE_FIRE_NUM_COL = "btl_fire_num"

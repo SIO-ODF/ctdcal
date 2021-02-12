@@ -12,11 +12,13 @@ import numpy as np
 import pandas as pd
 import scipy
 
-import config as cfg
+from . import get_ctdcal_config
 import ctdcal.ctd_plots as ctd_plots
 import ctdcal.flagging as flagging
 import ctdcal.process_ctd as process_ctd
 import ctdcal.sbe_reader as sbe_rd
+
+cfg = get_ctdcal_config()
 
 
 def load_winkler_oxy(oxy_file):

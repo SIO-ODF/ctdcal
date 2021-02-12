@@ -11,10 +11,12 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-import config as cfg
+from . import get_ctdcal_config
 import ctdcal.flagging as flagging
 import ctdcal.oxy_fitting as oxy_fitting
 import ctdcal.report_ctd as report_ctd
+
+cfg = get_ctdcal_config()
 
 warnings.filterwarnings("ignore", "Mean of empty slice.")
 

@@ -5,6 +5,7 @@ Attempt to write a cleaner processing script from scratch.
 # import necessary packages
 import sys
 
+from ctdcal import get_ctdcal_config
 import ctdcal.convert as convert
 import ctdcal.fit_ctd as fit_ctd
 import ctdcal.odf_io as odf_io
@@ -21,7 +22,7 @@ def process_all():
     # Step 0: Load and define necessary variables
     #####
 
-    import config as cfg
+    cfg = get_ctdcal_config()
 
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
