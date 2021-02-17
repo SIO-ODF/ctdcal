@@ -1,5 +1,6 @@
 import click
 from pathlib import Path
+from .scripts.odf_process_all import odf_process_all
 
 
 @click.group()
@@ -49,11 +50,25 @@ def import_data():
 
 
 @cli.command()
-def process():
-    """Process data using certain group's methodology"""
-    # something like this?
-    # ctdcal process -[odf / pmel / ...] -[bottle / ctd / all]
-    pass
+@click.option("-g", "--group", type=click.Choice(["ODF", "PMEL"], case_sensitive=False))
+@click.option(
+    "-t", "--type", type=click.Choice(["bottle", "ctd", "all"], case_sensitive=False)
+)
+def process(group, type):
+    """Process data using a particular group's methodology"""
+
+    if group is None:
+        print("No group specificed, default to processing as ODF")
+        group = "ODF"
+
+    if group == "ODF":
+        odf_process_all()
+    elif group == "PMEL":
+        # pmel_process()
+        pass
+    else:
+        print("Group not specified")
+        pass
 
 
 if __name__ == "__main__":
