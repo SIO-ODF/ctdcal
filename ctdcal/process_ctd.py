@@ -562,8 +562,12 @@ def make_depth_log(time_df, threshold=80):
         }
     )
     bottom_df.loc[bottom_df["alt"] > threshold, "alt"] = np.nan
+    # pandas 1.2.1 ufunc issue workaround with pd.to_numpy()
     bottom_df["DEPTH"] = (
-        (bottom_df["alt"] + np.abs(gsw.z_from_p(bottom_df["max_p"], bottom_df["lat"])))
+        (
+            bottom_df["alt"]
+            + np.abs(gsw.z_from_p(bottom_df["max_p"], bottom_df["lat"].to_numpy()))
+        )
         .fillna(value=-999)
         .round()
         .astype(int)

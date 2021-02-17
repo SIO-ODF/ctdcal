@@ -163,16 +163,12 @@ def make_time_files(ssscc_list):
 
             # Filter data
             filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df,
-                window="triangle",
-                parameters=cfg.filter_cols,
+                trimmed_df, window="triangle", parameters=cfg.filter_cols,
             )
 
             # Trim to downcast
             cast_data = process_ctd.cast_details(
-                filter_data,
-                ssscc,
-                log_file=cfg.directory["logs"] + "cast_details.csv",
+                filter_data, ssscc, log_file=cfg.directory["logs"] + "cast_details.csv",
             )
 
             cast_data.to_pickle(cfg.directory["time"] + ssscc + "_time.pkl")
@@ -374,7 +370,13 @@ def convertFromSBEReader(sbeReader, debug=False):
             # if cfg["correct_oxy_hysteresis"]:
             # sbe_eq.sbe43_hysteresis_voltage(raw_df[meta['column']], p_array, coefs)
             converted_df[col] = sbe_eq.sbe43(
-                raw_df[meta["column"]], p_array, t_array, c_array, coefs
+                raw_df[meta["column"]],
+                p_array,
+                t_array,
+                c_array,
+                coefs,
+                lat=meta_df["GPSLAT"],
+                lon=meta_df["GPSLON"],
             )
             converted_df["CTDOXYVOLTS"] = raw_df[meta["column"]]
 

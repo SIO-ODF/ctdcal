@@ -493,12 +493,7 @@ def match_sigmas(
 
     # Construct Dataframe from bottle and ctd values for merging
     btl_data = pd.DataFrame(
-        data={
-            "CTDPRS": btl_prs,
-            "REFOXY": btl_oxy,
-            "CTDTMP": btl_tmp,
-            "SA": btl_SA,
-        }
+        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA}
     )
     time_data = pd.DataFrame(
         data={
@@ -520,27 +515,27 @@ def match_sigmas(
 
     # calculate sigma referenced to multiple depths
     for idx, p_ref in enumerate([0, 1000, 2000, 3000, 4000, 5000, 6000]):
+
+        # pandas 1.2.1 ufunc issue workaround
+        btl_inputs = np.broadcast_arrays(
+            btl_data["SA"], btl_data["CTDTMP"], btl_data["CTDPRS"], p_ref
+        )
+        time_inputs = np.broadcast_arrays(
+            time_data["SA"], time_data["CTDTMP"], time_data["CTDPRS"], p_ref
+        )
+
         btl_data[f"sigma{idx}"] = (
-            gsw.pot_rho_t_exact(
-                btl_data["SA"],
-                btl_data["CTDTMP"],
-                btl_data["CTDPRS"],
-                p_ref,
-            )
+            gsw.pot_rho_t_exact(*btl_inputs)
             - 1000  # subtract 1000 to get potential density *anomaly*
         ) + 1e-8 * np.random.standard_normal(btl_data["SA"].size)
         time_data[f"sigma{idx}"] = (
-            gsw.pot_rho_t_exact(
-                time_data["SA"],
-                time_data["CTDTMP"],
-                time_data["CTDPRS"],
-                p_ref,
-            )
+            gsw.pot_rho_t_exact(*time_inputs)
             - 1000  # subtract 1000 to get potential density *anomaly*
         ) + 1e-8 * np.random.standard_normal(time_data["SA"].size)
         rows = (btl_data["CTDPRS"] > (p_ref - 500)) & (
             btl_data["CTDPRS"] < (p_ref + 500)
         )
+
         time_sigma_sorted = time_data[f"sigma{idx}"].sort_values().to_numpy()
         sigma_min = np.min(
             [np.min(btl_data.loc[rows, f"sigma{idx}"]), np.min(time_sigma_sorted)]
