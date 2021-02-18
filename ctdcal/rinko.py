@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy
 
-import ctdcal.oxy_fitting as oxy_fitting
+from . import oxy_fitting as oxy_fitting
 
 RinkoO2Cal = namedtuple("RinkoO2Cal", [*"ABCDEFGH"])
 RinkoTMPCal = namedtuple("RinkoTMPCal", [*"ABCD"])

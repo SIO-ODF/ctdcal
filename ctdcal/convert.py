@@ -5,10 +5,10 @@ import numpy as np
 import pandas as pd
 
 from . import get_ctdcal_config
-import ctdcal.equations_sbe as sbe_eq
-import ctdcal.process_bottle as btl
-import ctdcal.process_ctd as process_ctd
-import ctdcal.sbe_reader as sbe_rd
+from . import equations_sbe as sbe_eq
+from . import process_bottle as btl
+from . import process_ctd as process_ctd
+from . import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 

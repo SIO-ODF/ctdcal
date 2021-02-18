@@ -4,10 +4,11 @@ data, and similar data types such as ARGO and moored CTD
 sensors.
 """
 
-from . import *
-from ._version import get_versions
 import os.path
 import types
+
+from . import *
+from ._version import get_versions
 
 __version__ = get_versions()["version"]
 del get_versions

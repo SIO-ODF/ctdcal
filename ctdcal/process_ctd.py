@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
+from . import flagging as flagging
 from . import get_ctdcal_config
-import ctdcal.flagging as flagging
-import ctdcal.oxy_fitting as oxy_fitting
-import ctdcal.report_ctd as report_ctd
+from . import oxy_fitting as oxy_fitting
+from . import report_ctd as report_ctd
 
 cfg = get_ctdcal_config()
 

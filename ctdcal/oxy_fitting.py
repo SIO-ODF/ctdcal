@@ -12,11 +12,11 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from . import ctd_plots as ctd_plots
+from . import flagging as flagging
 from . import get_ctdcal_config
-import ctdcal.ctd_plots as ctd_plots
-import ctdcal.flagging as flagging
-import ctdcal.process_ctd as process_ctd
-import ctdcal.sbe_reader as sbe_rd
+from . import process_ctd as process_ctd
+from . import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 

@@ -17,9 +17,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from . import flagging as flagging
 from . import get_ctdcal_config
-import ctdcal.flagging as flagging
-import ctdcal.oxy_fitting as oxy_fitting
+from . import oxy_fitting as oxy_fitting
 
 cfg = get_ctdcal_config()
 

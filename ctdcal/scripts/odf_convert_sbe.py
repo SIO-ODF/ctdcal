@@ -4,8 +4,8 @@ import argparse
 import os
 import sys
 
-import ctdcal.convert as cnv
-import ctdcal.sbe_reader as sbe_reader
+from . import convert as cnv
+from . import sbe_reader as sbe_reader
 
 DEBUG = False
 

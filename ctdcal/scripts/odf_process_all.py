@@ -6,11 +6,11 @@ Process all CTD and bottle data using ODF routines.
 from .. import (
     convert,
     fit_ctd,
+    get_ctdcal_config,
     odf_io,
     oxy_fitting,
     process_bottle,
     process_ctd,
-    get_ctdcal_config,
 )
 
 

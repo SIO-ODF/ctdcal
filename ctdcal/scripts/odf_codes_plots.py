@@ -1,7 +1,7 @@
 import matplotlib
 
-import ctdcal.ctd_plots as ctd_plots
-import ctdcal.merge_codes as merge
+from . import ctd_plots as ctd_plots
+from . import merge_codes as merge
 
 matplotlib.use("ps")
 
