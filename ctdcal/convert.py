@@ -4,11 +4,13 @@ import gsw
 import numpy as np
 import pandas as pd
 
-import config as cfg
-import ctdcal.equations_sbe as sbe_eq
-import ctdcal.process_bottle as btl
-import ctdcal.process_ctd as process_ctd
-import ctdcal.sbe_reader as sbe_rd
+from . import get_ctdcal_config
+from . import equations_sbe as sbe_eq
+from . import process_bottle as btl
+from . import process_ctd as process_ctd
+from . import sbe_reader as sbe_rd
+
+cfg = get_ctdcal_config()
 
 DEBUG = False
 
@@ -161,16 +163,12 @@ def make_time_files(ssscc_list):
 
             # Filter data
             filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df,
-                window="triangle",
-                parameters=cfg.filter_cols,
+                trimmed_df, window="triangle", parameters=cfg.filter_cols,
             )
 
             # Trim to downcast
             cast_data = process_ctd.cast_details(
-                filter_data,
-                ssscc,
-                log_file=cfg.directory["logs"] + "cast_details.csv",
+                filter_data, ssscc, log_file=cfg.directory["logs"] + "cast_details.csv",
             )
 
             cast_data.to_pickle(cfg.directory["time"] + ssscc + "_time.pkl")
@@ -372,7 +370,13 @@ def convertFromSBEReader(sbeReader, debug=False):
             # if cfg["correct_oxy_hysteresis"]:
             # sbe_eq.sbe43_hysteresis_voltage(raw_df[meta['column']], p_array, coefs)
             converted_df[col] = sbe_eq.sbe43(
-                raw_df[meta["column"]], p_array, t_array, c_array, coefs
+                raw_df[meta["column"]],
+                p_array,
+                t_array,
+                c_array,
+                coefs,
+                lat=meta_df["GPSLAT"],
+                lon=meta_df["GPSLON"],
             )
             converted_df["CTDOXYVOLTS"] = raw_df[meta["column"]]
 

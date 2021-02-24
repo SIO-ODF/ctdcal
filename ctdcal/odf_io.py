@@ -8,7 +8,9 @@ import gsw
 import numpy as np
 import pandas as pd
 
-import config as cfg
+from . import get_ctdcal_config
+
+cfg = get_ctdcal_config()
 
 
 def _salt_loader(ssscc, salt_dir):

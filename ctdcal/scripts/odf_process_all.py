@@ -1,33 +1,37 @@
 """
-Attempt to write a cleaner processing script from scratch.
+Process all CTD and bottle data using ODF routines.
 """
 
-# import necessary packages
-import sys
+# import needed ctdcal modules
+from .. import (
+    convert,
+    fit_ctd,
+    get_ctdcal_config,
+    odf_io,
+    oxy_fitting,
+    process_bottle,
+    process_ctd,
+)
 
-import ctdcal.convert as convert
-import ctdcal.fit_ctd as fit_ctd
-import ctdcal.odf_io as odf_io
-import ctdcal.oxy_fitting as oxy_fitting
-import ctdcal.process_bottle as process_bottle
-import ctdcal.process_ctd as process_ctd
 
-
-def process_all():
-
-    # TODO: document which functions/scripts produce which files
+def odf_process_all():
 
     #####
     # Step 0: Load and define necessary variables
     #####
 
-    import config as cfg
+    cfg = get_ctdcal_config()
 
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
     #####
+
     # load station/cast list from file
-    ssscc_list = process_ctd.get_ssscc_list()
+    try:
+        ssscc_list = process_ctd.get_ssscc_list()
+    except FileNotFoundError:
+        print("No ssscc.csv file found, generating from .hex file list")
+        ssscc_list = process_ctd.make_ssscc_list()
 
     # convert raw .hex files
     convert.hex_to_ctd(ssscc_list)
@@ -78,7 +82,7 @@ def process_all():
     # Step 3: export data
     #####
 
-    # export time data to _ct1.csv format
+    # export to Exchange format
     # TODO: clean this up more
     process_ctd.export_ct1(time_data_all, ssscc_list)
     process_bottle.export_hy1(btl_data_all)
@@ -86,10 +90,5 @@ def process_all():
     # run: ctd_to_bottle.py
 
 
-def main(argv):
-    """Run everything."""
-    process_all()
-
-
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    odf_process_all()

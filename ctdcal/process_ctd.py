@@ -11,10 +11,12 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-import config as cfg
-import ctdcal.flagging as flagging
-import ctdcal.oxy_fitting as oxy_fitting
-import ctdcal.report_ctd as report_ctd
+from . import flagging as flagging
+from . import get_ctdcal_config
+from . import oxy_fitting as oxy_fitting
+from . import report_ctd as report_ctd
+
+cfg = get_ctdcal_config()
 
 warnings.filterwarnings("ignore", "Mean of empty slice.")
 
@@ -560,8 +562,12 @@ def make_depth_log(time_df, threshold=80):
         }
     )
     bottom_df.loc[bottom_df["alt"] > threshold, "alt"] = np.nan
+    # pandas 1.2.1 ufunc issue workaround with pd.to_numpy()
     bottom_df["DEPTH"] = (
-        (bottom_df["alt"] + np.abs(gsw.z_from_p(bottom_df["max_p"], bottom_df["lat"])))
+        (
+            bottom_df["alt"]
+            + np.abs(gsw.z_from_p(bottom_df["max_p"], bottom_df["lat"].to_numpy()))
+        )
         .fillna(value=-999)
         .round()
         .astype(int)
@@ -571,6 +577,19 @@ def make_depth_log(time_df, threshold=80):
     )
 
     return True
+
+
+def make_ssscc_list():
+    """
+    Attempt to automatically generate list of station/casts from raw files.
+    """
+    raw_files = Path(cfg.directory["raw"]).glob("*.hex")
+    ssscc_list = sorted([f.stem for f in raw_files])
+    pd.Series(ssscc_list).to_csv(
+        cfg.directory["ssscc_file"], header=None, index=False, mode="x"
+    )
+
+    return ssscc_list
 
 
 def get_ssscc_list():

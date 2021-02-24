@@ -17,9 +17,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import config as cfg
-import ctdcal.flagging as flagging
-import ctdcal.oxy_fitting as oxy_fitting
+from . import flagging as flagging
+from . import get_ctdcal_config
+from . import oxy_fitting as oxy_fitting
+
+cfg = get_ctdcal_config()
 
 BOTTLE_FIRE_COL = "btl_fire"
 BOTTLE_FIRE_NUM_COL = "btl_fire_num"
@@ -49,7 +51,7 @@ def retrieveBottleData(converted_df, debug=False):
     if BOTTLE_FIRE_COL in converted_df.columns:
         converted_df[BOTTLE_FIRE_NUM_COL] = (
             (
-                (converted_df[BOTTLE_FIRE_COL] is True)
+                (converted_df[BOTTLE_FIRE_COL])
                 & (
                     converted_df[BOTTLE_FIRE_COL]
                     != converted_df[BOTTLE_FIRE_COL].shift(1)
@@ -59,8 +61,7 @@ def retrieveBottleData(converted_df, debug=False):
             .cumsum()
         )
         # converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL] == False)).astype(int).cumsum()
-
-        return converted_df.loc[converted_df[BOTTLE_FIRE_COL] is True]
+        return converted_df.loc[converted_df[BOTTLE_FIRE_COL]]
         # return converted_df
     else:
         debugPrint("Bottle fire column:", BOTTLE_FIRE_COL, "not found")

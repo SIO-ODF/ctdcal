@@ -163,6 +163,7 @@ def sbe_altimeter(volts, coefs):
 
 
 def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
+    # NOTE: lat/lon = 0 is not "acceptable" for GSW, come up with something else?
     """
     SBE equation for converting SBE43 engineering units to oxygen (ml/l).
     SensorID: 38
@@ -191,11 +192,10 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
     """
     # TODO: is there any reason for this to output mL/L? if oxygen eq uses o2sol
     # in umol/kg, result is in umol/kg... which is what we use at the end anyway?
-
     t_Kelvin = t + 273.15
 
     SP = gsw.SP_from_C(c, t, p)
-    SA = gsw.SA_from_SP(SP, p, lat, lon)
+    SA = gsw.SA_from_SP(SP, p, lon, lat)
     CT = gsw.CT_from_t(SA, t, p)
     sigma0 = gsw.sigma0(SA, CT)
     o2sol = gsw.O2sol(SA, CT, p, lon, lat)  # umol/kg
