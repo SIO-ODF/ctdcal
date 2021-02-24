@@ -1,48 +1,56 @@
 # ctdcal project
 
-The ctdcal project is a library designed to process CTD cast data and calibrate
-them against taken bottle samples, and scripts providing an example case of how
-to use the library.
+The ctdcal project is a library primarily designed to process data from CTD casts and calibrate
+them against Niskin bottle samples.
 
-In the future parts of the ctdcal library will be split off into additional packages,
+In the future, parts of the ctdcal library will be split off into additional packages,
 such as an "ocean sensors" package with Python implementations of conversion routines
 for in-situ sensors used for ocean measurement.
 
-### Installation and Dependencies
-Run ```python setup.py```
-
-Dependencies:
- - python3 (3.6)
- - numpy (1.12.1)
- - scipy (0.19.0)
- - gsw (3.2)
- - matplotlib (2.0.1)
- - pandas (== 0.20.3)
-
-### Running the scripts
-Once installed, copy the test data set into the working directory.
-Afterwards go into the working directory and type:
-```odf_process_all.py
+***
+## Installation
+### Clone repository
+Pull down the latest version of ctdcal:
 ```
-This will run the scripts against the currently loaded data.
+git clone https://github.com/cchdo/ctdcal.git
+```
 
-### LICENSING
-BSD 3-clause
+### Install ctdcal and dependencies
+Change directories to the top-level ctdcal:
+```
+cd ctdcal
+```
 
+Create a new virtual environment with your preferred environment manager and install with pip:
+```
+pip install .
+```
 
-# DEPRECIATED
+Note: there is an occasional (conda?) bug where CLI tools are not immediately accessible after install – this can usually be remedied by deactivating and reactiving the virtual environment.
 
-# General Utilities for processing SBE Data
+Initialize default `/data/` folders by running:
+```
+ctdcal init
+```
 
-### Dependencies:
- - python3 (3.6)
- - numpy (1.12.1)
- - scipy (0.19.0)
- - gsw (3.2)
- - matplotlib (2.0.1)
- - pandas (== 0.20.3)
+(Future versions of ctdcal are planned have more robust init options/flags/etc.)
 
-###Overview of available scripts
+***
+## Usage
+
+### Import and process data
+To process data, copy over raw `.hex` and `.xmlcon` files into `/data/raw/` and reference data to their appropriate folder (`oxygen`, `reft`, `salt`).
+
+Users can process their data with individual ctdcal functions or try:
+```
+ctdcal process [--group ODF]
+```
+to process using ODF procedures.
+
+<!-- 
+## Overview of available commands
+this is outdated but a good template possibly
+
 #### Utility for converting Seabird Electronics .hex/.XMLCON raw data into csv-formatted text files
 ```
 usage: odf_convert_sbe.py [-h] [-d] [-r] [-o destDir] hex_file XMLCON_file
@@ -126,12 +134,9 @@ positional arguments:
 optional arguments:
   -h, --help   show this help message and exit
   -d, --debug  display debug messages
-```
+``` 
+-->
 
-### Additional information
- - Please take a look at [INSTALL.md](./INSTALL.md) for instructions on how to install the ODF-CTD-PROC Utilites.
- - Please take a look at [SETUP.md](./SETUP.md) for recommendation on how to setup the SBE CTD Hardware and SBE Data Acquisition software.
- - Please take a look at [COOKBOOK.md](./COOKBOOK.md) for suggestions on how to leverage the ODF-CTD-PROC Utilites in a real-world, at-sea scenario.
-
-### LICENSING
+***
+## LICENSING
 BSD 3-clause
