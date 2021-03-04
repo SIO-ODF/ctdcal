@@ -55,8 +55,8 @@ master_doc = "index"
 
 # General information about the project.
 project = "ctdcal"
-copyright = "2017, Joseph Gum and Andrew Barna"
-author = "Joseph Gum and Andrew Barna"
+copyright = "2021, Joseph Gum, Andrew Barna, Mike Kovatch"
+author = "Joseph Gum, Andrew Barna, and Mike Kovatch"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -91,7 +91,7 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -136,7 +136,7 @@ latex_documents = [
         master_doc,
         "ctdcal.tex",
         "ctdcal Documentation",
-        "Joseph Gum and Andrew Barna",
+        [author],
         "manual",
     ),
 ]
