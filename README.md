@@ -1,3 +1,6 @@
+[![Documentation Status](https://readthedocs.org/projects/ctdcal/badge/?version=latest)](https://ctdcal.readthedocs.io/en/latest/?badge=latest)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
+
 # ctdcal project
 
 The ctdcal project is a library primarily designed to process data from CTD casts and calibrate
