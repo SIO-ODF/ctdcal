@@ -4,12 +4,155 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from . import get_ctdcal_config
 from . import oxy_fitting as oxy_fitting
+
+cfg = get_ctdcal_config()
 
 RinkoO2Cal = namedtuple("RinkoO2Cal", [*"ABCDEFGH"])
 RinkoTMPCal = namedtuple("RinkoTMPCal", [*"ABCD"])
 
+
+def rinko_DO(p_prime, G, H):
+    """
+    Calculates the dissolved oxygen percentage.
+    """
+
+    DO = G + H * p_prime
+
+    return DO
+
+
+def rinko_p_prime(N, t, A, B, C, D, E, F, G, H):
+    """
+    Per RinkoIII manual: 'The film sensing the water is affect by environment
+    temperature and pressure at the depth where it is deployed. Based on experiments,
+    an empirical algorithm as following is used to correct data dissolved oxygen.'
+
+    Parameters
+    ----------
+    N : array-like
+        Raw instrument output
+    t : array-like
+        Temperature [degC]
+    A-H : float
+        Calibration parameters
+    """
+    p_prime = A / (1 + D * (t - 25)) + B / ((N - F) * (1 + D * (t - 25)) + C + F)
+
+    return p_prime
+
+
+def correct_pressure(P, d, E):
+    """
+    Parameters
+    ----------
+    P : array-like
+        Temperature-corrected DO [%]
+    d : array-like
+        Pressure [MPa]
+    E : float
+        Manufacturer calibration coefficient
+
+    Returns
+    -------
+    P_d : array-like
+        Temperature- and pressure-corrected DO [%]
+    """
+
+    # TODO: check d range to make sure it's MPa
+    # what is the dbar ~ MPa?
+
+    P_d = P * (1 + E * d)
+
+    return P_d
+
+
+def _Uchida_DO_eq(coefs, inputs):
+    """
+    See Uchida et. al (2008) for more info:
+    https://doi.org/10.1175/2008JTECHO549.1
+    """
+    c0, c1, c2, c3, c4, c5, c6 = coefs
+    V_r, T = inputs  # raw voltage and potential temperature
+
+    K_sv = c0 + (c1 * T) + (c2 * T ** 2)
+    V_0 = c3 + (c4 * T)
+    V_c = c5 + (c6 * V_r)
+    DO = ((V_0 / V_c) - 1) / K_sv
+
+    return DO
+
+
+def oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
+    # TODO: optionally include other residual types
+    # (abstracted from PMEL code oxygen_cal_ml.m)
+    # unweighted L2: sum((ref - oxy)^2)  # if weighted fails
+    # unweighted L4: sum((ref - oxy)^4)  # unsure of use case
+    # unweighted L1: sum(abs(ref - oxy))  # very far from ideal
+    # anything else? genericize with integer "norm" function input?
+
+    residuals = np.sum(
+        (weights * (refoxy - _Uchida_DO_eq(coefs, inputs)) ** 2)
+    ) / np.sum(weights ** 2)
+
+    return residuals
+
+
+def calibrate_oxy(btl_df, time_df, ssscc_list):
+
+    all_rinko_merged = pd.DataFrame()
+    for ssscc in ssscc_list:
+        time_data = time_df[time_df["SSSCC"] == ssscc].copy()
+        btl_data = btl_df[btl_df["SSSCC"] == ssscc].copy()
+        rinko_merged = oxy_fitting.match_sigmas(
+            btl_data[cfg.column["p_btl"]],
+            btl_data[cfg.column["oxy_btl"]],
+            btl_data["CTDTMP1"],
+            btl_data["SA"],
+            time_data["OS"],
+            time_data[cfg.column["p"]],
+            time_data[cfg.column["t1"]],
+            time_data["SA"],
+            time_data["FREE3"],
+            time_data["scan_datetime"],
+        )
+        rinko_merged = rinko_merged.reindex(btl_data.index)
+        rinko_merged["SSSCC"] = ssscc
+        all_rinko_merged = pd.concat([all_rinko_merged, rinko_merged])
+        print(ssscc + " density matching done")
+
+    # TODO: match_sigmas needs to be generalized, currently returns
+    # 2nd to last input as "CTDOXYVOLTS" no matter what. Make it
+    # variable name agnostic.
+
+    weights = oxy_fitting.calculate_weights(all_rinko_merged["CTDPRS"])
+    # dummy coefs from https://cchdo.ucsd.edu/data/2362/p09_49RY20100706do.txt
+    coef0 = (1.89890, 1.71137e-2, 1.59838e-4, -1.07941e-3, -1.23152e-1, 3.06114e-1, -4.58703e-5)
+    fit_data = (all_rinko_merged["CTDOXYVOLTS"], all_rinko_merged["CTDTMP"])
+    res = scipy.optimize.minimize(
+        oxy_weighted_residual,
+        x0=coef0,
+        args=(weights, fit_data, all_rinko_merged["REFOXY"]),
+        bounds=[(0, 5), (None, None), (None, None), (None, None), (None, None), (None, None), (None, None)],
+    )
+    breakpoint()
+    cfw_coefs = res.x
+    all_rinko_merged["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
+    from . import ctd_plots
+    diff = all_rinko_merged["REFOXY"] - all_rinko_merged["RINKO_OXY"]
+    rows = all_rinko_merged["SSSCC"] == "00101"
+    # plt.scatter(all_rinko_merged["REFOXY"], all_rinko_merged["CTDPRS"])
+    # plt.scatter(all_rinko_merged["RINKO_OXY"], all_rinko_merged["CTDPRS"])
+    # ctd_plots._intermediate_residual_plot(diff, all_rinko_merged["CTDPRS"], all_rinko_merged["SSSCC"], xlim=(-10,10), f_out="rinko_test_residual.pdf")
+
+
+
+
 def rinko_o2_cal_parameters(**kwargs):
+    """
+    Calibration coefficients for the oxygen calculations (from RinkoIII manual).
+    """
     A = kwargs.get("A", -4.524084e1)
     B = kwargs.get("B",  1.449377e2)
     C = kwargs.get("C", -3.051590e-1)
