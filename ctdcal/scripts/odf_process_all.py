@@ -75,9 +75,7 @@ def odf_process_all():
 
     # calibrate oxygen against reference
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
-
-    # TODO: calibrate rinko against reference, similar to oxy_fitting.calibrate_oxy()
-    rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)  # or something
+    rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #####
     # Step 3: export data
