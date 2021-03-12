@@ -4,9 +4,12 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import get_ctdcal_config
-from . import flagging
-from . import oxy_fitting as oxy_fitting
+from . import (
+    ctd_plots,
+    get_ctdcal_config,
+    flagging,
+    oxy_fitting,
+)
 
 cfg = get_ctdcal_config()
 
@@ -243,6 +246,17 @@ def rinko_oxy_fit(
     # while not thrown_values.empty:
     #     coefs, thrown_values = iter_oxy_fit(inputs, _Uchida_DO_eq)
 
+    # # Plot data to be fit together
+    # f_out = f"{cfg.directory['ox_fit_figs']}rinko_residual{f_suffix}_prefit.pdf"
+    # ctd_plots._intermediate_residual_plot(
+    #     merged_df["REFOXY"] - merged_df["FREE3"],
+    #     merged_df["CTDPRS"],
+    #     merged_df["SSSCC"],
+    #     xlabel="CTDRINKO Residual (umol/kg)",
+    #     f_out=f_out,
+    #     xlim=(-10, 10),
+    # )
+
     bad_df = pd.DataFrame()
     weights = oxy_fitting.calculate_weights(merged_df["CTDPRS"])
     fit_data = (merged_df["CTDOXYVOLTS"], merged_df["CTDTMP"])
@@ -298,6 +312,19 @@ def rinko_oxy_fit(
         thrown_values = merged_df[np.abs(merged_df["residual"]) > cutoff]
         bad_df = pd.concat([bad_df, thrown_values])
         merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
+
+    # intermediate plots to diagnose data chunks goodness
+    # TODO: implement into bokeh/flask dashboard
+    if f_suffix is not None:
+        f_out = f"{cfg.directory['ox_fit_figs']}rinko_residual{f_suffix}.pdf"
+        ctd_plots._intermediate_residual_plot(
+            merged_df["residual"],
+            merged_df["CTDPRS"],
+            merged_df["SSSCC"],
+            xlabel="CTDRINKO Residual (umol/kg)",
+            f_out=f_out,
+            xlim=(-10, 10),
+        )
 
     merged_df["CTDRINKO_FLAG_W"] = 2
     bad_df["CTDRINKO_FLAG_W"] = 3

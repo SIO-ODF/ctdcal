@@ -77,6 +77,8 @@ def odf_process_all():
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
     rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
+    # Rinko fitting does poor job near the surface.. why?
+
     #####
     # Step 3: export data
     #####
