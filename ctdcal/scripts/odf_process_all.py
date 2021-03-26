@@ -71,6 +71,7 @@ def odf_process_all():
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
     # calculate params needs for oxy/rinko calibration
+    # TODO: move density matching to prepare_oxy
     oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
 
     # calibrate oxygen against reference
