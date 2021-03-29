@@ -1,4 +1,5 @@
 from collections import namedtuple
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -107,7 +108,10 @@ def oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
 
 def calibrate_oxy(btl_df, time_df, ssscc_list):
     """
-    Non-linear least squares fit chemical sensor oxygen against bottle oxygen.
+    Non-linear least squares fit oxygen optode against bottle oxygen.
+
+    Note: optode data that were obtained during bottle stops can be used for calibration
+    instead of density matching the downcast (see Uchida 2010, pg. 7).
 
     Parameters
     ----------
@@ -121,113 +125,57 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     Returns
     -------
     """
+    # TODO: hysteresis correction!
+
     print("Calibrating oxygen (RINKO)")
 
-    # Prep vars, dfs, etc.
-    all_rinko_merged = pd.DataFrame()
-    all_rinko_fit = pd.DataFrame()
-
-    # Density match time/btl oxy dataframes
-    for ssscc in ssscc_list:
-        time_data = time_df[time_df["SSSCC"] == ssscc].copy()
-        btl_data = btl_df[btl_df["SSSCC"] == ssscc].copy()
-        # can't calibrate without bottle oxygen ("OXYGEN")
-        if (btl_data["OXYGEN_FLAG_W"] == 9).all():
-            rinko_dict[ssscc] = np.full(5, np.nan)
-            print(ssscc + " skipped, all oxy data is NaN")
-            continue
-        rinko_merged = oxy_fitting.match_sigmas(
-            btl_data[cfg.column["p_btl"]],
-            btl_data[cfg.column["oxy_btl"]],
-            btl_data["CTDTMP1"],
-            btl_data["SA"],
-            time_data["OS"],
-            time_data[cfg.column["p"]],
-            time_data[cfg.column["t1"]],
-            time_data["SA"],
-            time_data[cfg.column["rinko_oxy"]],
-            time_data["scan_datetime"],
-        )
-        rinko_merged = rinko_merged.reindex(btl_data.index)  # add nan rows back in
-        rinko_merged["SSSCC"] = ssscc
-        all_rinko_merged = pd.concat([all_rinko_merged, rinko_merged])
-        print(ssscc + " density matching done")
-
-    # TODO: match_sigmas needs to be generalized, currently returns
-    # 2nd to last input as "CTDOXYVOLTS" no matter what. Make it
-    # variable name agnostic.
-
     # Only fit using OXYGEN flagged good (2)
-    all_rinko_merged = all_rinko_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    good_data = btl_df[btl_df["OXYGEN_FLAG_W"] == 2].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
-    (rinko_coefs, _) = rinko_oxy_fit(all_rinko_merged, f_suffix="_ox0")
+    (rinko_coefs0, _) = rinko_oxy_fit(good_data, f_suffix="_ox0")
 
-    # Fit each cast individually
-    # NOTE (03/26/21): may be obsolete at this point
-    # for ssscc in ssscc_list:
-    #     rinko_coef, rinko_df = rinko_oxy_fit(
-    #         all_rinko_merged.loc[all_rinko_merged["SSSCC"] == ssscc].copy(),
-    #         rinko_coef0=rinko_coef0,
-    #         f_suffix=f"_{ssscc}",
-    #     )
-    #     # build coef dictionary
-    #     if ssscc not in rinko_dict.keys():  # don't overwrite NaN'd stations
-    #         rinko_dict[ssscc] = rinko_coef
-    #     # all non-NaN oxygen data with flags
-    #     all_rinko_fit = pd.concat([all_rinko_fit, rinko_df])
-
-    # TODO: save outlier data from fits?
+    # fit station groups, like T/C fitting (ssscc_r1, _r2, etc.)
+    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_r*.csv"))
+    all_rinko_coefs = pd.DataFrame()
+    for f in ssscc_subsets:
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+        f_stem = f.stem
+        (rinko_coefs, _) = rinko_oxy_fit(
+            good_data.loc[good_data["SSSCC"].isin(ssscc_sublist)].copy(),
+            f_suffix=f"_{f_stem}",
+        )
+        coefs_df = pd.DataFrame(
+            index=ssscc_sublist, columns=[f"c{n}" for n in np.arange(0, 8)]
+        )
+        coefs_df.loc[:, :] = rinko_coefs
+        all_rinko_coefs = pd.concat([all_rinko_coefs, coefs_df])
 
     # apply coefs
     time_df["CTDRINKO"] = np.nan
-    time_df["CTDRINKO"] = _Uchida_DO_eq(
-        rinko_coefs,
-        (
-            time_df[cfg.column["rinko_oxy"]],
-            time_df[cfg.column["t1"]],
-            time_df[cfg.column["p"]],
-            time_df["OS"],
-        ),
-    )
-    btl_df["CTDRINKO"] = _Uchida_DO_eq(
-        rinko_coefs,
-        (
-            btl_df[cfg.column["rinko_oxy"]],
-            btl_df[cfg.column["t1_btl"]],
-            btl_df[cfg.column["p_btl"]],
-            btl_df["OS"],
+    for ssscc in ssscc_list:
+        btl_rows = (btl_df["SSSCC"] == ssscc).values
+        time_rows = (time_df["SSSCC"] == ssscc).values
+        btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
+            all_rinko_coefs[all_rinko_coefs.index == ssscc].values.squeeze(),
+            (
+                btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
+                btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                btl_df.loc[btl_rows, cfg.column["p_btl"]],
+                btl_df.loc[btl_rows, "OS"],
+            ),
         )
-    )
-
-    # NOTE (03/26/21): may be obsolete at this point
-    # for ssscc in ssscc_list:
-    #     if np.isnan(rinko_dict[ssscc]).all():
-    #         print(ssscc + " missing oxy data, leaving nan values and flagging as 9")
-    #         time_df.loc[time_df["SSSCC"] == ssscc, "RINKO_FLAG_W"] = 9
-    #         continue
-    #     btl_rows = (btl_df["SSSCC"] == ssscc).values
-    #     time_rows = (time_df["SSSCC"] == ssscc).values
-    #     btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
-    #         rinko_dict[ssscc],
-    #         (
-    #             btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-    #             btl_df.loc[btl_rows, cfg.column["t1_btl"]],
-    #             btl_df.loc[btl_rows, cfg.column["p_btl"]],
-    #             btl_df.loc[btl_rows, "OS"],
-    #         ),
-    #     )
-    #     print(ssscc + " btl data fitting done")
-    #     time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
-    #         rinko_dict[ssscc],
-    #         (
-    #             time_df.loc[time_rows, cfg.column["rinko_oxy"]],
-    #             time_df.loc[time_rows, cfg.column["t1"]],
-    #             time_df.loc[time_rows, cfg.column["p"]],
-    #             time_df.loc[time_rows, "OS"],
-    #         ),
-    #     )
-    #     print(ssscc + " time data fitting done")
+        print(ssscc + " btl data fitting done")
+        time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
+            all_rinko_coefs[all_rinko_coefs.index == ssscc].values.squeeze(),
+            (
+                time_df.loc[time_rows, cfg.column["rinko_oxy"]],
+                time_df.loc[time_rows, cfg.column["t1_btl"]],
+                time_df.loc[time_rows, cfg.column["p_btl"]],
+                time_df.loc[time_rows, "OS"],
+            ),
+        )
+        print(ssscc + " time data fitting done")
 
     # flag CTDRINKO with more than 1% difference
     time_df["CTDRINKO_FLAG_W"] = 2  # TODO: actual flagging of some kind?
@@ -236,19 +184,13 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
 
     # export fitting coefs
-    # rinko_coefs = pd.DataFrame.from_dict(
-    #     rinko_dict, orient="index", columns=[f"c{n}" for n in np.arange(0, 7)]
-    # )
-    coefs_df = pd.DataFrame(
-        rinko_coefs, index=[f"c{n}" for n in np.arange(0, 8)]
-    ).transpose()
-    coefs_df.to_csv(cfg.directory["logs"] + "rinko_coefs.csv", index=False)
+    all_rinko_coefs.to_csv(cfg.directory["logs"] + "rinko_coefs.csv", index=False)
 
     return True
 
 
 def rinko_oxy_fit(
-    merged_df,
+    btl_df,
     rinko_coef0=(
         1.89890,
         1.71137e-2,
@@ -288,65 +230,65 @@ def rinko_oxy_fit(
     # )
 
     bad_df = pd.DataFrame()
-    weights = oxy_fitting.calculate_weights(merged_df["CTDPRS"])
+    weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
     fit_data = (
-        merged_df["CTDOXYVOLTS"],
-        merged_df["CTDTMP"],
-        merged_df["CTDPRS"],
-        merged_df["OS"],
+        btl_df[cfg.column["rinko_oxy"]],
+        btl_df[cfg.column["t1_btl"]],
+        btl_df[cfg.column["p_btl"]],
+        btl_df["OS"],
     )
     res = scipy.optimize.minimize(
         oxy_weighted_residual,
         x0=rinko_coef0,
-        args=(weights, fit_data, merged_df["REFOXY"]),
+        args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
     )
 
     cfw_coefs = res.x
-    merged_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
-    merged_df["residual"] = merged_df["REFOXY"] - merged_df["RINKO_OXY"]
+    btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
+    btl_df["residual"] = btl_df[cfg.column["oxy_btl"]] - btl_df["RINKO_OXY"]
 
-    cutoff = 2.8 * np.std(merged_df["residual"])
-    thrown_values = merged_df[np.abs(merged_df["residual"]) > cutoff]
+    cutoff = 2.8 * np.std(btl_df["residual"])
+    thrown_values = btl_df[np.abs(btl_df["residual"]) > cutoff]
     bad_df = pd.concat([bad_df, thrown_values])
-    merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
+    btl_df = btl_df[np.abs(btl_df["residual"]) <= cutoff].copy()
 
     while not thrown_values.empty:
 
         p0 = tuple(cfw_coefs)
-        weights = oxy_fitting.calculate_weights(merged_df["CTDPRS"])
+        weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
         fit_data = (
-            merged_df["CTDOXYVOLTS"],
-            merged_df["CTDTMP"],
-            merged_df["CTDPRS"],
-            merged_df["OS"],
+            btl_df[cfg.column["rinko_oxy"]],
+            btl_df[cfg.column["t1_btl"]],
+            btl_df[cfg.column["p_btl"]],
+            btl_df["OS"],
         )
         res = scipy.optimize.minimize(
-            oxy_weighted_residual, x0=p0, args=(weights, fit_data, merged_df["REFOXY"]),
+            oxy_weighted_residual, x0=p0, args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
         )
         cfw_coefs = res.x
-        merged_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
-        merged_df["residual"] = merged_df["REFOXY"] - merged_df["RINKO_OXY"]
-        cutoff = 2.8 * np.std(merged_df["residual"])
-        thrown_values = merged_df[np.abs(merged_df["residual"]) > cutoff]
+        btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
+        btl_df["residual"] = btl_df[cfg.column["oxy_btl"]] - btl_df["RINKO_OXY"]
+        cutoff = 2.8 * np.std(btl_df["residual"])
+        thrown_values = btl_df[np.abs(btl_df["residual"]) > cutoff]
         bad_df = pd.concat([bad_df, thrown_values])
-        merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
+        btl_df = btl_df[np.abs(btl_df["residual"]) <= cutoff].copy()
 
     # intermediate plots to diagnose data chunks goodness
     # TODO: implement into bokeh/flask dashboard
     if f_suffix is not None:
         f_out = f"{cfg.directory['rinko_fit_figs']}rinko_residual{f_suffix}.pdf"
         ctd_plots._intermediate_residual_plot(
-            merged_df["residual"],
-            merged_df["CTDPRS"],
-            merged_df["SSSCC"],
+            btl_df["residual"],
+            btl_df["CTDPRS"],
+            btl_df["SSSCC"],
             xlabel="CTDRINKO Residual (umol/kg)",
             f_out=f_out,
             xlim=(-10, 10),
         )
 
-    merged_df["CTDRINKO_FLAG_W"] = 2
+    btl_df["CTDRINKO_FLAG_W"] = 2
     bad_df["CTDRINKO_FLAG_W"] = 3
-    df = pd.concat([merged_df, bad_df])
+    df = pd.concat([btl_df, bad_df])
 
     return cfw_coefs, df
 
