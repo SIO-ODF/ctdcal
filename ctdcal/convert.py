@@ -63,8 +63,14 @@ short_lookup = {
         "type": "float64",
     },
     "61": {
-        "short_name": "U_DEF",
-        "long_name": "user defined",
+        "short_name": "U_DEF_poly",
+        "long_name": "user defined, polynomial",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
+    "80": {
+        "short_name": "U_DEF_e",
+        "long_name": "user defined, exponential",
         "units": "0-5VDC",
         "type": "float64",
     },
@@ -79,7 +85,7 @@ short_lookup = {
         "long_name": "WetlabECO_AFL_FL_Sensor",
         "units": "0-5VDC",
         "type": "float64",
-    },  # check short_name later
+    },
     "42": {
         "short_name": "PAR",
         "long_name": "PAR/Irradiance, Biospherical/Licor",
@@ -248,7 +254,8 @@ def convertFromSBEReader(sbeReader, debug=False):
     temp_counter = 0
     cond_counter = 0
     oxygen_counter = 0
-    u_def_counter = 0
+    u_def_p_counter = 0
+    u_def_e_counter = 0
     empty_counter = 0
 
     # The following are definitions for every key in the dict below:
@@ -289,9 +296,14 @@ def convertFromSBEReader(sbeReader, debug=False):
             channel_pos = empty_counter
             ranking = 6
 
-        elif sensor_id == "61":  # user defined block
-            u_def_counter += 1
-            channel_pos = u_def_counter
+        elif sensor_id == "61":  # user defined (polynomial) block
+            u_def_p_counter += 1
+            channel_pos = u_def_p_counter
+            ranking = 6
+
+        elif sensor_id == "80":  # user defined (exponential) block
+            u_def_e_counter += 1
+            channel_pos = u_def_e_counter
             ranking = 6
 
         else:  # auxiliary block
@@ -394,6 +406,17 @@ def convertFromSBEReader(sbeReader, debug=False):
         elif meta["sensor_id"] == "0":
             print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
             converted_df[col] = sbe_eq.sbe_altimeter(raw_df[meta["column"]], coefs)
+
+        elif meta["sensor_id"] == "61":
+            if meta["sensor_info"]["SensorName"] == "RinkoO2V":
+                print("Processing Rinko O2")
+                # hysteresis correct then pass through voltage (see Uchida, 2010)
+                coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
+                converted_df[col] = sbe_eq.sbe43_hysteresis_voltage(
+                    raw_df[meta["column"]],
+                    p_array,
+                    coefs,
+                )
 
         ### Aux block
         else:
