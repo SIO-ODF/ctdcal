@@ -142,6 +142,14 @@ def make_time_files(ssscc_list):
         if not Path(cfg.directory["time"] + ssscc + "_time.pkl").exists():
             converted_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
 
+            # Remove any pressure spikes
+            bad_rows = converted_df["CTDPRS"].abs() > 6500
+            if ssscc == "00901":
+                # 00901 had 3 large pressure spikes, one of which was 3000 > x > 6500
+                bad_rows = converted_df["CTDPRS"].abs() > 3000
+            converted_df.loc[bad_rows, :] = np.nan
+            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
