@@ -1,6 +1,7 @@
 from collections import namedtuple
 from pathlib import Path
 
+import logging
 import numpy as np
 import pandas as pd
 import scipy
@@ -13,6 +14,7 @@ from . import (
 )
 
 cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 RinkoO2Cal = namedtuple("RinkoO2Cal", [*"ABCDEFGH"])
 RinkoTMPCal = namedtuple("RinkoTMPCal", [*"ABCD"])
@@ -125,9 +127,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     Returns
     -------
     """
-    # TODO: hysteresis correction!
 
-    print("Calibrating oxygen (RINKO)")
+    log.info("Calibrating oxygen (RINKO)")
 
     # Only fit using OXYGEN flagged good (2)
     good_data = btl_df[btl_df["OXYGEN_FLAG_W"] == 2].copy()
@@ -165,7 +166,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 btl_df.loc[btl_rows, "OS"],
             ),
         )
-        print(ssscc + " btl data fitting done")
+        log.info(ssscc + " btl data fitting done")
         time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
             all_rinko_coefs[all_rinko_coefs.index == ssscc].values.squeeze(),
             (
@@ -175,7 +176,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 time_df.loc[time_rows, "OS"],
             ),
         )
-        print(ssscc + " time data fitting done")
+        log.info(ssscc + " time data fitting done")
 
     # flag CTDRINKO with more than 1% difference
     time_df["CTDRINKO_FLAG_W"] = 2  # TODO: actual flagging of some kind?
@@ -184,7 +185,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
 
     # export fitting coefs
-    all_rinko_coefs.to_csv(cfg.directory["logs"] + "rinko_coefs.csv", index=False)
+    all_rinko_coefs.to_csv(cfg.directory["logs"] + "rinko_coefs.csv")
 
     return True
 

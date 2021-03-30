@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import cmocean
@@ -5,6 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+
+log = logging.getLogger(__name__)
 
 #####
 # The following section is a little brittle due to hardcoded names, but we'll fix
@@ -917,7 +920,9 @@ def _intermediate_residual_plot(
     plt.tight_layout()
     if f_out is not None:
         if not Path(f_out).parent.exists():
-            print(f"Path {Path(f_out).parent.as_posix()} does not exists... creating")
+            log.info(
+                f"Path {Path(f_out).parent.as_posix()} does not exists... creating"
+            )
             Path(f_out).parent.mkdir(parents=True)
         plt.savefig(f_out)
     plt.close()

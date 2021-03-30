@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import gsw
+import logging
 import numpy as np
 import pandas as pd
 
@@ -11,6 +12,7 @@ from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 DEBUG = False
 
@@ -124,7 +126,7 @@ def hex_to_ctd(ssscc_list, debug=False):
 
     """
     # TODO: use logger module instead
-    print("Converting .hex files")
+    log.info("Converting .hex files")
     for ssscc in ssscc_list:
         if not Path(cfg.directory["converted"] + ssscc + ".pkl").exists():
             hexFile = cfg.directory["raw"] + ssscc + ".hex"
@@ -137,7 +139,7 @@ def hex_to_ctd(ssscc_list, debug=False):
 
 
 def make_time_files(ssscc_list):
-    print("Generating time.pkl files")
+    log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.directory["time"] + ssscc + "_time.pkl").exists():
             converted_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
@@ -205,7 +207,7 @@ def make_btl_mean(ssscc_list, debug=False):
     boolean
         bottle averaging of mean has finished successfully
     """
-    print("Generating btl_mean.pkl files")
+    log.info("Generating btl_mean.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
             imported_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")

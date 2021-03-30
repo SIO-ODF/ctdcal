@@ -1,5 +1,6 @@
 import csv
 import datetime as dt
+import logging
 import sys
 from collections import OrderedDict
 from pathlib import Path
@@ -11,6 +12,7 @@ import pandas as pd
 from . import get_ctdcal_config
 
 cfg = get_ctdcal_config()
+log = logging.getLogger
 
 
 def _salt_loader(ssscc, salt_dir):
@@ -89,18 +91,17 @@ def _salt_exporter(
         casts = stn_salts[cast_col].unique()
         for cast in casts:
             stn_cast_salts = stn_salts[stn_salts[cast_col] == cast]
+            stn_cast_salts.dropna(axis=1, how="all", inplace=True)  # drop empty columns
             outfile = (  # format to SSSCC_salts.csv
                 outdir + "{0:03}".format(station) + "{0:02}".format(cast) + "_salts.csv"
             )
             if Path(outfile).exists():
-                print(outfile + " already exists...skipping")
+                log.debug(outfile + " already exists...skipping")
                 continue
             stn_cast_salts.to_csv(outfile, index=False)
 
 
 def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
-    # TODO: import salt_dir from a config file
-    # TODO: update and include linear drift correction from above
     """
     Master salt processing function. Load in salt files for given station/cast list,
     calculate salinity, and export to .csv files.
@@ -118,7 +119,7 @@ def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
             try:
                 saltDF, refDF = _salt_loader(ssscc, salt_dir)
             except FileNotFoundError:
-                print("Salt file for cast " + ssscc + " does not exist... skipping")
+                log.warning("Salt file for cast " + ssscc + " does not exist... skipping")
                 continue
             saltDF = remove_autosal_drift(saltDF, refDF)
             saltDF["SALNTY"] = gsw.SP_salinometer(

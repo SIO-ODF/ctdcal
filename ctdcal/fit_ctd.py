@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import gsw
+import logging
 import numpy as np
 import pandas as pd
 import scipy
@@ -14,6 +15,7 @@ from . import get_ctdcal_config
 from . import process_ctd as process_ctd
 
 cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 
 def _conductivity_polyfit(cond, temp, press, coef):
@@ -257,10 +259,12 @@ def calibrate_temp(btl_df, time_df):
     --------
 
     """
-    print("Calibrating temperature")
+    log.info("Calibrating temperature")
     ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_t*.csv"))
     if not ssscc_subsets:  # if no t-segments exists, write one from full list
-        print("No CTDTMP grouping file found... creating ssscc_t1.csv with all casts")
+        log.debug(
+            "No CTDTMP grouping file found... creating ssscc_t1.csv with all casts"
+        )
         if not Path(cfg.directory["ssscc"]).exists():
             Path(cfg.directory["ssscc"]).mkdir()
         ssscc_list = process_ctd.get_ssscc_list()
@@ -492,7 +496,7 @@ def calibrate_cond(btl_df, time_df):
     --------
 
     """
-    print("Calibrating conductivity")
+    log.info("Calibrating conductivity")
     # calculate BTLCOND values from autosal data
     btl_df[cfg.column["refc"]] = convert.CR_to_cond(
         btl_df["CRavg"],
@@ -522,7 +526,9 @@ def calibrate_cond(btl_df, time_df):
 
     ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_c*.csv"))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
-        print("No CTDCOND grouping file found... creating ssscc_c1.csv with all casts")
+        log.debug(
+            "No CTDCOND grouping file found... creating ssscc_c1.csv with all casts"
+        )
         ssscc_list = process_ctd.get_ssscc_list()
         ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_c1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)

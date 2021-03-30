@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import csv
+import logging
 import math
 import warnings
 from collections import OrderedDict
@@ -17,6 +18,7 @@ from . import oxy_fitting as oxy_fitting
 from . import report_ctd as report_ctd
 
 cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", "Mean of empty slice.")
 
@@ -171,7 +173,7 @@ def _find_last_soak_period(
     df_blah["index"] = df_blah.index
     df_blah["bin"] = pd.cut(
         df_blah.loc[:, "index"],
-        range(df_blah.iloc[0]["index"], df_blah.iloc[-1]["index"], time_bin * 24),
+        np.arange(df_blah.iloc[0]["index"], df_blah.iloc[-1]["index"], time_bin * 24),
         labels=False,
         include_lowest=True,
     )
@@ -309,7 +311,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     fl2 = fl * 2
     # Half minute
     ms = 30
-    time_delay = fl * ms
+    time_delay = fl * ms  # time to let CTD pressure reading settle/sit on deck
 
     # split dataframe into upcast/downcast
     downcast = df.iloc[: (df["CTDPRS"].argmax() + 1)]
@@ -333,16 +335,15 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     if start_samples > time_delay:
         start_p = np.average(start_df.iloc[fl2 : (start_samples - time_delay)])
     else:
+        log.warning(f"{stacast}: Less than {ms} seconds of start pressure to average.")
         start_p = np.average(start_df.iloc[fl2:start_samples])
 
     end_samples = len(end_df)
     if end_samples > time_delay:
         end_p = np.average(end_df.iloc[(time_delay):])
     else:
-        try:
-            end_p = np.average(end_df.iloc[(end_samples):])
-        except ZeroDivisionError:
-            end_p = np.NaN
+        log.warning(f"{stacast}: Less than {ms} seconds of end pressure to average.")
+        end_p = np.average(end_df)  # just average whatever there is
 
     # Remove ondeck start and end pressures
     trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
@@ -620,7 +621,7 @@ def load_all_ctd_files(ssscc_list):
     """
     df_list = []
     for ssscc in ssscc_list:
-        print("Loading TIME data for station: " + ssscc + "...")
+        log.info("Loading TIME data for station: " + ssscc + "...")
         time_file = cfg.directory["time"] + ssscc + "_time.pkl"
         time_data = pd.read_pickle(time_file)
         time_data["SSSCC"] = str(ssscc)
@@ -628,7 +629,7 @@ def load_all_ctd_files(ssscc_list):
             time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
         )
         df_list.append(time_data)
-        print("** Finished TIME data station: " + ssscc + " **")
+        # print("** Finished TIME data station: " + ssscc + " **")
     df_data_all = pd.concat(df_list, axis=0, sort=False)
 
     df_data_all["master_index"] = range(len(df_data_all))
@@ -697,7 +698,7 @@ def export_ct1(df, ssscc_list):
     Needs depth_log.csv and manual_depth_log.csv to run successfully
 
     """
-    print("Exporting *_ct1.csv files")
+    log.info("Exporting CTD files")
     # clean up columns
     p_column_names = cfg.ctd_time_output["col_names"]
     p_column_units = cfg.ctd_time_output["col_units"]
@@ -716,14 +717,14 @@ def export_ct1(df, ssscc_list):
         df[p_column_names]
         # this is lazy, do better
     except KeyError as err:
-        print("Column names not configured properly... attempting to correct")
+        log.info("Column names not configured properly... attempting to correct")
         bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
         for col in bad_cols:
             if col.endswith("FLAG_W"):
-                print(col + " missing, flagging with 9s")
+                log.warning(col + " missing, flagging with 9s")
                 df[col] = 9
             else:
-                print(col + " missing, filling with -999s")
+                log.warning(col + " missing, filling with -999s")
                 df[col] = -999
 
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
@@ -739,7 +740,7 @@ def export_ct1(df, ssscc_list):
         )
     except FileNotFoundError:
         # TODO: add logging; look into inheriting/extending a class to add features
-        print("manual_depth_log.csv not found... duplicating depth_log.csv")
+        log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
         manual_depth_df.to_csv(
             cfg.directory["logs"] + "manual_depth_log.csv", index=False
@@ -758,7 +759,7 @@ def export_ct1(df, ssscc_list):
         try:
             depth = full_depth_df.loc[full_depth_df["SSSCC"] == ssscc, "DEPTH"].iloc[0]
         except IndexError:
-            print(f"No depth logged for {ssscc}, setting to -999")  # TODO: logger
+            log.warning(f"No depth logged for {ssscc}, setting to -999")
             depth = -999
 
         # get cast_details for current SSSCC

@@ -1,6 +1,19 @@
 from pathlib import Path
 
 import click
+import logging
+# from rich.logging import RichHandler
+# from rich.console import Console
+
+handler = logging.StreamHandler()
+handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
+FORMAT = "%(funcName)s: %(message)s"
+logging.basicConfig(
+    level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[handler],
+    # handlers=[RichHandler(console=Console(stderr=True))],
+)
+
+log = logging.getLogger(__name__)
 
 
 @click.group()
@@ -29,7 +42,7 @@ def init():
         "pressure",
     ]
 
-    print(f"Building default data directories: \n {*DEFAULT_DIRS,}")
+    log.info(f"Building default data directories: \n {*DEFAULT_DIRS,}")
 
     base_name = Path("./data/")
     for sub_dir in DEFAULT_DIRS:
