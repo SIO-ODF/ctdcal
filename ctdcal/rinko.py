@@ -196,19 +196,12 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             good_data.loc[good_data["SSSCC"].isin(ssscc_sublist)].copy(),
             f_suffix=f"_{f_stem}",
         )
-        coefs_df = pd.DataFrame(
-            index=ssscc_sublist, columns=[f"c{n}" for n in np.arange(0, 8)]
-        )
-        coefs_df.loc[:, :] = rinko_coefs
-        all_rinko_coefs = pd.concat([all_rinko_coefs, coefs_df])
 
-    # apply coefs
-    time_df["CTDRINKO"] = np.nan
-    for ssscc in ssscc_list:
-        btl_rows = (btl_df["SSSCC"] == ssscc).values
-        time_rows = (time_df["SSSCC"] == ssscc).values
+        # apply coefficients
+        btl_rows = btl_df["SSSCC"].isin(ssscc_sublist)
+        time_rows = time_df["SSSCC"].isin(ssscc_sublist)
         btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
-            all_rinko_coefs[all_rinko_coefs.index == ssscc].values.squeeze(),
+            rinko_coefs,
             (
                 btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
                 btl_df.loc[btl_rows, cfg.column["p_btl"]],
@@ -217,9 +210,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 btl_df.loc[btl_rows, "OS"],
             ),
         )
-        log.info(ssscc + " btl data fitting done")
         time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
-            all_rinko_coefs[all_rinko_coefs.index == ssscc].values.squeeze(),
+            rinko_coefs,
             (
                 time_df.loc[time_rows, cfg.column["rinko_oxy"]],
                 time_df.loc[time_rows, cfg.column["p"]],
@@ -228,7 +220,13 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 time_df.loc[time_rows, "OS"],
             ),
         )
-        log.info(ssscc + " time data fitting done")
+
+        # save coefficients for exporting
+        coefs_df = pd.DataFrame(
+            index=ssscc_sublist, columns=[f"c{n}" for n in np.arange(0, 8)]
+        )
+        coefs_df.loc[:, :] = rinko_coefs
+        all_rinko_coefs = pd.concat([all_rinko_coefs, coefs_df])
 
     # flag CTDRINKO with more than 1% difference
     time_df["CTDRINKO_FLAG_W"] = 2  # TODO: actual flagging of some kind?
