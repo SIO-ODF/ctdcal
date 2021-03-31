@@ -75,22 +75,72 @@ def correct_pressure(P, d, E):
     return P_d
 
 
+def salinity_correction(DO_c, T, S):
+    """
+    Oxygen optode is not able to detect salinity, so a correction is applied to
+    account for the effect of salt on oxygen concentration. See Uchida (2010) in
+    GO-SHIP manual (pg. 6, eq. 9) for more info.
+
+    Parameters
+    ----------
+    DO_c : array-like
+        Pressure-corrected dissolved oxygen
+    T : array-like
+        Calibrated CTD temperature
+    S : array-like
+        Calibrated CTD salinity
+
+    Returns
+    -------
+    DO_sc : array-like
+        Pressure- and salinity-corrected dissolved oxygen
+    """
+    # solubility coefficients from Benson and Krause (1984),
+    # as recommended by Garcia and Gordon (1992)
+    B0 = -6.24523e-3
+    B1 = -7.37614e-3
+    B2 = -1.03410e-2
+    B3 = -8.17083e-3
+    C0 = -4.88682e-7
+
+    # "scaled temperature"
+    T_scaled = np.log((298.15 - T) / (273.15 + T))
+
+    # correction equation
+    DO_sc = DO_c * np.exp(
+        S * (B0 + (B1 * T_scaled) + (B2 * T_scaled ** 2) + (B3 * T_scaled ** 3))
+        + C0 * S ** 2
+    )
+
+    return DO_sc
+
+
 def _Uchida_DO_eq(coefs, inputs):
     """
     See Uchida et. al (2008) for more info:
     https://doi.org/10.1175/2008JTECHO549.1
+
+    Parameters
+    ----------
+    coefs : tuple
+        (c0, c1, ... , c7)
+    inputs : tuple
+        (raw voltage, pressure, potential temperature, salinity, oxygen solubility)
     """
     c0, c1, c2, c3, c4, c5, c6, c7 = coefs
-    V_r, T, P, o2_sol = inputs  # raw volts, pot. temperature, pressure, o2 solubility
+    V_r, P, T, S, o2_sol = inputs
 
-    K_sv = c0 + (c1 * T) + (c2 * T ** 2)
-    V_0 = c3 + (c4 * T)
-    V_c = c5 + (c6 * V_r)  # TODO: time drift term(s)?
-    p_comp = (1 + c7 * P / 1000) ** (1 / 3)  # pressure componsation
-    o2_sat = ((V_0 / V_c) - 1) / (K_sv * p_comp)
-    DO = o2_sat * o2_sol
+    # TODO: time drift term(s) for V_c?
+    K_sv = c0 + (c1 * T) + (c2 * T ** 2)  # Stern-Volmer constant (Tengberg et al. 2006)
+    V_0 = c3 + (c4 * T)  # voltage in absense of O2
+    V_c = c5 + (c6 * V_r)  # corrected voltage
+    o2_sat = ((V_0 / V_c) - 1) / K_sv  # oxygen saturation [%]
 
-    return DO
+    DO = o2_sat * o2_sol  # dissolved oxygen concentration
+    DO_c = DO * (1 + c7 * P / 1000) ** (1 / 3)  # pressure compensated DO
+    DO_sc = salinity_correction(DO_c, T, S)  # salinity + pressure compensated DO
+
+    return DO_sc
 
 
 def oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
@@ -161,8 +211,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             all_rinko_coefs[all_rinko_coefs.index == ssscc].values.squeeze(),
             (
                 btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-                btl_df.loc[btl_rows, cfg.column["t1_btl"]],
                 btl_df.loc[btl_rows, cfg.column["p_btl"]],
+                btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                btl_df.loc[btl_rows, cfg.column["sal"]],
                 btl_df.loc[btl_rows, "OS"],
             ),
         )
@@ -171,8 +222,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             all_rinko_coefs[all_rinko_coefs.index == ssscc].values.squeeze(),
             (
                 time_df.loc[time_rows, cfg.column["rinko_oxy"]],
-                time_df.loc[time_rows, cfg.column["t1_btl"]],
-                time_df.loc[time_rows, cfg.column["p_btl"]],
+                time_df.loc[time_rows, cfg.column["p"]],
+                time_df.loc[time_rows, cfg.column["t1"]],
+                time_df.loc[time_rows, cfg.column["sal"]],
                 time_df.loc[time_rows, "OS"],
             ),
         )
@@ -234,14 +286,27 @@ def rinko_oxy_fit(
     weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
     fit_data = (
         btl_df[cfg.column["rinko_oxy"]],
-        btl_df[cfg.column["t1_btl"]],
         btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["t1_btl"]],
+        btl_df[cfg.column["sal"]],
         btl_df["OS"],
     )
+    # bounds need to be specified for all, can't just do c7...
+    coef_bounds = [
+        (None, None),  # c0,
+        (None, None),  # c1,
+        (None, None),  # c2,
+        (None, None),  # c3,
+        (None, None),  # c4,
+        (None, None),  # c5, raw voltage offset
+        (None, None),  # c6, raw voltage slope
+        (0, 0.2),  # c7, pressure compensation
+    ]
     res = scipy.optimize.minimize(
         oxy_weighted_residual,
         x0=rinko_coef0,
         args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
+        bounds=coef_bounds,
     )
 
     cfw_coefs = res.x
@@ -259,12 +324,16 @@ def rinko_oxy_fit(
         weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
         fit_data = (
             btl_df[cfg.column["rinko_oxy"]],
-            btl_df[cfg.column["t1_btl"]],
             btl_df[cfg.column["p_btl"]],
+            btl_df[cfg.column["t1_btl"]],
+            btl_df[cfg.column["sal"]],
             btl_df["OS"],
         )
         res = scipy.optimize.minimize(
-            oxy_weighted_residual, x0=p0, args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
+            oxy_weighted_residual,
+            x0=p0,
+            args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
+            bounds=coef_bounds,
         )
         cfw_coefs = res.x
         btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
