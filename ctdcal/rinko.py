@@ -235,7 +235,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
 
     # export fitting coefs
-    all_rinko_coefs.to_csv(cfg.directory["logs"] + "rinko_coefs.csv")
+    all_rinko_coefs.applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    ).to_csv(cfg.directory["logs"] + "rinko_coefs.csv")
 
     return True
 

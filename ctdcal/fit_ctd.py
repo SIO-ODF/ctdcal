@@ -305,20 +305,22 @@ def calibrate_temp(btl_df, time_df):
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
+        P1_order, T1_order, zRange1 = cfg.fit_orders1[f_stem]
+        P2_order, T2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_t1, df_bad_t1 = _get_T_coefs(
             btl_df[btl_rows],
             T_col=cfg.column["t1_btl"],
-            P_order=1,
-            T_order=0,
-            zRange="1000:6000",
+            P_order=P1_order,
+            T_order=T1_order,
+            zRange=zRange1,
             f_stem=f_stem,
         )
         coef_t2, df_bad_t2 = _get_T_coefs(
             btl_df[btl_rows],
             T_col=cfg.column["t2_btl"],
-            P_order=1,
-            T_order=0,
-            zRange="1000:6000",
+            P_order=P2_order,
+            T_order=T2_order,
+            zRange=zRange2,
             f_stem=f_stem,
         )
 
@@ -401,7 +403,13 @@ def calibrate_temp(btl_df, time_df):
         cfg.directory["logs"] + "qual_flag_t2.csv", index=False
     )
 
-    # export temp fit params
+    # export temp fit params (formated to 5 sig figs, scientific notation)
+    coef_t1_all[coef_names] = coef_t1_all[coef_names].applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    )
+    coef_t2_all[coef_names] = coef_t2_all[coef_names].applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    )
     coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
     coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
 
@@ -569,22 +577,24 @@ def calibrate_cond(btl_df, time_df):
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
+        P1_order, T1_order, C1_order, zRange1 = cfg.fit_orders1[f_stem]
+        P2_order, T2_order, C2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_c1, df_bad_c1 = _get_C_coefs(
             btl_df[btl_rows],
             C_col=cfg.column["c1_btl"],
-            P_order=1,
-            T_order=0,
-            C_order=0,
-            zRange="1000:5000",
+            P_order=P1_order,
+            T_order=T1_order,
+            C_order=C1_order,
+            zRange=zRange1,
             f_stem=f_stem,
         )
         coef_c2, df_bad_c2 = _get_C_coefs(
             btl_df[btl_rows],
             C_col=cfg.column["c2_btl"],
-            P_order=1,
-            T_order=0,
-            C_order=0,
-            zRange="1000:5000",
+            P_order=P2_order,
+            T_order=T2_order,
+            C_order=C2_order,
+            zRange=zRange2,
             f_stem=f_stem,
         )
 
@@ -673,6 +683,12 @@ def calibrate_cond(btl_df, time_df):
     )
 
     # export cond fit params
+    coef_c1_all[coef_names] = coef_c1_all[coef_names].applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    )
+    coef_c2_all[coef_names] = coef_c2_all[coef_names].applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    )
     coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
     coef_c2_all.to_csv(cfg.directory["logs"] + "fit_coef_c2.csv", index=False)
 
