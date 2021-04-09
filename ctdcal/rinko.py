@@ -119,25 +119,25 @@ def _Uchida_DO_eq(coefs, inputs):
     """
     See Uchida et. al (2008) for more info:
     https://doi.org/10.1175/2008JTECHO549.1
+    and Uchida et. al (2010) - GO-SHIP manual
 
     Parameters
     ----------
     coefs : tuple
-        (c0, c1, ... , c7)
+        (c0, c1, c2, d0, d1, d2, cp)
     inputs : tuple
-        (raw voltage, pressure, potential temperature, salinity, oxygen solubility)
+        (raw voltage, pressure, temperature, salinity, oxygen solubility)
     """
-    c0, c1, c2, c3, c4, c5, c6, c7 = coefs
+    c0, c1, c2, d0, d1, d2, cp = coefs
     V_r, P, T, S, o2_sol = inputs
 
-    # TODO: time drift term(s) for V_c?
     K_sv = c0 + (c1 * T) + (c2 * T ** 2)  # Stern-Volmer constant (Tengberg et al. 2006)
-    V_0 = c3 + (c4 * T)  # voltage in absense of O2
-    V_c = c5 + (c6 * V_r)  # corrected voltage
-    o2_sat = ((V_0 / V_c) - 1) / K_sv  # oxygen saturation [%]
+    V0 = (1 + d0 * T)  # voltage at zero oxygen (Uchida 2010, eq. 10)
+    Vc = (d1 + d2 * V_r)  # raw voltage (Uchida 2010, eq. 10)
+    o2_sat = ((V0 / Vc) - 1) / K_sv  # oxygen saturation [%] (Uchida 2010, eq. 6)
 
     DO = o2_sat * o2_sol  # dissolved oxygen concentration
-    DO_c = DO * (1 + c7 * P / 1000) ** (1 / 3)  # pressure compensated DO
+    DO_c = DO * (1 + cp * P / 1000) ** (1 / 3)  # pressure compensated DO
     DO_sc = salinity_correction(DO_c, T, S)  # salinity + pressure compensated DO
 
     return DO_sc
@@ -180,53 +180,64 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     log.info("Calibrating oxygen (RINKO)")
 
+    # initialize coef df
+    coefs_df = pd.DataFrame(columns=["c0", "c1", "c2", "d0", "d1", "d2", "cp"])
+
     # Only fit using OXYGEN flagged good (2)
     good_data = btl_df[btl_df["OXYGEN_FLAG_W"] == 2].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
-    (rinko_coefs0, _) = rinko_oxy_fit(good_data, f_suffix="_ox0")
+    (rinko_coefs0, _) = rinko_oxy_fit(good_data, f_suffix="_r0")
+    coefs_df.loc["r0"] = rinko_coefs0  # log for comparison
 
     # fit station groups, like T/C fitting (ssscc_r1, _r2, etc.)
     ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_r*.csv"))
-    all_rinko_coefs = pd.DataFrame()
     for f in ssscc_subsets:
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         f_stem = f.stem
-        (rinko_coefs, _) = rinko_oxy_fit(
+        (rinko_coefs_group, _) = rinko_oxy_fit(
             good_data.loc[good_data["SSSCC"].isin(ssscc_sublist)].copy(),
+            rinko_coef0=rinko_coefs0,
             f_suffix=f"_{f_stem}",
         )
+        coefs_df.loc[f_stem.split("_")[1]] = rinko_coefs_group  # log for comparison
 
-        # apply coefficients
-        btl_rows = btl_df["SSSCC"].isin(ssscc_sublist)
-        time_rows = time_df["SSSCC"].isin(ssscc_sublist)
-        btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
-            rinko_coefs,
-            (
-                btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-                btl_df.loc[btl_rows, cfg.column["p_btl"]],
-                btl_df.loc[btl_rows, cfg.column["t1_btl"]],
-                btl_df.loc[btl_rows, cfg.column["sal"]],
-                btl_df.loc[btl_rows, "OS"],
-            ),
-        )
-        time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
-            rinko_coefs,
-            (
-                time_df.loc[time_rows, cfg.column["rinko_oxy"]],
-                time_df.loc[time_rows, cfg.column["p"]],
-                time_df.loc[time_rows, cfg.column["t1"]],
-                time_df.loc[time_rows, cfg.column["sal"]],
-                time_df.loc[time_rows, "OS"],
-            ),
-        )
+        # deal with time dependent coefs by further fitting individual casts
+        # NOTE (4/9/21): tried adding time drift term unsuccessfully
+        # Uchida (2010) says fitting individual stations is the same (even preferred?)
+        for ssscc in ssscc_sublist:
+            (rinko_coefs_ssscc, _) = rinko_oxy_fit(
+                good_data.loc[good_data["SSSCC"] == ssscc].copy(),
+                rinko_coef0=rinko_coefs_group,
+                f_suffix=f"_{ssscc}",
+            )
 
-        # save coefficients for exporting
-        coefs_df = pd.DataFrame(
-            index=ssscc_sublist, columns=[f"c{n}" for n in np.arange(0, 8)]
-        )
-        coefs_df.loc[:, :] = rinko_coefs
-        all_rinko_coefs = pd.concat([all_rinko_coefs, coefs_df])
+            # apply coefficients
+            btl_rows = btl_df["SSSCC"] == ssscc
+            time_rows = time_df["SSSCC"] == ssscc
+            btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
+                rinko_coefs_ssscc,
+                (
+                    btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
+                    btl_df.loc[btl_rows, cfg.column["p_btl"]],
+                    btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                    btl_df.loc[btl_rows, cfg.column["sal"]],
+                    btl_df.loc[btl_rows, "OS"],
+                ),
+            )
+            time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
+                rinko_coefs_ssscc,
+                (
+                    time_df.loc[time_rows, cfg.column["rinko_oxy"]],
+                    time_df.loc[time_rows, cfg.column["p"]],
+                    time_df.loc[time_rows, cfg.column["t1"]],
+                    time_df.loc[time_rows, cfg.column["sal"]],
+                    time_df.loc[time_rows, "OS"],
+                ),
+            )
+
+            # save coefficients to dataframe
+            coefs_df.loc[ssscc] = rinko_coefs_ssscc
 
     # flag CTDRINKO with more than 1% difference
     time_df["CTDRINKO_FLAG_W"] = 2  # TODO: actual flagging of some kind?
@@ -235,7 +246,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
 
     # export fitting coefs
-    all_rinko_coefs.applymap(
+    coefs_df.applymap(
         lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
     ).to_csv(cfg.directory["logs"] + "rinko_coefs.csv")
 
@@ -248,7 +259,6 @@ def rinko_oxy_fit(
         1.89890,
         1.71137e-2,
         1.59838e-4,
-        1,
         -1.07941e-3,
         -1.23152e-1,
         3.06114e-1,
@@ -291,16 +301,15 @@ def rinko_oxy_fit(
         btl_df[cfg.column["sal"]],
         btl_df["OS"],
     )
-    # bounds need to be specified for all, can't just do c7...
+    # bounds need to be specified for all, can't just do cp...
     coef_bounds = [
         (None, None),  # c0,
         (None, None),  # c1,
         (None, None),  # c2,
-        (None, None),  # c3,
-        (None, None),  # c4,
-        (None, None),  # c5, raw voltage offset
-        (None, None),  # c6, raw voltage slope
-        (0, 0.2),  # c7, pressure compensation
+        (None, None),  # d0,
+        (None, None),  # d1,
+        (None, None),  # d2,
+        (0, 0.2),  # cp, pressure compensation
     ]
     res = scipy.optimize.minimize(
         oxy_weighted_residual,
