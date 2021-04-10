@@ -109,33 +109,14 @@ def _trim_soak_period(df=None):
     return df_trimmed
 
 
-def _find_last_soak_period(
-    df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50
-):
-    """Find the soak period before the downcast starts.
+def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
+    """
+    Find the soak period before the downcast starts.
 
     The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
     parameters. This assumes the soak depth will be somewhere between 10 and 30
     meters, the package will sit at the soak depth for at least 20 to 30 seconds
     before starting ascent to the surface and descent to target depth.
-
-    Parameters
-    ----------
-    df_cast : DataFrame
-        DataFrame of the entire cast
-    surface_pressure : integer
-        Minimum surface pressure threshold required to look for soak depth.
-        2 dbar was chosen as an average rosette is roughly 1.5 to 2 meters tall.
-    time_bin : integer
-        Time, in whole seconds.
-    downcast_pressure : integer
-        Minimum pressure threshold required to assume downcast has started.
-        50 dbar has been chosen as double the deep soak depth of 20-30 dbar.
-
-    Returns
-    -------
-    df_cast_ret : DataFrame
-        DataFrame starting within time_bin seconds of the last soak period.
 
     The algorithm is not guaranteed to catch the exact start of the soak period,
     but within a minimum period of time_bin seconds(?) from end of the soak if
@@ -149,70 +130,80 @@ def _find_last_soak_period(
         * A cast where the pumps turn on and off due to rosette coming out of water
         * A cast where there are multiple stops on the downcast to the target depth
 
+    Parameters
+    ----------
+    df_cast : DataFrame
+        DataFrame of the entire cast, from deckbox on to deckbox off
+    time_bin : integer, optional
+        Number of seconds to bin average for descent rate calculation
+    P_surface : integer, optional
+        Minimum surface pressure threshold required to look for soak depth
+        (2 dbar was chosen as an average rosette is roughly 1.5 to 2 meters tall)
+    P_downcast : integer, optional
+        Minimum pressure threshold required to assume downcast has started
+        (50 dbar has been chosen as double the deep soak depth of 20-30 dbar)
+
+    Returns
+    -------
+    df_cast_trimmed : DataFrame
+        DataFrame starting within time_bin seconds of the last soak period.
     """
     # Validate user input
     if time_bin <= 0:
         raise ValueError("Time bin value should be positive whole seconds.")
-    if downcast_pressure <= 0:
+    if P_downcast <= 0:
         raise ValueError(
             "Starting downcast pressure threshold must be positive integers."
         )
-    if downcast_pressure < surface_pressure:
+    if P_downcast < P_surface:
         raise ValueError(
             "Starting downcast pressure threshold must be greater \
                         than surface pressure threshold."
         )
 
     # If pumps have not turned on until in water, return DataFrame
-    if df_cast.iloc[0]["CTDPRS"] > surface_pressure:
+    if df_cast.iloc[0]["CTDPRS"] > P_surface:
         return df_cast
 
-    """code_pruning: variables should always have relevant names, even if it needs to be changed later with find/replace"""
     # Bin the data by time, and compute the average rate of descent
-    df_blah = df_cast.loc[:, :]
-    df_blah["index"] = df_blah.index
-    df_blah["bin"] = pd.cut(
-        df_blah.loc[:, "index"],
-        np.arange(df_blah.iloc[0]["index"], df_blah.iloc[-1]["index"], time_bin * 24),
+    df_cast["index"] = df_cast.index  # needed at end to identify start_idx
+    df_cast["bin"] = pd.cut(
+        df_cast.index,
+        np.arange(df_cast.index[0], df_cast.index[-1], time_bin * 24),
         labels=False,
         include_lowest=True,
     )
-    df_blah2 = df_blah.groupby("bin").mean()
+    df_binned = df_cast.groupby("bin").mean()
 
     # Compute difference of descent rates and label bins
-    df_blah2["prs_diff"] = df_blah2["CTDPRS"].diff().fillna(0).round(0)
-    df_blah2["movement"] = pd.cut(
-        df_blah2["prs_diff"], [-1000, -0.5, 0.5, 1000], labels=["up", "stop", "down"]
+    df_binned["dP"] = df_binned["CTDPRS"].diff().fillna(0).round(0)
+    df_binned["movement"] = pd.cut(
+        df_binned["dP"], [-1000, -0.5, 0.5, 1000], labels=["up", "stop", "down"]
     )
 
     # Find all periods where the rosette is not moving
-    # df_stop = df_blah2.groupby("movement").get_group("stop")
-    groupby_test = df_blah2.groupby(
-        df_blah2["movement"].ne(df_blah2["movement"].shift()).cumsum()
+    df_group = df_binned.groupby(
+        df_binned["movement"].ne(df_binned["movement"].shift()).cumsum()
     )
-    list_test = [g for i, g in groupby_test]
+    df_list = [g for i, g in df_group]
 
-    # Find a dataframe index of the last soak period before starting descent
-    def poop(list_obj, downcast_pressure):
-        """Return dataframe index in the last soak period before starting
-        descent to target depth.
-        """
-        for i, x in zip(range(len(list_test)), list_test):
-            if x["CTDPRS"].max() < downcast_pressure:
-                if x.max()["movement"] == "stop":
-                    index = i
-            if x["CTDPRS"].max() > downcast_pressure:
-                return index
-        return index
+    # Find last soak period before starting descent to target depth
+    def find_last(df_list, P_downcast):
+        for idx, df in enumerate(df_list):
+            if df["CTDPRS"].max() < P_downcast:
+                # make sure it's soak, not a stop to switch to autocast (i.e. A20 2021)
+                # TODO: try instead finding max depth then working backwards?
+                if df.max()["movement"] == "stop" and len(df) > 1:
+                    last_idx = idx
+            else:
+                return last_idx
+        return last_idx
 
-    # Truncate dataframe to new starting index : end of dataframe
-    start_index = np.around(
-        list_test[poop(list_test, downcast_pressure)].head(1)["index"]
-    )
-    df_cast = df_cast.set_index("index")
-    df_cast = df_cast.loc[int(start_index) :, :]
-    df_cast_ret = df_cast.reset_index()
-    return df_cast_ret
+    # Trim off everything before last soak
+    start_idx = int(df_list[find_last(df_list, P_downcast)].head(1)["index"])
+    df_cast_trimmed = df_cast.loc[start_idx:].reset_index()
+
+    return df_cast_trimmed
 
 
 def ctd_align(inMat=None, col=None, time=0.0):
