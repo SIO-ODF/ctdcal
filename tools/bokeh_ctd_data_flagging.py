@@ -199,7 +199,7 @@ upcast_sal = fig.triangle(
 )
 fig.select(BoxSelectTool).select_every_mousemove = False
 fig.y_range.flipped = True  # invert y-axis
-fig.legend.location = "bottom_left"
+fig.legend.location = "bottom_right"
 fig.legend.border_line_width = 3
 fig.legend.border_line_alpha = 1
 btl_sal.nonselection_glyph.line_alpha = 0.2
@@ -214,9 +214,10 @@ def update_selectors():
     print("exec update_selectors()")
     ctd_rows = ctd_data["SSSCC"] == station.value
     table_rows = btl_data["SSSCC"] == station.value
-    btl_rows = (btl_data["New Flag"].isin(flag_list.value)) & (
+    btl_rows = (btl_data["New Flag"].isin([int(v) for v in flag_list.value])) & (
         btl_data["SSSCC"] == station.value
     )
+    # breakpoint()
 
     # update table data
     current_table = btl_data[table_rows].reset_index()

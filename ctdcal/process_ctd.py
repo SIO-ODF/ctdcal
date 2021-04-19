@@ -326,17 +326,46 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     if start_samples > time_delay:
         start_p = np.average(start_df.iloc[fl2 : (start_samples - time_delay)])
     else:
-        log.warning(f"{stacast}: Less than {ms} seconds of start pressure to average.")
+        start_seconds = start_samples / fl
+        log.warning(
+            f"{stacast}: Only {start_seconds:0.1f} seconds of start pressure averaged."
+        )
         start_p = np.average(start_df.iloc[fl2:start_samples])
 
     end_samples = len(end_df)
     if end_samples > time_delay:
         end_p = np.average(end_df.iloc[(time_delay):])
     else:
-        log.warning(f"{stacast}: Less than {ms} seconds of end pressure to average.")
+        end_seconds = end_samples / fl
+        log.warning(
+            f"{stacast}: Only {end_seconds:0.1f} seconds of end pressure averaged."
+        )
         end_p = np.average(end_df)  # just average whatever there is
 
     # Remove ondeck start and end pressures
+    if len(start_df) == 0:
+        log.warning("Failed to find starting deck pressure.")
+        for n in [1, 2]:
+            try:
+                (downcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
+            except KeyError:
+                log.warning(
+                    f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
+                )
+        breakpoint()
+    if len(end_df) == 0:
+        log.warning("Failed to find ending deck pressure.")
+        for n in [1, 2]:
+            try:
+                (upcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
+            except KeyError:
+                log.warning(
+                    f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
+                )
+        breakpoint()
+    # MK (3/23/20, 11am):
+    # auto end calculation failed bc cond2 is still >30
+    # may have to do manually or just use cond1 for station 00901
     trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
 
     # Log ondeck pressures
@@ -409,10 +438,21 @@ def pressure_sequence(df, p_col="CTDPRS", direction="down"):
     # pandas.cut() to do binning
 
     df_filtered = roll_filter(df, p_col, direction=direction)
-    df_filled = _fill_surface_data(df_filtered, bin_size=2)
-    df_binned = binning_df(df_filled, bin_size=2)  # TODO: abstract bin_size in config
 
-    return df_binned.reset_index(drop=True)
+    # 04/11/21 MK: this is not behaving properly or the order is wrong?
+    # Currently this function fills the top-most good CTD value *before* bin avg,
+    # so those bin averages are not the same as the first good binned value.
+    # df_filled = _fill_surface_data(df_filtered, bin_size=2)
+
+    df_binned = binning_df(df_filtered, bin_size=2)  # TODO: abstract bin_size in config
+    fill_rows = df_binned["CTDPRS"].isna()
+    df_binned.loc[fill_rows, "CTDPRS"] = df_binned[fill_rows].index.to_numpy()
+    df_binned.bfill(inplace=True)
+    df_binned.loc[:, "interp_bool"] = False
+    df_binned.loc[fill_rows, "interp_bool"] = True
+    df_filled = _flag_backfill_data(df_binned).drop(columns="interp_bool")
+
+    return df_filled.reset_index(drop=True)
 
 
 def binning_df(df, p_column="CTDPRS", bin_size=2):
@@ -435,13 +475,14 @@ def binning_df(df, p_column="CTDPRS", bin_size=2):
     """
     if p_column not in df.columns:
         raise KeyError(f"{p_column} column missing from dataframe")
+    # breakpoint()
     p_max = np.ceil(df[p_column].max())
     labels = np.arange(0, p_max, bin_size)
     bin_edges = np.arange(0, p_max + bin_size, bin_size)
-    df["bins"] = pd.cut(
+    df.loc[:, "bins"] = pd.cut(
         df[p_column], bins=bin_edges, right=False, include_lowest=True, labels=labels
     )
-    df[p_column] = df["bins"].astype(float)
+    df.loc[:, p_column] = df["bins"].astype(float)
     df_out = df.groupby("bins").mean()
     return df_out
 
@@ -693,15 +734,24 @@ def export_ct1(df, ssscc_list):
     # clean up columns
     p_column_names = cfg.ctd_time_output["col_names"]
     p_column_units = cfg.ctd_time_output["col_units"]
+    p_column_names.pop(1)  # remove CTDPRS_FLAG_W
+    p_column_units.pop(1)  # remove CTDPRS_FLAG_W
 
     # initial flagging (some of this should be moved)
     # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
     # TODO: may not always have these channels so don't hardcode them in!
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
-    df["CTDBACKSCATTER_FLAG_W"] = 1
+    # df["CTDBACKSCATTER_FLAG_W"] = 1
+
     # renames
-    df = df.rename(columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"})
+    df = df.rename(
+        columns={
+            "CTDTMP1": "CTDTMP",
+            # "CTDRINKO": "CTDOXY",
+            # "CTDRINKO_FLAG_W": "CTDOXY_FLAG_W",
+        }
+    )
 
     # check that all columns are there
     try:
@@ -743,9 +793,19 @@ def export_ct1(df, ssscc_list):
 
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
+        # switch oxygen primary sensor to rinko from 03601 onward
+        if int(ssscc[:3]) > 35:
+            print(f"Using Rinko as CTDOXY for {ssscc}")
+            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[p_column_names]
         time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
+
+        # force flags back to int (TODO: make flags categorical)
+        for col in time_data.columns:
+            if col.endswith("FLAG_W"):
+                time_data[col] = time_data[col].astype(int)
 
         try:
             depth = full_depth_df.loc[full_depth_df["SSSCC"] == ssscc, "DEPTH"].iloc[0]

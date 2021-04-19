@@ -168,7 +168,7 @@ def _prepare_fit_data(df, param, ref_param, zRange=None):
         ]
 
     good_data["Diff"] = good_data[ref_param] - good_data[param]
-    good_data["Flag"] = flagging.outliers(good_data["Diff"])
+    good_data["Flag"] = flagging.outliers(good_data["Diff"], n_sigma2=4)
 
     df_good = good_data[good_data["Flag"] == 2].copy()
     df_bad = good_data[good_data["Flag"] == 4].copy()
@@ -278,7 +278,9 @@ def calibrate_temp(btl_df, time_df):
     for f in ssscc_subsets:
         # 0) load ssscc subset to be fit together
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
-        btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
+        btl_rows = (btl_df["SSSCC"].isin(ssscc_sublist).values) & (
+            btl_df["REFTMP_FLAG_W"] == 2  # only use good readings
+        )
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
         # 1) plot pre-fit residual
@@ -711,6 +713,9 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["sal"]],
         btl_df["SALNTY"],
         btl_df[cfg.column["p"]],
+    )
+    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.nan_values(
+        btl_df[cfg.column["sal"]], old_flags=btl_df[cfg.column["sal"] + "_FLAG_W"]
     )
 
     return btl_df, time_df

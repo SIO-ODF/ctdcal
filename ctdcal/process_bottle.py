@@ -367,6 +367,50 @@ def load_hy_file(path_to_hyfile):
     return df
 
 
+def export_report_data(df):
+
+    df["STNNBR"] = [int(x[0:3]) for x in df["SSSCC"]]
+    df["CTDPRS"] = df["CTDPRS"].round(1)
+    cruise_report_cols = [
+        "STNNBR",
+        "CTDPRS",
+        "CTDTMP1",
+        "CTDTMP1_FLAG_W",
+        "CTDTMP2",
+        "CTDTMP2_FLAG_W",
+        "REFTMP",
+        "CTDCOND1",
+        "CTDCOND1_FLAG_W",
+        "CTDCOND2",
+        "CTDCOND2_FLAG_W",
+        "BTLCOND",
+        "CTDSAL",
+        "CTDSAL_FLAG_W",
+        "SALNTY",
+        "CTDOXY",
+        "CTDOXY_FLAG_W",
+        "CTDRINKO",
+        "CTDRINKO_FLAG_W",
+        "OXYGEN",
+    ]
+
+    # add in missing flags
+    df["CTDTMP1_FLAG_W"] = flagging.by_residual(
+        df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
+    )
+    df["CTDTMP2_FLAG_W"] = flagging.by_residual(
+        df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
+    )
+    df["CTDCOND1_FLAG_W"] = flagging.by_residual(df["CTDCOND1"], df["BTLCOND"], df["CTDPRS"])
+    df["CTDCOND2_FLAG_W"] = flagging.by_residual(df["CTDCOND2"], df["BTLCOND"], df["CTDPRS"])
+    df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
+    df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
+
+    df[cruise_report_cols].to_csv("data/scratch_folder/report_data.csv", index=False)
+
+    return
+
+
 def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
     log.info("Exporting bottle file")
     btl_data = df.copy()
@@ -393,6 +437,10 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
         "CTDSAL_FLAG_W": "",
         "SALNTY": "PSS-78",
         "SALNTY_FLAG_W": "",
+        # "CTDOXY": "UMOL/KG",
+        # "CTDOXY_FLAG_W": "",
+        # "CTDRINKO": "UMOL/KG",
+        # "CTDRINKO_FLAG_W": "",
         "CTDOXY": "UMOL/KG",
         "CTDOXY_FLAG_W": "",
         "OXYGEN": "UMOL/KG",
@@ -403,7 +451,14 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
 
     # rename
     # TODO: put in config file which line to use (primary vs. secondary)
-    btl_data = btl_data.rename(columns={"CTDTMP1": "CTDTMP"})
+    btl_data = btl_data.rename(
+        columns={
+            "CTDTMP1": "CTDTMP",
+            # "CTDRINKO": "CTDOXY",
+            # "CTDRINKO_FLAG_W": "CTDOXY_FLAG_W",
+        }
+    )
+
     btl_data["EXPOCODE"] = cfg.cruise["expocode"]
     btl_data["SECT_ID"] = cfg.cruise["sectionid"]
     btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
@@ -415,6 +470,11 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
     btl_data = btl_data.sort_values(
         by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
     )
+
+    # switch oxygen primary sensor to rinko from 03601 onward
+    rinko_rows = ~btl_data["STNNBR"].isin(np.arange(1, 36))
+    btl_data.loc[rinko_rows, "CTDOXY"] = btl_data.loc[rinko_rows, "CTDRINKO"]
+    btl_data.loc[rinko_rows, "CTDOXY_FLAG_W"] = btl_data.loc[rinko_rows, "CTDRINKO_FLAG_W"]
 
     # round data
     for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:

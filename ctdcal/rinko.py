@@ -212,9 +212,44 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 f_suffix=f"_{ssscc}",
             )
 
-            # apply coefficients
+            # check mean/stdev to see if new fit is better or worse
             btl_rows = btl_df["SSSCC"] == ssscc
             time_rows = time_df["SSSCC"] == ssscc
+            group_resid = (
+                _Uchida_DO_eq(
+                    rinko_coefs_group,
+                    (
+                        btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
+                        btl_df.loc[btl_rows, cfg.column["p_btl"]],
+                        btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                        btl_df.loc[btl_rows, cfg.column["sal"]],
+                        btl_df.loc[btl_rows, "OS"],
+                    ),
+                )
+                - btl_df.loc[btl_rows, "OXYGEN"]
+            )
+            ssscc_resid = (
+                _Uchida_DO_eq(
+                    rinko_coefs_ssscc,
+                    (
+                        btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
+                        btl_df.loc[btl_rows, cfg.column["p_btl"]],
+                        btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                        btl_df.loc[btl_rows, cfg.column["sal"]],
+                        btl_df.loc[btl_rows, "OS"],
+                    ),
+                )
+                - btl_df.loc[btl_rows, "OXYGEN"]
+            )
+            worse_mean = np.abs(ssscc_resid.mean()) > np.abs(group_resid.mean())
+            worse_stdev = ssscc_resid.std() > group_resid.std()
+            if worse_mean and worse_stdev:
+                log.info(
+                    f"{ssscc} fit parameters worse than {f_stem} group – reverting back"
+                )
+                rinko_coefs_ssscc = rinko_coefs_group
+
+            # apply coefficients
             btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
                 rinko_coefs_ssscc,
                 (
@@ -243,6 +278,27 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     time_df["CTDRINKO_FLAG_W"] = 2  # TODO: actual flagging of some kind?
     btl_df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(
         btl_df["CTDRINKO"], btl_df["OXYGEN"], percent_thresh=1
+    )
+
+    # Plot all post fit data
+    f_out = f"{cfg.directory['rinko_fit_figs']}rinko_residual_all_postfit.pdf"
+    ctd_plots._intermediate_residual_plot(
+        btl_df["OXYGEN"] - btl_df["CTDRINKO"],
+        btl_df["CTDPRS"],
+        btl_df["SSSCC"],
+        xlabel="CTDRINKO Residual (umol/kg)",
+        f_out=f_out,
+        xlim=(-10, 10),
+    )
+    f_out = f"{cfg.directory['rinko_fit_figs']}rinko_residual_all_postfit_flag2.pdf"
+    flag2 = btl_df["CTDRINKO_FLAG_W"] == 2
+    ctd_plots._intermediate_residual_plot(
+        btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDRINKO"],
+        btl_df.loc[flag2, "CTDPRS"],
+        btl_df.loc[flag2, "SSSCC"],
+        xlabel="CTDRINKO Residual (umol/kg)",
+        f_out=f_out,
+        xlim=(-10, 10),
     )
 
     # export fitting coefs

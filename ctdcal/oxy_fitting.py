@@ -809,6 +809,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
+    sbe43_dict["ox0"] = sbe_coef0
 
     # Fit each cast individually
     for ssscc in ssscc_list:
@@ -872,6 +873,16 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
         btl_df["SSSCC"],
+        xlabel="CTDOXY Residual (umol/kg)",
+        f_out=f_out,
+        xlim=(-10, 10),
+    )
+    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_postfit_flag2.pdf"
+    flag2 = btl_df["CTDOXY_FLAG_W"] == 2
+    ctd_plots._intermediate_residual_plot(
+        btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDOXY"],
+        btl_df.loc[flag2, "CTDPRS"],
+        btl_df.loc[flag2, "SSSCC"],
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
         xlim=(-10, 10),

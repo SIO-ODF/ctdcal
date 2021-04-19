@@ -2,8 +2,21 @@ from pathlib import Path
 
 import click
 import logging
+
+# Rich handling
 # from rich.logging import RichHandler
 # from rich.console import Console
+# handler = logging.StreamHandler()
+# handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
+# FORMAT = "%(funcName)s: %(message)s"
+# logging.basicConfig(
+#     level="INFO",
+#     format=FORMAT,
+#     datefmt="[%X]",
+#     handlers=[handler, RichHandler(console=Console(stderr=True))],
+# )
+
+# log = logging.getLogger(__name__)
 
 handler = logging.StreamHandler()
 handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
@@ -82,6 +95,14 @@ def process(group, type):
     elif group == "PMEL":
         # pmel_process()
         pass
+
+
+@cli.command()
+def cruise_report():
+    """Generate bottle residual figures for cruise report"""
+
+    from .scripts.cruise_report import cruise_report_residuals
+    cruise_report_residuals()
 
 
 if __name__ == "__main__":

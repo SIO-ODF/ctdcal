@@ -126,7 +126,7 @@ def outliers(
     data_mean = mean(data[~questionable])
     data_std = std(data[~questionable])
     outliers = np.abs(data - data_mean) > (n_sigma2 * data_std)
-    flags[outliers] = flag_outlier
+    flags[outliers.values] = flag_outlier
 
     return _merge_flags(flags, old_flags)
 

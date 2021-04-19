@@ -149,6 +149,8 @@ def make_time_files(ssscc_list):
             if ssscc == "00901":
                 # 00901 had 3 large pressure spikes, one of which was 3000 > x > 6500
                 bad_rows = converted_df["CTDPRS"].abs() > 3000
+            if bad_rows.any():
+                log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
             converted_df.loc[bad_rows, :] = np.nan
             converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
@@ -213,6 +215,15 @@ def make_btl_mean(ssscc_list, debug=False):
             imported_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
             mean_df = btl.bottle_mean(bottle_df)
+            if ssscc == "04301":
+                # console glitch mess
+                log.info(f"Updating bottle fire order for {ssscc} (30-35 -> 31-36)")
+                mean_df.loc[np.arange(30, 36), "btl_fire_num"] = np.arange(31, 37)
+                mean_df.loc[36, ["btl_fire", "btl_fire_num"]] = [0, 30]
+                mean_df = mean_df.sort_values("btl_fire_num").reset_index(drop=True)
+            if ssscc in ["06701", "06801", "07401", "07501", "07701", "07801", "07901"]:
+                log.info(f"Swapping bottles 2 and 4 for {ssscc}")
+                mean_df.loc[[2, 4], "btl_fire_num"] = [4, 2]
             mean_df.to_pickle(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
@@ -390,9 +401,11 @@ def convertFromSBEReader(sbeReader, debug=False):
             print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
             # TODO: put some kind of user-enabled flag in config.py, e.g.
             # if cfg["correct_oxy_hysteresis"]:
-            # sbe_eq.sbe43_hysteresis_voltage(raw_df[meta['column']], p_array, coefs)
+            V_corrected = sbe_eq.sbe43_hysteresis_voltage(
+                raw_df[meta["column"]], p_array, coefs
+            )
             converted_df[col] = sbe_eq.sbe43(
-                raw_df[meta["column"]],
+                V_corrected,
                 p_array,
                 t_array,
                 c_array,

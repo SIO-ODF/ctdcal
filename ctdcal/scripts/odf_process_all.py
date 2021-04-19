@@ -79,12 +79,15 @@ def odf_process_all():
     oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
 
     # calibrate oxygen against reference
-    # oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+    oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
     rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #####
     # Step 3: export data
     #####
+
+    # export files for making cruise report figs
+    process_bottle.export_report_data(btl_data_all)
 
     # export to Exchange format
     # TODO: clean this up more

@@ -130,22 +130,26 @@ def main(argv):
         df_all = df_all.fillna(fillna_values)
 
     # create the stupid string
-    stringy = "CASTNO,CTDBACKSCATTER,CTDBACKSCATTER_FLAG_W,CTDFLUOR,CTDFLUOR_FLAG_W,"
+    # stringy = "CASTNO,CTDBACKSCATTER,CTDBACKSCATTER_FLAG_W,CTDFLUOR,CTDFLUOR_FLAG_W,"
+    # MK 03/27/21: no backscatter on A20/22
+    stringy = "CASTNO,CTDFLUOR,CTDFLUOR_FLAG_W,"
     stringy += (
-        "CTDOXY,CTDOXY_FLAG_W,CTDPRS,CTDPRS_FLAG_W,CTDRINKO,CTDRINKO_FLAG_W,CTDSAL,"
+        # "CTDOXY,CTDOXY_FLAG_W,CTDPRS,CTDRINKO,CTDRINKO_FLAG_W,CTDSAL,"
+        "CTDOXY,CTDOXY_FLAG_W,CTDPRS,CTDSAL,"
     )
     stringy += "CTDSAL_FLAG_W,CTDTMP,CTDTMP_FLAG_W,CTDXMISS,CTDXMISS_FLAG_W,REFTMP,REFTMP_FLAG_W,"
-    stringy += "SAMPNO,STNNBR\n,VOLTS,,VOLTS,,UMOL/KG,,DBAR,,VOLTS,,PSS-78,,ITS-90,,VOLTS,,ITS-90,,,\n"
+    # stringy += "SAMPNO,STNNBR\n,VOLTS,,VOLTS,,UMOL/KG,,DBAR,,VOLTS,,PSS-78,,ITS-90,,VOLTS,,ITS-90,,,\n"
+    stringy += "SAMPNO,STNNBR\n,VOLTS,,UMOL/KG,,DBAR,,VOLTS,,PSS-78,,ITS-90,,VOLTS,,ITS-90,,,\n"
     # the next line is incredibly stupid. find a better way to create
     stringy += df_all.iloc[:, 0:-1].to_string(
         header=False,
         index=False,
         formatters=[
-            lambda x: str(x) + ",",
-            lambda x: str(x) + ",",
-            lambda x: str(x) + ",",
-            lambda x: str(x) + ",",
-            lambda x: str(x) + ",",
+            # lambda x: str(x) + ",",
+            # lambda x: str(x) + ",",
+            # lambda x: str(x) + ",",
+            # lambda x: str(x) + ",",
+            # lambda x: str(x) + ",",
             lambda x: str(x) + ",",
             lambda x: str(x) + ",",
             lambda x: str(x) + ",",

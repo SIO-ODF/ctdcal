@@ -31,7 +31,7 @@ ctd_outputs = dict(
     temp=["CTDTMP", "CTDTMP_FLAG_W", "ITS-90", ""],
     salt=["CTDSAL", "CTDSAL_FLAG_W", "PSS-78", ""],
     doxy=["CTDOXY", "CTDOXY_FLAG_W", "UMOL/KG", ""],
-    rinko=["CTDRINKO", "CTDRINKO_FLAG_W", "UMOL/KG", ""],
+    # rinko=["CTDRINKO", "CTDRINKO_FLAG_W", "UMOL/KG", ""],
     # rinko=["CTDOXY", "CTDOXY_FLAG_W", "UMOL/KG", ""],  # reporting Rinko as primary oxy
     xmiss=["CTDXMISS", "CTDXMISS_FLAG_W", "0-5VDC", ""],
     fluor=["CTDFLUOR", "CTDFLUOR_FLAG_W", "0-5VDC", ""],
@@ -57,18 +57,22 @@ ctd_time_output = dict(col_names=ctd_col_names, col_units=ctd_col_units)
 fit_orders1 = {
     "ssscc_t1": (1, 0, "750:6000"),
     "ssscc_t2": (1, 0, "1000:6000"),
-    "ssscc_t3": (1, 0, "1500:6000"),
+    "ssscc_t3": (1, 0, "500:6000"),
+    # "ssscc_t4": (1, 0, "1000:6000"),
     "ssscc_c1": (1, 0, 0, "1000:6000"),
     "ssscc_c2": (2, 0, 1, "900:6000"),
     "ssscc_c3": (2, 0, 1, "900:6000"),
+    # "ssscc_c4": (1, 1, 1, "500:6000"),
 }
 fit_orders2 = {
     "ssscc_t1": (1, 0, "750:6000"),
     "ssscc_t2": (1, 0, "1000:6000"),
-    "ssscc_t3": (1, 0, "1500:6000"),
+    "ssscc_t3": (2, 0, "750:6000"),
+    # "ssscc_t4": (1, 0, "1000:6000"),
     "ssscc_c1": (1, 0, 0, "1000:6000"),
     "ssscc_c2": (1, 1, 0, "1000:6000"),
-    "ssscc_c3": (2, 1, 1, "1200:6000"),
+    "ssscc_c3": (2, 0, 1, "1100:6000"),
+    # "ssscc_c4": (1, 1, 1, "500:6000"),
 }
 
 # List of directories for I/O purposes
