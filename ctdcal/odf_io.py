@@ -12,7 +12,7 @@ import pandas as pd
 from . import get_ctdcal_config
 
 cfg = get_ctdcal_config()
-log = logging.getLogger
+log = logging.getLogger(__name__)
 
 
 def _salt_loader(ssscc, salt_dir):
@@ -53,6 +53,22 @@ def _salt_loader(ssscc, salt_dir):
     # TODO: check autosalSAMPNO against SAMPNO for mismatches?
     # TODO: handling for re-samples?
 
+    # check end time for * and code questionable
+    # (unconfirmed but * appears to indicate a lot of things from LabView code:
+    # large spread in values, long time between samples, manual override, etc.)
+    flagged = saltDF["EndTime"].str.contains("*", regex=False)
+    if flagged.any():
+        log.debug(f"Found * in {ssscc} salt file, flagging value(s) as questionable")
+        questionable = pd.DataFrame()
+        questionable["SAMPNO"] = saltDF.loc[flagged, "SAMPNO"].astype(int)
+        questionable.insert(0, "SSSCC", ssscc)
+        questionable["diff"] = np.nan
+        questionable["salinity_flag"] = 3
+        questionable["comments"] = "Auto-flagged by processing function (had * in row)"
+        questionable.to_csv(
+            "tools/salt_flags_handcoded.csv", mode="a+", index=False, header=None
+        )
+
     # add time (in seconds) needed for autosal drift removal step
     saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"])
     saltDF["IndexTime"] = (saltDF["IndexTime"] - saltDF["IndexTime"].iloc[0]).dt.seconds
@@ -68,6 +84,14 @@ def _salt_loader(ssscc, salt_dir):
 
 def remove_autosal_drift(saltDF, refDF):
     """Calculate linear CR drift between reference values"""
+    if len(refDF) != 2:
+        ssscc = f"{saltDF['STNNBR'].unique()[0]:03d}{saltDF['CASTNO'].unique()[0]:02d}"
+        log.warning(
+            f"Failed to find start/end reference readings for {ssscc}, check salt file"
+        )
+
+        return saltDF.drop(labels="IndexTime", axis="columns")
+
     diff = refDF.diff(axis="index").dropna()
     time_coef = (diff["CRavg"] / diff["IndexTime"]).iloc[0]
 
@@ -119,7 +143,7 @@ def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
             try:
                 saltDF, refDF = _salt_loader(ssscc, salt_dir)
             except FileNotFoundError:
-                log.warning("Salt file for cast " + ssscc + " does not exist... skipping")
+                log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue
             saltDF = remove_autosal_drift(saltDF, refDF)
             saltDF["SALNTY"] = gsw.SP_salinometer(
