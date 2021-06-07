@@ -278,9 +278,8 @@ def calibrate_temp(btl_df, time_df):
     for f in ssscc_subsets:
         # 0) load ssscc subset to be fit together
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
-        btl_rows = (btl_df["SSSCC"].isin(ssscc_sublist).values) & (
-            btl_df["REFTMP_FLAG_W"] == 2  # only use good readings
-        )
+        btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
+        good_rows = btl_rows & (btl_df["REFTMP_FLAG_W"] == 2)
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
         # 1) plot pre-fit residual
@@ -310,7 +309,7 @@ def calibrate_temp(btl_df, time_df):
         P1_order, T1_order, zRange1 = cfg.fit_orders1[f_stem]
         P2_order, T2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_t1, df_bad_t1 = _get_T_coefs(
-            btl_df[btl_rows],
+            btl_df[good_rows],
             T_col=cfg.column["t1_btl"],
             P_order=P1_order,
             T_order=T1_order,
@@ -318,7 +317,7 @@ def calibrate_temp(btl_df, time_df):
             f_stem=f_stem,
         )
         coef_t2, df_bad_t2 = _get_T_coefs(
-            btl_df[btl_rows],
+            btl_df[good_rows],
             T_col=cfg.column["t2_btl"],
             P_order=P2_order,
             T_order=T2_order,
@@ -550,9 +549,8 @@ def calibrate_cond(btl_df, time_df):
     for f in ssscc_subsets:
         # 0) grab ssscc chunk to fit
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
-        btl_rows = (btl_df["SSSCC"].isin(ssscc_sublist).values) & (
-            btl_df["SALNTY_FLAG_W"] == 2  # only use salts flagged good (e.g. 2)
-        )
+        btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
+        good_rows = btl_rows & (btl_df["SALNTY_FLAG_W"] == 2)
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
         # 1) plot pre-fit residual
@@ -582,7 +580,7 @@ def calibrate_cond(btl_df, time_df):
         P1_order, T1_order, C1_order, zRange1 = cfg.fit_orders1[f_stem]
         P2_order, T2_order, C2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_c1, df_bad_c1 = _get_C_coefs(
-            btl_df[btl_rows],
+            btl_df[good_rows],
             C_col=cfg.column["c1_btl"],
             P_order=P1_order,
             T_order=T1_order,
@@ -591,7 +589,7 @@ def calibrate_cond(btl_df, time_df):
             f_stem=f_stem,
         )
         coef_c2, df_bad_c2 = _get_C_coefs(
-            btl_df[btl_rows],
+            btl_df[good_rows],
             C_col=cfg.column["c2_btl"],
             P_order=P2_order,
             T_order=T2_order,
