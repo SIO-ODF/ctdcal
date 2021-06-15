@@ -734,7 +734,7 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         )
         for _, flags in manual_flags.iterrows():
             df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
-                btl_df["btl_fire_num"] == flags["Bottle"]
+                btl_df["btl_fire_num"] == flags["SAMPNO"]
             )
             btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
 

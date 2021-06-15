@@ -10,6 +10,7 @@ from . import (
     ctd_plots,
     get_ctdcal_config,
     flagging,
+    process_ctd,
     oxy_fitting,
 )
 
@@ -192,6 +193,15 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # fit station groups, like T/C fitting (ssscc_r1, _r2, etc.)
     ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_r*.csv"))
+    if not ssscc_subsets:  # if no r-segments exists, write one from full list
+        log.debug(
+            "No CTDRINKO grouping file found... creating ssscc_r1.csv with all casts"
+        )
+        if not Path(cfg.directory["ssscc"]).exists():
+            Path(cfg.directory["ssscc"]).mkdir()
+        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_r1.csv")]
+        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         f_stem = f.stem
