@@ -830,6 +830,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         if np.isnan(sbe43_dict[ssscc]).all():
             print(ssscc + " missing oxy data, leaving nan values and flagging as 9")
             time_df.loc[time_df["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
+            time_df.loc[time_df["SSSCC"] == ssscc, "RINKO_FLAG_W"] = 9
             continue
         btl_rows = (btl_df["SSSCC"] == ssscc).values
         time_rows = (time_df["SSSCC"] == ssscc).values
