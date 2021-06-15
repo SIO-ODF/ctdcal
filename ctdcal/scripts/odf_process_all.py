@@ -11,6 +11,7 @@ from .. import (
     oxy_fitting,
     process_bottle,
     process_ctd,
+    rinko
 )
 
 
@@ -74,9 +75,9 @@ def odf_process_all():
 
     # calibrate oxygen against reference
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+    rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
-    # TODO: calibrate rinko against reference, similar to oxy_fitting.calibrate_oxy()
-    # rinko.calibrate_oxy()  # or something
+    # Rinko fitting does poor job near the surface.. why?
 
     #####
     # Step 3: export data
