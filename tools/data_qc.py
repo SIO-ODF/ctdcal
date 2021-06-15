@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import glob
 import pickle
@@ -60,11 +61,35 @@ if glob.glob(handcoded_file):
         columns={"New Flag_x": "New Flag", "Comments_x": "Comments"}
     ).drop(columns=["New Flag_y", "Comments_y"])
 
+# make downcast data point by interpolating bottle points on CTD data
+downcast_data = []
+for ssscc in ssscc_list:
+    btl_rows = btl_data["SSSCC"] == ssscc
+    ctd_rows = ctd_data["SSSCC"] == ssscc
+    df = pd.DataFrame()
+    for v in ["CTDTMP", "CTDSAL", "CTDOXY"]:
+        df["CTDPRS"] = btl_data.loc[btl_rows, "CTDPRS"]
+        df[v] = np.interp(
+            btl_data.loc[btl_rows, "CTDPRS"],
+            ctd_data.loc[ctd_rows, "CTDPRS"],
+            ctd_data.loc[ctd_rows, v]
+        )
+    downcast_data.append(df)
+
+downcast_data = pd.concat(downcast_data)
+
 # intialize widgets
 save_button = Button(label="Save flagged data", button_type="success")
-parameter = Select(title="Parameter", options=["CTDSAL", "CTDTMP"], value="CTDSAL")
-ref_param = Select(title="Reference", options=["SALNTY"], value="SALNTY")
-# ref_param.options = ["foo","bar"]  # can dynamically change dropdowns
+parameter = Select(
+    title="Parameter", options=["CTDSAL", "CTDTMP", "CTDOXY"], value="CTDSAL"
+)
+ref_dict = {"CTDSAL": "SALNTY", "CTDTMP": "REFTMP", "CTDOXY": "OXYGEN"}
+ref_param = Select(
+    title="Reference",
+    options=["SALNTY", "REFTMP", "OXYGEN"],
+    value=ref_dict[parameter.value],
+    disabled=True,
+)
 station = Select(title="Station", options=ssscc_list, value=ssscc_list[0])
 # explanation of flags:
 # https://cchdo.github.io/hdo-assets/documentation/manuals/pdf/90_1/chap4.pdf
@@ -121,7 +146,7 @@ bulk_flag_text = Div(
 src_table = ColumnDataSource(data=dict())
 src_table_changes = ColumnDataSource(data=dict())
 src_plot_trace = ColumnDataSource(data=dict(x=[], y=[]))
-src_plot_ctd = ColumnDataSource(data=dict(x=[], y=[]))
+src_plot_downcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_upcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
@@ -155,7 +180,7 @@ ctd_sal = fig.circle(
     "y",
     size=7,
     color="#BB0000",
-    source=src_plot_ctd,
+    source=src_plot_downcast,
     legend_label="Downcast CTD sample",
 )
 upcast_sal = fig.triangle(
@@ -187,14 +212,16 @@ def update_selectors():
         btl_data["SSSCC"] == station.value
     )
 
+    ref_param.value = ref_dict[parameter.value]
+
     # update table data
     current_table = btl_data[table_rows].reset_index()
     src_table.data = {  # this causes edit_flag() to execute
         "SSSCC": current_table["SSSCC"],
         "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
-        "CTDSAL": current_table["CTDSAL"],
-        "SALNTY": current_table["SALNTY"],
+        parameter.value: current_table[parameter.value],
+        ref_param.value: current_table[ref_param.value],
         "diff": current_table["Residual"],
         "flag": current_table["New Flag"],
         "Comments": current_table["Comments"],
@@ -209,8 +236,12 @@ def update_selectors():
         "x": btl_data.loc[table_rows, parameter.value],
         "y": btl_data.loc[table_rows, "CTDPRS"],
     }
+    src_plot_downcast.data = {
+        "x": downcast_data.loc[table_rows, parameter.value],
+        "y": downcast_data.loc[table_rows, "CTDPRS"],
+    }
     src_plot_btl.data = {
-        "x": btl_data.loc[btl_rows, "SALNTY"],
+        "x": btl_data.loc[btl_rows, ref_param.value],
         "y": btl_data.loc[btl_rows, "CTDPRS"],
     }
 
@@ -308,11 +339,15 @@ def save_data():
 
 def selected_from_plot(attr, old, new):
 
+    # update using bottle number, not index
+    # currently there is a bug if not all data from a cast are plotted
     src_table.selected.indices = new
 
 
 def selected_from_table(attr, old, new):
 
+    # update using bottle number, not index
+    # currently there is a bug if not all data from a cast are plotted
     btl_sal.data_source.selected.indices = new
 
 
@@ -332,7 +367,7 @@ btl_sal.data_source.selected.on_change("indices", selected_from_plot)
 columns = []
 fields = ["SSSCC", "SAMPNO", "CTDPRS", "CTDSAL", "SALNTY", "diff", "flag", "Comments"]
 titles = ["SSSCC", "Bottle", "CTDPRS", "CTDSAL", "SALNTY", "Residual", "Flag", "Comments"]
-widths = [40, 20, 75, 65, 65, 65, 15, 135]
+widths = [50, 40, 65, 65, 65, 65, 15, 200]
 for (field, title, width) in zip(fields, titles, widths):
     if field == "flag":
         strfmt_in = {"text_align": "center", "font_style": "bold"}
@@ -350,7 +385,7 @@ for (field, title, width) in zip(fields, titles, widths):
 columns_changed = []
 fields = ["SSSCC", "SAMPNO", "diff", "flag_old", "flag_new", "Comments"]
 titles = ["SSSCC", "Bottle", "Residual", "Old", "New", "Comments"]
-widths = [40, 20, 40, 20, 20, 200]
+widths = [50, 40, 65, 15, 15, 375]
 for (field, title, width) in zip(fields, titles, widths):
     if field == "flag_old":
         strfmt_in = {"text_align": "center", "font_style": "bold"}
@@ -371,20 +406,20 @@ data_table = DataTable(
     source=src_table,
     columns=columns,
     index_width=20,
-    width=480 + 20,  # sum of col widths + idx width
+    width=565 + 50 + 20,  # sum of col widths + fudge factor + idx width
     height=600,
     editable=True,
-    fit_columns=True,
+    fit_columns=False,
     sortable=False,
 )
 data_table_changed = DataTable(
     source=src_table_changes,
     columns=columns_changed,
     index_width=20,
-    width=480 + 20,  # sum of col widths + idx width
+    width=565 + 50 + 20,  # sum of col widths + fudge factor + idx width
     height=200,
     editable=False,
-    fit_columns=True,
+    fit_columns=False,
     sortable=False,
 )
 data_table_title = Div(text="""<b>All Station Data:</b>""", width=200, height=15)
