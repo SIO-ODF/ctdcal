@@ -140,11 +140,14 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
 
 def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
     cast_details = pd.read_csv(
-        cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        # cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        cfg.directory["logs"] + "bottom_bottle_details.csv", dtype={"SSSCC": str}
     )
     cast_details = cast_details[cast_details["SSSCC"] == cast]
-    df[lat_col] = np.round(cast_details["latitude"].iat[0], decimals)
-    df[lon_col] = np.round(cast_details["longitude"].iat[0], decimals)
+    # df[lat_col] = np.round(cast_details["latitude"].iat[0], decimals)
+    # df[lon_col] = np.round(cast_details["longitude"].iat[0], decimals)
+    df[lat_col] = cast_details["latitude"].iat[0]
+    df[lon_col] = cast_details["longitude"].iat[0]
 
     ts = pd.to_datetime(cast_details["bottom_time"].iat[0], unit="s")
     date = ts.strftime("%Y%m%d")
@@ -471,16 +474,15 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
         by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
     )
 
-    # switch oxygen primary sensor to rinko from 03601 onward
-    rinko_rows = ~btl_data["STNNBR"].isin(np.arange(1, 36))
-    btl_data.loc[rinko_rows, "CTDOXY"] = btl_data.loc[rinko_rows, "CTDRINKO"]
-    btl_data.loc[rinko_rows, "CTDOXY_FLAG_W"] = btl_data.loc[rinko_rows, "CTDRINKO_FLAG_W"]
+    # switch oxygen primary sensor to rinko
+    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
 
     # round data
-    for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
-        btl_data[col] = btl_data[col].round(4)
-    for col in ["CTDPRS", "CTDOXY", "OXYGEN"]:
-        btl_data[col] = btl_data[col].round(1)
+    # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
+    #     btl_data[col] = btl_data[col].round(4)
+    # for col in ["CTDPRS", "CTDOXY", "OXYGEN"]:
+    #     btl_data[col] = btl_data[col].round(1)
 
     # add depth
     depth_df = pd.read_csv(

@@ -475,16 +475,17 @@ def binning_df(df, p_column="CTDPRS", bin_size=2):
     """
     if p_column not in df.columns:
         raise KeyError(f"{p_column} column missing from dataframe")
-    # breakpoint()
+
     p_max = np.ceil(df[p_column].max())
     labels = np.arange(0, p_max, bin_size)
     bin_edges = np.arange(0, p_max + bin_size, bin_size)
-    df.loc[:, "bins"] = pd.cut(
+    df_out = df.copy()
+    df_out.loc[:, "bins"] = pd.cut(
         df[p_column], bins=bin_edges, right=False, include_lowest=True, labels=labels
     )
-    df.loc[:, p_column] = df["bins"].astype(float)
-    df_out = df.groupby("bins").mean()
-    return df_out
+    df_out.loc[:, p_column] = df_out["bins"].astype(float)
+
+    return df_out.groupby("bins").mean()
 
 
 def _fill_surface_data(df, bin_size=2):
@@ -770,7 +771,8 @@ def export_ct1(df, ssscc_list):
 
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(
-        cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        # cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        cfg.directory["logs"] + "bottom_bottle_details.csv", dtype={"SSSCC": str}
     )
     depth_df = pd.read_csv(
         cfg.directory["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
@@ -793,13 +795,13 @@ def export_ct1(df, ssscc_list):
 
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
-        # switch oxygen primary sensor to rinko from 03601 onward
-        if int(ssscc[:3]) > 35:
-            print(f"Using Rinko as CTDOXY for {ssscc}")
-            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        # switch oxygen primary sensor to rinko
+        # if int(ssscc[:3]) > 35:
+        print(f"Using Rinko as CTDOXY for {ssscc}")
+        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[p_column_names]
-        time_data = time_data.round(4)
+        # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
         # force flags back to int (TODO: make flags categorical)

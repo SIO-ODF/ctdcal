@@ -146,9 +146,6 @@ def make_time_files(ssscc_list):
 
             # Remove any pressure spikes
             bad_rows = converted_df["CTDPRS"].abs() > 6500
-            if ssscc == "00901":
-                # 00901 had 3 large pressure spikes, one of which was 3000 > x > 6500
-                bad_rows = converted_df["CTDPRS"].abs() > 3000
             if bad_rows.any():
                 log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
             converted_df.loc[bad_rows, :] = np.nan
@@ -215,15 +212,16 @@ def make_btl_mean(ssscc_list, debug=False):
             imported_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
             mean_df = btl.bottle_mean(bottle_df)
-            if ssscc == "04301":
-                # console glitch mess
-                log.info(f"Updating bottle fire order for {ssscc} (30-35 -> 31-36)")
-                mean_df.loc[np.arange(30, 36), "btl_fire_num"] = np.arange(31, 37)
-                mean_df.loc[36, ["btl_fire", "btl_fire_num"]] = [0, 30]
-                mean_df = mean_df.sort_values("btl_fire_num").reset_index(drop=True)
-            if ssscc in ["06701", "06801", "07401", "07501", "07701", "07801", "07901"]:
-                log.info(f"Swapping bottles 2 and 4 for {ssscc}")
-                mean_df.loc[[2, 4], "btl_fire_num"] = [4, 2]
+
+            # export bottom bottle time/lat/lon info
+            fname = cfg.directory["logs"] + "bottom_bottle_details.csv"
+            bot_df = mean_df[["nmea_datetime", "GPSLAT", "GPSLON"]].head(1)
+            bot_df.columns = ["bottom_time", "latitude", "longitude"]
+            bot_df.insert(0, "SSSCC", ssscc)
+            add_header = not Path(fname).exists()  # add header iff file doesn't exist
+            with open(fname, "a") as f:
+                bot_df.to_csv(f, mode="a", header=add_header, index=False)
+
             mean_df.to_pickle(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
