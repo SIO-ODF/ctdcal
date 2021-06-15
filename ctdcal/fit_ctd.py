@@ -712,6 +712,8 @@ def calibrate_cond(btl_df, time_df):
         btl_df["SALNTY"],
         btl_df[cfg.column["p"]],
     )
+    bad_rows = btl_df["SALNTY_FLAG_W"].isin([3, 4])
+    btl_df.loc[bad_rows, cfg.column["sal"] + "_FLAG_W"] = 2  # bad salts not used for QC
     btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.nan_values(
         btl_df[cfg.column["sal"]], old_flags=btl_df[cfg.column["sal"] + "_FLAG_W"]
     )

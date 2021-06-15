@@ -53,12 +53,20 @@ def _salt_loader(ssscc, salt_dir):
     # TODO: check autosalSAMPNO against SAMPNO for mismatches?
     # TODO: handling for re-samples?
 
+    # check for commented out lines
+    commented = saltDF["STNNBR"].str.startswith(("#", "x"))
+    if commented.any():
+        log.debug(f"Found comment character (#, x) in {ssscc} salt file, ignoring line")
+        saltDF = saltDF[~commented]
+
     # check end time for * and code questionable
     # (unconfirmed but * appears to indicate a lot of things from LabView code:
     # large spread in values, long time between samples, manual override, etc.)
     flagged = saltDF["EndTime"].str.contains("*", regex=False)
     if flagged.any():
+        # remove asterisks from EndTime and flag samples
         log.debug(f"Found * in {ssscc} salt file, flagging value(s) as questionable")
+        saltDF["EndTime"] = saltDF["EndTime"].str.rstrip("*")
         questionable = pd.DataFrame()
         questionable["SAMPNO"] = saltDF.loc[flagged, "SAMPNO"].astype(int)
         questionable.insert(0, "SSSCC", ssscc)
@@ -148,7 +156,7 @@ def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
             saltDF = remove_autosal_drift(saltDF, refDF)
             saltDF["SALNTY"] = gsw.SP_salinometer(
                 (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
-            ).round(4)
+            )#.round(4)
             _salt_exporter(saltDF, salt_dir)
 
     return True
