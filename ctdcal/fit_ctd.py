@@ -29,7 +29,6 @@ def _conductivity_polyfit(cond, temp, press, coef):
         + coef[5] * cond
         + coef[6]
     )
-    fitted_cond = fitted_cond.round(4)
 
     return fitted_cond
 
@@ -187,7 +186,7 @@ def _temperature_polyfit(temp, press, coef):
         + coef[4]
     )
 
-    return fitted_temp.round(4)
+    return fitted_temp
 
 
 def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None):
