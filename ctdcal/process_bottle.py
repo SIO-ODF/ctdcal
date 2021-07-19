@@ -141,7 +141,8 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
 def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
     cast_details = pd.read_csv(
         # cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.directory["logs"] + "bottom_bottle_details.csv", dtype={"SSSCC": str}
+        cfg.directory["logs"] + "bottom_bottle_details.csv",
+        dtype={"SSSCC": str},
     )
     cast_details = cast_details[cast_details["SSSCC"] == cast]
     # df[lat_col] = np.round(cast_details["latitude"].iat[0], decimals)
@@ -258,7 +259,9 @@ def load_all_btl_files(ssscc_list, series, cols=None):
         )
 
         if len(btl_data) > 36:
-            log.error(f"""Length of bottle data for {ssscc} is > 36, check for errors in reference parameter files""")
+            log.error(
+                f"""Length of bottle data for {ssscc} is > 36, check for errors in reference parameter files"""
+            )
 
         # Add bottom of cast information (date,time,lat,lon,etc.)
         btl_data = _add_btl_bottom_data(btl_data, ssscc)
@@ -404,8 +407,12 @@ def export_report_data(df):
     df["CTDTMP2_FLAG_W"] = flagging.by_residual(
         df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
     )
-    df["CTDCOND1_FLAG_W"] = flagging.by_residual(df["CTDCOND1"], df["BTLCOND"], df["CTDPRS"])
-    df["CTDCOND2_FLAG_W"] = flagging.by_residual(df["CTDCOND2"], df["BTLCOND"], df["CTDPRS"])
+    df["CTDCOND1_FLAG_W"] = flagging.by_residual(
+        df["CTDCOND1"], df["BTLCOND"], df["CTDPRS"]
+    )
+    df["CTDCOND2_FLAG_W"] = flagging.by_residual(
+        df["CTDCOND2"], df["BTLCOND"], df["CTDPRS"]
+    )
     df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
     df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
@@ -462,8 +469,8 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
         }
     )
 
-    btl_data["EXPOCODE"] = cfg.cruise["expocode"]
-    btl_data["SECT_ID"] = cfg.cruise["sectionid"]
+    btl_data["EXPOCODE"] = cfg.expocode
+    btl_data["SECT_ID"] = cfg.section_id
     btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
     btl_data["CASTNO"] = [int(x[3:]) for x in btl_data["SSSCC"]]
     btl_data["SAMPNO"] = btl_data["btl_fire_num"].astype(int)
@@ -523,7 +530,7 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
 
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org
-    with open(out_dir + cfg.cruise["expocode"] + "_hy1.csv", mode="w+") as f:
+    with open(out_dir + ["expocode"] + "_hy1.csv", mode="w+") as f:
         f.write("BOTTLE, %s\n" % (time_stamp))
         f.write(",".join(btl_columns.keys()) + "\n")
         f.write(",".join(btl_columns.values()) + "\n")

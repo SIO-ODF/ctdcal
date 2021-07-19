@@ -4,25 +4,9 @@
 # TODO: organize these by editable/fixed variables
 
 # Cruise specifics
-# not really needed for processing, move elsewhere
-cruise = dict(
-    cruise_title="GO-SHIP TN389",
-    cruise_name="TN389",
-    cruisedb="TN389",
-    vessel="R/V Thomas G Thompson",
-    ship_code="3250",
-    expocode="325020210316",
-    chief_sci="Ryan Woosley",
-    sectionid="A20",
-    start_date="2021-03- 14:00:00",
-    start_port="Woods Hole, Massachussetts, USA",
-    start_latlon="42.8821 S 147.3272 W",
-    end_date="2018-05-14 10:00:00",
-    end_port="St. Thomas, USVI",
-    end_latlon="53.1638 S 70.9171 W",
-)
-
-ctd_serial = 914
+expocode = "325020210316"
+section_id = "A20"
+ctd_serial = 914  # TODO: how to handle multiple CTDs on one cruise?
 
 # CTD variables/flags/units
 # move elsewhere when xarray is implemented

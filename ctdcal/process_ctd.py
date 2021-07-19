@@ -772,7 +772,8 @@ def export_ct1(df, ssscc_list):
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(
         # cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.directory["logs"] + "bottom_bottle_details.csv", dtype={"SSSCC": str}
+        cfg.directory["logs"] + "bottom_bottle_details.csv",
+        dtype={"SSSCC": str},
     )
     depth_df = pd.read_csv(
         cfg.directory["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
@@ -837,8 +838,8 @@ def export_ct1(df, ssscc_list):
             ctd_header = (  # this is ugly but prevents tabs before label
                 f"CTD,{file_datetime}\n"
                 f"NUMBER_HEADERS = 11\n"
-                f"EXPOCODE = {cfg.cruise['expocode']}\n"
-                f"SECT_ID = {cfg.cruise['sectionid']}\n"
+                f"EXPOCODE = {cfg.expocode}\n"
+                f"SECT_ID = {cfg.section_id}\n"
                 f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
                 f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
                 f"DATE = {b_datetime[0]}\n"
