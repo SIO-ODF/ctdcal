@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import cmocean
@@ -5,6 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+
+log = logging.getLogger(__name__)
 
 #####
 # The following section is a little brittle due to hardcoded names, but we'll fix
@@ -874,6 +877,100 @@ def btl_oxy_residuals_station_concentration_plot(ref_oxy, ctd_oxy, press, stnno)
     return None
 
 
+def residual_vs_pressure(
+    param,
+    ref,
+    prs,
+    stn,
+    xlim=(-0.02, 0.02),
+    ylim=(6000, 0),
+    xlabel="Residual",
+    ylabel="Pressure (dbar)",
+    deep=False,
+    f_out=None,
+):
+
+    title = f"{ref.name}-{param.name} vs. {prs.name}"
+    diff = ref - param
+    if deep:
+        title = f"{ref.name}-{param.name} (>2000 dbar) vs. {prs.name}"
+        deep_rows = prs > 2000
+        diff = diff[deep_rows]
+        prs = prs[deep_rows]
+        stn = stn[deep_rows]
+
+    idx, uniques = stn.factorize()  # find unique stations #s and index them
+
+    plt.figure(figsize=(7, 6))
+    plt.scatter(diff, prs, c=idx, marker="+")
+    plt.xlim(xlim)
+    plt.xticks(rotation=45)
+    plt.ylim(ylim)
+    cbar = plt.colorbar(pad=0.1)  # set cbar ticks to station names
+    if not uniques.empty:
+        tick_inds = cbar.get_ticks().astype(int)
+        cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
+        cbar.ax.set_yticklabels(uniques[tick_inds])
+    cbar.set_label("Station Number")
+    plt.xlabel(xlabel, fontsize=12)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.title(title, fontsize=12)
+    plt.tight_layout()
+    if f_out is not None:
+        if not Path(f_out).parent.exists():
+            log.info(
+                f"Path {Path(f_out).parent.as_posix()} does not exists... creating"
+            )
+            Path(f_out).parent.mkdir(parents=True)
+        plt.savefig(f_out)
+    plt.close()
+
+    return True
+
+
+def residual_vs_station(
+    param,
+    ref,
+    prs,
+    stn,
+    ylim=(-0.02, 0.02),
+    xlabel="Station Number",
+    ylabel="Residual",
+    deep=False,
+    f_out=None,
+):
+
+    title = f"{ref.name}-{param.name} vs. {stn.name}"
+    diff = ref - param
+    if deep:
+        title = f"{ref.name}-{param.name} (>2000 dbar) vs. {stn.name}"
+        deep_rows = prs > 2000
+        diff = diff[deep_rows]
+        prs = prs[deep_rows]
+        stn = stn[deep_rows]
+
+    plt.figure(figsize=(7, 6))
+    plt.scatter(stn, diff, c=prs, marker="+")
+    plt.xticks(rotation=45)
+    plt.ylim(ylim)
+    cbar = plt.colorbar(pad=0.1)
+    cbar.set_label("Pressure (dbar)")
+    plt.xlabel(xlabel, fontsize=12)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.title(title, fontsize=12)
+    plt.tight_layout()
+    if f_out is not None:
+        if not Path(f_out).parent.exists():
+            log.info(
+                f"Path {Path(f_out).parent.as_posix()} does not exists... creating"
+            )
+            Path(f_out).parent.mkdir(parents=True)
+        plt.savefig(f_out)
+    plt.close()
+
+    return True
+
+
 def _intermediate_residual_plot(
     diff,
     prs,
@@ -917,7 +1014,9 @@ def _intermediate_residual_plot(
     plt.tight_layout()
     if f_out is not None:
         if not Path(f_out).parent.exists():
-            print(f"Path {Path(f_out).parent.as_posix()} does not exists... creating")
+            log.info(
+                f"Path {Path(f_out).parent.as_posix()} does not exists... creating"
+            )
             Path(f_out).parent.mkdir(parents=True)
         plt.savefig(f_out)
     plt.close()

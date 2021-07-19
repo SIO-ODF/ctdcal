@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import gsw
+import logging
 import numpy as np
 import pandas as pd
 
@@ -11,6 +12,7 @@ from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 DEBUG = False
 
@@ -63,8 +65,14 @@ short_lookup = {
         "type": "float64",
     },
     "61": {
-        "short_name": "U_DEF",
-        "long_name": "user defined",
+        "short_name": "U_DEF_poly",
+        "long_name": "user defined, polynomial",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
+    "80": {
+        "short_name": "U_DEF_e",
+        "long_name": "user defined, exponential",
         "units": "0-5VDC",
         "type": "float64",
     },
@@ -79,7 +87,7 @@ short_lookup = {
         "long_name": "WetlabECO_AFL_FL_Sensor",
         "units": "0-5VDC",
         "type": "float64",
-    },  # check short_name later
+    },
     "42": {
         "short_name": "PAR",
         "long_name": "PAR/Irradiance, Biospherical/Licor",
@@ -118,7 +126,7 @@ def hex_to_ctd(ssscc_list, debug=False):
 
     """
     # TODO: use logger module instead
-    print("Converting .hex files")
+    log.info("Converting .hex files")
     for ssscc in ssscc_list:
         if not Path(cfg.directory["converted"] + ssscc + ".pkl").exists():
             hexFile = cfg.directory["raw"] + ssscc + ".hex"
@@ -131,10 +139,17 @@ def hex_to_ctd(ssscc_list, debug=False):
 
 
 def make_time_files(ssscc_list):
-    print("Generating time.pkl files")
+    log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.directory["time"] + ssscc + "_time.pkl").exists():
             converted_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
+
+            # Remove any pressure spikes
+            bad_rows = converted_df["CTDPRS"].abs() > 6500
+            if bad_rows.any():
+                log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
+            converted_df.loc[bad_rows, :] = np.nan
+            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
@@ -191,12 +206,22 @@ def make_btl_mean(ssscc_list, debug=False):
     boolean
         bottle averaging of mean has finished successfully
     """
-    print("Generating btl_mean.pkl files")
+    log.info("Generating btl_mean.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
             imported_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
             mean_df = btl.bottle_mean(bottle_df)
+
+            # export bottom bottle time/lat/lon info
+            fname = cfg.directory["logs"] + "bottom_bottle_details.csv"
+            bot_df = mean_df[["nmea_datetime", "GPSLAT", "GPSLON"]].head(1)
+            bot_df.columns = ["bottom_time", "latitude", "longitude"]
+            bot_df.insert(0, "SSSCC", ssscc)
+            add_header = not Path(fname).exists()  # add header iff file doesn't exist
+            with open(fname, "a") as f:
+                bot_df.to_csv(f, mode="a", header=add_header, index=False)
+
             mean_df.to_pickle(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
@@ -248,7 +273,8 @@ def convertFromSBEReader(sbeReader, debug=False):
     temp_counter = 0
     cond_counter = 0
     oxygen_counter = 0
-    u_def_counter = 0
+    u_def_p_counter = 0
+    u_def_e_counter = 0
     empty_counter = 0
 
     # The following are definitions for every key in the dict below:
@@ -289,9 +315,14 @@ def convertFromSBEReader(sbeReader, debug=False):
             channel_pos = empty_counter
             ranking = 6
 
-        elif sensor_id == "61":  # user defined block
-            u_def_counter += 1
-            channel_pos = u_def_counter
+        elif sensor_id == "61":  # user defined (polynomial) block
+            u_def_p_counter += 1
+            channel_pos = u_def_p_counter
+            ranking = 6
+
+        elif sensor_id == "80":  # user defined (exponential) block
+            u_def_e_counter += 1
+            channel_pos = u_def_e_counter
             ranking = 6
 
         else:  # auxiliary block
@@ -368,9 +399,11 @@ def convertFromSBEReader(sbeReader, debug=False):
             print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
             # TODO: put some kind of user-enabled flag in config.py, e.g.
             # if cfg["correct_oxy_hysteresis"]:
-            # sbe_eq.sbe43_hysteresis_voltage(raw_df[meta['column']], p_array, coefs)
+            V_corrected = sbe_eq.sbe43_hysteresis_voltage(
+                raw_df[meta["column"]], p_array, coefs
+            )
             converted_df[col] = sbe_eq.sbe43(
-                raw_df[meta["column"]],
+                V_corrected,
                 p_array,
                 t_array,
                 c_array,
@@ -394,6 +427,17 @@ def convertFromSBEReader(sbeReader, debug=False):
         elif meta["sensor_id"] == "0":
             print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
             converted_df[col] = sbe_eq.sbe_altimeter(raw_df[meta["column"]], coefs)
+
+        elif meta["sensor_id"] == "61":
+            if meta["sensor_info"]["SensorName"] == "RinkoO2V":
+                print("Processing Rinko O2")
+                # hysteresis correct then pass through voltage (see Uchida, 2010)
+                coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
+                converted_df[col] = sbe_eq.sbe43_hysteresis_voltage(
+                    raw_df[meta["column"]],
+                    p_array,
+                    coefs,
+                )
 
         ### Aux block
         else:

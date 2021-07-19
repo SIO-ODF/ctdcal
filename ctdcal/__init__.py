@@ -4,12 +4,14 @@ data, and similar data types such as ARGO and moored CTD
 sensors.
 """
 
+import logging
 import os.path
 import types
 
 from . import *
 from ._version import get_versions
 
+log = logging.getLogger(__name__)
 __version__ = get_versions()["version"]
 del get_versions
 
@@ -42,7 +44,7 @@ def get_ctdcal_config():
         with open(filepath, mode="rb") as f:
             exec(compile(f.read(), filepath, "exec"), config)
     except OSError:
-        print("Failed to load config file")
+        log.error(f"Failed to load config file {filepath}")
 
     for k in list(config.keys()):
         if k.startswith("__"):

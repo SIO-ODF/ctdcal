@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import gsw
+import logging
 import numpy as np
 import pandas as pd
 import scipy
@@ -14,6 +15,7 @@ from . import get_ctdcal_config
 from . import process_ctd as process_ctd
 
 cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 
 def _conductivity_polyfit(cond, temp, press, coef):
@@ -27,7 +29,6 @@ def _conductivity_polyfit(cond, temp, press, coef):
         + coef[5] * cond
         + coef[6]
     )
-    fitted_cond = fitted_cond.round(4)
 
     return fitted_cond
 
@@ -166,7 +167,7 @@ def _prepare_fit_data(df, param, ref_param, zRange=None):
         ]
 
     good_data["Diff"] = good_data[ref_param] - good_data[param]
-    good_data["Flag"] = flagging.outliers(good_data["Diff"])
+    good_data["Flag"] = flagging.outliers(good_data["Diff"], n_sigma2=4)
 
     df_good = good_data[good_data["Flag"] == 2].copy()
     df_bad = good_data[good_data["Flag"] == 4].copy()
@@ -185,7 +186,7 @@ def _temperature_polyfit(temp, press, coef):
         + coef[4]
     )
 
-    return fitted_temp.round(4)
+    return fitted_temp
 
 
 def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None):
@@ -257,10 +258,12 @@ def calibrate_temp(btl_df, time_df):
     --------
 
     """
-    print("Calibrating temperature")
+    log.info("Calibrating temperature")
     ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_t*.csv"))
     if not ssscc_subsets:  # if no t-segments exists, write one from full list
-        print("No CTDTMP grouping file found... creating ssscc_t1.csv with all casts")
+        log.debug(
+            "No CTDTMP grouping file found... creating ssscc_t1.csv with all casts"
+        )
         if not Path(cfg.directory["ssscc"]).exists():
             Path(cfg.directory["ssscc"]).mkdir()
         ssscc_list = process_ctd.get_ssscc_list()
@@ -275,6 +278,7 @@ def calibrate_temp(btl_df, time_df):
         # 0) load ssscc subset to be fit together
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
+        good_rows = btl_rows & (btl_df["REFTMP_FLAG_W"] == 2)
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
         # 1) plot pre-fit residual
@@ -301,20 +305,22 @@ def calibrate_temp(btl_df, time_df):
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
+        P1_order, T1_order, zRange1 = cfg.fit_orders1[f_stem]
+        P2_order, T2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_t1, df_bad_t1 = _get_T_coefs(
-            btl_df[btl_rows],
+            btl_df[good_rows],
             T_col=cfg.column["t1_btl"],
-            P_order=1,
-            T_order=0,
-            zRange="1000:6000",
+            P_order=P1_order,
+            T_order=T1_order,
+            zRange=zRange1,
             f_stem=f_stem,
         )
         coef_t2, df_bad_t2 = _get_T_coefs(
-            btl_df[btl_rows],
+            btl_df[good_rows],
             T_col=cfg.column["t2_btl"],
-            P_order=1,
-            T_order=0,
-            zRange="1000:6000",
+            P_order=P2_order,
+            T_order=T2_order,
+            zRange=zRange2,
             f_stem=f_stem,
         )
 
@@ -397,7 +403,13 @@ def calibrate_temp(btl_df, time_df):
         cfg.directory["logs"] + "qual_flag_t2.csv", index=False
     )
 
-    # export temp fit params
+    # export temp fit params (formated to 5 sig figs, scientific notation)
+    coef_t1_all[coef_names] = coef_t1_all[coef_names].applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    )
+    coef_t2_all[coef_names] = coef_t2_all[coef_names].applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    )
     coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
     coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
 
@@ -492,7 +504,7 @@ def calibrate_cond(btl_df, time_df):
     --------
 
     """
-    print("Calibrating conductivity")
+    log.info("Calibrating conductivity")
     # calculate BTLCOND values from autosal data
     btl_df[cfg.column["refc"]] = convert.CR_to_cond(
         btl_df["CRavg"],
@@ -522,7 +534,9 @@ def calibrate_cond(btl_df, time_df):
 
     ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_c*.csv"))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
-        print("No CTDCOND grouping file found... creating ssscc_c1.csv with all casts")
+        log.debug(
+            "No CTDCOND grouping file found... creating ssscc_c1.csv with all casts"
+        )
         ssscc_list = process_ctd.get_ssscc_list()
         ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_c1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
@@ -534,9 +548,8 @@ def calibrate_cond(btl_df, time_df):
     for f in ssscc_subsets:
         # 0) grab ssscc chunk to fit
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
-        btl_rows = (btl_df["SSSCC"].isin(ssscc_sublist).values) & (
-            btl_df["SALNTY_FLAG_W"] == 2  # only use salts flagged good (e.g. 2)
-        )
+        btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
+        good_rows = btl_rows & (btl_df["SALNTY_FLAG_W"] == 2)
         time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
         # 1) plot pre-fit residual
@@ -563,22 +576,24 @@ def calibrate_cond(btl_df, time_df):
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
+        P1_order, T1_order, C1_order, zRange1 = cfg.fit_orders1[f_stem]
+        P2_order, T2_order, C2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_c1, df_bad_c1 = _get_C_coefs(
-            btl_df[btl_rows],
+            btl_df[good_rows],
             C_col=cfg.column["c1_btl"],
-            P_order=1,
-            T_order=0,
-            C_order=0,
-            zRange="1000:5000",
+            P_order=P1_order,
+            T_order=T1_order,
+            C_order=C1_order,
+            zRange=zRange1,
             f_stem=f_stem,
         )
         coef_c2, df_bad_c2 = _get_C_coefs(
-            btl_df[btl_rows],
+            btl_df[good_rows],
             C_col=cfg.column["c2_btl"],
-            P_order=1,
-            T_order=0,
-            C_order=0,
-            zRange="1000:5000",
+            P_order=P2_order,
+            T_order=T2_order,
+            C_order=C2_order,
+            zRange=zRange2,
             f_stem=f_stem,
         )
 
@@ -667,6 +682,12 @@ def calibrate_cond(btl_df, time_df):
     )
 
     # export cond fit params
+    coef_c1_all[coef_names] = coef_c1_all[coef_names].applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    )
+    coef_c2_all[coef_names] = coef_c2_all[coef_names].applymap(
+        lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+    )
     coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
     coef_c2_all.to_csv(cfg.directory["logs"] + "fit_coef_c2.csv", index=False)
 
@@ -689,6 +710,11 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["sal"]],
         btl_df["SALNTY"],
         btl_df[cfg.column["p"]],
+    )
+    bad_rows = btl_df["SALNTY_FLAG_W"].isin([3, 4])
+    btl_df.loc[bad_rows, cfg.column["sal"] + "_FLAG_W"] = 2  # bad salts not used for QC
+    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.nan_values(
+        btl_df[cfg.column["sal"]], old_flags=btl_df[cfg.column["sal"] + "_FLAG_W"]
     )
 
     return btl_df, time_df

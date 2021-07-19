@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import csv
+import logging
 import math
 import warnings
 from collections import OrderedDict
@@ -17,6 +18,7 @@ from . import oxy_fitting as oxy_fitting
 from . import report_ctd as report_ctd
 
 cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", "Mean of empty slice.")
 
@@ -107,33 +109,14 @@ def _trim_soak_period(df=None):
     return df_trimmed
 
 
-def _find_last_soak_period(
-    df_cast, surface_pressure=2, time_bin=8, downcast_pressure=50
-):
-    """Find the soak period before the downcast starts.
+def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
+    """
+    Find the soak period before the downcast starts.
 
     The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
     parameters. This assumes the soak depth will be somewhere between 10 and 30
     meters, the package will sit at the soak depth for at least 20 to 30 seconds
     before starting ascent to the surface and descent to target depth.
-
-    Parameters
-    ----------
-    df_cast : DataFrame
-        DataFrame of the entire cast
-    surface_pressure : integer
-        Minimum surface pressure threshold required to look for soak depth.
-        2 dbar was chosen as an average rosette is roughly 1.5 to 2 meters tall.
-    time_bin : integer
-        Time, in whole seconds.
-    downcast_pressure : integer
-        Minimum pressure threshold required to assume downcast has started.
-        50 dbar has been chosen as double the deep soak depth of 20-30 dbar.
-
-    Returns
-    -------
-    df_cast_ret : DataFrame
-        DataFrame starting within time_bin seconds of the last soak period.
 
     The algorithm is not guaranteed to catch the exact start of the soak period,
     but within a minimum period of time_bin seconds(?) from end of the soak if
@@ -147,70 +130,80 @@ def _find_last_soak_period(
         * A cast where the pumps turn on and off due to rosette coming out of water
         * A cast where there are multiple stops on the downcast to the target depth
 
+    Parameters
+    ----------
+    df_cast : DataFrame
+        DataFrame of the entire cast, from deckbox on to deckbox off
+    time_bin : integer, optional
+        Number of seconds to bin average for descent rate calculation
+    P_surface : integer, optional
+        Minimum surface pressure threshold required to look for soak depth
+        (2 dbar was chosen as an average rosette is roughly 1.5 to 2 meters tall)
+    P_downcast : integer, optional
+        Minimum pressure threshold required to assume downcast has started
+        (50 dbar has been chosen as double the deep soak depth of 20-30 dbar)
+
+    Returns
+    -------
+    df_cast_trimmed : DataFrame
+        DataFrame starting within time_bin seconds of the last soak period.
     """
     # Validate user input
     if time_bin <= 0:
         raise ValueError("Time bin value should be positive whole seconds.")
-    if downcast_pressure <= 0:
+    if P_downcast <= 0:
         raise ValueError(
             "Starting downcast pressure threshold must be positive integers."
         )
-    if downcast_pressure < surface_pressure:
+    if P_downcast < P_surface:
         raise ValueError(
             "Starting downcast pressure threshold must be greater \
                         than surface pressure threshold."
         )
 
     # If pumps have not turned on until in water, return DataFrame
-    if df_cast.iloc[0]["CTDPRS"] > surface_pressure:
+    if df_cast.iloc[0]["CTDPRS"] > P_surface:
         return df_cast
 
-    """code_pruning: variables should always have relevant names, even if it needs to be changed later with find/replace"""
     # Bin the data by time, and compute the average rate of descent
-    df_blah = df_cast.loc[:, :]
-    df_blah["index"] = df_blah.index
-    df_blah["bin"] = pd.cut(
-        df_blah.loc[:, "index"],
-        range(df_blah.iloc[0]["index"], df_blah.iloc[-1]["index"], time_bin * 24),
+    df_cast["index"] = df_cast.index  # needed at end to identify start_idx
+    df_cast["bin"] = pd.cut(
+        df_cast.index,
+        np.arange(df_cast.index[0], df_cast.index[-1], time_bin * 24),
         labels=False,
         include_lowest=True,
     )
-    df_blah2 = df_blah.groupby("bin").mean()
+    df_binned = df_cast.groupby("bin").mean()
 
     # Compute difference of descent rates and label bins
-    df_blah2["prs_diff"] = df_blah2["CTDPRS"].diff().fillna(0).round(0)
-    df_blah2["movement"] = pd.cut(
-        df_blah2["prs_diff"], [-1000, -0.5, 0.5, 1000], labels=["up", "stop", "down"]
+    df_binned["dP"] = df_binned["CTDPRS"].diff().fillna(0).round(0)
+    df_binned["movement"] = pd.cut(
+        df_binned["dP"], [-1000, -0.5, 0.5, 1000], labels=["up", "stop", "down"]
     )
 
     # Find all periods where the rosette is not moving
-    # df_stop = df_blah2.groupby("movement").get_group("stop")
-    groupby_test = df_blah2.groupby(
-        df_blah2["movement"].ne(df_blah2["movement"].shift()).cumsum()
+    df_group = df_binned.groupby(
+        df_binned["movement"].ne(df_binned["movement"].shift()).cumsum()
     )
-    list_test = [g for i, g in groupby_test]
+    df_list = [g for i, g in df_group]
 
-    # Find a dataframe index of the last soak period before starting descent
-    def poop(list_obj, downcast_pressure):
-        """Return dataframe index in the last soak period before starting
-        descent to target depth.
-        """
-        for i, x in zip(range(len(list_test)), list_test):
-            if x["CTDPRS"].max() < downcast_pressure:
-                if x.max()["movement"] == "stop":
-                    index = i
-            if x["CTDPRS"].max() > downcast_pressure:
-                return index
-        return index
+    # Find last soak period before starting descent to target depth
+    def find_last(df_list, P_downcast):
+        for idx, df in enumerate(df_list):
+            if df["CTDPRS"].max() < P_downcast:
+                # make sure it's soak, not a stop to switch to autocast (i.e. A20 2021)
+                # TODO: try instead finding max depth then working backwards?
+                if df.max()["movement"] == "stop" and len(df) > 1:
+                    last_idx = idx
+            else:
+                return last_idx
+        return last_idx
 
-    # Truncate dataframe to new starting index : end of dataframe
-    start_index = np.around(
-        list_test[poop(list_test, downcast_pressure)].head(1)["index"]
-    )
-    df_cast = df_cast.set_index("index")
-    df_cast = df_cast.loc[int(start_index) :, :]
-    df_cast_ret = df_cast.reset_index()
-    return df_cast_ret
+    # Trim off everything before last soak
+    start_idx = int(df_list[find_last(df_list, P_downcast)].head(1)["index"])
+    df_cast_trimmed = df_cast.loc[start_idx:].reset_index()
+
+    return df_cast_trimmed
 
 
 def ctd_align(inMat=None, col=None, time=0.0):
@@ -309,7 +302,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     fl2 = fl * 2
     # Half minute
     ms = 30
-    time_delay = fl * ms
+    time_delay = fl * ms  # time to let CTD pressure reading settle/sit on deck
 
     # split dataframe into upcast/downcast
     downcast = df.iloc[: (df["CTDPRS"].argmax() + 1)]
@@ -333,18 +326,46 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     if start_samples > time_delay:
         start_p = np.average(start_df.iloc[fl2 : (start_samples - time_delay)])
     else:
+        start_seconds = start_samples / fl
+        log.warning(
+            f"{stacast}: Only {start_seconds:0.1f} seconds of start pressure averaged."
+        )
         start_p = np.average(start_df.iloc[fl2:start_samples])
 
     end_samples = len(end_df)
     if end_samples > time_delay:
         end_p = np.average(end_df.iloc[(time_delay):])
     else:
-        try:
-            end_p = np.average(end_df.iloc[(end_samples):])
-        except ZeroDivisionError:
-            end_p = np.NaN
+        end_seconds = end_samples / fl
+        log.warning(
+            f"{stacast}: Only {end_seconds:0.1f} seconds of end pressure averaged."
+        )
+        end_p = np.average(end_df)  # just average whatever there is
 
     # Remove ondeck start and end pressures
+    if len(start_df) == 0:
+        log.warning("Failed to find starting deck pressure.")
+        for n in [1, 2]:
+            try:
+                (downcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
+            except KeyError:
+                log.warning(
+                    f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
+                )
+        breakpoint()
+    if len(end_df) == 0:
+        log.warning("Failed to find ending deck pressure.")
+        for n in [1, 2]:
+            try:
+                (upcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
+            except KeyError:
+                log.warning(
+                    f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
+                )
+        breakpoint()
+    # MK (3/23/20, 11am):
+    # auto end calculation failed bc cond2 is still >30
+    # may have to do manually or just use cond1 for station 00901
     trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
 
     # Log ondeck pressures
@@ -417,10 +438,21 @@ def pressure_sequence(df, p_col="CTDPRS", direction="down"):
     # pandas.cut() to do binning
 
     df_filtered = roll_filter(df, p_col, direction=direction)
-    df_filled = _fill_surface_data(df_filtered, bin_size=2)
-    df_binned = binning_df(df_filled, bin_size=2)  # TODO: abstract bin_size in config
 
-    return df_binned.reset_index(drop=True)
+    # 04/11/21 MK: this is not behaving properly or the order is wrong?
+    # Currently this function fills the top-most good CTD value *before* bin avg,
+    # so those bin averages are not the same as the first good binned value.
+    # df_filled = _fill_surface_data(df_filtered, bin_size=2)
+
+    df_binned = binning_df(df_filtered, bin_size=2)  # TODO: abstract bin_size in config
+    fill_rows = df_binned["CTDPRS"].isna()
+    df_binned.loc[fill_rows, "CTDPRS"] = df_binned[fill_rows].index.to_numpy()
+    df_binned.bfill(inplace=True)
+    df_binned.loc[:, "interp_bool"] = False
+    df_binned.loc[fill_rows, "interp_bool"] = True
+    df_filled = _flag_backfill_data(df_binned).drop(columns="interp_bool")
+
+    return df_filled.reset_index(drop=True)
 
 
 def binning_df(df, p_column="CTDPRS", bin_size=2):
@@ -443,15 +475,17 @@ def binning_df(df, p_column="CTDPRS", bin_size=2):
     """
     if p_column not in df.columns:
         raise KeyError(f"{p_column} column missing from dataframe")
+
     p_max = np.ceil(df[p_column].max())
     labels = np.arange(0, p_max, bin_size)
     bin_edges = np.arange(0, p_max + bin_size, bin_size)
-    df["bins"] = pd.cut(
+    df_out = df.copy()
+    df_out.loc[:, "bins"] = pd.cut(
         df[p_column], bins=bin_edges, right=False, include_lowest=True, labels=labels
     )
-    df[p_column] = df["bins"].astype(float)
-    df_out = df.groupby("bins").mean()
-    return df_out
+    df_out.loc[:, p_column] = df_out["bins"].astype(float)
+
+    return df_out.groupby("bins").mean()
 
 
 def _fill_surface_data(df, bin_size=2):
@@ -620,7 +654,7 @@ def load_all_ctd_files(ssscc_list):
     """
     df_list = []
     for ssscc in ssscc_list:
-        print("Loading TIME data for station: " + ssscc + "...")
+        log.info("Loading TIME data for station: " + ssscc + "...")
         time_file = cfg.directory["time"] + ssscc + "_time.pkl"
         time_data = pd.read_pickle(time_file)
         time_data["SSSCC"] = str(ssscc)
@@ -628,7 +662,7 @@ def load_all_ctd_files(ssscc_list):
             time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
         )
         df_list.append(time_data)
-        print("** Finished TIME data station: " + ssscc + " **")
+        # print("** Finished TIME data station: " + ssscc + " **")
     df_data_all = pd.concat(df_list, axis=0, sort=False)
 
     df_data_all["master_index"] = range(len(df_data_all))
@@ -697,38 +731,49 @@ def export_ct1(df, ssscc_list):
     Needs depth_log.csv and manual_depth_log.csv to run successfully
 
     """
-    print("Exporting *_ct1.csv files")
+    log.info("Exporting CTD files")
     # clean up columns
     p_column_names = cfg.ctd_time_output["col_names"]
     p_column_units = cfg.ctd_time_output["col_units"]
+    p_column_names.pop(1)  # remove CTDPRS_FLAG_W
+    p_column_units.pop(1)  # remove CTDPRS_FLAG_W
 
     # initial flagging (some of this should be moved)
     # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
     # TODO: may not always have these channels so don't hardcode them in!
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
-    df["CTDBACKSCATTER_FLAG_W"] = 1
+    # df["CTDBACKSCATTER_FLAG_W"] = 1
+
     # renames
-    df = df.rename(columns={"CTDTMP1": "CTDTMP", "FLUOR": "CTDFLUOR"})
+    df = df.rename(
+        columns={
+            "CTDTMP1": "CTDTMP",
+            # "CTDRINKO": "CTDOXY",
+            # "CTDRINKO_FLAG_W": "CTDOXY_FLAG_W",
+        }
+    )
 
     # check that all columns are there
     try:
         df[p_column_names]
         # this is lazy, do better
     except KeyError as err:
-        print("Column names not configured properly... attempting to correct")
+        log.info("Column names not configured properly... attempting to correct")
         bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
         for col in bad_cols:
             if col.endswith("FLAG_W"):
-                print(col + " missing, flagging with 9s")
+                log.warning(col + " missing, flagging with 9s")
                 df[col] = 9
             else:
-                print(col + " missing, filling with -999s")
+                log.warning(col + " missing, filling with -999s")
                 df[col] = -999
 
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(
-        cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        # cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        cfg.directory["logs"] + "bottom_bottle_details.csv",
+        dtype={"SSSCC": str},
     )
     depth_df = pd.read_csv(
         cfg.directory["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
@@ -739,7 +784,7 @@ def export_ct1(df, ssscc_list):
         )
     except FileNotFoundError:
         # TODO: add logging; look into inheriting/extending a class to add features
-        print("manual_depth_log.csv not found... duplicating depth_log.csv")
+        log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
         manual_depth_df.to_csv(
             cfg.directory["logs"] + "manual_depth_log.csv", index=False
@@ -751,14 +796,24 @@ def export_ct1(df, ssscc_list):
 
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
+        # switch oxygen primary sensor to rinko
+        # if int(ssscc[:3]) > 35:
+        print(f"Using Rinko as CTDOXY for {ssscc}")
+        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[p_column_names]
-        time_data = time_data.round(4)
+        # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
+
+        # force flags back to int (TODO: make flags categorical)
+        for col in time_data.columns:
+            if col.endswith("FLAG_W"):
+                time_data[col] = time_data[col].astype(int)
 
         try:
             depth = full_depth_df.loc[full_depth_df["SSSCC"] == ssscc, "DEPTH"].iloc[0]
         except IndexError:
-            print(f"No depth logged for {ssscc}, setting to -999")  # TODO: logger
+            log.warning(f"No depth logged for {ssscc}, setting to -999")
             depth = -999
 
         # get cast_details for current SSSCC
@@ -783,8 +838,8 @@ def export_ct1(df, ssscc_list):
             ctd_header = (  # this is ugly but prevents tabs before label
                 f"CTD,{file_datetime}\n"
                 f"NUMBER_HEADERS = 11\n"
-                f"EXPOCODE = {cfg.cruise['expocode']}\n"
-                f"SECT_ID = {cfg.cruise['sectionid']}\n"
+                f"EXPOCODE = {cfg.expocode}\n"
+                f"SECT_ID = {cfg.section_id}\n"
                 f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
                 f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
                 f"DATE = {b_datetime[0]}\n"

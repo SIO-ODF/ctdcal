@@ -4,25 +4,9 @@
 # TODO: organize these by editable/fixed variables
 
 # Cruise specifics
-# not really needed for processing, move elsewhere
-cruise = dict(
-    cruise_title="GO-SHIP NBP1802",
-    cruise_name="nbp1802",
-    cruisedb="nbp1802",
-    vessel="R/V Palmer",
-    ship_code="3206",
-    expocode="320620180309",
-    chief_sci="Scientist McScienceface",
-    sectionid="S04P",
-    start_date="2018-03-09 14:00:00",
-    start_port="Hobart, Tasmania, Australia",
-    start_latlon="42.8821 S 147.3272 W",
-    end_date="2018-05-14 10:00:00",
-    end_port="Punta Arenas, Chile",
-    end_latlon="53.1638 S 70.9171 W",
-)
-
-ctd_serial = 1281
+expocode = "325020210316"
+section_id = "A20"
+ctd_serial = 914  # TODO: how to handle multiple CTDs on one cruise?
 
 # CTD variables/flags/units
 # move elsewhere when xarray is implemented
@@ -31,10 +15,11 @@ ctd_outputs = dict(
     temp=["CTDTMP", "CTDTMP_FLAG_W", "ITS-90", ""],
     salt=["CTDSAL", "CTDSAL_FLAG_W", "PSS-78", ""],
     doxy=["CTDOXY", "CTDOXY_FLAG_W", "UMOL/KG", ""],
-    rinko=["CTDRINKO", "CTDRINKO_FLAG_W", "0-5VDC", ""],
+    # rinko=["CTDRINKO", "CTDRINKO_FLAG_W", "UMOL/KG", ""],
+    # rinko=["CTDOXY", "CTDOXY_FLAG_W", "UMOL/KG", ""],  # reporting Rinko as primary oxy
     xmiss=["CTDXMISS", "CTDXMISS_FLAG_W", "0-5VDC", ""],
     fluor=["CTDFLUOR", "CTDFLUOR_FLAG_W", "0-5VDC", ""],
-    backscatter=["CTDBACKSCATTER", "CTDBACKSCATTER_FLAG_W", "0-5VDC", ""],
+    # backscatter=["CTDBACKSCATTER", "CTDBACKSCATTER_FLAG_W", "0-5VDC", ""],
     # bbp = ['CTDBBP700RAW', 'CTDBBP700RAW_FLAG_W', '0-5VDC', ''],
 )
 
@@ -49,6 +34,30 @@ for i in range(len(ctd_outputs)):
     ctd_col_units.append(param_list[3])
 
 ctd_time_output = dict(col_names=ctd_col_names, col_units=ctd_col_units)
+
+# T/C fitting parameters
+# temperature params are (P_order, T_order, zRange)
+# conductivity params are (P_order, T_order, C_order, zRange)
+fit_orders1 = {
+    "ssscc_t1": (1, 0, "750:6000"),
+    "ssscc_t2": (1, 0, "1000:6000"),
+    "ssscc_t3": (1, 0, "500:6000"),
+    # "ssscc_t4": (1, 0, "1000:6000"),
+    "ssscc_c1": (1, 0, 0, "1000:6000"),
+    "ssscc_c2": (2, 0, 1, "900:6000"),
+    "ssscc_c3": (2, 0, 1, "900:6000"),
+    # "ssscc_c4": (1, 1, 1, "500:6000"),
+}
+fit_orders2 = {
+    "ssscc_t1": (1, 0, "750:6000"),
+    "ssscc_t2": (1, 0, "1000:6000"),
+    "ssscc_t3": (2, 0, "750:6000"),
+    # "ssscc_t4": (1, 0, "1000:6000"),
+    "ssscc_c1": (1, 0, 0, "1000:6000"),
+    "ssscc_c2": (1, 1, 0, "1000:6000"),
+    "ssscc_c3": (2, 0, 1, "1100:6000"),
+    # "ssscc_c4": (1, 1, 1, "500:6000"),
+}
 
 # List of directories for I/O purposes
 directory = {
@@ -72,6 +81,7 @@ directory = {
     "c1_fit_figs": "data/logs/fitting_figs/cond_primary/",
     "c2_fit_figs": "data/logs/fitting_figs/cond_secondary/",
     "ox_fit_figs": "data/logs/fitting_figs/oxy_primary/",
+    "rinko_fit_figs": "data/logs/fitting_figs/oxy_rinko/",
 }
 
 # remnant of old system, will be pushed into xarray metadata/attrs
@@ -91,7 +101,7 @@ column = {
     "refc": "BTLCOND",
     "sal": "CTDSAL",
     "sal_btl": "SALNTY",
-    "rinko_oxy": "FREE1",
+    "rinko_oxy": "U_DEF_poly1",  # CHECK THIS!
     "oxy_btl": "OXYGEN",
     "oxyvolts": "CTDOXYVOLTS",
     "lat": "GPSLAT",
@@ -115,7 +125,9 @@ btl_cols = [
     "CTDSAL",
     "CTDOXY1",
     "CTDOXYVOLTS",
+    "U_DEF_poly1",
     "CTDXMISS",
+    "CTDFLUOR",
     "ALT",
     "REF_PAR",
     "GPSLAT",

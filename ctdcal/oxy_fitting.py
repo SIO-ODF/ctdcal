@@ -3,6 +3,7 @@ Module for processing oxygen from CTD and bottle samples.
 """
 
 import csv
+import logging
 import xml.etree.cElementTree as ET
 from collections import OrderedDict
 from pathlib import Path
@@ -19,6 +20,7 @@ from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 
 def load_winkler_oxy(oxy_file):
@@ -732,7 +734,7 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         )
         for _, flags in manual_flags.iterrows():
             df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
-                btl_df["btl_fire_num"] == flags["Bottle"]
+                btl_df["btl_fire_num"] == flags["SAMPNO"]
             )
             btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
 
@@ -756,7 +758,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     -------
 
     """
-    print("Calibrating oxygen (SBE43)")
+    log.info("Calibrating oxygen (SBE43)")
     # Plot all pre fit data
     f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
@@ -780,7 +782,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         # can't calibrate without bottle oxygen ("OXYGEN")
         if (btl_data["OXYGEN_FLAG_W"] == 9).all():
             sbe43_dict[ssscc] = np.full(5, np.nan)
-            print(ssscc + " skipped, all oxy data is NaN")
+            log.warning(ssscc + " skipped, all oxy data is NaN")
             continue
         sbe43_merged = match_sigmas(
             btl_data[cfg.column["p_btl"]],
@@ -800,13 +802,14 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         ] = sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
         sbe43_merged["SSSCC"] = ssscc
         all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
-        print(ssscc + " density matching done")
+        log.info(ssscc + " density matching done")
 
     # Only fit using OXYGEN flagged good (2)
     all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
+    sbe43_dict["ox0"] = sbe_coef0
 
     # Fit each cast individually
     for ssscc in ssscc_list:
@@ -828,9 +831,10 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     time_df["CTDOXY"] = np.nan
     for ssscc in ssscc_list:
         if np.isnan(sbe43_dict[ssscc]).all():
-            print(ssscc + " missing oxy data, leaving nan values and flagging as 9")
+            log.warning(
+                f"{ssscc} missing oxy data, leaving nan values and flagging as 9"
+            )
             time_df.loc[time_df["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
-            time_df.loc[time_df["SSSCC"] == ssscc, "RINKO_FLAG_W"] = 9
             continue
         btl_rows = (btl_df["SSSCC"] == ssscc).values
         time_rows = (time_df["SSSCC"] == ssscc).values
@@ -844,7 +848,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 btl_df.loc[btl_rows, "OS"],
             ),
         )
-        print(ssscc + " btl data fitting done")
+        log.info(ssscc + " btl data fitting done")
         time_df.loc[time_rows, "CTDOXY"] = _PMEL_oxy_eq(
             sbe43_dict[ssscc],
             (
@@ -855,7 +859,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 time_df.loc[time_rows, "OS"],
             ),
         )
-        print(ssscc + " time data fitting done")
+        log.info(ssscc + " time data fitting done")
 
     # flag CTDOXY with more than 1% difference
     time_df["CTDOXY_FLAG_W"] = 2  # TODO: actual flagging of some kind?
@@ -873,11 +877,21 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         f_out=f_out,
         xlim=(-10, 10),
     )
+    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_postfit_flag2.pdf"
+    flag2 = btl_df["CTDOXY_FLAG_W"] == 2
+    ctd_plots._intermediate_residual_plot(
+        btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDOXY"],
+        btl_df.loc[flag2, "CTDPRS"],
+        btl_df.loc[flag2, "SSSCC"],
+        xlabel="CTDOXY Residual (umol/kg)",
+        f_out=f_out,
+        xlim=(-10, 10),
+    )
 
     # export fitting coefs
     sbe43_coefs = pd.DataFrame.from_dict(
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
-    )
+    ).applymap(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
     sbe43_coefs.to_csv(cfg.directory["logs"] + "sbe43_coefs.csv")
 
     return True

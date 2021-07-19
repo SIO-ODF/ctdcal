@@ -11,7 +11,12 @@ from .. import (
     oxy_fitting,
     process_bottle,
     process_ctd,
+    rinko
 )
+
+import logging
+
+log = logging.getLogger(__name__)
 
 
 def odf_process_all():
@@ -30,7 +35,7 @@ def odf_process_all():
     try:
         ssscc_list = process_ctd.get_ssscc_list()
     except FileNotFoundError:
-        print("No ssscc.csv file found, generating from .hex file list")
+        log.info("No ssscc.csv file found, generating from .hex file list")
         ssscc_list = process_ctd.make_ssscc_list()
 
     # convert raw .hex files
@@ -70,17 +75,19 @@ def odf_process_all():
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
     # calculate params needs for oxy/rinko calibration
+    # TODO: move density matching to prepare_oxy
     oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
 
     # calibrate oxygen against reference
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
-
-    # TODO: calibrate rinko against reference, similar to oxy_fitting.calibrate_oxy()
-    # rinko.calibrate_oxy()  # or something
+    rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #####
     # Step 3: export data
     #####
+
+    # export files for making cruise report figs
+    process_bottle.export_report_data(btl_data_all)
 
     # export to Exchange format
     # TODO: clean this up more
