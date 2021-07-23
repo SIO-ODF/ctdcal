@@ -30,15 +30,15 @@ BOTTLE_FIRE_NUM_COL = "btl_fire_num"
 
 
 # Retrieve the bottle data from a converted file.
-def retrieveBottleDataFromFile(converted_file, debug=False):
+def retrieveBottleDataFromFile(converted_file):
 
     converted_df = pd.read_pickle(converted_file)
 
-    return retrieveBottleData(converted_df, debug)
+    return retrieveBottleData(converted_df)
 
 
 # Retrieve the bottle data from a dataframe created from a converted file.
-def retrieveBottleData(converted_df, debug=False):
+def retrieveBottleData(converted_df):
     if BOTTLE_FIRE_COL in converted_df.columns:
         converted_df[BOTTLE_FIRE_NUM_COL] = (
             (
@@ -530,7 +530,7 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
 
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org
-    with open(out_dir + ["expocode"] + "_hy1.csv", mode="w+") as f:
+    with open(out_dir + cfg.expocode + "_hy1.csv", mode="w+") as f:
         f.write("BOTTLE, %s\n" % (time_stamp))
         f.write(",".join(btl_columns.keys()) + "\n")
         f.write(",".join(btl_columns.values()) + "\n")

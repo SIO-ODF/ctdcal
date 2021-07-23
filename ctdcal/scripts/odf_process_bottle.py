@@ -92,7 +92,7 @@ def main(argv):
 
     # Retrieve the rows from the imported dataframe where the btl_fire_bool column == True
     # Returns a new dataframe
-    bottle_df = btl.retrieveBottleData(imported_df, False)
+    bottle_df = btl.retrieveBottleData(imported_df)
 
     if bottle_df.empty:
         errPrint("Bottle fire data not found in converted file")

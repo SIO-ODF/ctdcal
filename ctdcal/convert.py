@@ -14,8 +14,6 @@ from . import sbe_reader as sbe_rd
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
-DEBUG = False
-
 # TODO: move this to a separate file?
 # lookup table for sensor data
 # DOUBLE CHECK TYPE IS CORRECT #
@@ -109,7 +107,7 @@ short_lookup = {
 }
 
 
-def hex_to_ctd(ssscc_list, debug=False):
+def hex_to_ctd(ssscc_list):
     # TODO: add (some) error handling from odf_convert_sbe.py
     """
     Convert raw CTD data and export to .pkl files.
@@ -118,21 +116,18 @@ def hex_to_ctd(ssscc_list, debug=False):
     ----------
     ssscc_list : list of str
         List of stations to convert
-    debug : bool, optional
-        Display verbose messages
 
     Returns
     -------
 
     """
-    # TODO: use logger module instead
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
         if not Path(cfg.directory["converted"] + ssscc + ".pkl").exists():
             hexFile = cfg.directory["raw"] + ssscc + ".hex"
             xmlconFile = cfg.directory["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
-            converted_df = convertFromSBEReader(sbeReader, debug=debug)
+            converted_df = convertFromSBEReader(sbeReader)
             converted_df.to_pickle(cfg.directory["converted"] + ssscc + ".pkl")
 
     return True
@@ -178,18 +173,22 @@ def make_time_files(ssscc_list):
 
             # Filter data
             filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df, window="triangle", parameters=cfg.filter_cols,
+                trimmed_df,
+                window="triangle",
+                parameters=cfg.filter_cols,
             )
 
             # Trim to downcast
             cast_data = process_ctd.cast_details(
-                filter_data, ssscc, log_file=cfg.directory["logs"] + "cast_details.csv",
+                filter_data,
+                ssscc,
+                log_file=cfg.directory["logs"] + "cast_details.csv",
             )
 
             cast_data.to_pickle(cfg.directory["time"] + ssscc + "_time.pkl")
 
 
-def make_btl_mean(ssscc_list, debug=False):
+def make_btl_mean(ssscc_list):
     # TODO: add (some) error handling from odf_process_bottle.py
     """
     Create "bottle mean" files from continuous CTD data averaged at the bottle stops.
@@ -198,8 +197,6 @@ def make_btl_mean(ssscc_list, debug=False):
     ----------
     ssscc_list : list of str
         List of stations to convert
-    debug : bool, optional
-        Display verbose messages
 
     Returns
     -------
@@ -210,12 +207,19 @@ def make_btl_mean(ssscc_list, debug=False):
     for ssscc in ssscc_list:
         if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
             imported_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
-            bottle_df = btl.retrieveBottleData(imported_df, debug=debug)
+            bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
 
             # export bottom bottle time/lat/lon info
             fname = cfg.directory["logs"] + "bottom_bottle_details.csv"
-            bot_df = mean_df[["nmea_datetime", "GPSLAT", "GPSLON"]].head(1)
+            datetime_col = "nmea_datetime"
+            if datetime_col not in mean_df.columns:
+                log.debug(
+                    f"'{datetime_col}' not found in DataFrame - using 'scan_datetime'"
+                )
+                datetime_col = "scan_datetime"
+
+            bot_df = mean_df[[datetime_col, "GPSLAT", "GPSLON"]].head(1)
             bot_df.columns = ["bottom_time", "latitude", "longitude"]
             bot_df.insert(0, "SSSCC", ssscc)
             add_header = not Path(fname).exists()  # add header iff file doesn't exist
@@ -227,15 +231,10 @@ def make_btl_mean(ssscc_list, debug=False):
     return True
 
 
-def convertFromSBEReader(sbeReader, debug=False):
+def convertFromSBEReader(sbeReader):
     """Handler to convert engineering data to sci units automatically.
     Takes SBEReader object that is already connected to the .hex and .XMLCON files.
-    Optionally takes a boolean debug flag to specify whether or not to display
-    verbose messages to stderr
     """
-
-    global DEBUG
-    DEBUG = debug
 
     # Retrieve parsed scans and convert to dataframe
     rawData = sbeReader.parsed_scans
