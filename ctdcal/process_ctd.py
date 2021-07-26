@@ -732,11 +732,6 @@ def export_ct1(df, ssscc_list):
 
     """
     log.info("Exporting CTD files")
-    # clean up columns
-    p_column_names = cfg.ctd_time_output["col_names"]
-    p_column_units = cfg.ctd_time_output["col_units"]
-    p_column_names.pop(1)  # remove CTDPRS_FLAG_W
-    p_column_units.pop(1)  # remove CTDPRS_FLAG_W
 
     # initial flagging (some of this should be moved)
     # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
@@ -756,7 +751,7 @@ def export_ct1(df, ssscc_list):
 
     # check that all columns are there
     try:
-        df[p_column_names]
+        df[cfg.ctd_col_names]
         # this is lazy, do better
     except KeyError as err:
         log.info("Column names not configured properly... attempting to correct")
@@ -801,7 +796,7 @@ def export_ct1(df, ssscc_list):
         print(f"Using Rinko as CTDOXY for {ssscc}")
         time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
         time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
-        time_data = time_data[p_column_names]
+        time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
@@ -850,9 +845,9 @@ def export_ct1(df, ssscc_list):
                 f"DEPTH = {depth:.0f}\n"
             )
             f.write(ctd_header)
-            np.asarray(p_column_names).tofile(f, sep=",", format="%s")
+            np.asarray(cfg.ctd_col_names).tofile(f, sep=",", format="%s")
             f.write("\n")
-            np.asarray(p_column_units).tofile(f, sep=",", format="%s")
+            np.asarray(cfg.ctd_col_units).tofile(f, sep=",", format="%s")
             f.write("\n")
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")

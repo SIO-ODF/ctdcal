@@ -8,32 +8,27 @@ expocode = "325020210316"
 section_id = "A20"
 ctd_serial = 914  # TODO: how to handle multiple CTDs on one cruise?
 
-# CTD variables/flags/units
+# CTD file (.ct1) variable outputs
 # move elsewhere when xarray is implemented
+# TODO: import dict from user_settings.yaml (working title), check against cchdo.params?
 ctd_outputs = dict(
-    press=["CTDPRS", "CTDPRS_FLAG_W", "DBAR", ""],
-    temp=["CTDTMP", "CTDTMP_FLAG_W", "ITS-90", ""],
-    salt=["CTDSAL", "CTDSAL_FLAG_W", "PSS-78", ""],
-    doxy=["CTDOXY", "CTDOXY_FLAG_W", "UMOL/KG", ""],
-    # rinko=["CTDRINKO", "CTDRINKO_FLAG_W", "UMOL/KG", ""],
-    # rinko=["CTDOXY", "CTDOXY_FLAG_W", "UMOL/KG", ""],  # reporting Rinko as primary oxy
-    xmiss=["CTDXMISS", "CTDXMISS_FLAG_W", "0-5VDC", ""],
-    fluor=["CTDFLUOR", "CTDFLUOR_FLAG_W", "0-5VDC", ""],
-    # backscatter=["CTDBACKSCATTER", "CTDBACKSCATTER_FLAG_W", "0-5VDC", ""],
-    # bbp = ['CTDBBP700RAW', 'CTDBBP700RAW_FLAG_W', '0-5VDC', ''],
+    press=["CTDPRS", "DBAR"],
+    temp=["CTDTMP", "ITS-90"],
+    salt=["CTDSAL", "PSS-78"],
+    doxy=["CTDOXY", "UMOL/KG"],
+    # rinko=["CTDRINKO", "UMOL/KG"],
+    xmiss=["CTDXMISS", "0-5VDC"],
+    fluor=["CTDFLUOR", "0-5VDC"],
+    # backscatter=["CTDBACKSCATTER", "0-5VDC"],
 )
-
-ctd_col_names = []
-ctd_col_units = []
-for i in range(len(ctd_outputs)):
-    param = list(ctd_outputs.keys())[i]
-    param_list = ctd_outputs[param]
-    ctd_col_names.append(param_list[0])
-    ctd_col_names.append(param_list[1])
-    ctd_col_units.append(param_list[2])
-    ctd_col_units.append(param_list[3])
-
-ctd_time_output = dict(col_names=ctd_col_names, col_units=ctd_col_units)
+ctd_col_names, ctd_col_units = [], []
+for (param, unit) in ctd_outputs.values():
+    if param == "CTDPRS":
+        ctd_col_names += [param]
+        ctd_col_units += [unit]
+    else:
+        ctd_col_names += [param, f"{param}_FLAG_W"]
+        ctd_col_units += [unit, ""]
 
 # List of directories for I/O purposes
 directory = {
