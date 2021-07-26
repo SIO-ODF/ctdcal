@@ -35,30 +35,6 @@ for i in range(len(ctd_outputs)):
 
 ctd_time_output = dict(col_names=ctd_col_names, col_units=ctd_col_units)
 
-# T/C fitting parameters
-# temperature params are (P_order, T_order, zRange)
-# conductivity params are (P_order, T_order, C_order, zRange)
-fit_orders1 = {
-    "ssscc_t1": (1, 0, "750:6000"),
-    "ssscc_t2": (1, 0, "1000:6000"),
-    "ssscc_t3": (1, 0, "500:6000"),
-    # "ssscc_t4": (1, 0, "1000:6000"),
-    "ssscc_c1": (1, 0, 0, "1000:6000"),
-    "ssscc_c2": (2, 0, 1, "900:6000"),
-    "ssscc_c3": (2, 0, 1, "900:6000"),
-    # "ssscc_c4": (1, 1, 1, "500:6000"),
-}
-fit_orders2 = {
-    "ssscc_t1": (1, 0, "750:6000"),
-    "ssscc_t2": (1, 0, "1000:6000"),
-    "ssscc_t3": (2, 0, "750:6000"),
-    # "ssscc_t4": (1, 0, "1000:6000"),
-    "ssscc_c1": (1, 0, 0, "1000:6000"),
-    "ssscc_c2": (1, 1, 0, "1000:6000"),
-    "ssscc_c3": (2, 0, 1, "1100:6000"),
-    # "ssscc_c4": (1, 1, 1, "500:6000"),
-}
-
 # List of directories for I/O purposes
 directory = {
     "ssscc_file": "data/ssscc.csv",

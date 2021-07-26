@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import scipy
 from scipy.ndimage.interpolation import shift
+import yaml
 
 from . import convert as convert
 from . import ctd_plots as ctd_plots
@@ -16,6 +17,24 @@ from . import process_ctd as process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
+
+
+def load_fit_yaml(fname=f"{cfg.directory['logs']}fit_coefs.yaml", to_object=False):
+    """Load polynomail fit order information from .yaml file."""
+
+    with open(fname, "r") as f:
+        ymlfile = yaml.safe_load(f)
+
+    if to_object:
+        return type("ymlfile", (object,), ymlfile)
+    else:
+        return ymlfile
+
+
+def write_fit_yaml():
+    """For future use with automated fitting routine(s).
+    i.e., iterate to find best fit parameters, save to file"""
+    pass
 
 
 def _conductivity_polyfit(cond, temp, press, coef):
@@ -274,6 +293,8 @@ def calibrate_temp(btl_df, time_df):
     coef_t1_all = pd.DataFrame()
     coef_t2_all = pd.DataFrame()
 
+    fit_yaml = load_fit_yaml(to_object=True)  # load fit polynomial order
+
     for f in ssscc_subsets:
         # 0) load ssscc subset to be fit together
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
@@ -300,27 +321,24 @@ def calibrate_temp(btl_df, time_df):
             f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_prefit.pdf",
         )
 
-        # TODO: allow for cast-by-cast T_order/P_order/zRange
         # TODO: truncate coefs (10 digits? look at historical data)
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
-        P1_order, T1_order, zRange1 = cfg.fit_orders1[f_stem]
-        P2_order, T2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_t1, df_bad_t1 = _get_T_coefs(
             btl_df[good_rows],
             T_col=cfg.column["t1_btl"],
-            P_order=P1_order,
-            T_order=T1_order,
-            zRange=zRange1,
+            P_order=fit_yaml.fit_orders1[f_stem]["P_order"],
+            T_order=fit_yaml.fit_orders1[f_stem]["T_order"],
+            zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
             f_stem=f_stem,
         )
         coef_t2, df_bad_t2 = _get_T_coefs(
             btl_df[good_rows],
             T_col=cfg.column["t2_btl"],
-            P_order=P2_order,
-            T_order=T2_order,
-            zRange=zRange2,
+            P_order=fit_yaml.fit_orders2[f_stem]["P_order"],
+            T_order=fit_yaml.fit_orders2[f_stem]["T_order"],
+            zRange=fit_yaml.fit_orders2[f_stem]["zRange"],
             f_stem=f_stem,
         )
 
@@ -545,6 +563,8 @@ def calibrate_cond(btl_df, time_df):
     coef_c1_all = pd.DataFrame()
     coef_c2_all = pd.DataFrame()
 
+    fit_yaml = load_fit_yaml(to_object=True)  # load fit polynomial order
+
     for f in ssscc_subsets:
         # 0) grab ssscc chunk to fit
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
@@ -576,24 +596,22 @@ def calibrate_cond(btl_df, time_df):
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
-        P1_order, T1_order, C1_order, zRange1 = cfg.fit_orders1[f_stem]
-        P2_order, T2_order, C2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_c1, df_bad_c1 = _get_C_coefs(
             btl_df[good_rows],
             C_col=cfg.column["c1_btl"],
-            P_order=P1_order,
-            T_order=T1_order,
-            C_order=C1_order,
-            zRange=zRange1,
+            P_order=fit_yaml.fit_orders1[f_stem]["P_order"],
+            T_order=fit_yaml.fit_orders1[f_stem]["T_order"],
+            C_order=fit_yaml.fit_orders1[f_stem]["C_order"],
+            zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
             f_stem=f_stem,
         )
         coef_c2, df_bad_c2 = _get_C_coefs(
             btl_df[good_rows],
             C_col=cfg.column["c2_btl"],
-            P_order=P2_order,
-            T_order=T2_order,
-            C_order=C2_order,
-            zRange=zRange2,
+            P_order=fit_yaml.fit_orders2[f_stem]["P_order"],
+            T_order=fit_yaml.fit_orders2[f_stem]["T_order"],
+            C_order=fit_yaml.fit_orders2[f_stem]["C_order"],
+            zRange=fit_yaml.fit_orders2[f_stem]["zRange"],
             f_stem=f_stem,
         )
 
