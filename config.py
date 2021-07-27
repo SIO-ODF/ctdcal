@@ -79,28 +79,3 @@ column = {
 filter_cols = []
 for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]:
     filter_cols.append(column[x])
-
-# List of bottle columns to be read during calibration
-btl_cols = [
-    "CTDTMP1",
-    "CTDTMP2",
-    "CTDPRS",
-    "CTDCOND1",
-    "CTDCOND2",
-    "CTDSAL",
-    "CTDOXY1",
-    "CTDOXYVOLTS",
-    "FREE1",
-    "CTDXMISS",
-    "CTDFLUOR",
-    "ALT",
-    "REF_PAR",
-    "GPSLAT",
-    "GPSLON",
-    "new_fix",
-    "pressure_temp_int",
-    "pump_on",
-    "btl_fire",
-    "scan_datetime",
-    "btl_fire_num",
-]

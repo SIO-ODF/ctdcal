@@ -158,7 +158,7 @@ def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", deci
     return df
 
 
-def load_all_btl_files(ssscc_list, series, cols=None):
+def load_all_btl_files(ssscc_list, cols=None):
     """
     Load bottle and secondary (e.g. reference temperature, bottle salts, bottle oxygen)
     files for station/cast list and merge into a dataframe.
