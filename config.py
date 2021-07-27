@@ -1,34 +1,28 @@
-### configuration file for odf_process_all_MK.py
-# this is an example to fill with your own values
+### configuration file for odf_process_all.py
 #
 # TODO: organize these by editable/fixed variables
+import yaml
 
-# Cruise specifics
-expocode = "325020210316"
-section_id = "A20"
-ctd_serial = 914  # TODO: how to handle multiple CTDs on one cruise?
+with open("user_settings.yaml", "r") as f:
+    settings = yaml.safe_load(f)
+
+# Unpack user settings (any sanitizing/checks needed? probably)
+expocode = settings["expocode"]
+section_id = settings["section_id"]
+ctd_serial = settings["ctd_serial"]
+ctd_outputs = settings["ctd_outputs"]
 
 # CTD file (.ct1) variable outputs
 # move elsewhere when xarray is implemented
-# TODO: import dict from user_settings.yaml (working title), check against cchdo.params?
-ctd_outputs = dict(
-    press=["CTDPRS", "DBAR"],
-    temp=["CTDTMP", "ITS-90"],
-    salt=["CTDSAL", "PSS-78"],
-    doxy=["CTDOXY", "UMOL/KG"],
-    # rinko=["CTDRINKO", "UMOL/KG"],
-    xmiss=["CTDXMISS", "0-5VDC"],
-    fluor=["CTDFLUOR", "0-5VDC"],
-    # backscatter=["CTDBACKSCATTER", "0-5VDC"],
-)
+# TODO: check against cchdo.params?
 ctd_col_names, ctd_col_units = [], []
-for (param, unit) in ctd_outputs.values():
+for (param, attrs) in ctd_outputs.items():
     if param == "CTDPRS":
         ctd_col_names += [param]
-        ctd_col_units += [unit]
+        ctd_col_units += [attrs["units"]]
     else:
         ctd_col_names += [param, f"{param}_FLAG_W"]
-        ctd_col_units += [unit, ""]
+        ctd_col_units += [attrs["units"], ""]
 
 # List of directories for I/O purposes
 directory = {
@@ -72,7 +66,7 @@ column = {
     "refc": "BTLCOND",
     "sal": "CTDSAL",
     "sal_btl": "SALNTY",
-    "rinko_oxy": "U_DEF_poly1",  # CHECK THIS!
+    "rinko_oxy": "FREE1",  # CHECK THIS!
     "oxy_btl": "OXYGEN",
     "oxyvolts": "CTDOXYVOLTS",
     "lat": "GPSLAT",
@@ -96,7 +90,7 @@ btl_cols = [
     "CTDSAL",
     "CTDOXY1",
     "CTDOXYVOLTS",
-    "U_DEF_poly1",
+    "FREE1",
     "CTDXMISS",
     "CTDFLUOR",
     "ALT",

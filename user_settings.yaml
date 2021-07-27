@@ -1,0 +1,32 @@
+### configuration file for odf_process_all.py
+
+# this is an example to fill with your own values
+
+# Cruise specifics
+expocode: "325020210316"
+section_id: "A20"
+ctd_serial: 914  # TODO: how to handle multiple CTDs on one cruise?
+
+# CTD output variables/units
+ctd_outputs:
+    CTDPRS:
+        sensor: CTDPRS
+        units: DBAR
+    CTDTMP:
+        sensor: CTDTMP1
+        units: ITS-90
+    CTDSAL:
+        sensor: CTDSAL1
+        units: PSS-78
+    CTDOXY:
+        sensor: CTDOXY1
+        units: UMOL/KG
+    # CTDRINKO:
+    #     sensor: CTDRINKO
+    #     units: UMOL/KG
+    CTDXMISS:
+        sensor: CTDXMISS1
+        units: 0-5VDC
+    CTDFLUOR:
+        sensor: CTDFLUOR1
+        units: 0-5VDC
