@@ -459,15 +459,10 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
         "REFTMP_FLAG_W": "",
     }
 
-    # rename
-    # TODO: put in config file which line to use (primary vs. secondary)
-    btl_data = btl_data.rename(
-        columns={
-            "CTDTMP1": "CTDTMP",
-            # "CTDRINKO": "CTDOXY",
-            # "CTDRINKO_FLAG_W": "CTDOXY_FLAG_W",
-        }
-    )
+    # rename outputs as defined in user_settings.yaml
+    for param, attrs in cfg.ctd_outputs.items():
+        if param not in btl_data.columns:
+            btl_data.rename(columns={attrs["sensor"]: param}, inplace=True)
 
     btl_data["EXPOCODE"] = cfg.expocode
     btl_data["SECT_ID"] = cfg.section_id

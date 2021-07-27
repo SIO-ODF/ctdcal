@@ -740,14 +740,10 @@ def export_ct1(df, ssscc_list):
     df["CTDXMISS_FLAG_W"] = 1
     # df["CTDBACKSCATTER_FLAG_W"] = 1
 
-    # renames
-    df = df.rename(
-        columns={
-            "CTDTMP1": "CTDTMP",
-            # "CTDRINKO": "CTDOXY",
-            # "CTDRINKO_FLAG_W": "CTDOXY_FLAG_W",
-        }
-    )
+    # rename outputs as defined in user_settings.yaml
+    for param, attrs in cfg.ctd_outputs.items():
+        if param not in df.columns:
+            df.rename(columns={attrs["sensor"]: param}, inplace=True)
 
     # check that all columns are there
     try:
