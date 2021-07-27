@@ -230,8 +230,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                     rinko_coefs_group,
                     (
                         btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-                        btl_df.loc[btl_rows, cfg.column["p_btl"]],
-                        btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                        btl_df.loc[btl_rows, cfg.column["p"]],
+                        btl_df.loc[btl_rows, cfg.column["t1"]],
                         btl_df.loc[btl_rows, cfg.column["sal"]],
                         btl_df.loc[btl_rows, "OS"],
                     ),
@@ -243,8 +243,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                     rinko_coefs_ssscc,
                     (
                         btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-                        btl_df.loc[btl_rows, cfg.column["p_btl"]],
-                        btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                        btl_df.loc[btl_rows, cfg.column["p"]],
+                        btl_df.loc[btl_rows, cfg.column["t1"]],
                         btl_df.loc[btl_rows, cfg.column["sal"]],
                         btl_df.loc[btl_rows, "OS"],
                     ),
@@ -264,8 +264,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 rinko_coefs_ssscc,
                 (
                     btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-                    btl_df.loc[btl_rows, cfg.column["p_btl"]],
-                    btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                    btl_df.loc[btl_rows, cfg.column["p"]],
+                    btl_df.loc[btl_rows, cfg.column["t1"]],
                     btl_df.loc[btl_rows, cfg.column["sal"]],
                     btl_df.loc[btl_rows, "OS"],
                 ),
@@ -362,8 +362,8 @@ def rinko_oxy_fit(
     weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
     fit_data = (
         btl_df[cfg.column["rinko_oxy"]],
-        btl_df[cfg.column["p_btl"]],
-        btl_df[cfg.column["t1_btl"]],
+        btl_df[cfg.column["p"]],
+        btl_df[cfg.column["t1"]],
         btl_df[cfg.column["sal"]],
         btl_df["OS"],
     )
@@ -380,13 +380,13 @@ def rinko_oxy_fit(
     res = scipy.optimize.minimize(
         oxy_weighted_residual,
         x0=rinko_coef0,
-        args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
+        args=(weights, fit_data, btl_df[cfg.column["refO"]]),
         bounds=coef_bounds,
     )
 
     cfw_coefs = res.x
     btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
-    btl_df["residual"] = btl_df[cfg.column["oxy_btl"]] - btl_df["RINKO_OXY"]
+    btl_df["residual"] = btl_df[cfg.column["refO"]] - btl_df["RINKO_OXY"]
 
     cutoff = 2.8 * np.std(btl_df["residual"])
     thrown_values = btl_df[np.abs(btl_df["residual"]) > cutoff]
@@ -399,20 +399,20 @@ def rinko_oxy_fit(
         weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
         fit_data = (
             btl_df[cfg.column["rinko_oxy"]],
-            btl_df[cfg.column["p_btl"]],
-            btl_df[cfg.column["t1_btl"]],
+            btl_df[cfg.column["p"]],
+            btl_df[cfg.column["t1"]],
             btl_df[cfg.column["sal"]],
             btl_df["OS"],
         )
         res = scipy.optimize.minimize(
             oxy_weighted_residual,
             x0=p0,
-            args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
+            args=(weights, fit_data, btl_df[cfg.column["refO"]]),
             bounds=coef_bounds,
         )
         cfw_coefs = res.x
         btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
-        btl_df["residual"] = btl_df[cfg.column["oxy_btl"]] - btl_df["RINKO_OXY"]
+        btl_df["residual"] = btl_df[cfg.column["refO"]] - btl_df["RINKO_OXY"]
         cutoff = 2.8 * np.std(btl_df["residual"])
         thrown_values = btl_df[np.abs(btl_df["residual"]) > cutoff]
         bad_df = pd.concat([bad_df, thrown_values])

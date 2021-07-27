@@ -53,26 +53,21 @@ directory = {
 # Labels for CTD columns
 column = {
     "p": "CTDPRS",
-    "p_btl": "CTDPRS",
     "t1": "CTDTMP1",
     "t2": "CTDTMP2",
-    "t1_btl": "CTDTMP1",
-    "t2_btl": "CTDTMP2",
     "c1": "CTDCOND1",
     "c2": "CTDCOND2",
-    "c1_btl": "CTDCOND1",
-    "c2_btl": "CTDCOND2",
-    "reft": "T90",
-    "refc": "BTLCOND",
     "sal": "CTDSAL",
-    "sal_btl": "SALNTY",
+    # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
+    # "s2": "CTDSAL2",
     "rinko_oxy": "FREE1",  # CHECK THIS!
-    "oxy_btl": "OXYGEN",
     "oxyvolts": "CTDOXYVOLTS",
+    "refT": "T90",
+    "refC": "BTLCOND",
+    "refS": "SALNTY",
+    "refO": "OXYGEN",
     "lat": "GPSLAT",
     "lon": "GPSLON",
-    "lat_btl": "GPSLAT",
-    "lon_btl": "GPSLON",
 }
 
 # List of columns to filter

@@ -673,20 +673,20 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     # Calculate SA and CT
     btl_df["SA"] = gsw.SA_from_SP(
         btl_df[cfg.column["sal"]],
-        btl_df[cfg.column["p_btl"]],
-        btl_df[cfg.column["lon_btl"]],
-        btl_df[cfg.column["lat_btl"]],
+        btl_df[cfg.column["p"]],
+        btl_df[cfg.column["lon"]],
+        btl_df[cfg.column["lat"]],
     )
     btl_df["CT"] = gsw.CT_from_t(
         btl_df["SA"],
-        btl_df[cfg.column["t1_btl"]],  # oxygen sensor is on primary line (ie t1)
-        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
+        btl_df[cfg.column["p"]],
     )
     time_df["SA"] = gsw.SA_from_SP(
         time_df[cfg.column["sal"]],
         time_df[cfg.column["p"]],
-        time_df[cfg.column["lon_btl"]],
-        time_df[cfg.column["lat_btl"]],
+        time_df[cfg.column["lon"]],
+        time_df[cfg.column["lat"]],
     )
     time_df["CT"] = gsw.CT_from_t(
         time_df["SA"],
@@ -702,9 +702,9 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     btl_df["OS"] = gsw.O2sol(
         btl_df["SA"],
         btl_df["CT"],
-        btl_df[cfg.column["p_btl"]],
-        btl_df[cfg.column["lon_btl"]],
-        btl_df[cfg.column["lat_btl"]],
+        btl_df[cfg.column["p"]],
+        btl_df[cfg.column["lon"]],
+        btl_df[cfg.column["lat"]],
     )
     time_df["OS"] = gsw.O2sol(
         time_df["SA"],
@@ -716,17 +716,17 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     # Convert CTDOXY units
     btl_df["CTDOXY"] = oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
     # Calculate bottle oxygen
-    btl_df[cfg.column["oxy_btl"]] = calculate_bottle_oxygen(
+    btl_df[cfg.column["refO"]] = calculate_bottle_oxygen(
         ssscc_list,
         btl_df["SSSCC"],
         btl_df["TITR_VOL"],
         btl_df["TITR_TEMP"],
         btl_df["FLASKNO"],
     )
-    btl_df[cfg.column["oxy_btl"]] = oxy_ml_to_umolkg(
-        btl_df[cfg.column["oxy_btl"]], btl_df["sigma_btl"]
+    btl_df[cfg.column["refO"]] = oxy_ml_to_umolkg(
+        btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
     )
-    btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["oxy_btl"]])
+    btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["refO"]])
     # Load manual OXYGEN flags
     if Path("data/oxygen/manual_oxy_flags.csv").exists():
         manual_flags = pd.read_csv(
@@ -785,8 +785,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             log.warning(ssscc + " skipped, all oxy data is NaN")
             continue
         sbe43_merged = match_sigmas(
-            btl_data[cfg.column["p_btl"]],
-            btl_data[cfg.column["oxy_btl"]],
+            btl_data[cfg.column["p"]],
+            btl_data[cfg.column["refO"]],
             btl_data["CTDTMP1"],
             btl_data["SA"],
             time_data["OS"],
@@ -842,8 +842,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             sbe43_dict[ssscc],
             (
                 btl_df.loc[btl_rows, cfg.column["oxyvolts"]],
-                btl_df.loc[btl_rows, cfg.column["p_btl"]],
-                btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                btl_df.loc[btl_rows, cfg.column["p"]],
+                btl_df.loc[btl_rows, cfg.column["t1"]],
                 btl_df.loc[btl_rows, "dv_dt"],
                 btl_df.loc[btl_rows, "OS"],
             ),
