@@ -22,7 +22,10 @@ handler = logging.StreamHandler()
 handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
 FORMAT = "%(funcName)s: %(message)s"
 logging.basicConfig(
-    level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[handler],
+    level="NOTSET",
+    format=FORMAT,
+    datefmt="[%X]",
+    handlers=[handler],
     # handlers=[RichHandler(console=Console(stderr=True))],
 )
 
@@ -42,6 +45,7 @@ def cli():
 def init():
     """Setup data folder with appropriate subfolders"""
 
+    # TODO: import get config.py data and build from that
     DEFAULT_DIRS = [
         "raw",
         "converted",
@@ -102,6 +106,7 @@ def cruise_report():
     """Generate bottle residual figures for cruise report"""
 
     from .scripts.cruise_report import cruise_report_residuals
+
     cruise_report_residuals()
 
 

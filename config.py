@@ -25,8 +25,8 @@ for (param, attrs) in ctd_outputs.items():
         ctd_col_units += [attrs["units"], ""]
 
 # List of directories for I/O purposes
+# TODO: refactor/rethink this
 directory = {
-    "ssscc_file": "data/ssscc.csv",
     "ssscc": "data/ssscc/",
     "raw": "data/raw/",
     "converted": "data/converted/",
@@ -37,10 +37,6 @@ directory = {
     "reft": "data/reft/",
     "oxy": "data/oxygen/",
     "logs": "data/logs/",
-    "qual_temp_primary": "quality_code/temp_primary/",
-    "qual_temp_secondary": "quality_code/temp_secondary/",
-    "qual_cond_primary": "quality_code/cond_primary/",
-    "qual_cond_secondary": "quality_code/cond_secondary/",
     "t1_fit_figs": "data/logs/fitting_figs/temp_primary/",
     "t2_fit_figs": "data/logs/fitting_figs/temp_secondary/",
     "c1_fit_figs": "data/logs/fitting_figs/cond_primary/",

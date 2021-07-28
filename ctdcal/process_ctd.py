@@ -613,25 +613,23 @@ def make_depth_log(time_df, threshold=80):
     return True
 
 
-def make_ssscc_list():
+def make_ssscc_list(fname="data/ssscc.csv"):
     """
     Attempt to automatically generate list of station/casts from raw files.
     """
     raw_files = Path(cfg.directory["raw"]).glob("*.hex")
     ssscc_list = sorted([f.stem for f in raw_files])
-    pd.Series(ssscc_list).to_csv(
-        cfg.directory["ssscc_file"], header=None, index=False, mode="x"
-    )
+    pd.Series(ssscc_list).to_csv(fname, header=None, index=False, mode="x")
 
     return ssscc_list
 
 
-def get_ssscc_list():
+def get_ssscc_list(fname="data/ssscc.csv"):
     """
     Load in list of stations/casts to process.
     """
     ssscc_list = []
-    with open(cfg.directory["ssscc_file"], "r") as filename:
+    with open(fname, "r") as filename:
         ssscc_list = [line.strip() for line in filename]
 
     return ssscc_list
