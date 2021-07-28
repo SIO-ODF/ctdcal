@@ -2,6 +2,7 @@ from pathlib import Path
 
 import click
 import logging
+from . import get_ctdcal_config
 
 # Rich handling
 # from rich.logging import RichHandler
@@ -30,6 +31,7 @@ logging.basicConfig(
 )
 
 log = logging.getLogger(__name__)
+cfg = get_ctdcal_config()
 
 
 @click.group()
@@ -45,26 +47,10 @@ def cli():
 def init():
     """Setup data folder with appropriate subfolders"""
 
-    # TODO: import get config.py data and build from that
-    DEFAULT_DIRS = [
-        "raw",
-        "converted",
-        "time",
-        "bottle",
-        "reft",
-        "salt",
-        "oxygen",
-        "logs",
-        "ssscc",
-        "pressure",
-    ]
+    log.info(f"Building default /data/ directories: \n {*cfg.dirs.keys(),}")
 
-    log.info(f"Building default data directories: \n {*DEFAULT_DIRS,}")
-
-    base_name = Path("./data/")
-    for sub_dir in DEFAULT_DIRS:
-        path = base_name / sub_dir
-        path.mkdir(parents=True)
+    for sub_dir in cfg.dirs.values():
+        Path(sub_dir).mkdir(parents=True)
 
 
 @cli.command("import")  # click workaround to get a command named 'import'

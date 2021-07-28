@@ -75,7 +75,7 @@ def load_winkler_oxy(oxy_file):
     return df, params
 
 
-def load_flasks(flask_file=cfg.directory["oxy"] + "o2flasks.vol", comment="#"):
+def load_flasks(flask_file=cfg.dirs["oxygen"] + "o2flasks.vol", comment="#"):
     """
     Load oxygen flask information from .vol file.
 
@@ -195,7 +195,7 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
     """
     params = pd.DataFrame()
     for ssscc in ssscc_list:
-        df = gather_oxy_params(cfg.directory["oxy"] + ssscc)
+        df = gather_oxy_params(cfg.dirs["oxygen"] + ssscc)
         df["SSSCC"] = ssscc
         params = pd.concat([params, df])
 
@@ -381,7 +381,7 @@ def _get_sbe_coef(idx=0):
     # TODO: does scipy's minimize function needs a tuple? can this be improved further?
 
     station = process_ctd.get_ssscc_list()[idx]
-    xmlfile = cfg.directory["raw"] + station + ".XMLCON"
+    xmlfile = cfg.dirs["raw"] + station + ".XMLCON"
 
     tree = ET.parse(xmlfile)
     root_eq0 = tree.find(".//CalibrationCoefficients[@equation='0']")  # Owens-Millard
@@ -576,7 +576,7 @@ def match_sigmas(
 def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
 
     # Plot data to be fit together
-    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual{f_suffix}_prefit.pdf"
+    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
         merged_df["REFOXY"] - merged_df["CTDOXY"],
         merged_df["CTDPRS"],
@@ -635,7 +635,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     # intermediate plots to diagnose data chunks goodness
     # TODO: implement into bokeh/flask dashboard
     if f_suffix is not None:
-        f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual{f_suffix}.pdf"
+        f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}.pdf"
         ctd_plots._intermediate_residual_plot(
             merged_df["residual"],
             merged_df["CTDPRS"],
@@ -760,7 +760,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     """
     log.info("Calibrating oxygen (SBE43)")
     # Plot all pre fit data
-    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_prefit.pdf"
+    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
@@ -868,7 +868,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
 
     # Plot all post fit data
-    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_postfit.pdf"
+    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit.pdf"
     ctd_plots._intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
@@ -877,7 +877,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         f_out=f_out,
         xlim=(-10, 10),
     )
-    f_out = f"{cfg.directory['ox_fit_figs']}sbe43_residual_all_postfit_flag2.pdf"
+    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit_flag2.pdf"
     flag2 = btl_df["CTDOXY_FLAG_W"] == 2
     ctd_plots._intermediate_residual_plot(
         btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDOXY"],
@@ -892,6 +892,6 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_coefs = pd.DataFrame.from_dict(
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
     ).applymap(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
-    sbe43_coefs.to_csv(cfg.directory["logs"] + "sbe43_coefs.csv")
+    sbe43_coefs.to_csv(cfg.dirs["logs"] + "sbe43_coefs.csv")
 
     return True

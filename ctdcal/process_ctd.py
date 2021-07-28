@@ -558,7 +558,7 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
 
     """
     p_log = pd.read_csv(
-        cfg.directory["logs"] + "ondeck_pressure.csv",
+        cfg.dirs["logs"] + "ondeck_pressure.csv",
         dtype={"SSSCC": str},
         na_values="Started in Water",
     )
@@ -607,7 +607,7 @@ def make_depth_log(time_df, threshold=80):
         .astype(int)
     )
     bottom_df[["SSSCC", "DEPTH"]].to_csv(
-        cfg.directory["logs"] + "depth_log.csv", index=False
+        cfg.dirs["logs"] + "depth_log.csv", index=False
     )
 
     return True
@@ -617,7 +617,7 @@ def make_ssscc_list(fname="data/ssscc.csv"):
     """
     Attempt to automatically generate list of station/casts from raw files.
     """
-    raw_files = Path(cfg.directory["raw"]).glob("*.hex")
+    raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
     ssscc_list = sorted([f.stem for f in raw_files])
     pd.Series(ssscc_list).to_csv(fname, header=None, index=False, mode="x")
 
@@ -653,7 +653,7 @@ def load_all_ctd_files(ssscc_list):
     df_list = []
     for ssscc in ssscc_list:
         log.info("Loading TIME data for station: " + ssscc + "...")
-        time_file = cfg.directory["time"] + ssscc + "_time.pkl"
+        time_file = cfg.dirs["time"] + ssscc + "_time.pkl"
         time_data = pd.read_pickle(time_file)
         time_data["SSSCC"] = str(ssscc)
         time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
@@ -760,24 +760,22 @@ def export_ct1(df, ssscc_list):
 
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(
-        # cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.directory["logs"] + "bottom_bottle_details.csv",
+        # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        cfg.dirs["logs"] + "bottom_bottle_details.csv",
         dtype={"SSSCC": str},
     )
     depth_df = pd.read_csv(
-        cfg.directory["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     try:
         manual_depth_df = pd.read_csv(
-            cfg.directory["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+            cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
         )
     except FileNotFoundError:
         # TODO: add logging; look into inheriting/extending a class to add features
         log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
-        manual_depth_df.to_csv(
-            cfg.directory["logs"] + "manual_depth_log.csv", index=False
-        )
+        manual_depth_df.to_csv(cfg.dirs["logs"] + "manual_depth_log.csv", index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
@@ -821,7 +819,7 @@ def export_ct1(df, ssscc_list):
         file_datetime = file_datetime + "ODFSIO"
         # TODO: only "cast" needs to be int; "station" is explicitly allowed to incl.
         # letters/etc. Moving from SSSCC to station & cast fields will be beneficial
-        with open(f"{cfg.directory['pressure']}{ssscc}_ct1.csv", "w+") as f:
+        with open(f"{cfg.dirs['pressure']}{ssscc}_ct1.csv", "w+") as f:
             # put in logic to check columns?
             # number_headers should be calculated, not defined
             ctd_header = (  # this is ugly but prevents tabs before label

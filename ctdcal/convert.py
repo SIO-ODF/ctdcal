@@ -123,12 +123,12 @@ def hex_to_ctd(ssscc_list):
     """
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
-        if not Path(cfg.directory["converted"] + ssscc + ".pkl").exists():
-            hexFile = cfg.directory["raw"] + ssscc + ".hex"
-            xmlconFile = cfg.directory["raw"] + ssscc + ".XMLCON"
+        if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
+            hexFile = cfg.dirs["raw"] + ssscc + ".hex"
+            xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader)
-            converted_df.to_pickle(cfg.directory["converted"] + ssscc + ".pkl")
+            converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
 
@@ -136,8 +136,8 @@ def hex_to_ctd(ssscc_list):
 def make_time_files(ssscc_list):
     log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
-        if not Path(cfg.directory["time"] + ssscc + "_time.pkl").exists():
-            converted_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
+        if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
+            converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
             # Remove any pressure spikes
             bad_rows = converted_df["CTDPRS"].abs() > 6500
@@ -150,7 +150,7 @@ def make_time_files(ssscc_list):
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
                 ssscc,
-                log_file=cfg.directory["logs"] + "ondeck_pressure.csv",
+                log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
             )
 
             # # TODO: switch to loop instead, e.g.:
@@ -182,10 +182,10 @@ def make_time_files(ssscc_list):
             cast_data = process_ctd.cast_details(
                 filter_data,
                 ssscc,
-                log_file=cfg.directory["logs"] + "cast_details.csv",
+                log_file=cfg.dirs["logs"] + "cast_details.csv",
             )
 
-            cast_data.to_pickle(cfg.directory["time"] + ssscc + "_time.pkl")
+            cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
 
 
 def make_btl_mean(ssscc_list):
@@ -205,13 +205,13 @@ def make_btl_mean(ssscc_list):
     """
     log.info("Generating btl_mean.pkl files")
     for ssscc in ssscc_list:
-        if not Path(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl").exists():
-            imported_df = pd.read_pickle(cfg.directory["converted"] + ssscc + ".pkl")
+        if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
+            imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
 
             # export bottom bottle time/lat/lon info
-            fname = cfg.directory["logs"] + "bottom_bottle_details.csv"
+            fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
             datetime_col = "nmea_datetime"
             if datetime_col not in mean_df.columns:
                 log.debug(
@@ -226,7 +226,7 @@ def make_btl_mean(ssscc_list):
             with open(fname, "a") as f:
                 bot_df.to_csv(f, mode="a", header=add_header, index=False)
 
-            mean_df.to_pickle(cfg.directory["bottle"] + ssscc + "_btl_mean.pkl")
+            mean_df.to_pickle(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
 

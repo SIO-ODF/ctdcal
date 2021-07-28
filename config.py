@@ -25,8 +25,7 @@ for (param, attrs) in ctd_outputs.items():
         ctd_col_units += [attrs["units"], ""]
 
 # List of directories for I/O purposes
-# TODO: refactor/rethink this
-directory = {
+dirs = {
     "ssscc": "data/ssscc/",
     "raw": "data/raw/",
     "converted": "data/converted/",
@@ -35,14 +34,16 @@ directory = {
     "bottle": "data/bottle/",
     "salt": "data/salt/",
     "reft": "data/reft/",
-    "oxy": "data/oxygen/",
+    "oxygen": "data/oxygen/",
     "logs": "data/logs/",
-    "t1_fit_figs": "data/logs/fitting_figs/temp_primary/",
-    "t2_fit_figs": "data/logs/fitting_figs/temp_secondary/",
-    "c1_fit_figs": "data/logs/fitting_figs/cond_primary/",
-    "c2_fit_figs": "data/logs/fitting_figs/cond_secondary/",
-    "ox_fit_figs": "data/logs/fitting_figs/oxy_primary/",
-    "rinko_fit_figs": "data/logs/fitting_figs/oxy_rinko/",
+}
+fig_dirs = {
+    "t1": "data/logs/fitting_figs/temp_primary/",
+    "t2": "data/logs/fitting_figs/temp_secondary/",
+    "c1": "data/logs/fitting_figs/cond_primary/",
+    "c2": "data/logs/fitting_figs/cond_secondary/",
+    "ox": "data/logs/fitting_figs/oxy_primary/",
+    "rinko": "data/logs/fitting_figs/oxy_rinko/",
 }
 
 # remnant of old system, will be pushed into xarray metadata/attrs

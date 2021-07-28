@@ -19,7 +19,7 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def load_fit_yaml(fname=f"{cfg.directory['logs']}fit_coefs.yaml", to_object=False):
+def load_fit_yaml(fname=f"{cfg.dirs['logs']}fit_coefs.yaml", to_object=False):
     """Load polynomail fit order information from .yaml file."""
 
     with open(fname, "r") as f:
@@ -221,10 +221,10 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None)
     if f_stem is not None:
         if T_col == cfg.column["t1"]:
             xlabel = "T1 Residual (T90 C)"
-            f_out = f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_fit_data.pdf"
+            f_out = f"{cfg.fig_dirs['t1']}residual_{f_stem}_fit_data.pdf"
         elif T_col == cfg.column["t2"]:
             xlabel = "T2 Residual (T90 C)"
-            f_out = f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_fit_data.pdf"
+            f_out = f"{cfg.fig_dirs['t2']}residual_{f_stem}_fit_data.pdf"
         ctd_plots._intermediate_residual_plot(
             df_good["Diff"],
             df_good[cfg.column["p"]],
@@ -278,15 +278,15 @@ def calibrate_temp(btl_df, time_df):
 
     """
     log.info("Calibrating temperature")
-    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_t*.csv"))
+    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_t*.csv"))
     if not ssscc_subsets:  # if no t-segments exists, write one from full list
         log.debug(
             "No CTDTMP grouping file found... creating ssscc_t1.csv with all casts"
         )
-        if not Path(cfg.directory["ssscc"]).exists():
-            Path(cfg.directory["ssscc"]).mkdir()
+        if not Path(cfg.dirs["ssscc"]).exists():
+            Path(cfg.dirs["ssscc"]).mkdir()
         ssscc_list = process_ctd.get_ssscc_list()
-        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_t1.csv")]
+        ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_t1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     qual_flag_t1 = pd.DataFrame()
     qual_flag_t2 = pd.DataFrame()
@@ -310,7 +310,7 @@ def calibrate_temp(btl_df, time_df):
             btl_df.loc[btl_rows, cfg.column["p"]],
             btl_df.loc[btl_rows, "SSSCC"],
             xlabel="T1 Residual (T90 C)",
-            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_prefit.pdf",
+            f_out=f"{cfg.fig_dirs['t1']}residual_{f_stem}_prefit.pdf",
         )
         ctd_plots._intermediate_residual_plot(
             btl_df.loc[btl_rows, cfg.column["refT"]]
@@ -318,7 +318,7 @@ def calibrate_temp(btl_df, time_df):
             btl_df.loc[btl_rows, cfg.column["p"]],
             btl_df.loc[btl_rows, "SSSCC"],
             xlabel="T2 Residual (T90 C)",
-            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_prefit.pdf",
+            f_out=f"{cfg.fig_dirs['t2']}residual_{f_stem}_prefit.pdf",
         )
 
         # TODO: truncate coefs (10 digits? look at historical data)
@@ -369,13 +369,13 @@ def calibrate_temp(btl_df, time_df):
             btl_df[btl_rows],
             param=cfg.column["t1"],
             ref=cfg.column["refT"],
-            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}.pdf",
+            f_out=f"{cfg.fig_dirs['t1']}residual_{f_stem}.pdf",
         )
         df_ques_t2, df_bad_t2 = _flag_btl_data(
             btl_df[btl_rows],
             param=cfg.column["t2"],
             ref=cfg.column["refT"],
-            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}.pdf",
+            f_out=f"{cfg.fig_dirs['t2']}residual_{f_stem}.pdf",
         )
 
         # 5) handle quality flags
@@ -401,7 +401,7 @@ def calibrate_temp(btl_df, time_df):
         btl_df["SSSCC"],
         xlabel="T1 Residual (T90 C)",
         show_thresh=True,
-        f_out=f"{cfg.directory['t1_fit_figs']}residual_all_postfit.pdf",
+        f_out=f"{cfg.fig_dirs['t1']}residual_all_postfit.pdf",
     )
     ctd_plots._intermediate_residual_plot(
         btl_df[cfg.column["refT"]] - btl_df[cfg.column["t2"]],
@@ -409,17 +409,15 @@ def calibrate_temp(btl_df, time_df):
         btl_df["SSSCC"],
         xlabel="T2 Residual (T90 C)",
         show_thresh=True,
-        f_out=f"{cfg.directory['t2_fit_figs']}residual_all_postfit.pdf",
+        f_out=f"{cfg.fig_dirs['t2']}residual_all_postfit.pdf",
     )
 
     # export temp quality flags
     qual_flag_t1.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_t1.csv",
+        cfg.dirs["logs"] + "qual_flag_t1.csv",
         index=False,
     )
-    qual_flag_t2.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_t2.csv", index=False
-    )
+    qual_flag_t2.sort_index().to_csv(cfg.dirs["logs"] + "qual_flag_t2.csv", index=False)
 
     # export temp fit params (formated to 5 sig figs, scientific notation)
     coef_t1_all[coef_names] = coef_t1_all[coef_names].applymap(
@@ -428,8 +426,8 @@ def calibrate_temp(btl_df, time_df):
     coef_t2_all[coef_names] = coef_t2_all[coef_names].applymap(
         lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
     )
-    coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
-    coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
+    coef_t1_all.to_csv(cfg.dirs["logs"] + "fit_coef_t1.csv", index=False)
+    coef_t2_all.to_csv(cfg.dirs["logs"] + "fit_coef_t2.csv", index=False)
 
     # flag temperature data
     # TODO: CTDTMP_FLAG_W historically not included in hy1 file... should it be?
@@ -461,10 +459,10 @@ def _get_C_coefs(
     if f_stem is not None:
         if C_col == cfg.column["c1"]:
             xlabel = "C1 Residual (mS/cm)"
-            f_out = f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_fit_data.pdf"
+            f_out = f"{cfg.fig_dirs['c1']}residual_{f_stem}_fit_data.pdf"
         elif C_col == cfg.column["c2"]:
             xlabel = "C2 Residual (mS/cm)"
-            f_out = f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_fit_data.pdf"
+            f_out = f"{cfg.fig_dirs['c2']}residual_{f_stem}_fit_data.pdf"
         ctd_plots._intermediate_residual_plot(
             df_good["Diff"],
             df_good[cfg.column["p"]],
@@ -550,13 +548,13 @@ def calibrate_cond(btl_df, time_df):
     else:
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
 
-    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_c*.csv"))
+    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
         log.debug(
             "No CTDCOND grouping file found... creating ssscc_c1.csv with all casts"
         )
         ssscc_list = process_ctd.get_ssscc_list()
-        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_c1.csv")]
+        ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_c1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     qual_flag_c1 = pd.DataFrame()
     qual_flag_c2 = pd.DataFrame()
@@ -580,7 +578,7 @@ def calibrate_cond(btl_df, time_df):
             btl_df.loc[btl_rows, cfg.column["p"]],
             btl_df.loc[btl_rows, "SSSCC"],
             xlabel="C1 Residual (mS/cm)",
-            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_prefit.pdf",
+            f_out=f"{cfg.fig_dirs['c1']}residual_{f_stem}_prefit.pdf",
         )
         ctd_plots._intermediate_residual_plot(
             btl_df.loc[btl_rows, cfg.column["refC"]]
@@ -588,7 +586,7 @@ def calibrate_cond(btl_df, time_df):
             btl_df.loc[btl_rows, cfg.column["p"]],
             btl_df.loc[btl_rows, "SSSCC"],
             xlabel="C2 Residual (mS/cm)",
-            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_prefit.pdf",
+            f_out=f"{cfg.fig_dirs['c2']}residual_{f_stem}_prefit.pdf",
         )
 
         # TODO: allow for cast-by-cast T_order/P_order/zRange
@@ -646,13 +644,13 @@ def calibrate_cond(btl_df, time_df):
             btl_df[btl_rows],
             param=cfg.column["c1"],
             ref=cfg.column["refC"],
-            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}.pdf",
+            f_out=f"{cfg.fig_dirs['c1']}residual_{f_stem}.pdf",
         )
         df_ques_c2, df_bad_c2 = _flag_btl_data(
             btl_df[btl_rows],
             param=cfg.column["c2"],
             ref=cfg.column["refC"],
-            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}.pdf",
+            f_out=f"{cfg.fig_dirs['c2']}residual_{f_stem}.pdf",
         )
 
         # 5) handle quality flags
@@ -678,7 +676,7 @@ def calibrate_cond(btl_df, time_df):
         btl_df["SSSCC"],
         xlabel="C1 Residual (mS/cm)",
         show_thresh=True,
-        f_out=f"{cfg.directory['c1_fit_figs']}residual_all_postfit.pdf",
+        f_out=f"{cfg.fig_dirs['c1']}residual_all_postfit.pdf",
     )
     ctd_plots._intermediate_residual_plot(
         btl_df[cfg.column["refC"]] - btl_df[cfg.column["c2"]],
@@ -686,16 +684,16 @@ def calibrate_cond(btl_df, time_df):
         btl_df["SSSCC"],
         xlabel="C2 Residual (mS/cm)",
         show_thresh=True,
-        f_out=f"{cfg.directory['c2_fit_figs']}residual_all_postfit.pdf",
+        f_out=f"{cfg.fig_dirs['c2']}residual_all_postfit.pdf",
     )
 
     # export cond quality flags
     qual_flag_c1.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_c1.csv",
+        cfg.dirs["logs"] + "qual_flag_c1.csv",
         index=False,
     )
     qual_flag_c2.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_c2.csv",
+        cfg.dirs["logs"] + "qual_flag_c2.csv",
         index=False,
     )
 
@@ -706,8 +704,8 @@ def calibrate_cond(btl_df, time_df):
     coef_c2_all[coef_names] = coef_c2_all[coef_names].applymap(
         lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
     )
-    coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
-    coef_c2_all.to_csv(cfg.directory["logs"] + "fit_coef_c2.csv", index=False)
+    coef_c1_all.to_csv(cfg.dirs["logs"] + "fit_coef_c1.csv", index=False)
+    coef_c2_all.to_csv(cfg.dirs["logs"] + "fit_coef_c2.csv", index=False)
 
     # recalculate salinity with calibrated C/T
     time_df[cfg.column["sal"]] = gsw.SP_from_C(
