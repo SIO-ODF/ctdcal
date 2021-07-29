@@ -192,15 +192,15 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     coefs_df.loc["r0"] = rinko_coefs0  # log for comparison
 
     # fit station groups, like T/C fitting (ssscc_r1, _r2, etc.)
-    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_r*.csv"))
+    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_r*.csv"))
     if not ssscc_subsets:  # if no r-segments exists, write one from full list
         log.debug(
             "No CTDRINKO grouping file found... creating ssscc_r1.csv with all casts"
         )
-        if not Path(cfg.directory["ssscc"]).exists():
-            Path(cfg.directory["ssscc"]).mkdir()
+        if not Path(cfg.dirs["ssscc"]).exists():
+            Path(cfg.dirs["ssscc"]).mkdir()
         ssscc_list = process_ctd.get_ssscc_list()
-        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_r1.csv")]
+        ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
@@ -230,8 +230,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                     rinko_coefs_group,
                     (
                         btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-                        btl_df.loc[btl_rows, cfg.column["p_btl"]],
-                        btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                        btl_df.loc[btl_rows, cfg.column["p"]],
+                        btl_df.loc[btl_rows, cfg.column["t1"]],
                         btl_df.loc[btl_rows, cfg.column["sal"]],
                         btl_df.loc[btl_rows, "OS"],
                     ),
@@ -243,8 +243,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                     rinko_coefs_ssscc,
                     (
                         btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-                        btl_df.loc[btl_rows, cfg.column["p_btl"]],
-                        btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                        btl_df.loc[btl_rows, cfg.column["p"]],
+                        btl_df.loc[btl_rows, cfg.column["t1"]],
                         btl_df.loc[btl_rows, cfg.column["sal"]],
                         btl_df.loc[btl_rows, "OS"],
                     ),
@@ -264,8 +264,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 rinko_coefs_ssscc,
                 (
                     btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
-                    btl_df.loc[btl_rows, cfg.column["p_btl"]],
-                    btl_df.loc[btl_rows, cfg.column["t1_btl"]],
+                    btl_df.loc[btl_rows, cfg.column["p"]],
+                    btl_df.loc[btl_rows, cfg.column["t1"]],
                     btl_df.loc[btl_rows, cfg.column["sal"]],
                     btl_df.loc[btl_rows, "OS"],
                 ),
@@ -291,7 +291,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
 
     # Plot all post fit data
-    f_out = f"{cfg.directory['rinko_fit_figs']}rinko_residual_all_postfit.pdf"
+    f_out = f"{cfg.fig_dirs['rinko']}rinko_residual_all_postfit.pdf"
     ctd_plots._intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDRINKO"],
         btl_df["CTDPRS"],
@@ -300,7 +300,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         f_out=f_out,
         xlim=(-10, 10),
     )
-    f_out = f"{cfg.directory['rinko_fit_figs']}rinko_residual_all_postfit_flag2.pdf"
+    f_out = f"{cfg.fig_dirs['rinko']}rinko_residual_all_postfit_flag2.pdf"
     flag2 = btl_df["CTDRINKO_FLAG_W"] == 2
     ctd_plots._intermediate_residual_plot(
         btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDRINKO"],
@@ -314,7 +314,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # export fitting coefs
     coefs_df.applymap(
         lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
-    ).to_csv(cfg.directory["logs"] + "rinko_coefs.csv")
+    ).to_csv(cfg.dirs["logs"] + "rinko_coefs.csv")
 
     return True
 
@@ -348,7 +348,7 @@ def rinko_oxy_fit(
     #     coefs, thrown_values = iter_oxy_fit(inputs, _Uchida_DO_eq)
 
     # # Plot data to be fit together
-    # f_out = f"{cfg.directory['ox_fit_figs']}rinko_residual{f_suffix}_prefit.pdf"
+    # f_out = f"{cfg.fig_dirs['ox']}rinko_residual{f_suffix}_prefit.pdf"
     # ctd_plots._intermediate_residual_plot(
     #     merged_df["REFOXY"] - merged_df[cfg.column["rinko_oxy"]],
     #     merged_df["CTDPRS"],
@@ -362,8 +362,8 @@ def rinko_oxy_fit(
     weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
     fit_data = (
         btl_df[cfg.column["rinko_oxy"]],
-        btl_df[cfg.column["p_btl"]],
-        btl_df[cfg.column["t1_btl"]],
+        btl_df[cfg.column["p"]],
+        btl_df[cfg.column["t1"]],
         btl_df[cfg.column["sal"]],
         btl_df["OS"],
     )
@@ -380,13 +380,13 @@ def rinko_oxy_fit(
     res = scipy.optimize.minimize(
         oxy_weighted_residual,
         x0=rinko_coef0,
-        args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
+        args=(weights, fit_data, btl_df[cfg.column["refO"]]),
         bounds=coef_bounds,
     )
 
     cfw_coefs = res.x
     btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
-    btl_df["residual"] = btl_df[cfg.column["oxy_btl"]] - btl_df["RINKO_OXY"]
+    btl_df["residual"] = btl_df[cfg.column["refO"]] - btl_df["RINKO_OXY"]
 
     cutoff = 2.8 * np.std(btl_df["residual"])
     thrown_values = btl_df[np.abs(btl_df["residual"]) > cutoff]
@@ -399,20 +399,20 @@ def rinko_oxy_fit(
         weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
         fit_data = (
             btl_df[cfg.column["rinko_oxy"]],
-            btl_df[cfg.column["p_btl"]],
-            btl_df[cfg.column["t1_btl"]],
+            btl_df[cfg.column["p"]],
+            btl_df[cfg.column["t1"]],
             btl_df[cfg.column["sal"]],
             btl_df["OS"],
         )
         res = scipy.optimize.minimize(
             oxy_weighted_residual,
             x0=p0,
-            args=(weights, fit_data, btl_df[cfg.column["oxy_btl"]]),
+            args=(weights, fit_data, btl_df[cfg.column["refO"]]),
             bounds=coef_bounds,
         )
         cfw_coefs = res.x
         btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
-        btl_df["residual"] = btl_df[cfg.column["oxy_btl"]] - btl_df["RINKO_OXY"]
+        btl_df["residual"] = btl_df[cfg.column["refO"]] - btl_df["RINKO_OXY"]
         cutoff = 2.8 * np.std(btl_df["residual"])
         thrown_values = btl_df[np.abs(btl_df["residual"]) > cutoff]
         bad_df = pd.concat([bad_df, thrown_values])
@@ -421,7 +421,7 @@ def rinko_oxy_fit(
     # intermediate plots to diagnose data chunks goodness
     # TODO: implement into bokeh/flask dashboard
     if f_suffix is not None:
-        f_out = f"{cfg.directory['rinko_fit_figs']}rinko_residual{f_suffix}.pdf"
+        f_out = f"{cfg.fig_dirs['rinko']}rinko_residual{f_suffix}.pdf"
         ctd_plots._intermediate_residual_plot(
             btl_df["residual"],
             btl_df["CTDPRS"],

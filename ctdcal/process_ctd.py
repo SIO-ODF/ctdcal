@@ -558,7 +558,7 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
 
     """
     p_log = pd.read_csv(
-        cfg.directory["logs"] + "ondeck_pressure.csv",
+        cfg.dirs["logs"] + "ondeck_pressure.csv",
         dtype={"SSSCC": str},
         na_values="Started in Water",
     )
@@ -607,31 +607,29 @@ def make_depth_log(time_df, threshold=80):
         .astype(int)
     )
     bottom_df[["SSSCC", "DEPTH"]].to_csv(
-        cfg.directory["logs"] + "depth_log.csv", index=False
+        cfg.dirs["logs"] + "depth_log.csv", index=False
     )
 
     return True
 
 
-def make_ssscc_list():
+def make_ssscc_list(fname="data/ssscc.csv"):
     """
     Attempt to automatically generate list of station/casts from raw files.
     """
-    raw_files = Path(cfg.directory["raw"]).glob("*.hex")
+    raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
     ssscc_list = sorted([f.stem for f in raw_files])
-    pd.Series(ssscc_list).to_csv(
-        cfg.directory["ssscc_file"], header=None, index=False, mode="x"
-    )
+    pd.Series(ssscc_list).to_csv(fname, header=None, index=False, mode="x")
 
     return ssscc_list
 
 
-def get_ssscc_list():
+def get_ssscc_list(fname="data/ssscc.csv"):
     """
     Load in list of stations/casts to process.
     """
     ssscc_list = []
-    with open(cfg.directory["ssscc_file"], "r") as filename:
+    with open(fname, "r") as filename:
         ssscc_list = [line.strip() for line in filename]
 
     return ssscc_list
@@ -655,7 +653,7 @@ def load_all_ctd_files(ssscc_list):
     df_list = []
     for ssscc in ssscc_list:
         log.info("Loading TIME data for station: " + ssscc + "...")
-        time_file = cfg.directory["time"] + ssscc + "_time.pkl"
+        time_file = cfg.dirs["time"] + ssscc + "_time.pkl"
         time_data = pd.read_pickle(time_file)
         time_data["SSSCC"] = str(ssscc)
         time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
@@ -732,11 +730,6 @@ def export_ct1(df, ssscc_list):
 
     """
     log.info("Exporting CTD files")
-    # clean up columns
-    p_column_names = cfg.ctd_time_output["col_names"]
-    p_column_units = cfg.ctd_time_output["col_units"]
-    p_column_names.pop(1)  # remove CTDPRS_FLAG_W
-    p_column_units.pop(1)  # remove CTDPRS_FLAG_W
 
     # initial flagging (some of this should be moved)
     # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
@@ -745,18 +738,14 @@ def export_ct1(df, ssscc_list):
     df["CTDXMISS_FLAG_W"] = 1
     # df["CTDBACKSCATTER_FLAG_W"] = 1
 
-    # renames
-    df = df.rename(
-        columns={
-            "CTDTMP1": "CTDTMP",
-            # "CTDRINKO": "CTDOXY",
-            # "CTDRINKO_FLAG_W": "CTDOXY_FLAG_W",
-        }
-    )
+    # rename outputs as defined in user_settings.yaml
+    for param, attrs in cfg.ctd_outputs.items():
+        if param not in df.columns:
+            df.rename(columns={attrs["sensor"]: param}, inplace=True)
 
     # check that all columns are there
     try:
-        df[p_column_names]
+        df[cfg.ctd_col_names]
         # this is lazy, do better
     except KeyError as err:
         log.info("Column names not configured properly... attempting to correct")
@@ -771,24 +760,22 @@ def export_ct1(df, ssscc_list):
 
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(
-        # cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.directory["logs"] + "bottom_bottle_details.csv",
+        # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        cfg.dirs["logs"] + "bottom_bottle_details.csv",
         dtype={"SSSCC": str},
     )
     depth_df = pd.read_csv(
-        cfg.directory["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     try:
         manual_depth_df = pd.read_csv(
-            cfg.directory["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+            cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
         )
     except FileNotFoundError:
         # TODO: add logging; look into inheriting/extending a class to add features
         log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
-        manual_depth_df.to_csv(
-            cfg.directory["logs"] + "manual_depth_log.csv", index=False
-        )
+        manual_depth_df.to_csv(cfg.dirs["logs"] + "manual_depth_log.csv", index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
@@ -801,7 +788,7 @@ def export_ct1(df, ssscc_list):
         print(f"Using Rinko as CTDOXY for {ssscc}")
         time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
         time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
-        time_data = time_data[p_column_names]
+        time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
@@ -832,7 +819,7 @@ def export_ct1(df, ssscc_list):
         file_datetime = file_datetime + "ODFSIO"
         # TODO: only "cast" needs to be int; "station" is explicitly allowed to incl.
         # letters/etc. Moving from SSSCC to station & cast fields will be beneficial
-        with open(f"{cfg.directory['pressure']}{ssscc}_ct1.csv", "w+") as f:
+        with open(f"{cfg.dirs['pressure']}{ssscc}_ct1.csv", "w+") as f:
             # put in logic to check columns?
             # number_headers should be calculated, not defined
             ctd_header = (  # this is ugly but prevents tabs before label
@@ -850,9 +837,9 @@ def export_ct1(df, ssscc_list):
                 f"DEPTH = {depth:.0f}\n"
             )
             f.write(ctd_header)
-            np.asarray(p_column_names).tofile(f, sep=",", format="%s")
+            np.asarray(cfg.ctd_col_names).tofile(f, sep=",", format="%s")
             f.write("\n")
-            np.asarray(p_column_units).tofile(f, sep=",", format="%s")
+            np.asarray(cfg.ctd_col_units).tofile(f, sep=",", format="%s")
             f.write("\n")
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")

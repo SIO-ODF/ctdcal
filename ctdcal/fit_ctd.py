@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import scipy
 from scipy.ndimage.interpolation import shift
+import yaml
 
 from . import convert as convert
 from . import ctd_plots as ctd_plots
@@ -16,6 +17,24 @@ from . import process_ctd as process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
+
+
+def load_fit_yaml(fname=f"{cfg.dirs['logs']}fit_coefs.yaml", to_object=False):
+    """Load polynomail fit order information from .yaml file."""
+
+    with open(fname, "r") as f:
+        ymlfile = yaml.safe_load(f)
+
+    if to_object:
+        return type("ymlfile", (object,), ymlfile)
+    else:
+        return ymlfile
+
+
+def write_fit_yaml():
+    """For future use with automated fitting routine(s).
+    i.e., iterate to find best fit parameters, save to file"""
+    pass
 
 
 def _conductivity_polyfit(cond, temp, press, coef):
@@ -111,7 +130,7 @@ def _flag_btl_data(
 
     """
     # TODO: thresh should probably be put in config/cast-by-cast config
-    prs = cfg.column["p_btl"]
+    prs = cfg.column["p"]
 
     # Remove extreme outliers and code bad
     df = df.reset_index(drop=True)
@@ -125,13 +144,13 @@ def _flag_btl_data(
     df_bad = df[df["Flag"] == 4].copy()
 
     if f_out is not None:
-        if param == cfg.column["t1_btl"]:
+        if param == cfg.column["t1"]:
             xlabel = "T1 Residual (T90 C)"
-        elif param == cfg.column["t2_btl"]:
+        elif param == cfg.column["t2"]:
             xlabel = "T2 Residual (T90 C)"
-        elif param == cfg.column["c1_btl"]:
+        elif param == cfg.column["c1"]:
             xlabel = "C1 Residual (mS/cm)"
-        elif param == cfg.column["c2_btl"]:
+        elif param == cfg.column["c2"]:
             xlabel = "C2 Residual (mS/cm)"
         f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
         ctd_plots._intermediate_residual_plot(
@@ -196,19 +215,19 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None)
         return
 
     # remove non-finite data and extreme outliers and trim to fit zRange
-    df_good, df_bad = _prepare_fit_data(df, T_col, cfg.column["reft"], zRange)
+    df_good, df_bad = _prepare_fit_data(df, T_col, cfg.column["refT"], zRange)
 
     # plot data which will be used in fit (for debugging purposes)
     if f_stem is not None:
-        if T_col == cfg.column["t1_btl"]:
+        if T_col == cfg.column["t1"]:
             xlabel = "T1 Residual (T90 C)"
-            f_out = f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_fit_data.pdf"
-        elif T_col == cfg.column["t2_btl"]:
+            f_out = f"{cfg.fig_dirs['t1']}residual_{f_stem}_fit_data.pdf"
+        elif T_col == cfg.column["t2"]:
             xlabel = "T2 Residual (T90 C)"
-            f_out = f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_fit_data.pdf"
+            f_out = f"{cfg.fig_dirs['t2']}residual_{f_stem}_fit_data.pdf"
         ctd_plots._intermediate_residual_plot(
             df_good["Diff"],
-            df_good[cfg.column["p_btl"]],
+            df_good[cfg.column["p"]],
             df_good["SSSCC"],
             xlabel=xlabel,
             f_out=f_out,
@@ -226,8 +245,8 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None)
     # T_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4
     fit_matrix = np.vstack(
         [
-            P_fit[0] * df_good[cfg.column["p_btl"]] ** 2,
-            P_fit[1] * df_good[cfg.column["p_btl"]],
+            P_fit[0] * df_good[cfg.column["p"]] ** 2,
+            P_fit[1] * df_good[cfg.column["p"]],
             T_fit[0] * df_good[T_col] ** 2,
             T_fit[1] * df_good[T_col],
             np.ones(len(df_good[T_col])),
@@ -259,20 +278,22 @@ def calibrate_temp(btl_df, time_df):
 
     """
     log.info("Calibrating temperature")
-    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_t*.csv"))
+    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_t*.csv"))
     if not ssscc_subsets:  # if no t-segments exists, write one from full list
         log.debug(
             "No CTDTMP grouping file found... creating ssscc_t1.csv with all casts"
         )
-        if not Path(cfg.directory["ssscc"]).exists():
-            Path(cfg.directory["ssscc"]).mkdir()
+        if not Path(cfg.dirs["ssscc"]).exists():
+            Path(cfg.dirs["ssscc"]).mkdir()
         ssscc_list = process_ctd.get_ssscc_list()
-        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_t1.csv")]
+        ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_t1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     qual_flag_t1 = pd.DataFrame()
     qual_flag_t2 = pd.DataFrame()
     coef_t1_all = pd.DataFrame()
     coef_t2_all = pd.DataFrame()
+
+    fit_yaml = load_fit_yaml(to_object=True)  # load fit polynomial order
 
     for f in ssscc_subsets:
         # 0) load ssscc subset to be fit together
@@ -284,55 +305,52 @@ def calibrate_temp(btl_df, time_df):
         # 1) plot pre-fit residual
         f_stem = f.stem  # get "ssscc_t*" from path
         ctd_plots._intermediate_residual_plot(
-            btl_df.loc[btl_rows, cfg.column["reft"]]
-            - btl_df.loc[btl_rows, cfg.column["t1_btl"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, cfg.column["refT"]]
+            - btl_df.loc[btl_rows, cfg.column["t1"]],
+            btl_df.loc[btl_rows, cfg.column["p"]],
             btl_df.loc[btl_rows, "SSSCC"],
             xlabel="T1 Residual (T90 C)",
-            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}_prefit.pdf",
+            f_out=f"{cfg.fig_dirs['t1']}residual_{f_stem}_prefit.pdf",
         )
         ctd_plots._intermediate_residual_plot(
-            btl_df.loc[btl_rows, cfg.column["reft"]]
-            - btl_df.loc[btl_rows, cfg.column["t2_btl"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, cfg.column["refT"]]
+            - btl_df.loc[btl_rows, cfg.column["t2"]],
+            btl_df.loc[btl_rows, cfg.column["p"]],
             btl_df.loc[btl_rows, "SSSCC"],
             xlabel="T2 Residual (T90 C)",
-            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}_prefit.pdf",
+            f_out=f"{cfg.fig_dirs['t2']}residual_{f_stem}_prefit.pdf",
         )
 
-        # TODO: allow for cast-by-cast T_order/P_order/zRange
         # TODO: truncate coefs (10 digits? look at historical data)
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
-        P1_order, T1_order, zRange1 = cfg.fit_orders1[f_stem]
-        P2_order, T2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_t1, df_bad_t1 = _get_T_coefs(
             btl_df[good_rows],
-            T_col=cfg.column["t1_btl"],
-            P_order=P1_order,
-            T_order=T1_order,
-            zRange=zRange1,
+            T_col=cfg.column["t1"],
+            P_order=fit_yaml.fit_orders1[f_stem]["P_order"],
+            T_order=fit_yaml.fit_orders1[f_stem]["T_order"],
+            zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
             f_stem=f_stem,
         )
         coef_t2, df_bad_t2 = _get_T_coefs(
             btl_df[good_rows],
-            T_col=cfg.column["t2_btl"],
-            P_order=P2_order,
-            T_order=T2_order,
-            zRange=zRange2,
+            T_col=cfg.column["t2"],
+            P_order=fit_yaml.fit_orders2[f_stem]["P_order"],
+            T_order=fit_yaml.fit_orders2[f_stem]["T_order"],
+            zRange=fit_yaml.fit_orders2[f_stem]["zRange"],
             f_stem=f_stem,
         )
 
         # 4) apply fit
-        btl_df.loc[btl_rows, cfg.column["t1_btl"]] = _temperature_polyfit(
-            btl_df.loc[btl_rows, cfg.column["t1_btl"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+        btl_df.loc[btl_rows, cfg.column["t1"]] = _temperature_polyfit(
+            btl_df.loc[btl_rows, cfg.column["t1"]],
+            btl_df.loc[btl_rows, cfg.column["p"]],
             coef_t1,
         )
-        btl_df.loc[btl_rows, cfg.column["t2_btl"]] = _temperature_polyfit(
-            btl_df.loc[btl_rows, cfg.column["t2_btl"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+        btl_df.loc[btl_rows, cfg.column["t2"]] = _temperature_polyfit(
+            btl_df.loc[btl_rows, cfg.column["t2"]],
+            btl_df.loc[btl_rows, cfg.column["p"]],
             coef_t2,
         )
         time_df.loc[time_rows, cfg.column["t1"]] = _temperature_polyfit(
@@ -349,15 +367,15 @@ def calibrate_temp(btl_df, time_df):
         # 4.5) flag CTDTMP and make residual plots
         df_ques_t1, df_bad_t1 = _flag_btl_data(
             btl_df[btl_rows],
-            param=cfg.column["t1_btl"],
-            ref=cfg.column["reft"],
-            f_out=f"{cfg.directory['t1_fit_figs']}residual_{f_stem}.pdf",
+            param=cfg.column["t1"],
+            ref=cfg.column["refT"],
+            f_out=f"{cfg.fig_dirs['t1']}residual_{f_stem}.pdf",
         )
         df_ques_t2, df_bad_t2 = _flag_btl_data(
             btl_df[btl_rows],
-            param=cfg.column["t2_btl"],
-            ref=cfg.column["reft"],
-            f_out=f"{cfg.directory['t2_fit_figs']}residual_{f_stem}.pdf",
+            param=cfg.column["t2"],
+            ref=cfg.column["refT"],
+            f_out=f"{cfg.fig_dirs['t2']}residual_{f_stem}.pdf",
         )
 
         # 5) handle quality flags
@@ -378,30 +396,28 @@ def calibrate_temp(btl_df, time_df):
 
     # one more fig with all cuts
     ctd_plots._intermediate_residual_plot(
-        btl_df[cfg.column["reft"]] - btl_df[cfg.column["t1_btl"]],
-        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["refT"]] - btl_df[cfg.column["t1"]],
+        btl_df[cfg.column["p"]],
         btl_df["SSSCC"],
         xlabel="T1 Residual (T90 C)",
         show_thresh=True,
-        f_out=f"{cfg.directory['t1_fit_figs']}residual_all_postfit.pdf",
+        f_out=f"{cfg.fig_dirs['t1']}residual_all_postfit.pdf",
     )
     ctd_plots._intermediate_residual_plot(
-        btl_df[cfg.column["reft"]] - btl_df[cfg.column["t2_btl"]],
-        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["refT"]] - btl_df[cfg.column["t2"]],
+        btl_df[cfg.column["p"]],
         btl_df["SSSCC"],
         xlabel="T2 Residual (T90 C)",
         show_thresh=True,
-        f_out=f"{cfg.directory['t2_fit_figs']}residual_all_postfit.pdf",
+        f_out=f"{cfg.fig_dirs['t2']}residual_all_postfit.pdf",
     )
 
     # export temp quality flags
     qual_flag_t1.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_t1.csv",
+        cfg.dirs["logs"] + "qual_flag_t1.csv",
         index=False,
     )
-    qual_flag_t2.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_t2.csv", index=False
-    )
+    qual_flag_t2.sort_index().to_csv(cfg.dirs["logs"] + "qual_flag_t2.csv", index=False)
 
     # export temp fit params (formated to 5 sig figs, scientific notation)
     coef_t1_all[coef_names] = coef_t1_all[coef_names].applymap(
@@ -410,8 +426,8 @@ def calibrate_temp(btl_df, time_df):
     coef_t2_all[coef_names] = coef_t2_all[coef_names].applymap(
         lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
     )
-    coef_t1_all.to_csv(cfg.directory["logs"] + "fit_coef_t1.csv", index=False)
-    coef_t2_all.to_csv(cfg.directory["logs"] + "fit_coef_t2.csv", index=False)
+    coef_t1_all.to_csv(cfg.dirs["logs"] + "fit_coef_t1.csv", index=False)
+    coef_t2_all.to_csv(cfg.dirs["logs"] + "fit_coef_t2.csv", index=False)
 
     # flag temperature data
     # TODO: CTDTMP_FLAG_W historically not included in hy1 file... should it be?
@@ -427,29 +443,29 @@ def _get_C_coefs(
     if C_col is None:
         print("Parameter invalid, specify what cond sensor is being calibrated")
         return
-    elif C_col == cfg.column["c1_btl"]:
-        T_col = cfg.column["t1_btl"]
-    elif C_col == cfg.column["c2_btl"]:
-        T_col = cfg.column["t2_btl"]
+    elif C_col == cfg.column["c1"]:
+        T_col = cfg.column["t1"]
+    elif C_col == cfg.column["c2"]:
+        T_col = cfg.column["t2"]
 
     df = df.reset_index().copy()
     # remove non-finite data and extreme outliers and trim to fit zRange
-    df_good, df_bad = _prepare_fit_data(df, C_col, cfg.column["refc"], zRange)
+    df_good, df_bad = _prepare_fit_data(df, C_col, cfg.column["refC"], zRange)
 
     # add CTDTMP column
     df_good[T_col] = df.loc[df_good.index, T_col]
 
     # plot data which will be used in fit (for debugging purposes)
     if f_stem is not None:
-        if C_col == cfg.column["c1_btl"]:
+        if C_col == cfg.column["c1"]:
             xlabel = "C1 Residual (mS/cm)"
-            f_out = f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_fit_data.pdf"
-        elif C_col == cfg.column["c2_btl"]:
+            f_out = f"{cfg.fig_dirs['c1']}residual_{f_stem}_fit_data.pdf"
+        elif C_col == cfg.column["c2"]:
             xlabel = "C2 Residual (mS/cm)"
-            f_out = f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_fit_data.pdf"
+            f_out = f"{cfg.fig_dirs['c2']}residual_{f_stem}_fit_data.pdf"
         ctd_plots._intermediate_residual_plot(
             df_good["Diff"],
-            df_good[cfg.column["p_btl"]],
+            df_good[cfg.column["p"]],
             df_good["SSSCC"],
             xlabel=xlabel,
             f_out=f_out,
@@ -468,8 +484,8 @@ def _get_C_coefs(
     # C_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4*C^2 + c5*C + c6
     fit_matrix = np.vstack(
         [
-            P_fit[0] * df_good[cfg.column["p_btl"]] ** 2,
-            P_fit[1] * df_good[cfg.column["p_btl"]],
+            P_fit[0] * df_good[cfg.column["p"]] ** 2,
+            P_fit[1] * df_good[cfg.column["p"]],
             T_fit[0] * df_good[T_col] ** 2,
             T_fit[1] * df_good[T_col],
             C_fit[0] * df_good[C_col] ** 2,
@@ -506,11 +522,11 @@ def calibrate_cond(btl_df, time_df):
     """
     log.info("Calibrating conductivity")
     # calculate BTLCOND values from autosal data
-    btl_df[cfg.column["refc"]] = convert.CR_to_cond(
+    btl_df[cfg.column["refC"]] = convert.CR_to_cond(
         btl_df["CRavg"],
         btl_df["BathTEMP"],
-        btl_df[cfg.column["t1_btl"]],
-        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["t1"]],
+        btl_df[cfg.column["p"]],
     )
 
     # merge in handcoded salt flags
@@ -532,18 +548,20 @@ def calibrate_cond(btl_df, time_df):
     else:
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
 
-    ssscc_subsets = sorted(Path(cfg.directory["ssscc"]).glob("ssscc_c*.csv"))
+    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
         log.debug(
             "No CTDCOND grouping file found... creating ssscc_c1.csv with all casts"
         )
         ssscc_list = process_ctd.get_ssscc_list()
-        ssscc_subsets = [Path(cfg.directory["ssscc"] + "ssscc_c1.csv")]
+        ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_c1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     qual_flag_c1 = pd.DataFrame()
     qual_flag_c2 = pd.DataFrame()
     coef_c1_all = pd.DataFrame()
     coef_c2_all = pd.DataFrame()
+
+    fit_yaml = load_fit_yaml(to_object=True)  # load fit polynomial order
 
     for f in ssscc_subsets:
         # 0) grab ssscc chunk to fit
@@ -555,20 +573,20 @@ def calibrate_cond(btl_df, time_df):
         # 1) plot pre-fit residual
         f_stem = f.stem  # get "ssscc_c*" from path
         ctd_plots._intermediate_residual_plot(
-            btl_df.loc[btl_rows, cfg.column["refc"]]
-            - btl_df.loc[btl_rows, cfg.column["c1_btl"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, cfg.column["refC"]]
+            - btl_df.loc[btl_rows, cfg.column["c1"]],
+            btl_df.loc[btl_rows, cfg.column["p"]],
             btl_df.loc[btl_rows, "SSSCC"],
             xlabel="C1 Residual (mS/cm)",
-            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}_prefit.pdf",
+            f_out=f"{cfg.fig_dirs['c1']}residual_{f_stem}_prefit.pdf",
         )
         ctd_plots._intermediate_residual_plot(
-            btl_df.loc[btl_rows, cfg.column["refc"]]
-            - btl_df.loc[btl_rows, cfg.column["c2_btl"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+            btl_df.loc[btl_rows, cfg.column["refC"]]
+            - btl_df.loc[btl_rows, cfg.column["c2"]],
+            btl_df.loc[btl_rows, cfg.column["p"]],
             btl_df.loc[btl_rows, "SSSCC"],
             xlabel="C2 Residual (mS/cm)",
-            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}_prefit.pdf",
+            f_out=f"{cfg.fig_dirs['c2']}residual_{f_stem}_prefit.pdf",
         )
 
         # TODO: allow for cast-by-cast T_order/P_order/zRange
@@ -576,38 +594,36 @@ def calibrate_cond(btl_df, time_df):
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
-        P1_order, T1_order, C1_order, zRange1 = cfg.fit_orders1[f_stem]
-        P2_order, T2_order, C2_order, zRange2 = cfg.fit_orders2[f_stem]
         coef_c1, df_bad_c1 = _get_C_coefs(
             btl_df[good_rows],
-            C_col=cfg.column["c1_btl"],
-            P_order=P1_order,
-            T_order=T1_order,
-            C_order=C1_order,
-            zRange=zRange1,
+            C_col=cfg.column["c1"],
+            P_order=fit_yaml.fit_orders1[f_stem]["P_order"],
+            T_order=fit_yaml.fit_orders1[f_stem]["T_order"],
+            C_order=fit_yaml.fit_orders1[f_stem]["C_order"],
+            zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
             f_stem=f_stem,
         )
         coef_c2, df_bad_c2 = _get_C_coefs(
             btl_df[good_rows],
-            C_col=cfg.column["c2_btl"],
-            P_order=P2_order,
-            T_order=T2_order,
-            C_order=C2_order,
-            zRange=zRange2,
+            C_col=cfg.column["c2"],
+            P_order=fit_yaml.fit_orders2[f_stem]["P_order"],
+            T_order=fit_yaml.fit_orders2[f_stem]["T_order"],
+            C_order=fit_yaml.fit_orders2[f_stem]["C_order"],
+            zRange=fit_yaml.fit_orders2[f_stem]["zRange"],
             f_stem=f_stem,
         )
 
         # 4) apply fit
-        btl_df.loc[btl_rows, cfg.column["c1_btl"]] = _conductivity_polyfit(
-            btl_df.loc[btl_rows, cfg.column["c1_btl"]],
-            btl_df.loc[btl_rows, cfg.column["t1_btl"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+        btl_df.loc[btl_rows, cfg.column["c1"]] = _conductivity_polyfit(
+            btl_df.loc[btl_rows, cfg.column["c1"]],
+            btl_df.loc[btl_rows, cfg.column["t1"]],
+            btl_df.loc[btl_rows, cfg.column["p"]],
             coef_c1,
         )
-        btl_df.loc[btl_rows, cfg.column["c2_btl"]] = _conductivity_polyfit(
-            btl_df.loc[btl_rows, cfg.column["c2_btl"]],
-            btl_df.loc[btl_rows, cfg.column["t2_btl"]],
-            btl_df.loc[btl_rows, cfg.column["p_btl"]],
+        btl_df.loc[btl_rows, cfg.column["c2"]] = _conductivity_polyfit(
+            btl_df.loc[btl_rows, cfg.column["c2"]],
+            btl_df.loc[btl_rows, cfg.column["t2"]],
+            btl_df.loc[btl_rows, cfg.column["p"]],
             coef_c2,
         )
         time_df.loc[time_rows, cfg.column["c1"]] = _conductivity_polyfit(
@@ -626,15 +642,15 @@ def calibrate_cond(btl_df, time_df):
         # 4.5) flag CTDCOND and make residual plots
         df_ques_c1, df_bad_c1 = _flag_btl_data(
             btl_df[btl_rows],
-            param=cfg.column["c1_btl"],
-            ref=cfg.column["refc"],
-            f_out=f"{cfg.directory['c1_fit_figs']}residual_{f_stem}.pdf",
+            param=cfg.column["c1"],
+            ref=cfg.column["refC"],
+            f_out=f"{cfg.fig_dirs['c1']}residual_{f_stem}.pdf",
         )
         df_ques_c2, df_bad_c2 = _flag_btl_data(
             btl_df[btl_rows],
-            param=cfg.column["c2_btl"],
-            ref=cfg.column["refc"],
-            f_out=f"{cfg.directory['c2_fit_figs']}residual_{f_stem}.pdf",
+            param=cfg.column["c2"],
+            ref=cfg.column["refC"],
+            f_out=f"{cfg.fig_dirs['c2']}residual_{f_stem}.pdf",
         )
 
         # 5) handle quality flags
@@ -655,29 +671,29 @@ def calibrate_cond(btl_df, time_df):
 
     # one more fig with all cuts
     ctd_plots._intermediate_residual_plot(
-        btl_df[cfg.column["refc"]] - btl_df[cfg.column["c1_btl"]],
-        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["refC"]] - btl_df[cfg.column["c1"]],
+        btl_df[cfg.column["p"]],
         btl_df["SSSCC"],
         xlabel="C1 Residual (mS/cm)",
         show_thresh=True,
-        f_out=f"{cfg.directory['c1_fit_figs']}residual_all_postfit.pdf",
+        f_out=f"{cfg.fig_dirs['c1']}residual_all_postfit.pdf",
     )
     ctd_plots._intermediate_residual_plot(
-        btl_df[cfg.column["refc"]] - btl_df[cfg.column["c2_btl"]],
-        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["refC"]] - btl_df[cfg.column["c2"]],
+        btl_df[cfg.column["p"]],
         btl_df["SSSCC"],
         xlabel="C2 Residual (mS/cm)",
         show_thresh=True,
-        f_out=f"{cfg.directory['c2_fit_figs']}residual_all_postfit.pdf",
+        f_out=f"{cfg.fig_dirs['c2']}residual_all_postfit.pdf",
     )
 
     # export cond quality flags
     qual_flag_c1.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_c1.csv",
+        cfg.dirs["logs"] + "qual_flag_c1.csv",
         index=False,
     )
     qual_flag_c2.sort_index().to_csv(
-        cfg.directory["logs"] + "qual_flag_c2.csv",
+        cfg.dirs["logs"] + "qual_flag_c2.csv",
         index=False,
     )
 
@@ -688,8 +704,8 @@ def calibrate_cond(btl_df, time_df):
     coef_c2_all[coef_names] = coef_c2_all[coef_names].applymap(
         lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
     )
-    coef_c1_all.to_csv(cfg.directory["logs"] + "fit_coef_c1.csv", index=False)
-    coef_c2_all.to_csv(cfg.directory["logs"] + "fit_coef_c2.csv", index=False)
+    coef_c1_all.to_csv(cfg.dirs["logs"] + "fit_coef_c1.csv", index=False)
+    coef_c2_all.to_csv(cfg.dirs["logs"] + "fit_coef_c2.csv", index=False)
 
     # recalculate salinity with calibrated C/T
     time_df[cfg.column["sal"]] = gsw.SP_from_C(
@@ -698,9 +714,9 @@ def calibrate_cond(btl_df, time_df):
         time_df[cfg.column["p"]],
     )
     btl_df[cfg.column["sal"]] = gsw.SP_from_C(
-        btl_df[cfg.column["c1_btl"]],
-        btl_df[cfg.column["t1_btl"]],
-        btl_df[cfg.column["p_btl"]],
+        btl_df[cfg.column["c1"]],
+        btl_df[cfg.column["t1"]],
+        btl_df[cfg.column["p"]],
     )
 
     # flag salinity data

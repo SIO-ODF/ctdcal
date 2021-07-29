@@ -11,7 +11,7 @@ from .. import (
     oxy_fitting,
     process_bottle,
     process_ctd,
-    rinko
+    rinko,
 )
 
 import logging
@@ -25,7 +25,7 @@ def odf_process_all():
     # Step 0: Load and define necessary variables
     #####
 
-    cfg = get_ctdcal_config()
+    # cfg = get_ctdcal_config()
 
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
@@ -59,7 +59,7 @@ def odf_process_all():
 
     # load in all bottle and time data into DataFrame
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
-    btl_data_all = process_bottle.load_all_btl_files(ssscc_list, cfg.btl_cols)
+    btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
 
     # process pressure offset
     process_ctd.apply_pressure_offset(btl_data_all)

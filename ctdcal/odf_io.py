@@ -111,7 +111,7 @@ def remove_autosal_drift(saltDF, refDF):
 
 
 def _salt_exporter(
-    saltDF, outdir=cfg.directory["salt"], stn_col="STNNBR", cast_col="CASTNO"
+    saltDF, outdir=cfg.dirs["salt"], stn_col="STNNBR", cast_col="CASTNO"
 ):
     """
     Export salt DataFrame to .csv file. Extra logic is included in the event that
@@ -133,7 +133,7 @@ def _salt_exporter(
             stn_cast_salts.to_csv(outfile, index=False)
 
 
-def process_salts(ssscc_list, salt_dir=cfg.directory["salt"]):
+def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
     """
     Master salt processing function. Load in salt files for given station/cast list,
     calculate salinity, and export to .csv files.

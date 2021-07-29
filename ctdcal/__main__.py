@@ -2,6 +2,7 @@ from pathlib import Path
 
 import click
 import logging
+from . import get_ctdcal_config
 
 # Rich handling
 # from rich.logging import RichHandler
@@ -22,11 +23,15 @@ handler = logging.StreamHandler()
 handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
 FORMAT = "%(funcName)s: %(message)s"
 logging.basicConfig(
-    level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[handler],
+    level="NOTSET",
+    format=FORMAT,
+    datefmt="[%X]",
+    handlers=[handler],
     # handlers=[RichHandler(console=Console(stderr=True))],
 )
 
 log = logging.getLogger(__name__)
+cfg = get_ctdcal_config()
 
 
 @click.group()
@@ -42,25 +47,10 @@ def cli():
 def init():
     """Setup data folder with appropriate subfolders"""
 
-    DEFAULT_DIRS = [
-        "raw",
-        "converted",
-        "time",
-        "bottle",
-        "reft",
-        "salt",
-        "oxygen",
-        "logs",
-        "ssscc",
-        "pressure",
-    ]
+    log.info(f"Building default /data/ directories: \n {*cfg.dirs.keys(),}")
 
-    log.info(f"Building default data directories: \n {*DEFAULT_DIRS,}")
-
-    base_name = Path("./data/")
-    for sub_dir in DEFAULT_DIRS:
-        path = base_name / sub_dir
-        path.mkdir(parents=True)
+    for sub_dir in cfg.dirs.values():
+        Path(sub_dir).mkdir(parents=True)
 
 
 @cli.command("import")  # click workaround to get a command named 'import'
@@ -102,6 +92,7 @@ def cruise_report():
     """Generate bottle residual figures for cruise report"""
 
     from .scripts.cruise_report import cruise_report_residuals
+
     cruise_report_residuals()
 
 

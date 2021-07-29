@@ -140,8 +140,8 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
 
 def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
     cast_details = pd.read_csv(
-        # cfg.directory["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.directory["logs"] + "bottom_bottle_details.csv",
+        # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
+        cfg.dirs["logs"] + "bottom_bottle_details.csv",
         dtype={"SSSCC": str},
     )
     cast_details = cast_details[cast_details["SSSCC"] == cast]
@@ -158,7 +158,7 @@ def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", deci
     return df
 
 
-def load_all_btl_files(ssscc_list, series, cols=None):
+def load_all_btl_files(ssscc_list, cols=None):
     """
     Load bottle and secondary (e.g. reference temperature, bottle salts, bottle oxygen)
     files for station/cast list and merge into a dataframe.
@@ -180,11 +180,11 @@ def load_all_btl_files(ssscc_list, series, cols=None):
 
     for ssscc in ssscc_list:
         log.info("Loading BTL data for station: " + ssscc + "...")
-        btl_file = cfg.directory["bottle"] + ssscc + "_btl_mean.pkl"
+        btl_file = cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl"
         btl_data = _load_btl_data(btl_file, cols)
 
         ### load REFT data
-        reft_file = cfg.directory["reft"] + ssscc + "_reft.csv"
+        reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
         try:
             reft_data = _load_reft_data(reft_file)
         except FileNotFoundError:
@@ -198,7 +198,7 @@ def load_all_btl_files(ssscc_list, series, cols=None):
             reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
         ### load REFC data
-        refc_file = cfg.directory["salt"] + ssscc + "_salts.csv"
+        refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
         try:
             refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
         except FileNotFoundError:
@@ -215,7 +215,7 @@ def load_all_btl_files(ssscc_list, series, cols=None):
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
-        oxy_file = cfg.directory["oxy"] + ssscc
+        oxy_file = cfg.dirs["oxygen"] + ssscc
         try:
             oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
         except FileNotFoundError:
@@ -334,7 +334,7 @@ def _reft_loader(ssscc, reft_dir):
     return reftDF
 
 
-def process_reft(ssscc_list, reft_dir=cfg.directory["reft"]):
+def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
     # TODO: import reft_dir from a config file
     """
     SBE35 reference thermometer processing function. Load in .cap files for given
@@ -421,7 +421,7 @@ def export_report_data(df):
     return
 
 
-def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
+def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     log.info("Exporting bottle file")
     btl_data = df.copy()
     now = datetime.now()
@@ -459,15 +459,10 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
         "REFTMP_FLAG_W": "",
     }
 
-    # rename
-    # TODO: put in config file which line to use (primary vs. secondary)
-    btl_data = btl_data.rename(
-        columns={
-            "CTDTMP1": "CTDTMP",
-            # "CTDRINKO": "CTDOXY",
-            # "CTDRINKO_FLAG_W": "CTDOXY_FLAG_W",
-        }
-    )
+    # rename outputs as defined in user_settings.yaml
+    for param, attrs in cfg.ctd_outputs.items():
+        if param not in btl_data.columns:
+            btl_data.rename(columns={attrs["sensor"]: param}, inplace=True)
 
     btl_data["EXPOCODE"] = cfg.expocode
     btl_data["SECT_ID"] = cfg.section_id
@@ -493,10 +488,10 @@ def export_hy1(df, out_dir=cfg.directory["pressure"], org="ODF"):
 
     # add depth
     depth_df = pd.read_csv(
-        cfg.directory["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     manual_depth_df = pd.read_csv(
-        cfg.directory["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+        cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
     )
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
