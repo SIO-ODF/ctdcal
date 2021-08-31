@@ -261,6 +261,40 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None)
     return coefs, df_bad
 
 
+def multivariate_fit(y, *args):
+    """
+    Least-squares fit data using multiple dependent variables.
+
+    Parameters
+    ----------
+    y : array-like
+        Indepedent variable to be fit
+    args : tuple
+        Pairs of fit order and data for dependent variables (i.e., (order, data))
+
+    Returns
+    -------
+    coefs : array-like
+        Least-squares fit coefficients in decreasing powers
+    """
+    rows = []
+    for arg in args:
+        if type(arg) is not tuple:
+            raise TypeError(f"Positional args must be tuples, not {type(arg)}")
+        # if len(arg) != 2:
+        #     raise ValueError("dependent variable tuples must be length 2")
+
+        order, series = arg
+        for n in np.arange(1, order + 1)[::-1]:
+            rows.append(series ** n)  # n is np.int64 so series will cast to np.ndarray
+
+    rows.append(np.ones(len(y)))
+    fit_matrix = np.vstack(rows)
+    coefs = np.linalg.lstsq(fit_matrix.T, y, rcond=None)[0]
+
+    return coefs
+
+
 def calibrate_temp(btl_df, time_df):
     # TODO: break off parts of this to useful functions for all vars (C/T/O)
     """
@@ -325,6 +359,17 @@ def calibrate_temp(btl_df, time_df):
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
+        df_good, df_bad = _prepare_fit_data(
+            btl_df[good_rows],
+            cfg.column["t1"],
+            cfg.column["refT"],
+            zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
+        )
+        new_coefs = multivariate_fit(
+            df_good["Diff"],
+            (fit_yaml.fit_orders1[f_stem]["P_order"], df_good[cfg.column["p"]]),
+            (fit_yaml.fit_orders1[f_stem]["T_order"], df_good[cfg.column["t1"]]),
+        )
         coef_t1, df_bad_t1 = _get_T_coefs(
             btl_df[good_rows],
             T_col=cfg.column["t1"],
@@ -333,6 +378,7 @@ def calibrate_temp(btl_df, time_df):
             zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
             f_stem=f_stem,
         )
+        breakpoint()
         coef_t2, df_bad_t2 = _get_T_coefs(
             btl_df[good_rows],
             T_col=cfg.column["t2"],
