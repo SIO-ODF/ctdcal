@@ -336,6 +336,45 @@ def multivariate_fit(y, *args, coef_names=None, const_name="c0"):
     return dict(zip(names, coefs)) if to_dict else coefs
 
 
+def apply_polyfit(y, y_coefs, *args):
+    """
+    Apply a polynomial correction to series of data. Coefficients should be provided in
+    increasing order (i.e., a0, a1, a2 for y_fit = y + a2 * y ** 2 + a1 * y + a0)
+
+    For the independent variables (y), coefficients start from the zero-th order (i.e.,
+    constant offset). For dependent variables (args), coefficients start from the first
+    order (i.e., linear term).
+
+    Parameters
+    ----------
+    y : array-like
+        Independent variable data to be corrected
+    y_coefs : tuple of float
+        Independent variable fit coefficients (i.e., (data, coef0, ..., coefN))
+    args : tuple of (array-like, (float, float, ...))
+        Dependent variable data and fit coefficients (i.e., (data, coef1, ..., coefN))
+
+    Returns
+    -------
+    fitted_y : array-like
+        Independent variable data with polynomial fit correction applied
+    """
+    breakpoint()
+    fitted_y = np.copy(y)
+    for n, coef in enumerate(y_coefs):
+        fitted_y += coef * y ** n
+
+    for arg in args:
+        if type(arg) is not tuple:
+            raise TypeError(f"Positional args must be tuples, not {type(arg)}")
+
+        series, coefs = arg
+        for n, coef in enumerate(coefs):
+            fitted_y += coef * series ** (n + 1)
+
+    return fitted_y
+
+
 def calibrate_temp(btl_df, time_df):
     # TODO: break off parts of this to useful functions for all vars (C/T/O)
     """
@@ -420,7 +459,6 @@ def calibrate_temp(btl_df, time_df):
             zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
             f_stem=f_stem,
         )
-        breakpoint()
         coef_t2, df_bad_t2 = _get_T_coefs(
             btl_df[good_rows],
             T_col=cfg.column["t2"],
@@ -436,6 +474,7 @@ def calibrate_temp(btl_df, time_df):
             btl_df.loc[btl_rows, cfg.column["p"]],
             coef_t1,
         )
+        breakpoint()
         btl_df.loc[btl_rows, cfg.column["t2"]] = _temperature_polyfit(
             btl_df.loc[btl_rows, cfg.column["t2"]],
             btl_df.loc[btl_rows, cfg.column["p"]],
