@@ -359,7 +359,6 @@ def apply_polyfit(y, y_coefs, *args):
     fitted_y : array-like
         Independent variable data with polynomial fit correction applied
     """
-    breakpoint()
     fitted_y = np.copy(y)
     for n, coef in enumerate(y_coefs):
         fitted_y += coef * y ** n
@@ -435,8 +434,7 @@ def calibrate_temp(btl_df, time_df):
             f_out=f"{cfg.fig_dirs['t2']}residual_{f_stem}_prefit.pdf",
         )
 
-        # TODO: truncate coefs (10 digits? look at historical data)
-        # 2 & 3) calculate fit params
+        # 2) prepare data for fitting
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
         df_good, df_bad = _prepare_fit_data(
@@ -445,10 +443,15 @@ def calibrate_temp(btl_df, time_df):
             cfg.column["refT"],
             zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
         )
+
+        # 3) calculate fit coefs
+        # TODO: truncate coefs (10 digits? look at historical data)
+        P_order = fit_yaml.fit_orders1[f_stem]["P_order"]
+        T_order = fit_yaml.fit_orders1[f_stem]["T_order"]
         new_coefs = multivariate_fit(
             df_good["Diff"],
-            (df_good[cfg.column["p"]], fit_yaml.fit_orders1[f_stem]["P_order"]),
-            (df_good[cfg.column["t1"]], fit_yaml.fit_orders1[f_stem]["T_order"]),
+            (df_good[cfg.column["p"]], P_order),
+            (df_good[cfg.column["t1"]], T_order),
             coef_names=["cp", "ct"],
         )
         coef_t1, df_bad_t1 = _get_T_coefs(
@@ -469,22 +472,33 @@ def calibrate_temp(btl_df, time_df):
         )
 
         # 4) apply fit
-        btl_df.loc[btl_rows, cfg.column["t1"]] = _temperature_polyfit(
+        P_coefs = tuple(new_coefs[f"cp{n}"] for n in np.arange(1, P_order + 1))
+        T_coefs = tuple(new_coefs[f"ct{n}"] for n in np.arange(1, T_order + 1))
+        btl_df.loc[btl_rows, cfg.column["t1"]] = apply_polyfit(
             btl_df.loc[btl_rows, cfg.column["t1"]],
-            btl_df.loc[btl_rows, cfg.column["p"]],
-            coef_t1,
+            (new_coefs["c0"],) + T_coefs,
+            (btl_df.loc[btl_rows, cfg.column["p"]], P_coefs),
         )
-        breakpoint()
+        time_df.loc[time_rows, cfg.column["t1"]] = apply_polyfit(
+            time_df.loc[time_rows, cfg.column["t1"]],
+            (new_coefs["c0"],) + T_coefs,
+            (time_df.loc[time_rows, cfg.column["p"]], P_coefs),
+        )
+        # btl_df.loc[btl_rows, cfg.column["t1"]] = _temperature_polyfit(
+        #     btl_df.loc[btl_rows, cfg.column["t1"]],
+        #     btl_df.loc[btl_rows, cfg.column["p"]],
+        #     coef_t1,
+        # )
         btl_df.loc[btl_rows, cfg.column["t2"]] = _temperature_polyfit(
             btl_df.loc[btl_rows, cfg.column["t2"]],
             btl_df.loc[btl_rows, cfg.column["p"]],
             coef_t2,
         )
-        time_df.loc[time_rows, cfg.column["t1"]] = _temperature_polyfit(
-            time_df.loc[time_rows, cfg.column["t1"]],
-            time_df.loc[time_rows, cfg.column["p"]],
-            coef_t1,
-        )
+        # time_df.loc[time_rows, cfg.column["t1"]] = _temperature_polyfit(
+        #     time_df.loc[time_rows, cfg.column["t1"]],
+        #     time_df.loc[time_rows, cfg.column["p"]],
+        #     coef_t1,
+        # )
         time_df.loc[time_rows, cfg.column["t2"]] = _temperature_polyfit(
             time_df.loc[time_rows, cfg.column["t2"]],
             time_df.loc[time_rows, cfg.column["p"]],
