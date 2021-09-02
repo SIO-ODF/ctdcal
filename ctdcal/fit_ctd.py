@@ -218,6 +218,7 @@ def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None)
     df_good, df_bad = _prepare_fit_data(df, T_col, cfg.column["refT"], zRange)
 
     # plot data which will be used in fit (for debugging purposes)
+    # TODO: save this step into calibrate_temp()?
     if f_stem is not None:
         if T_col == cfg.column["t1"]:
             xlabel = "T1 Residual (T90 C)"
@@ -313,7 +314,9 @@ def multivariate_fit(y, *args, coef_names=None, const_name="c0"):
         to_dict = False
         coef_names = [""] * len(args)  # needed to prevent zip() error
     elif len(args) != len(coef_names):
-        raise ValueError("coef_names must be the same length as dependent variables")
+        raise ValueError(
+            "length of coef_names must match the number of dependent variables"
+        )
 
     # iteratively build fit matrix
     rows, names = [], []
@@ -632,7 +635,7 @@ def calibrate_cond(btl_df, time_df):
     coef_c1_all = pd.DataFrame()
     coef_c2_all = pd.DataFrame()
 
-    fit_yaml = load_fit_yaml(to_object=True)  # load fit polynomial order
+    fit_yaml = load_fit_yaml()  # load fit polynomial order
 
     for f in ssscc_subsets:
         # 0) grab ssscc chunk to fit
@@ -665,44 +668,75 @@ def calibrate_cond(btl_df, time_df):
         # 2 & 3) calculate fit params
         # NOTE: df_bad_c1/2 will be overwritten during post-fit data flagging
         # but are left here for future debugging (if necessary)
+        df_good, df_bad = _prepare_fit_data(
+            btl_df[good_rows],
+            cfg.column["c1"],
+            cfg.column["refC"],
+            zRange=fit_yaml["c1"][f_stem]["zRange"],
+        )
+        P_order = fit_yaml["c1"][f_stem]["P_order"]
+        T_order = fit_yaml["c1"][f_stem]["T_order"]
+        C_order = fit_yaml["c1"][f_stem]["C_order"]
+        coef_dict = multivariate_fit(
+            df_good["Diff"],
+            (df_good[cfg.column["p"]], P_order),
+            (df_good[cfg.column["t1"]], T_order),
+            (df_good[cfg.column["c1"]], C_order),
+            coef_names=["cp", "ct", "cc"],
+        )
         coef_c1, df_bad_c1 = _get_C_coefs(
             btl_df[good_rows],
             C_col=cfg.column["c1"],
-            P_order=fit_yaml.fit_orders1[f_stem]["P_order"],
-            T_order=fit_yaml.fit_orders1[f_stem]["T_order"],
-            C_order=fit_yaml.fit_orders1[f_stem]["C_order"],
-            zRange=fit_yaml.fit_orders1[f_stem]["zRange"],
+            P_order=fit_yaml["c1"][f_stem]["P_order"],
+            T_order=fit_yaml["c1"][f_stem]["T_order"],
+            C_order=fit_yaml["c1"][f_stem]["C_order"],
+            zRange=fit_yaml["c1"][f_stem]["zRange"],
             f_stem=f_stem,
         )
         coef_c2, df_bad_c2 = _get_C_coefs(
             btl_df[good_rows],
             C_col=cfg.column["c2"],
-            P_order=fit_yaml.fit_orders2[f_stem]["P_order"],
-            T_order=fit_yaml.fit_orders2[f_stem]["T_order"],
-            C_order=fit_yaml.fit_orders2[f_stem]["C_order"],
-            zRange=fit_yaml.fit_orders2[f_stem]["zRange"],
+            P_order=fit_yaml["c2"][f_stem]["P_order"],
+            T_order=fit_yaml["c2"][f_stem]["T_order"],
+            C_order=fit_yaml["c2"][f_stem]["C_order"],
+            zRange=fit_yaml["c2"][f_stem]["zRange"],
             f_stem=f_stem,
         )
 
         # 4) apply fit
-        btl_df.loc[btl_rows, cfg.column["c1"]] = _conductivity_polyfit(
+        P_coefs = tuple(coef_dict[f"cp{n}"] for n in np.arange(1, P_order + 1))
+        T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1))
+        C_coefs = tuple(coef_dict[f"cc{n}"] for n in np.arange(1, C_order + 1))
+        btl_df.loc[btl_rows, cfg.column["c1"]] = apply_polyfit(
             btl_df.loc[btl_rows, cfg.column["c1"]],
-            btl_df.loc[btl_rows, cfg.column["t1"]],
-            btl_df.loc[btl_rows, cfg.column["p"]],
-            coef_c1,
+            (coef_dict["c0"],) + C_coefs,
+            (btl_df.loc[btl_rows, cfg.column["p"]], P_coefs),
+            (btl_df.loc[btl_rows, cfg.column["t1"]], T_coefs),
         )
+        time_df.loc[time_rows, cfg.column["c1"]] = apply_polyfit(
+            time_df.loc[time_rows, cfg.column["c1"]],
+            (coef_dict["c0"],) + C_coefs,
+            (time_df.loc[time_rows, cfg.column["p"]], P_coefs),
+            (time_df.loc[time_rows, cfg.column["t1"]], T_coefs),
+        )
+        # btl_df.loc[btl_rows, cfg.column["c1"]] = _conductivity_polyfit(
+        #     btl_df.loc[btl_rows, cfg.column["c1"]],
+        #     btl_df.loc[btl_rows, cfg.column["t1"]],
+        #     btl_df.loc[btl_rows, cfg.column["p"]],
+        #     coef_c1,
+        # )
         btl_df.loc[btl_rows, cfg.column["c2"]] = _conductivity_polyfit(
             btl_df.loc[btl_rows, cfg.column["c2"]],
             btl_df.loc[btl_rows, cfg.column["t2"]],
             btl_df.loc[btl_rows, cfg.column["p"]],
             coef_c2,
         )
-        time_df.loc[time_rows, cfg.column["c1"]] = _conductivity_polyfit(
-            time_df.loc[time_rows, cfg.column["c1"]],
-            time_df.loc[time_rows, cfg.column["t1"]],
-            time_df.loc[time_rows, cfg.column["p"]],
-            coef_c1,
-        )
+        # time_df.loc[time_rows, cfg.column["c1"]] = _conductivity_polyfit(
+        #     time_df.loc[time_rows, cfg.column["c1"]],
+        #     time_df.loc[time_rows, cfg.column["t1"]],
+        #     time_df.loc[time_rows, cfg.column["p"]],
+        #     coef_c1,
+        # )
         time_df.loc[time_rows, cfg.column["c2"]] = _conductivity_polyfit(
             time_df.loc[time_rows, cfg.column["c2"]],
             time_df.loc[time_rows, cfg.column["t2"]],
