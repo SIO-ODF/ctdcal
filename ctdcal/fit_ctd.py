@@ -5,7 +5,6 @@ import gsw
 import logging
 import numpy as np
 import pandas as pd
-import scipy
 from scipy.ndimage.interpolation import shift
 import yaml
 
@@ -35,21 +34,6 @@ def write_fit_yaml():
     """For future use with automated fitting routine(s).
     i.e., iterate to find best fit parameters, save to file"""
     pass
-
-
-def _conductivity_polyfit(cond, temp, press, coef):
-
-    fitted_cond = cond + (
-        coef[0] * (press ** 2)
-        + coef[1] * press
-        + coef[2] * (temp ** 2)
-        + coef[3] * temp
-        + coef[4] * (cond ** 2)
-        + coef[5] * cond
-        + coef[6]
-    )
-
-    return fitted_cond
 
 
 def cell_therm_mass_corr(temp, cond, sample_int=1 / 24, alpha=0.03, beta=1 / 7):
@@ -192,74 +176,6 @@ def _prepare_fit_data(df, param, ref_param, zRange=None):
     df_bad = good_data[good_data["Flag"] == 4].copy()
 
     return df_good, df_bad
-
-
-def _temperature_polyfit(temp, press, coef):
-
-    fitted_temp = (
-        temp
-        + coef[0] * (press ** 2)
-        + coef[1] * press
-        + coef[2] * (temp ** 2)
-        + coef[3] * temp
-        + coef[4]
-    )
-
-    return fitted_temp
-
-
-def _get_T_coefs(df, T_col=None, P_order=2, T_order=2, zRange=None, f_stem=None):
-
-    if T_col is None:
-        print("Parameter invalid, specify what temp sensor is being calibrated")
-        return
-
-    # remove non-finite data and extreme outliers and trim to fit zRange
-    df_good, df_bad = _prepare_fit_data(df, T_col, cfg.column["refT"], zRange)
-
-    # plot data which will be used in fit (for debugging purposes)
-    # TODO: save this step into calibrate_temp()?
-    if f_stem is not None:
-        if T_col == cfg.column["t1"]:
-            xlabel = "T1 Residual (T90 C)"
-            f_out = f"{cfg.fig_dirs['t1']}residual_{f_stem}_fit_data.pdf"
-        elif T_col == cfg.column["t2"]:
-            xlabel = "T2 Residual (T90 C)"
-            f_out = f"{cfg.fig_dirs['t2']}residual_{f_stem}_fit_data.pdf"
-        ctd_plots._intermediate_residual_plot(
-            df_good["Diff"],
-            df_good[cfg.column["p"]],
-            df_good["SSSCC"],
-            xlabel=xlabel,
-            f_out=f_out,
-        )
-
-    # Toggle columns based on desired polyfit order
-    # (i.e. don't calculate 2nd order term if only doing 1st order fit)
-    order_list = [[0, 0], [0, 1], [1, 1]]
-    P_fit = order_list[P_order]
-    T_fit = order_list[T_order]
-
-    # Calculate coefficients using linear algebra.
-    #
-    # Columns are [P^2, P, T^2, T, 1] and give associated coefs for:
-    # T_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4
-    fit_matrix = np.vstack(
-        [
-            P_fit[0] * df_good[cfg.column["p"]] ** 2,
-            P_fit[1] * df_good[cfg.column["p"]],
-            T_fit[0] * df_good[T_col] ** 2,
-            T_fit[1] * df_good[T_col],
-            np.ones(len(df_good[T_col])),
-        ]
-    )
-    coefs = np.linalg.lstsq(fit_matrix.T, df_good["Diff"], rcond=None)[0]
-
-    # Column of zeros can sometimes return a non-zero value (machine precision),
-    # so force uncalculated fit terms to be truly zero
-    coefs = coefs * np.concatenate((P_fit, T_fit, [1]))
-
-    return coefs, df_bad
 
 
 def multivariate_fit(y, *args, coef_names=None, const_name="c0"):
@@ -515,72 +431,6 @@ def calibrate_temp(btl_df, time_df):
     time_df["CTDTMP_FLAG_W"] = 2  # TODO: flag w/ REFT somehow? discrete vs continuous
 
     return True
-
-
-def _get_C_coefs(
-    df, C_col=None, P_order=2, T_order=2, C_order=2, zRange=None, f_stem=None
-):
-
-    if C_col is None:
-        print("Parameter invalid, specify what cond sensor is being calibrated")
-        return
-    elif C_col == cfg.column["c1"]:
-        T_col = cfg.column["t1"]
-    elif C_col == cfg.column["c2"]:
-        T_col = cfg.column["t2"]
-
-    df = df.reset_index().copy()
-    # remove non-finite data and extreme outliers and trim to fit zRange
-    df_good, df_bad = _prepare_fit_data(df, C_col, cfg.column["refC"], zRange)
-
-    # add CTDTMP column
-    df_good[T_col] = df.loc[df_good.index, T_col]
-
-    # plot data which will be used in fit (for debugging purposes)
-    if f_stem is not None:
-        if C_col == cfg.column["c1"]:
-            xlabel = "C1 Residual (mS/cm)"
-            f_out = f"{cfg.fig_dirs['c1']}residual_{f_stem}_fit_data.pdf"
-        elif C_col == cfg.column["c2"]:
-            xlabel = "C2 Residual (mS/cm)"
-            f_out = f"{cfg.fig_dirs['c2']}residual_{f_stem}_fit_data.pdf"
-        ctd_plots._intermediate_residual_plot(
-            df_good["Diff"],
-            df_good[cfg.column["p"]],
-            df_good["SSSCC"],
-            xlabel=xlabel,
-            f_out=f_out,
-        )
-
-    # Toggle columns based on desired polyfit order
-    # (i.e. don't calculate 2nd order term if only doing 1st order fit)
-    order_list = [[0, 0], [0, 1], [1, 1]]
-    P_fit = order_list[P_order]
-    T_fit = order_list[T_order]
-    C_fit = order_list[C_order]
-
-    # Calculate coefficients using linear algebra.
-    #
-    # Columns are [P^2, P, T^2, T, C^2, C, 1] and give associated coefs for:
-    # C_fit = c0*P^2 + c1*P + c2*T^2 + c3*T + c4*C^2 + c5*C + c6
-    fit_matrix = np.vstack(
-        [
-            P_fit[0] * df_good[cfg.column["p"]] ** 2,
-            P_fit[1] * df_good[cfg.column["p"]],
-            T_fit[0] * df_good[T_col] ** 2,
-            T_fit[1] * df_good[T_col],
-            C_fit[0] * df_good[C_col] ** 2,
-            C_fit[1] * df_good[C_col],
-            np.ones(len(df_good[C_col])),
-        ]
-    )
-    coefs = np.linalg.lstsq(fit_matrix.T, df_good["Diff"], rcond=None)[0]
-
-    # Column of zeros can sometimes return a non-zero value (machine precision),
-    # so force uncalculated fit terms to be truly zero
-    coefs = coefs * np.concatenate((P_fit, T_fit, C_fit, [1]))
-
-    return coefs, df_bad
 
 
 def calibrate_cond(btl_df, time_df):
