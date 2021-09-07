@@ -436,6 +436,13 @@ def calibrate_temp(btl_df, time_df):
                 cfg.column["refT"],
                 zRange=fit_yaml[tN][f_stem]["zRange"],
             )
+            ctd_plots._intermediate_residual_plot(
+                df_good["Diff"],
+                df_good[cfg.column["p"]],
+                df_good["SSSCC"],
+                xlabel=f"{tN.upper()} Residual (T90 C)",
+                f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}_fit_data.pdf",
+            )
 
             # 3) calculate fit coefs
             # TODO: truncate coefs (10 digits? look at historical data)
@@ -661,6 +668,13 @@ def calibrate_cond(btl_df, time_df):
                 cfg.column[cN],
                 cfg.column["refC"],
                 zRange=fit_yaml[cN][f_stem]["zRange"],
+            )
+            ctd_plots._intermediate_residual_plot(
+                df_good["Diff"],
+                df_good[cfg.column["p"]],
+                df_good["SSSCC"],
+                xlabel=f"{cN.upper()} Residual (mS/cm)",
+                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_fit_data.pdf",
             )
 
             # 3) calculate fit coefs
