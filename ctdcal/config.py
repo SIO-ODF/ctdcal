@@ -1,9 +1,10 @@
 ### configuration file for odf_process_all.py
 #
 # TODO: organize these by editable/fixed variables
+from importlib import resources
 import yaml
 
-with open("user_settings.yaml", "r") as f:
+with resources.open_text("ctdcal", "user_settings.yaml") as f:
     settings = yaml.safe_load(f)
 
 # Unpack user settings (any sanitizing/checks needed? probably)
