@@ -5,8 +5,7 @@ sensors.
 """
 
 import logging
-import os.path
-import types
+from importlib import resources
 
 from . import *
 from ._version import get_versions
@@ -18,33 +17,18 @@ del get_versions
 
 def get_ctdcal_config():
     """
-    Find and load config file.
+    Find and load config file from ctdcal module folder (ctdcal/ctdcal/).
 
-    Directory search mimicked from cchdo/hdo-uow
     File read mimicked from pallets/flask
     """
-    last_dir = os.getcwd()
-    filepath = None
-    config_file = "config.py"
-
-    if os.path.exists(os.path.join(last_dir, config_file)):
-        filepath = os.path.join(last_dir, config_file)
-    else:
-        while last_dir != os.path.dirname(last_dir):
-            last_dir = os.path.dirname(last_dir)
-            if os.path.exists(os.path.join(last_dir, config_file)):
-                filepath = os.path.join(last_dir, config_file)
-                break
-    if not filepath:
-        raise FileNotFoundError(f"Failed to find config.py file in {os.getcwd()}")
-
     # compile config.py and save variables to dict
     config = {}
-    try:
-        with open(filepath, mode="rb") as f:
-            exec(compile(f.read(), filepath, "exec"), config)
-    except OSError:
-        log.error(f"Failed to load config file {filepath}")
+    with resources.path("ctdcal", "config.py") as filepath:
+        try:
+            with open(filepath, mode="rb") as f:
+                exec(compile(f.read(), filepath, "exec"), config)
+        except OSError:
+            log.error(f"Failed to load config file {filepath}")
 
     for k in list(config.keys()):
         if k.startswith("__"):
