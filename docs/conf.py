@@ -19,6 +19,7 @@
 #
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.abspath(".."))
 
@@ -46,6 +47,15 @@ extensions = [
 autosummary_generate = True
 nbsphinx_allow_errors = True  # Continue through Jupyter errors
 
+# Example configuration for intersphinx: refer to the Python standard library.
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/reference/", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+    "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
+}
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
@@ -60,7 +70,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "ctdcal"
-copyright = "2021, Joseph Gum, Andrew Barna, Mike Kovatch"
+copyright = f"{time.strftime('%Y')}, Joseph Gum, Andrew Barna, Mike Kovatch"
 author = "Joseph Gum, Andrew Barna, and Mike Kovatch"
 
 # The version info for the project you're documenting, acts as replacement for
@@ -170,7 +180,3 @@ texinfo_documents = [
         "Miscellaneous",
     ),
 ]
-
-
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {"https://docs.python.org/": None}
