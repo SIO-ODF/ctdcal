@@ -9,10 +9,9 @@ Process and calibrate CTD data: ctdcal
 This package is under development by the Scripps ODF group.
 
 .. toctree::
-   :maxdepth: 4
-   :caption: Contents:
+   :hidden:
 
-   ctdcal
+   API reference <_autosummary/ctdcal>
 
 Indices and tables
 ==================
