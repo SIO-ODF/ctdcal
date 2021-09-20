@@ -33,15 +33,18 @@ sys.path.insert(0, os.path.abspath(".."))
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
-    "sphinx.ext.intersphinx",
+    "sphinx.ext.autodoc",  # Core Sphinx library for auto html doc generation from docstrings
+    "sphinx.ext.autosummary",  # Create neat summary tables for modules/classes/methods etc
+    "sphinx.ext.intersphinx",  # Link to other project's documentation (see mapping below)
     "sphinx.ext.mathjax",
-    "sphinx.ext.viewcode",
+    "sphinx.ext.viewcode",  # Add a link to the Python source code for classes, functions etc.
     "sphinx.ext.githubpages",
     "sphinx.ext.napoleon",
+    "nbsphinx",  # Integrate Jupyter Notebooks and Sphinx
+    "IPython.sphinxext.ipython_console_highlighting",
 ]
 autosummary_generate = True
+nbsphinx_allow_errors = True  # Continue through Jupyter errors
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
