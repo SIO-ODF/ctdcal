@@ -12,7 +12,7 @@ This package is under development by the Scripps ODF group.
    :hidden:
 
    Jupyter tutorials <tutorials>
-   API reference <_autosummary/ctdcal>
+   API reference <api>
 
 Indices and tables
 ==================
