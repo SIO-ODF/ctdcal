@@ -8,13 +8,14 @@
 
    Jupyter tutorials <tutorials>
    API reference <api>
+   Contribute on GitHub <https://github.com/cchdo/ctdcal>
 
 ctdcal: Process and calibrate CTD data in Python
-======================================
+================================================
 
-This package is under development by the Oceanographic Data Facility (ODF) group at Scripps Institution of Oceanography (SIO). ODF uses data processing software and techniques that were developed internally and provide exceptional fitting of CTD and hydrographic data. The software is regularly updated to take full advantage of the latest coding standards and improvements.
+This package is under development by the `Oceanographic Data Facility (ODF) <https://scripps.ucsd.edu/ships/shipboard-technical-support/odf>`_ group at `Scripps Institution of Oceanography (SIO) <https://scripps.ucsd.edu/>`_. ODF uses data processing software and techniques that were developed internally and provide exceptional fitting of CTD and hydrographic data. The software is regularly updated to take full advantage of the latest coding standards and improvements.
 
-The software is all-encompassing with the ability to process raw data, perform quality control with automated data flagging, easily visualize the finalized data, and export to netCDF using standardized conventions. Users have the ability to get the highest quality data out of their measurements.
+The software is all-encompassing with the ability to process raw data, perform quality control with automated data flagging, easily visualize the finalized data, and export to `netCDF <https://www.unidata.ucar.edu/software/netcdf/>`_ using standardized conventions. Users have the ability to get the highest quality data out of their measurements.
 
 Installation
 ============
