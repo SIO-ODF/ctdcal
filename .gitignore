@@ -67,4 +67,4 @@ docs/generated/
 *.ipynb*
 
 __pycache__/
-_version.py
+ctdcal/_version.py
