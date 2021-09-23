@@ -1,10 +1,11 @@
-name: Publish Python distributions to PyPI and TestPyPI
+name: Publish releases to PyPI
 
-on: push
+on:
+  release:
+    types: [published]
 
 jobs:
   publish:
-    name: Build and publish Python distributions to PyPI and TestPyPI
     runs-on: ubuntu-latest
 
     steps:
@@ -21,10 +22,13 @@ jobs:
 
     - name: Build dists
       run: |
-        python -m pep517.build --source --binary . --out-dir dist
+        python -m build .
 
-    - name: Publish distribution to Test PyPI
+    - name: Twine check
+      run: |
+        twine check dist/*
+
+    - name: Publish distribution to PyPI
       uses: pypa/gh-action-pypi-publish@master
       with:
-        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        repository_url: https://test.pypi.org/legacy/
+        password: ${{ secrets.PYPI_API_TOKEN }}
