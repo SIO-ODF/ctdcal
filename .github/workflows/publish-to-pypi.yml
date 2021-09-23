@@ -24,9 +24,9 @@ jobs:
       run: |
         python -m build .
 
-    - name: Twine check
+    - name: Test build and wheel
       run: |
-        twine check dist/*
+        cd dist && pip install $(ls *.whl) && twine check *
 
     - name: Publish distribution to PyPI
       uses: pypa/gh-action-pypi-publish@master
