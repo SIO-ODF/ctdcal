@@ -1,32 +1,20 @@
 This is a lightweight guide for testing and publishing a new release.
 
-## Test release on TestPyPI
+## Test release on TestPyPI with GitHub Actions
 
-Tag current commit with a new, unused test version name
-
-```
-$ git tag -a v0.1.0b8 -m ""
-```
-
-Build distribution
+Assuming test branch is up to date and synced with remote, tag current commit with a new, unused test version name
 
 ```
-$ python -m build
+$ git tag -a v0.1.1b2 -m ""
 ```
 
-Upload using twine
+Push tags to remote to initialize TestPyPI action
 
 ```
-$ twine upload --repository testpypi dist/ctdcal-0.1.0b8
+$ git push --tags
 ```
 
-When prompted:
-```
-username = __token__
-password = TestPyPI API key
-```
-
-Visit https://test.pypi.org/project/ctdcal/0.1.0b8/ to ensure test release was successful.
+Visit https://github.com/cchdo/ctdcal/actions to ensure test release was successful.
 
 ## Full release on PyPI with GitHub Actions
 
@@ -37,7 +25,7 @@ $ git checkout _hash_
 $ git tag -a v0.2.0 -m ""
 ```
 
-Assuming commit is already pushed, now push tags to remote
+Assuming commit is already pushed, now push tags to remote (this will trigger the TestPyPI action above)
 
 ```
 $ git push --tags
