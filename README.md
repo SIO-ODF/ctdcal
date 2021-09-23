@@ -13,49 +13,57 @@ for in-situ sensors used for ocean measurement.
 ---
 
 ## Installation
-### Clone repository
-Pull down the latest version of ctdcal:
+ctdcal can be installed using pip:
 
 ```
-git clone https://github.com/cchdo/ctdcal.git
+$ pip install ctdcal
 ```
 
-### Install ctdcal and dependencies
-Change directories to the top-level ctdcal:
+---
 
-```
-cd ctdcal
-```
-
-Create a new virtual environment with your preferred environment manager and install with pip:
-
-```
-pip install .
-```
-
-Note: there is an occasional (conda?) bug where CLI tools are not immediately accessible after install – this can usually be remedied by deactivating and reactiving the virtual environment.
-
+## CLI usage
+### Initialize data folders
 Initialize default `/data/` folders by running:
 
 ```
-ctdcal init
+$ ctdcal init
 ```
 
 (Future versions of ctdcal are planned have more robust init options/flags/etc.)
 
----
-
-## Usage
 ### Import and process data
 To process data, copy over raw `.hex` and `.xmlcon` files into `/data/raw/` and reference data to their appropriate folder (`oxygen`, `reft`, `salt`).
 
 Users can process their data with individual ctdcal functions or try:
 
 ```
-ctdcal process [--group ODF]
+$ ctdcal process [--group ODF]
 ```
 
 to process using ODF procedures.
+
+---
+
+## Package usage
+### Explore user settings
+Most ctdcal functions get settings from `user_settings.yaml` and subsequently `config.py`. Call the configuration loader to explore default settings:
+
+```py
+from ctdcal import get_ctdcal_config
+cfg = get_ctdcal_config()
+
+# directories for I/O purposes
+print(cfg.dirs)
+print(cfg.fig_dirs)
+
+# experiment-specific settings (e.g., expocode, CTD serial number) from user_settings.yaml
+print(cfg.settings)
+
+# dictionary mapping of short/long column names
+print(cfg.columns)
+```
+
+As ctdcal continues to be developed, more robust [tutorials](https://ctdcal.readthedocs.io/en/latest/tutorials.html) will be added to [our documentation](https://ctdcal.readthedocs.io/en/latest/).
 
 ---
 

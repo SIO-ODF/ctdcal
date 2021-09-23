@@ -1,1 +1,2 @@
 include ctdcal/_version.py
+include ctdcal/user_settings.yaml
