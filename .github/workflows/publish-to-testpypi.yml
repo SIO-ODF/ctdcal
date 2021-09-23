@@ -1,6 +1,9 @@
 name: Publish tagged commits to TestPyPI
 
-on: push
+on:
+  push:
+    tags:
+      - v*.*.*
 
 jobs:
   publish:
@@ -15,8 +18,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip build
-        pip install twine
+        python -m pip install --upgrade pip build wheel twine
 
     - name: Build dists
       run: |
