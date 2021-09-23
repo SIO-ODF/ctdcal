@@ -1,0 +1,7 @@
+[build-system]
+requires = ["setuptools>=30.3.0", "wheel", "setuptools_scm[toml]>=3.4"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "ctdcal/_version.py"
+write_to_template = 'version = "{version}"'

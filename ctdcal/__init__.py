@@ -6,13 +6,15 @@ sensors.
 
 import logging
 from importlib import resources
-
-from . import *
-from ._version import get_versions
+from importlib.metadata import version, PackageNotFoundError
 
 log = logging.getLogger(__name__)
-__version__ = get_versions()["version"]
-del get_versions
+
+try:
+    __version__ = version(__name__)
+except PackageNotFoundError:
+    # package is not installed
+    pass
 
 
 def get_ctdcal_config():
