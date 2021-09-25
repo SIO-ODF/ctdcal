@@ -269,18 +269,37 @@ def apply_polyfit(y, y_coefs, *args):
     y : array-like
         Independent variable data to be corrected
     y_coefs : tuple of float
-        Independent variable fit coefficients (i.e., (data, coef0, ..., coefN))
+        Independent variable fit coefficients (i.e., (coef0, ..., coefN))
     args : tuple of (array-like, (float, float, ...))
-        Dependent variable data and fit coefficients (i.e., (data, coef1, ..., coefN))
+        Dependent variable data and fit coefficients (i.e., (data, (coef1, ..., coefN)))
 
     Returns
     -------
     fitted_y : array-like
         Independent variable data with polynomial fit correction applied
+
+    Examples
+    --------
+    Behavior without additional args:
+
+    >>> y = [2, 4, 6]
+    >>> apply_polyfit(y, (1, 2, 3))  # y0 = 1; y1 = 2; y2 = 3
+    array([ 19.,  61., 127.])
+
+    where fitted_y = y + y0 + (y1 * y) + (y2 * y ** 2)
+
+    Behavior with additional args:
+
+    >>> y = [2, 4, 6]
+    >>> x = [1, 2, 3]
+    >>> apply_polyfit(y, (1,), (x, (2, 3)))  # y0 = 1; x1 = 2; x2 = 3
+    array([ 8., 21., 40.])
+
+    where fitted_y = y + y0 + (x1 * x) + (x2 * x ** 2)
     """
-    fitted_y = np.copy(y)
+    fitted_y = np.copy(y).astype(float)
     for n, coef in enumerate(y_coefs):
-        fitted_y += coef * y ** n
+        fitted_y += coef * np.power(y, n)
 
     for arg in args:
         if type(arg) is not tuple:
@@ -288,7 +307,7 @@ def apply_polyfit(y, y_coefs, *args):
 
         series, coefs = arg
         for n, coef in enumerate(coefs):
-            fitted_y += coef * series ** (n + 1)
+            fitted_y += coef * np.power(series, n + 1)
 
     return fitted_y
 

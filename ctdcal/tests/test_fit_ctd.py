@@ -28,3 +28,28 @@ def test_multivariate_fit(xN, yN):
     # check error if input is not tuple
     with pytest.raises(TypeError):
         fit_ctd.multivariate_fit(data, (data, xN), [data, yN])
+
+
+def test_apply_polyfit():
+    y = np.array([1, 2, 3])
+
+    # check correction is applied correctly (no dependent variables)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0,)), y)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (1, 0)), y + 1)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0, 1)), y + y)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0, 0.5)), y + 0.5 * y)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0, 0, 1)), y + y ** 2)
+
+    # check correction is applied correctly (with dependent variables)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0,), (y, (0,))), y)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0,), (y, (1,))), y + y)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0,), (y, (1.0,))), y + y)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0.0,), (y, (1,))), y + y)
+    np.testing.assert_array_equal(fit_ctd.apply_polyfit(y, (0.0,), (y, (1.0,))), y + y)
+    np.testing.assert_array_equal(
+        fit_ctd.apply_polyfit(y, (0,), (y, (0, 1))), y + y ** 2
+    )
+
+    # check error if input is not tuple
+    with pytest.raises(TypeError):
+        fit_ctd.apply_polyfit(y, (0,), [y, (0,)])
