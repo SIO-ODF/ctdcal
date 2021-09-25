@@ -35,7 +35,7 @@ def _merge_flags(new_flags, old_flags, keep_higher=True):
         merged_flags[is_higher] = old_flags[is_higher]
     else:
         # can't really think of a use case for this... maybe delete?
-        is_lower = old_flags < old_flags
+        is_lower = old_flags < new_flags
         merged_flags[is_lower] = old_flags[is_lower]
 
     return merged_flags
@@ -111,6 +111,11 @@ def outliers(
     """
 
     data = np.squeeze(data)
+
+    # np.squeeze converts DataFrame->Series but does nothing to Series
+    if type(data) is pd.Series:
+        data = data.to_numpy()  # force to np.array
+
     flags = np.full(np.shape(data), flag_good).squeeze()
 
     # function aliases
@@ -126,7 +131,7 @@ def outliers(
     data_mean = mean(data[~questionable])
     data_std = std(data[~questionable])
     outliers = np.abs(data - data_mean) > (n_sigma2 * data_std)
-    flags[outliers.values] = flag_outlier
+    flags[outliers] = flag_outlier
 
     return _merge_flags(flags, old_flags)
 
