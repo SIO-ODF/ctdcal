@@ -49,6 +49,8 @@ def nan_values(data, old_flags=None, flag_good=2, flag_nan=9):
     ----------
     data : array-like
         Variable to be flagged
+    old_flags : array-like, optional
+        Original data flags to be merged in (if provided)
     flag_good : int, optional
         Flag value for good data
     flag_nan : int, optional
@@ -89,6 +91,8 @@ def outliers(
     ----------
     data : array-like
         Variable to be flagged
+    old_flags : array-like, optional
+        Original data flags to be merged in (if provided)
     flag_good : int, optional
         Flag value for good data
     flag_outlier : int, optional
@@ -119,6 +123,7 @@ def outliers(
     flags = np.full(np.shape(data), flag_good).squeeze()
 
     # function aliases
+    # TODO: is ignore_nan needed? not very useful atm
     if ignore_nan:
         mean, std = np.nanmean, np.nanstd
     else:
@@ -139,6 +144,32 @@ def outliers(
 def by_percent_diff(
     data, ref_data, old_flags=None, percent_thresh=1, flag_good=2, flag_bad=3
 ):
+    """
+    Flag residuals based on the percent error relative to the reference data.
+
+    Parameters
+    ----------
+    data : array-like
+        Variable to be flagged
+    ref_data : array-like
+        Reference data to compare against
+    old_flags : array-like, optional
+        Original data flags to be merged in (if provided)
+    percent_thresh : int, optional
+        Percent different cutoff to be flagged as bad data
+    flag_good : int, optional
+        Flag value for good data
+    flag_bad : int, optional
+        Flag value for bad data
+
+    Returns
+    -------
+    flags : array-like
+        Flag for each data point in input
+    """
+    data = np.squeeze(data)
+    ref_data = np.squeeze(ref_data)
+
     percent_diff = (np.abs(data - ref_data) / data).squeeze() * 100
     flags = np.full(np.shape(percent_diff), flag_good).squeeze()
 
