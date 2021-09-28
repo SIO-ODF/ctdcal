@@ -1,3 +1,6 @@
+[![PyPI Latest Release](https://img.shields.io/pypi/v/ctdcal.svg)](https://pypi.org/project/ctdcal/)
+[![Package Status](https://img.shields.io/pypi/status/ctdcal.svg)](https://pypi.org/project/ctdcal/)
+[![License](https://img.shields.io/pypi/l/ctdcal.svg)](https://github.com/cchdo/ctdcal/blob/master/LICENSE.md)
 [![Documentation Status](https://readthedocs.org/projects/ctdcal/badge/?version=latest)](https://ctdcal.readthedocs.io/en/latest/?badge=latest)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 
