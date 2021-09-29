@@ -2,6 +2,9 @@
 
 ## v0.1.3b (unreleased)
 
+### Changed
+* Fix sphinx/RTD version bug by importing ctdcal._version instead of importlib.metadata.version("ctdcal")
+
 ## v0.1.2b (09/29/2021)
 
 ### Added
