@@ -1,10 +1,14 @@
 # Change Log
 
-## v0.1.2b (09/27/2021)
+## v0.1.3b (unreleased)
+
+## v0.1.2b (09/29/2021)
 
 ### Added
 * Initialize testing framework using `pytest`
 * Add testing for `fit_ctd` and `flagging` modules
+* Run tests on multiple OS and Python version using GitHub Actions
+* More status badges
 
 ### Removed
 * Deleted outdated `unitTest.sh` testing file
