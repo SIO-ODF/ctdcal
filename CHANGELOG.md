@@ -4,6 +4,7 @@
 
 ### Changed
 * Fix sphinx/RTD version bug by importing ctdcal._version instead of importlib.metadata.version("ctdcal")
+* Fix GitHub Action `run-tests` bug which triggered twice when pushing tagged commits
 
 ## v0.1.2b (09/29/2021)
 
