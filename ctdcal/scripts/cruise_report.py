@@ -10,10 +10,25 @@ log = logging.getLogger(__name__)
 btl_file = "data/scratch_folder/report_data.csv"
 btl_df = pd.read_csv(btl_file)
 
+# TODO: these were in old plots module; worth adding?
+# (BTLCOND - C1) vs. BTLCOND
+# (BTLCOND - C2) vs. BTLCOND
+# (C1 - C2) vs. BTLCOND
+# (BTLCOND - C1_uncorrected) vs. STNNBR
+# (BTLCOND - C2_uncorrected) vs. STNNBR
+# (C1_uncorrected - C2_uncorrected) vs. STNNBR
+# T1 vs. (OXYGEN - CTDOXY)
+# (OXYGEN - CTDOXY) vs. STNNBR (c=T1)
+# deep(OXYGEN - CTDOXY) vs. STNNBR (c=T1)
+# OXYGEN vs. (OXYGEN - CTDOXY) (c=STNNBR)
+# OXYGEN vs. (OXYGEN - CTDOXY) (c=CTDPRS)
+
 
 def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
 
-    # temperature plots
+    #################################################################
+    ##### Here lies the temperature plots, long may they rest.  #####
+    #################################################################
     log.info("Generating temperature residual plots")
     ctd_plots.residual_vs_pressure(
         btl_df["CTDTMP1"],
@@ -91,7 +106,9 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         f_out=f"{outdir}t1-t2_vs_stn_deep{ext}",
     )
 
-    # conductivity plots
+    #################################################################
+    ##### Here lies the conductivity plots, long may they rest. #####
+    #################################################################
     log.info("Generating conductivity residual plots")
     ctd_plots.residual_vs_pressure(
         btl_df["CTDCOND1"],
@@ -217,7 +234,9 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         deep=True,
         f_out=f"{outdir}btlsal-sal_vs_stn_deep{ext}",
     )
-
+    #################################################################
+    ######## Here lies the oxygen plots, long may they rest. ########
+    #################################################################
     # SBE43 oxygen plots
     log.info("Generating oxygen (SBE43) residual plots")
     ctd_plots.residual_vs_pressure(
@@ -248,11 +267,6 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         ylabel="CTDOXY Residual (umol/kg)",
         f_out=f"{outdir}oxy-43_vs_stn_deep{ext}",
     )
-    # ctd_plots.btl_oxy_residuals_temperature_plot(btl_df)
-    # ctd_plots.btl_oxy_residuals_station_temperature_plot(btl_df)
-    # ctd_plots.btl_oxy_residuals_station_deep_temperature_plot(btl_df)
-    # ctd_plots.btl_oxy_residuals_pressure_concentration_plot(btl_df)
-    # ctd_plots.btl_oxy_residuals_station_concentration_plot(btl_df)
 
     # RINKO oxygen plots
     log.info("Generating oxygen (RINKO) residual plots")
@@ -290,7 +304,9 @@ def pressure_offset():
 
     data = pd.read_csv("data/logs/ondeck_pressure.csv")
     print(f"Average deck pressure:\n{data.describe().loc[['min', 'max', 'mean']]}\n")
-    print(f"Average offset:\n{(data['ondeck_end_p'] - data['ondeck_start_p']).describe()}\n")
+    print(
+        f"Average offset:\n{(data['ondeck_end_p'] - data['ondeck_start_p']).describe()}\n"
+    )
 
 
 def fit_coefficients():
