@@ -3,11 +3,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## v0.1.3b (unreleased)
 
+### Added
+* `isort` pre-commit hook
+
 ### Changed
 * Fix sphinx/RTD version bug by importing ctdcal._version instead of importlib.metadata.version("ctdcal")
 * Fix GitHub Action `run-tests` bug which triggered twice when pushing tagged commits
 
 ### Removed
+* `cmocean` is no longer a package dependency
 * Remove hardcoded cruise report plot code from `ctd_plots` module in favor of `ctdcal/scripts/cruise_report.py`
 
 ## v0.1.2b (2021-09-29)
