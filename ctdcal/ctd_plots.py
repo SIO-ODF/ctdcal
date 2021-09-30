@@ -1,11 +1,9 @@
 import logging
 from pathlib import Path
 
-import cmocean
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
-import pandas as pd
 
 log = logging.getLogger(__name__)
 
