@@ -62,7 +62,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
     ##### Here lies the conductivity plots, long may they rest. #####
     #################################################################
     log.info("Generating conductivity residual plots")
-    for param, ref in zip(["c1", "c2", "c1"], ["refC", "refC", "c2"]):
+    for param, ref in zip(["c1", "c2", "c2"], ["refC", "refC", "c1"]):
         ctd_plots.residual_vs_pressure(
             btl_df[cfg.column[param]],
             btl_df[cfg.column[ref]],
