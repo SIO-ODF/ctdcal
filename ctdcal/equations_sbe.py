@@ -12,6 +12,13 @@ import numpy as np
 from ctdcal.oxy_fitting import oxy_umolkg_to_ml
 
 
+def _check_coefs(coefs_in, expected):
+    """Compare function input coefs with expected"""
+    missing_coefs = sorted(set(expected) - set(coefs_in))
+    if missing_coefs != []:
+        raise KeyError(f"Coefficient dictionary missing keys: {missing_coefs}")
+
+
 def sbe3(freq, coefs):
     """
     SBE equation for converting SBE3 frequency to temperature.
@@ -29,6 +36,7 @@ def sbe3(freq, coefs):
     t_ITS90 : array-like
         Converted temperature (ITS-90)
     """
+    _check_coefs(coefs, ["G", "H", "I", "J", "F0"])
     freq = np.array(freq)
 
     if freq.dtype != float:  # can sometimes come in as object
@@ -74,6 +82,7 @@ def sbe4(freq, t, p, coefs):
     c_mS_cm : array-like
         Converted conductivity (mS/cm)
     """
+    _check_coefs(coefs, ["G", "H", "I", "J", "CPcor", "CTcor"])
     freq_kHz = freq * 1e-3  # equation expects kHz
     c_S_m = (
         coefs["G"]
@@ -106,6 +115,15 @@ def sbe9(freq, t_probe, coefs):
     p_dbar : array-like
         Converted pressure (dbar)
     """
+    _check_coefs(
+        coefs,
+        (
+            ["T1", "T2", "T3", "T4", "T5"]
+            + ["C1", "C2", "C3"]
+            + ["D1", "D2"]
+            + ["AD590M", "AD590B"]
+        ),
+    )
     freq = np.array(freq)
     t_probe = np.array(t_probe).astype(int)
     freq_MHz = freq * 1e-6  # equation expects MHz
@@ -151,6 +169,7 @@ def sbe_altimeter(volts, coefs):
     While the SBE documentation refers to a Teledyne Benthos or Valeport altimeter,
     the equation works for all altimeters typically found in the wild.
     """
+    _check_coefs(coefs, ["ScaleFactor", "Offset"])
     volts = np.array(volts)
     if volts.dtype != float:  # can sometimes come in as object
         volts = volts.astype(float)
@@ -190,6 +209,7 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
     oxy_ml_l : array-like
         Converted oxygen (mL/L)
     """
+    _check_coefs(coefs, ["Soc", "Voffset", "Tau20", "A", "B", "C", "E"])
     # TODO: is there any reason for this to output mL/L? if oxygen eq uses o2sol
     # in umol/kg, result is in umol/kg... which is what we use at the end anyway?
     t_Kelvin = t + 273.15
@@ -252,6 +272,7 @@ def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
 
     See Application Note 64-3 for more information.
     """
+    _check_coefs(coefs, ["H1", "H2", "H3", "offset"])
     # TODO: vectorize (if possible), will probably require matrix inversion
     dt = 1 / sample_freq
     D = 1 + coefs["H1"] * (np.exp(p / coefs["H2"]) - 1)
@@ -292,6 +313,7 @@ def wetlabs_eco_fl(volts, coefs):
     Chlorophyll units depend on scale factor (e.g. ug/L-volt, ug/L-counts, ppb/volts),
     see Application Note 62 for more information.
     """
+    # how to check coefs with optional inputs?
     if "DarkOutput" in coefs.keys():
         chl = coefs["ScaleFactor"] * (volts - coefs["DarkOutput"])
     elif "Vblank" in coefs.keys():  # from older calibration sheets
@@ -332,7 +354,7 @@ def wetlabs_cstar(volts, coefs):
 
     See Application Note 91 for more information.
     """
-
+    _check_coefs(coefs, ["M", "B", "PathLength"])
     xmiss = (coefs["M"] * volts) + coefs["B"]  # xmiss as a percentage
     c = -(1 / coefs["PathLength"]) * np.log(xmiss * 100)  # needs xmiss as a decimal
 
@@ -361,6 +383,7 @@ def seapoint_fluor(volts, coefs):
     -----
     According to .xmlcon, GainSetting "is an array index, not the actual gain setting."
     """
+    _check_coefs(coefs, ["GainSetting", "Offset"])
     # TODO: actual calibration/conversion/something?
     # TODO: move this to different module? edge case since it's the only Seapoint sensor
     volts = np.array(volts)
