@@ -19,7 +19,7 @@ def _check_coefs(coefs_in, expected):
         raise KeyError(f"Coefficient dictionary missing keys: {missing_coefs}")
 
 
-def sbe3(freq, coefs):
+def sbe3(freq, coefs, decimals=4):
     """
     SBE equation for converting SBE3 frequency to temperature.
     SensorID: 55
@@ -57,10 +57,10 @@ def sbe3(freq, coefs):
         )
         - 273.15
     )
-    return np.around(t_ITS90, 4)
+    return np.around(t_ITS90, decimals)
 
 
-def sbe4(freq, t, p, coefs):
+def sbe4(freq, t, p, coefs, decimals=4):
     """
     SBE equation for converting SBE4 frequency to conductivity. This conversion
     is valid for both SBE4C (profiling) and SBE4M (mooring).
@@ -92,10 +92,10 @@ def sbe4(freq, t, p, coefs):
     ) / (10 * (1 + coefs["CTcor"] * t + coefs["CPcor"] * p))
     c_mS_cm = c_S_m * 10  # S/m to mS/cm
 
-    return np.around(c_mS_cm, 5)
+    return np.around(c_mS_cm, decimals)
 
 
-def sbe9(freq, t_probe, coefs):
+def sbe9(freq, t_probe, coefs, decimals=4):
     """
     SBE/STS(?) equation for converting SBE9 frequency to pressure.
     SensorID: 45
@@ -141,10 +141,10 @@ def sbe9(freq, t_probe, coefs):
         * (1 - (coefs["D1"] + coefs["D2"] * t_probe) * w)
         - 14.7
     )
-    return np.around(p_dbar, 4)
+    return np.around(p_dbar, decimals)
 
 
-def sbe_altimeter(volts, coefs):
+def sbe_altimeter(volts, coefs, decimals=1):
     """
     SBE equation for converting altimeter voltages to meters. This conversion
     is valid for altimeters integrated with any Sea-Bird CTD (e.g. 9+, 19, 25).
@@ -176,12 +176,12 @@ def sbe_altimeter(volts, coefs):
         # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
 
     bottom_distance = np.around(
-        ((300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]), 1
+        ((300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]), decimals
     )
     return bottom_distance
 
 
-def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
+def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0, decimals=4):
     # NOTE: lat/lon = 0 is not "acceptable" for GSW, come up with something else?
     """
     SBE equation for converting SBE43 engineering units to oxygen (ml/l).
@@ -238,7 +238,7 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
         * o2sol_ml_l
         * np.exp(coefs["E"] * p / t_Kelvin)
     )
-    return np.around(oxy_ml_l, 4)
+    return np.around(oxy_ml_l, decimals)
 
 
 def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
@@ -361,7 +361,7 @@ def wetlabs_cstar(volts, coefs):
     return xmiss, c
 
 
-def seapoint_fluor(volts, coefs):
+def seapoint_fluor(volts, coefs, decimals=6):
     """
     Raw voltage supplied from fluorometer right now, after looking at xmlcon.
     The method will do nothing but spit out the exact values that came in.
@@ -387,6 +387,6 @@ def seapoint_fluor(volts, coefs):
     # TODO: actual calibration/conversion/something?
     # TODO: move this to different module? edge case since it's the only Seapoint sensor
     volts = np.array(volts)
-    fluoro = np.around(volts, 6)
+    fluoro = np.around(volts, decimals)
 
     return fluoro
