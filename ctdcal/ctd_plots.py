@@ -9,13 +9,13 @@ import pandas as pd
 log = logging.getLogger(__name__)
 
 
-def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title):
+def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, fontsize=12):
     plt.xlim(xlim)
     plt.xticks(rotation=45)
     plt.ylim(ylim)
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel(ylabel, fontsize=12)
-    plt.title(title, fontsize=12)
+    plt.xlabel(xlabel, fontsize=fontsize)
+    plt.ylabel(ylabel, fontsize=fontsize)
+    plt.title(title, fontsize=fontsize)
     plt.tight_layout()
 
 
@@ -63,20 +63,10 @@ def residual_vs_pressure(
         Formatted scatter plot (if f_out is not given)
     """
     diff = ref - param
-    deep_text = " (>2000 dbar) " if deep else " "
+    deep_text = " (>2000 dbar)" if deep else ""
     if deep:
         deep_rows = prs > 2000
         diff, prs, stn = diff[deep_rows], prs[deep_rows], stn[deep_rows]
-
-    # attempt to make title from pd.Series.name
-    try:
-        title = f"{ref.name}-{param.name}{deep_text}vs. {prs.name}"
-    except AttributeError:
-        title = None
-        log.warning(
-            "Failed to set title from variable names (requires dtype pd.Series)"
-        )
-        log.info('Set afterward using \'ax.set_title("title")`')
 
     # initialize figure
     plt.figure(figsize=(7, 6))
@@ -95,6 +85,14 @@ def residual_vs_pressure(
         sc = ax.scatter(diff, prs, marker="+")
 
     # formatting
+    try:
+        title = f"{ref.name}-{param.name}{deep_text} vs. {prs.name}"
+    except AttributeError:
+        title = None
+        log.warning(
+            "Failed to set title from variable names (requires dtype pd.Series)"
+        )
+        log.info('Set afterward using \'ax.set_title("title")`')
     _apply_default_fmt(xlim, ylim, xlabel, ylabel, title)
 
     # save to path or return axis
@@ -121,26 +119,59 @@ def residual_vs_station(
     deep=False,
     f_out=None,
 ):
+    """
+    Plot residuals (ref - param) as a function of station number.
 
-    title = f"{ref.name}-{param.name} vs. {stn.name}"
+    Parameters
+    ----------
+    param : pd.Series or array-like
+        Input variable
+    ref : pd.Series or array-like
+        Reference variable
+    prs : pd.Series or array-like
+        Pressure variable
+    stn : pd.Series or array-like, optional
+        Station variable
+    ylim : tuple, optional
+        Lower and upper y-limits
+    xlabel : str, optional
+        Label for the x-axis
+    ylabel : str, optional
+        Label for the y-axis
+    deep : bool, optional
+        Whether to plot only values >2000 dbar
+    f_out : path-like, optional
+        Path to save figure
+
+    Returns
+    -------
+    ax : matplotlib.axes, optional
+        Formatted scatter plot (if f_out is not given)
+    """
     diff = ref - param
+    deep_text = " (>2000 dbar)" if deep else ""
     if deep:
-        title = f"{ref.name}-{param.name} (>2000 dbar) vs. {stn.name}"
         deep_rows = prs > 2000
-        diff = diff[deep_rows]
-        prs = prs[deep_rows]
-        stn = stn[deep_rows]
+        diff, prs, stn = diff[deep_rows], prs[deep_rows], stn[deep_rows]
 
     plt.figure(figsize=(7, 6))
-    plt.scatter(stn, diff, c=prs, marker="+")
-    plt.xticks(rotation=45)
-    plt.ylim(ylim)
-    cbar = plt.colorbar(pad=0.1)
+    ax = plt.axes()
+    sc = ax.scatter(stn, diff, c=prs, marker="+")
+    cbar = plt.colorbar(sc, pad=0.1)
     cbar.set_label("Pressure (dbar)")
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel(ylabel, fontsize=12)
-    plt.title(title, fontsize=12)
-    plt.tight_layout()
+
+    # formatting
+    try:
+        title = f"{ref.name}-{param.name}{deep_text} vs. {stn.name}"
+    except AttributeError:
+        title = None
+        log.warning(
+            "Failed to set title from variable names (requires dtype pd.Series)"
+        )
+        log.info('Set afterward using \'ax.set_title("title")`')
+    _apply_default_fmt(None, ylim, xlabel, ylabel, title)
+
+    # save to path or return axis
     if f_out is not None:
         if not Path(f_out).parent.exists():
             log.info(
@@ -148,9 +179,9 @@ def residual_vs_station(
             )
             Path(f_out).parent.mkdir(parents=True)
         plt.savefig(f_out)
-    plt.close()
-
-    return True
+        plt.close()
+    else:
+        return ax
 
 
 def _intermediate_residual_plot(
@@ -204,3 +235,8 @@ def _intermediate_residual_plot(
     plt.close()
 
     return True
+
+
+# TODO: more plots! what does ODV have?
+# section plots (w/ PyDiva)
+# parameter-parameter plots
