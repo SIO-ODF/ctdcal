@@ -36,7 +36,7 @@ def residual_vs_pressure(
     param,
     ref,
     prs,
-    stn,
+    stn=None,
     xlim=(-0.02, 0.02),
     ylim=(6000, 0),
     xlabel="Residual",
@@ -92,8 +92,8 @@ def residual_vs_pressure(
     ax = plt.axes()
 
     # color scatter by stations if given
-    idx, uniques = pd.factorize(stn)  # find unique stations #s and index them
-    if len(uniques) >= 1:
+    if stn is not None:
+        idx, uniques = pd.factorize(stn)  # find unique stations #s and index them
         sc = ax.scatter(diff, prs, c=idx, marker="+")
         cbar = plt.colorbar(sc, ax=ax, pad=0.1)  # set cbar ticks to station names
         tick_inds = cbar.get_ticks().astype(int)
@@ -112,7 +112,7 @@ def residual_vs_pressure(
             log.warning(
                 "Failed to set title from variable names (requires dtype pd.Series)"
             )
-            log.info('Set afterward using \'ax.set_title("title")`')
+            log.info("Set afterward using 'ax.set_title(\"title\")'")
     _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid)
 
     # save to path or return axis
@@ -202,7 +202,7 @@ def _intermediate_residual_plot(
     Internal function to make figures at intermediate processing stages for debugging.
     """
     ax = residual_vs_pressure(
-        0, diff, prs, stn, xlim=xlim, xlabel=xlabel, auto_title=False, grid=True
+        0, diff, prs, stn=stn, xlim=xlim, xlabel=xlabel, auto_title=False, grid=True
     )
 
     if show_thresh:
