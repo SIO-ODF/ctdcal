@@ -5,11 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 * `isort` pre-commit hook
+* Set up [Codecov](https://app.codecov.io/gh/cchdo/ctdcal/)
 
 ### Changed
 * Fix sphinx/RTD version bug by importing ctdcal._version instead of importlib.metadata.version("ctdcal")
 * Fix GitHub Action `run-tests` bug which triggered twice when pushing tagged commits
 * `ctd_plots` functions now return axis handle if filename is not given
+* `_intermediate_residual_plot()` is now wrapped around `residual_vs_pressure()` instead of being a duplicate function
 
 ### Removed
 * `cmocean` is no longer a package dependency

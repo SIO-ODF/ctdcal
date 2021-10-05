@@ -9,13 +9,14 @@ import pandas as pd
 log = logging.getLogger(__name__)
 
 
-def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, fontsize=12):
+def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid, fontsize=12):
     plt.xlim(xlim)
     plt.xticks(rotation=45)
     plt.ylim(ylim)
     plt.xlabel(xlabel, fontsize=fontsize)
     plt.ylabel(ylabel, fontsize=fontsize)
     plt.title(title, fontsize=fontsize)
+    plt.grid(grid)
     plt.tight_layout()
 
 
@@ -28,6 +29,8 @@ def residual_vs_pressure(
     ylim=(6000, 0),
     xlabel="Residual",
     ylabel="Pressure (dbar)",
+    auto_title=True,
+    grid=False,
     deep=False,
     f_out=None,
 ):
@@ -52,6 +55,10 @@ def residual_vs_pressure(
         Label for the x-axis
     ylabel : str, optional
         Label for the y-axis
+    auto_title : bool, optional
+        Generate title from input attributes (iff dtype is pd.Series)
+    grid : bool, optional
+        Overlay grid on figure
     deep : bool, optional
         Whether to plot only values >2000 dbar
     f_out : path-like, optional
@@ -80,20 +87,21 @@ def residual_vs_pressure(
         tick_inds = cbar.get_ticks().astype(int)
         cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
         cbar.ax.set_yticklabels(uniques[tick_inds])
-        cbar.set_label("Station Number")
+        cbar.ax.set_title("Station")
     else:
         sc = ax.scatter(diff, prs, marker="+")
 
     # formatting
-    try:
-        title = f"{ref.name}-{param.name}{deep_text} vs. {prs.name}"
-    except AttributeError:
-        title = None
-        log.warning(
-            "Failed to set title from variable names (requires dtype pd.Series)"
-        )
-        log.info('Set afterward using \'ax.set_title("title")`')
-    _apply_default_fmt(xlim, ylim, xlabel, ylabel, title)
+    title = None
+    if auto_title:
+        try:
+            title = f"{ref.name}-{param.name}{deep_text} vs. {prs.name}"
+        except AttributeError:
+            log.warning(
+                "Failed to set title from variable names (requires dtype pd.Series)"
+            )
+            log.info('Set afterward using \'ax.set_title("title")`')
+    _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid)
 
     # save to path or return axis
     if f_out is not None:
@@ -116,6 +124,7 @@ def residual_vs_station(
     ylim=(-0.02, 0.02),
     xlabel="Station Number",
     ylabel="Residual",
+    grid=False,
     deep=False,
     f_out=None,
 ):
@@ -138,6 +147,8 @@ def residual_vs_station(
         Label for the x-axis
     ylabel : str, optional
         Label for the y-axis
+    grid : bool, optional
+        Overlay grid on figure
     deep : bool, optional
         Whether to plot only values >2000 dbar
     f_out : path-like, optional
@@ -169,7 +180,7 @@ def residual_vs_station(
             "Failed to set title from variable names (requires dtype pd.Series)"
         )
         log.info('Set afterward using \'ax.set_title("title")`')
-    _apply_default_fmt(None, ylim, xlabel, ylabel, title)
+    _apply_default_fmt(None, ylim, xlabel, ylabel, title, grid)
 
     # save to path or return axis
     if f_out is not None:
@@ -187,21 +198,20 @@ def residual_vs_station(
 def _intermediate_residual_plot(
     diff,
     prs,
-    ssscc,
+    stn,
     xlim=(-0.02, 0.02),
-    ylim=(6000, 0),
     xlabel="Residual",
-    ylabel="CTDPRS",
     show_thresh=False,
     f_out=None,
 ):
+    """
+    Internal function to make figures at intermediate processing stages for debugging.
+    """
+    ax = residual_vs_pressure(
+        0, diff, prs, stn, xlim=xlim, xlabel=xlabel, auto_title=False, grid=True
+    )
 
-    idx, uniques = ssscc.factorize()  # find unique SSSCC and index them
-
-    plt.figure(figsize=(6, 6))
-    plt.scatter(diff, prs, c=idx, marker="+")
     if show_thresh:
-        # TODO: thresh should probably be put in config/cast-by-cast config
         thresh = np.array([0.002, 0.005, 0.010, 0.020])
         p_range = np.array([6000, 2000, 1000, 500])
         thresh = np.append(thresh, thresh[-1])  # this should still work fine even when
@@ -209,22 +219,10 @@ def _intermediate_residual_plot(
         plt.step(thresh, p_range, ":k")
         plt.step(-thresh, p_range, ":k")
 
-    plt.xlim(xlim)
-    plt.xticks(rotation=45)
-    plt.ylim(ylim)
-    cbar = plt.colorbar(pad=0.1)  # set cbar ticks to SSSCC names
-    if not uniques.empty:
-        tick_inds = cbar.get_ticks().astype(int)
-        cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
-        cbar.ax.set_yticklabels(uniques[tick_inds])
-        mean = np.round(np.nanmean(diff), 4)
-        stdev = np.round(np.nanstd(diff), 4)
-        plt.title(f"Mean: {mean} / Stdev: {stdev}")
-    cbar.ax.set_title("SSSCC")
-    plt.grid()
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel(ylabel, fontsize=12)
-    plt.tight_layout()
+    mean = np.round(np.nanmean(diff), 4)
+    stdev = np.round(np.nanstd(diff), 4)
+    ax.set_title(f"Mean: {mean} / Stdev: {stdev}")
+
     if f_out is not None:
         if not Path(f_out).parent.exists():
             log.info(
@@ -232,9 +230,7 @@ def _intermediate_residual_plot(
             )
             Path(f_out).parent.mkdir(parents=True)
         plt.savefig(f_out)
-    plt.close()
-
-    return True
+        plt.close()
 
 
 # TODO: more plots! what does ODV have?
