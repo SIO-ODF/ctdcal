@@ -20,6 +20,18 @@ def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid, fontsize=12):
     plt.tight_layout()
 
 
+def _save_fig(ax, f_out):
+    if f_out is not None:
+        f_parent = Path(f_out).parent
+        if not f_parent.exists():
+            log.info(f"Parent folder '{f_parent.as_posix()}' doesn't exist... creating")
+            Path(f_out).parent.mkdir(parents=True)
+        plt.savefig(f_out)
+        plt.close()
+    else:
+        return ax
+
+
 def residual_vs_pressure(
     param,
     ref,
@@ -104,16 +116,7 @@ def residual_vs_pressure(
     _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid)
 
     # save to path or return axis
-    if f_out is not None:
-        if not Path(f_out).parent.exists():
-            log.info(
-                f"Path {Path(f_out).parent.as_posix()} does not exists... creating"
-            )
-            Path(f_out).parent.mkdir(parents=True)
-        plt.savefig(f_out)
-        plt.close()
-    else:
-        return ax
+    return _save_fig(ax, f_out)
 
 
 def residual_vs_station(
@@ -183,16 +186,7 @@ def residual_vs_station(
     _apply_default_fmt(None, ylim, xlabel, ylabel, title, grid)
 
     # save to path or return axis
-    if f_out is not None:
-        if not Path(f_out).parent.exists():
-            log.info(
-                f"Path {Path(f_out).parent.as_posix()} does not exists... creating"
-            )
-            Path(f_out).parent.mkdir(parents=True)
-        plt.savefig(f_out)
-        plt.close()
-    else:
-        return ax
+    return _save_fig(ax, f_out)
 
 
 def _intermediate_residual_plot(
@@ -223,14 +217,8 @@ def _intermediate_residual_plot(
     stdev = np.round(np.nanstd(diff), 4)
     ax.set_title(f"Mean: {mean} / Stdev: {stdev}")
 
-    if f_out is not None:
-        if not Path(f_out).parent.exists():
-            log.info(
-                f"Path {Path(f_out).parent.as_posix()} does not exists... creating"
-            )
-            Path(f_out).parent.mkdir(parents=True)
-        plt.savefig(f_out)
-        plt.close()
+    # save to path or return axis (primarily for testing)
+    return _save_fig(ax, f_out)
 
 
 # TODO: more plots! what does ODV have?

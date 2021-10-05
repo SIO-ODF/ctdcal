@@ -5,7 +5,7 @@ import pytest
 from ctdcal import ctd_plots
 
 
-def test_residual_vs_pressure():
+def test_residual_vs_pressure(tmp_path):
     param = pd.Series(data=[0, 1, 2], name="param")
     ref = pd.Series(data=[0, 1, 2], name="ref")
     prs = pd.Series(data=[0, 3000, 6000], name="prs")
@@ -59,8 +59,16 @@ def test_residual_vs_pressure():
     unlabeled = ctd_plots.residual_vs_pressure(x, x, x, x)
     assert unlabeled.get_title() == ""
 
+    # check figure saving
+    # TODO: pymark parameterize?
+    for ext in [".jpg", ".png", ".pdf"]:
+        with (tmp_path / "figures" / f"fig1{ext}") as f_out:
+            assert not f_out.exists()
+            ctd_plots.residual_vs_pressure(x, x, x, x, f_out=f_out)
+            assert f_out.exists()
 
-def test_residual_vs_station():
+
+def test_residual_vs_station(tmp_path):
     param = pd.Series(data=[0, 1, 2], name="param")
     ref = pd.Series(data=[0, 1, 2], name="ref")
     prs = pd.Series(data=[0, 3000, 6000], name="prs")
@@ -109,3 +117,23 @@ def test_residual_vs_station():
     x = np.array([0, 0, 0])
     unlabeled = ctd_plots.residual_vs_station(x, x, x, x)
     assert unlabeled.get_title() == ""
+
+    # check figure saving
+    # TODO: pymark parameterize?
+    for ext in [".jpg", ".png", ".pdf"]:
+        with (tmp_path / "figures" / f"fig2{ext}") as f_out:
+            assert not f_out.exists()
+            ctd_plots.residual_vs_station(x, x, x, x, f_out=f_out)
+            assert f_out.exists()
+
+
+def test_intermediate_residual_plot(tmp_path):
+
+    # check figure saving
+    # TODO: pymark parameterize?
+    x = np.array([0, 0, 0])
+    for ext in [".jpg", ".png", ".pdf"]:
+        with (tmp_path / "figures" / f"fig3{ext}") as f_out:
+            assert not f_out.exists()
+            ctd_plots._intermediate_residual_plot(x, x, x, f_out=f_out)
+            assert f_out.exists()
