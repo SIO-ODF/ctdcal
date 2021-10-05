@@ -2,6 +2,7 @@
 #
 # TODO: organize these by editable/fixed variables
 from importlib import resources
+
 import yaml
 
 with resources.open_text("ctdcal", "user_settings.yaml") as f:
@@ -60,7 +61,7 @@ column = {
     # "s2": "CTDSAL2",
     "rinko_oxy": "FREE1",  # CHECK THIS!
     "oxyvolts": "CTDOXYVOLTS",
-    "refT": "T90",
+    "refT": "REFTMP",
     "refC": "BTLCOND",
     "refS": "SALNTY",
     "refO": "OXYGEN",

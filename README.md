@@ -3,6 +3,8 @@
 [![Package Status](https://img.shields.io/pypi/status/ctdcal.svg)](https://pypi.org/project/ctdcal/)
 [![License](https://img.shields.io/pypi/l/ctdcal.svg)](https://github.com/cchdo/ctdcal/blob/master/LICENSE.md)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
+[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
+
 
 ![GH Testing](https://github.com/cchdo/ctdcal/actions/workflows/run-tests.yml/badge.svg)
 [![Documentation Status](https://readthedocs.org/projects/ctdcal/badge/?version=latest)](https://ctdcal.readthedocs.io/en/latest/?badge=latest)

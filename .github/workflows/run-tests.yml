@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - '**'
-  pull_request:
-    branches:
-      - 'master'
 
 jobs:
 
@@ -35,4 +32,9 @@ jobs:
         python3 -m pip install .[dev]
     - name: Run pytest
       run: |
-        pytest -v
+        pytest -v --cov-report xml --cov=ctdcal
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v2
+      with:
+        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}

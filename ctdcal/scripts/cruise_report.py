@@ -1,4 +1,5 @@
 import logging
+
 import numpy as np
 import pandas as pd
 
@@ -10,164 +11,84 @@ log = logging.getLogger(__name__)
 btl_file = "data/scratch_folder/report_data.csv"
 btl_df = pd.read_csv(btl_file)
 
+# TODO: these were in old plots module; worth adding?
+# (BTLCOND - C1) vs. BTLCOND
+# (BTLCOND - C2) vs. BTLCOND
+# (C1 - C2) vs. BTLCOND
+# (BTLCOND - C1_uncorrected) vs. STNNBR
+# (BTLCOND - C2_uncorrected) vs. STNNBR
+# (C1_uncorrected - C2_uncorrected) vs. STNNBR
+# T1 vs. (OXYGEN - CTDOXY)
+# (OXYGEN - CTDOXY) vs. STNNBR (c=T1)
+# deep(OXYGEN - CTDOXY) vs. STNNBR (c=T1)
+# OXYGEN vs. (OXYGEN - CTDOXY) (c=STNNBR)
+# OXYGEN vs. (OXYGEN - CTDOXY) (c=CTDPRS)
+
 
 def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
 
-    # temperature plots
+    #################################################################
+    ##### Here lies the temperature plots, long may they rest.  #####
+    #################################################################
     log.info("Generating temperature residual plots")
-    ctd_plots.residual_vs_pressure(
-        btl_df["CTDTMP1"],
-        btl_df["REFTMP"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        xlabel="CTDTMP1 Residual (T90 C)",
-        f_out=f"{outdir}reft-t1_vs_p{ext}",
-    )
-    ctd_plots.residual_vs_pressure(
-        btl_df["CTDTMP2"],
-        btl_df["REFTMP"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        xlabel="CTDTMP2 Residual (T90 C)",
-        f_out=f"{outdir}reft-t2_vs_p{ext}",
-    )
-    ctd_plots.residual_vs_pressure(
-        btl_df["CTDTMP2"],
-        btl_df["CTDTMP1"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        xlabel="CTDTMP1-CTDTMP2 Residual (T90 C)",
-        f_out=f"{outdir}t1-t2_vs_p{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDTMP1"],
-        btl_df["REFTMP"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDTMP1 Residual (T90 C)",
-        f_out=f"{outdir}reft-t1_vs_stn{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDTMP2"],
-        btl_df["REFTMP"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDTMP2 Residual (T90 C)",
-        f_out=f"{outdir}reft-t2_vs_stn{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDTMP2"],
-        btl_df["CTDTMP1"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDTMP1-CTDTMP2 Residual (T90 C)",
-        f_out=f"{outdir}t1-t2_vs_stn{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDTMP1"],
-        btl_df["REFTMP"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDTMP1 Residual (T90 C)",
-        deep=True,
-        f_out=f"{outdir}reft-t1_vs_stn_deep{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDTMP2"],
-        btl_df["REFTMP"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDTMP2 Residual (T90 C)",
-        deep=True,
-        f_out=f"{outdir}reft-t2_vs_stn_deep{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDTMP1"],
-        btl_df["CTDTMP2"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDTMP1-CTDTMP2 Residual (T90 C)",
-        deep=True,
-        f_out=f"{outdir}t1-t2_vs_stn_deep{ext}",
-    )
+    for param, ref in zip(["t1", "t2", "t2"], ["refT", "refT", "t1"]):
+        ctd_plots.residual_vs_pressure(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            stn=btl_df["STNNBR"],
+            xlabel=f"{cfg.column[param]} Residual (T90 C)",
+            f_out=f"{outdir}{ref}-{param}_vs_p{ext}",
+        )
+        ctd_plots.residual_vs_station(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            btl_df["STNNBR"],
+            ylabel=f"{cfg.column[param]} Residual (T90 C)",
+            f_out=f"{outdir}{ref}-{param}_vs_stn{ext}",
+        )
+        ctd_plots.residual_vs_station(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            btl_df["STNNBR"],
+            ylabel=f"{cfg.column[param]} Residual (T90 C)",
+            deep=True,
+            f_out=f"{outdir}{ref}-{param}_vs_stn_deep{ext}",
+        )
 
-    # conductivity plots
+    #################################################################
+    ##### Here lies the conductivity plots, long may they rest. #####
+    #################################################################
     log.info("Generating conductivity residual plots")
-    ctd_plots.residual_vs_pressure(
-        btl_df["CTDCOND1"],
-        btl_df["BTLCOND"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        xlabel="CTDCOND1 Residual (mS/cm)",
-        f_out=f"{outdir}refc-c1_vs_p{ext}",
-    )
-    ctd_plots.residual_vs_pressure(
-        btl_df["CTDCOND2"],
-        btl_df["BTLCOND"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        xlabel="CTDCOND2 Residual (mS/cm)",
-        f_out=f"{outdir}refc-c2_vs_p{ext}",
-    )
-    ctd_plots.residual_vs_pressure(
-        btl_df["CTDCOND1"],
-        btl_df["CTDCOND2"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        xlabel="CTDCOND1-CTDCOND2 Residual (mS/cm)",
-        f_out=f"{outdir}c1-c2_vs_p{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDCOND1"],
-        btl_df["BTLCOND"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDCOND1 Residual (mS/cm)",
-        f_out=f"{outdir}refc-c1_vs_stn{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDCOND2"],
-        btl_df["BTLCOND"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDCOND2 Residual (mS/cm)",
-        f_out=f"{outdir}refc-c2_vs_stn{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDCOND1"],
-        btl_df["CTDCOND2"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDCOND1-CTDCOND2 Residual (mS/cm)",
-        f_out=f"{outdir}c1-c2_vs_stn{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDCOND1"],
-        btl_df["BTLCOND"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDCOND1 Residual (mS/cm)",
-        deep=True,
-        f_out=f"{outdir}refc-c1_vs_stn_deep{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDCOND2"],
-        btl_df["BTLCOND"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDCOND2 Residual (mS/cm)",
-        deep=True,
-        f_out=f"{outdir}refc-c2_vs_stn_deep{ext}",
-    )
-    ctd_plots.residual_vs_station(
-        btl_df["CTDCOND1"],
-        btl_df["CTDCOND2"],
-        btl_df["CTDPRS"],
-        btl_df["STNNBR"],
-        ylabel="CTDCOND1-CTDCOND2 Residual (mS/cm)",
-        deep=True,
-        f_out=f"{outdir}c1-c2_vs_stn_deep{ext}",
-    )
+    for param, ref in zip(["c1", "c2", "c2"], ["refC", "refC", "c1"]):
+        ctd_plots.residual_vs_pressure(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            stn=btl_df["STNNBR"],
+            xlabel=f"{cfg.column[param]} Residual (mS/cm)",
+            f_out=f"{outdir}{ref}-{param}_vs_p{ext}",
+        )
+        ctd_plots.residual_vs_station(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            btl_df["STNNBR"],
+            ylabel=f"{cfg.column[param]} Residual (mS/cm)",
+            f_out=f"{outdir}{ref}-{param}_vs_stn{ext}",
+        )
+        ctd_plots.residual_vs_station(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            btl_df["STNNBR"],
+            ylabel=f"{cfg.column[param]} Residual (mS/cm)",
+            deep=True,
+            f_out=f"{outdir}{ref}-{param}_vs_stn_deep{ext}",
+        )
+
     # coherence plot doesn't have its own function...
     import matplotlib.pyplot as plt
 
@@ -196,7 +117,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         btl_df["CTDSAL"],
         btl_df["SALNTY"],
         btl_df["CTDPRS"],
-        btl_df["STNNBR"],
+        stn=btl_df["STNNBR"],
         xlabel="CTDSAL Residual (PSU)",
         f_out=f"{outdir}btlsal-sal_vs_p{ext}",
     )
@@ -217,14 +138,16 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         deep=True,
         f_out=f"{outdir}btlsal-sal_vs_stn_deep{ext}",
     )
-
+    #################################################################
+    ######## Here lies the oxygen plots, long may they rest. ########
+    #################################################################
     # SBE43 oxygen plots
     log.info("Generating oxygen (SBE43) residual plots")
     ctd_plots.residual_vs_pressure(
         btl_df["CTDOXY"],
         btl_df["OXYGEN"],
         btl_df["CTDPRS"],
-        btl_df["STNNBR"],
+        stn=btl_df["STNNBR"],
         xlim=(-10, 10),
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f"{outdir}oxy-43_vs_p{ext}",
@@ -248,11 +171,6 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         ylabel="CTDOXY Residual (umol/kg)",
         f_out=f"{outdir}oxy-43_vs_stn_deep{ext}",
     )
-    # ctd_plots.btl_oxy_residuals_temperature_plot(btl_df)
-    # ctd_plots.btl_oxy_residuals_station_temperature_plot(btl_df)
-    # ctd_plots.btl_oxy_residuals_station_deep_temperature_plot(btl_df)
-    # ctd_plots.btl_oxy_residuals_pressure_concentration_plot(btl_df)
-    # ctd_plots.btl_oxy_residuals_station_concentration_plot(btl_df)
 
     # RINKO oxygen plots
     log.info("Generating oxygen (RINKO) residual plots")
@@ -260,7 +178,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         btl_df["CTDRINKO"],
         btl_df["OXYGEN"],
         btl_df["CTDPRS"],
-        btl_df["STNNBR"],
+        stn=btl_df["STNNBR"],
         xlim=(-10, 10),
         xlabel="CTDRINKO Residual (umol/kg)",
         f_out=f"{outdir}oxy-rinko_vs_p{ext}",
@@ -290,7 +208,9 @@ def pressure_offset():
 
     data = pd.read_csv("data/logs/ondeck_pressure.csv")
     print(f"Average deck pressure:\n{data.describe().loc[['min', 'max', 'mean']]}\n")
-    print(f"Average offset:\n{(data['ondeck_end_p'] - data['ondeck_start_p']).describe()}\n")
+    print(
+        f"Average offset:\n{(data['ondeck_end_p'] - data['ondeck_start_p']).describe()}\n"
+    )
 
 
 def fit_coefficients():
