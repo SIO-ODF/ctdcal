@@ -34,7 +34,9 @@ jobs:
       run: |
         pytest -v --cov-report xml --cov=ctdcal
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v1
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.9'
       with:
         fail_ci_if_error: true
-        token: ${{ secrets.CODECOV_TOKEN }}
+        flags: pytest
+        files: ./coverage.xml
