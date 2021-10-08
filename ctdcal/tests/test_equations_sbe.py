@@ -22,10 +22,10 @@ def test_sbe3(caplog):
     assert cnv.dtype == float
 
     # check there are no warnings if freq is float with no zeroes
-    no_err = eqs.sbe3(np.ones(len(freq)), make_coefs(coefs, value=1))
+    no_warn = eqs.sbe3(np.ones(len(freq)), make_coefs(coefs, value=1))
     assert len(caplog.records) == 2
-    assert all(no_err == -272.15)
-    assert no_err.dtype == float
+    assert all(no_warn == -272.15)
+    assert no_warn.dtype == float
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="F0"):
@@ -47,10 +47,10 @@ def test_sbe4(caplog):
     assert cnv.dtype == float
 
     # check there are no warnings if freq is float with no zeroes
-    no_err = eqs.sbe4(np.ones(len(freq)), t, p, make_coefs(coefs, value=1))
+    no_warn = eqs.sbe4(np.ones(len(freq)), t, p, make_coefs(coefs, value=1))
     assert len(caplog.records) == 2
-    assert all(no_err == 1)
-    assert no_err.dtype == float
+    assert all(no_warn == 1)
+    assert no_warn.dtype == float
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="CTcor"):
@@ -76,19 +76,33 @@ def test_sbe9(caplog):
     assert cnv.dtype == float
 
     # check there are no warnings if freq is float with no zeroes
-    no_err = eqs.sbe9(np.ones(len(freq)), t, make_coefs(coefs))
+    no_warn = eqs.sbe9(np.ones(len(freq)), t, make_coefs(coefs))
     assert len(caplog.records) == 2
-    assert all(no_err == -10.1353)
-    assert no_err.dtype == float
+    assert all(no_warn == -10.1353)
+    assert no_warn.dtype == float
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="AD590B"):
         eqs.sbe9(freq, t, make_coefs(coefs[:-1]))
 
 
-def test_sbe_altimeter():
+def test_sbe_altimeter(caplog):
     volts = 99 * [0] + [1]
     coefs = ["ScaleFactor", "Offset"]
+
+    # check values are converted correctly
+    cnv = eqs.sbe_altimeter(volts, make_coefs(coefs, value=1))  # avoid divide by zero
+    assert "int" in caplog.records[0].message
+    assert "sbe_altimeter" in caplog.records[0].message
+    assert all(cnv[:-1] == 1)
+    assert cnv[-1] == 301
+    assert cnv.dtype == float
+
+    # check there are no warnings if volts are float with no zeroes
+    no_warn = eqs.sbe_altimeter(np.ones(len(volts)), make_coefs(coefs, value=1))
+    assert len(caplog.records) == 1
+    assert all(no_warn == 301)
+    assert no_warn.dtype == float
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="Offset"):
@@ -117,13 +131,54 @@ def test_sbe43_hysteresis_voltage():
         eqs.sbe43_hysteresis_voltage(volts, p, make_coefs(coefs[:-1]))
 
 
-# def test_wetlabs_eco_fl():
-#     eqs.wetlabs_eco_fl()
+def test_wetlabs_eco_fl(caplog):
+    volts = 99 * [0] + [1]
+    coefs = ["ScaleFactor", "DarkOutput"]
+
+    # check values are converted correctly
+    cnv = eqs.wetlabs_eco_fl(volts, make_coefs(coefs, value=1))
+    assert "int" in caplog.records[0].message
+    assert "wetlabs_eco_fl" in caplog.records[0].message
+    assert all(cnv[:-1] == -1)
+    assert cnv[-1] == 0
+    assert cnv.dtype == float
+
+    # check for same result with "Vblank"
+    coefs = ["ScaleFactor", "Vblank"]
+    cnv_Vblank = eqs.wetlabs_eco_fl(volts, make_coefs(coefs, value=1))
+    assert all(cnv == cnv_Vblank)
+
+    # check there are no warnings if volts are float with no zeroes
+    no_warn = eqs.wetlabs_eco_fl(np.ones(len(volts)), make_coefs(coefs, value=1))
+    assert len(caplog.records) == 2
+    assert all(no_warn == 0)
+    assert no_warn.dtype == float
+
+    # return volts if "DarkOutput" or "Vblank" not in coefs
+    no_cnv = eqs.wetlabs_eco_fl(np.ones(len(volts)), make_coefs(["ScaleFactor"]))
+    assert "returning voltage" in caplog.records[2].message
+    assert all(no_cnv == np.ones(len(volts)))
 
 
-def test_wetlabs_cstar():
+def test_wetlabs_cstar(caplog):
     volts = 99 * [0] + [1]
     coefs = ["M", "B", "PathLength"]
+
+    # check values are converted correctly
+    cnv = eqs.wetlabs_cstar(volts, make_coefs(coefs, value=1))  # avoid divide by zero
+    xmiss, c = cnv
+    assert "int" in caplog.records[0].message
+    assert "wetlabs_cstar" in caplog.records[0].message
+    assert all(xmiss[:-1] == 1)
+    assert xmiss[-1] == 2
+    assert all(c[:-1] == -4.6052)
+    assert c[-1] == -5.2983
+
+    # check there are no warnings if volts are float with no zeroes
+    no_warn = eqs.wetlabs_cstar(np.ones(len(volts)), make_coefs(coefs, value=1))
+    assert len(caplog.records) == 1
+    assert all(no_warn[0] == 2)
+    assert all(no_warn[1] == -5.2983)
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="PathLength"):

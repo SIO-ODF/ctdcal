@@ -29,7 +29,7 @@ def _check_freq(freq):
     freq = np.array(freq)
     sensor = inspect.stack()[1].function  # name of function calling _check_freq
 
-    if freq.dtype != float:
+    if freq.dtype != float:  # can sometimes come in as object
         log.warning(f"Attempting to convert {freq.dtype} to float for {sensor}")
         freq = freq.astype(float)
 
@@ -38,6 +38,21 @@ def _check_freq(freq):
         freq[freq == 0] = np.nan
 
     return freq
+
+
+def _check_volts(volts, v_min=0, v_max=5):
+    """Convert to np.array, NaN out values outside of 0-5V, convert to float if needed"""
+    volts = np.array(volts)
+    sensor = inspect.stack()[1].function  # name of function calling _check_volts
+
+    if volts.dtype != float:  # can sometimes come in as object
+        log.warning(f"Attempting to convert {volts.dtype} to float for {sensor}")
+        volts = volts.astype(float)
+
+    if any(volts < v_min) or any(volts > v_max):
+        breakpoint()
+
+    return volts
 
 
 def sbe3(freq, coefs, decimals=4):
@@ -184,15 +199,11 @@ def sbe_altimeter(volts, coefs, decimals=1):
     the equation works for all altimeters typically found in the wild.
     """
     _check_coefs(coefs, ["ScaleFactor", "Offset"])
-    volts = np.array(volts)
-    if volts.dtype != float:  # can sometimes come in as object
-        volts = volts.astype(float)
-        # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
+    volts = _check_volts(volts)
 
-    bottom_distance = np.around(
-        ((300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]), decimals
-    )
-    return bottom_distance
+    bottom_distance = (300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]
+
+    return np.around(bottom_distance, decimals)
 
 
 def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0, decimals=4):
@@ -305,7 +316,7 @@ def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
     return volts_corrected
 
 
-def wetlabs_eco_fl(volts, coefs):
+def wetlabs_eco_fl(volts, coefs, decimals=4):
     """
     SBE equation for converting ECO-FL fluorometer voltage to concentration.
     SensorID: 20
@@ -327,18 +338,22 @@ def wetlabs_eco_fl(volts, coefs):
     Chlorophyll units depend on scale factor (e.g. ug/L-volt, ug/L-counts, ppb/volts),
     see Application Note 62 for more information.
     """
-    # how to check coefs with optional inputs?
+    volts = _check_volts(volts)
+
     if "DarkOutput" in coefs.keys():
         chl = coefs["ScaleFactor"] * (volts - coefs["DarkOutput"])
     elif "Vblank" in coefs.keys():  # from older calibration sheets
         chl = coefs["ScaleFactor"] * (volts - coefs["Vblank"])
     else:
-        print("No dark cast info in calibration coefficients, returning raw voltage.")
+        log.warning(
+            "No dark cast coefficient ('DarkOutput' or 'Vblank'), returning voltage."
+        )
         chl = volts
-    return chl
+
+    return np.around(chl, decimals)
 
 
-def wetlabs_cstar(volts, coefs):
+def wetlabs_cstar(volts, coefs, decimals=4):
     """
     SBE equation for converting C-Star transmissometer voltage to light transmission.
     SensorID: 71
@@ -369,10 +384,11 @@ def wetlabs_cstar(volts, coefs):
     See Application Note 91 for more information.
     """
     _check_coefs(coefs, ["M", "B", "PathLength"])
+    volts = _check_volts(volts)
     xmiss = (coefs["M"] * volts) + coefs["B"]  # xmiss as a percentage
     c = -(1 / coefs["PathLength"]) * np.log(xmiss * 100)  # needs xmiss as a decimal
 
-    return xmiss, c
+    return np.around(xmiss, decimals), np.around(c, decimals)
 
 
 def seapoint_fluor(volts, coefs, decimals=6):
