@@ -139,10 +139,9 @@ def sbe9(freq, t_probe, coefs, decimals=4):
             + ["AD590M", "AD590B"]
         ),
     )
-    freq = np.array(freq)
-    t_probe = np.array(t_probe).astype(int)
-    freq_MHz = freq * 1e-6  # equation expects MHz
-    t_probe = (coefs["AD590M"] * t_probe) + coefs["AD590B"]
+    freq_MHz = _check_freq(freq) * 1e-6  # equation expects MHz
+    t_probe = (coefs["AD590M"] * np.array(t_probe).astype(int)) + coefs["AD590B"]
+
     T0 = (
         coefs["T1"]
         + coefs["T2"] * t_probe
