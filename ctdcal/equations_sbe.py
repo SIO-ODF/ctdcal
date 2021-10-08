@@ -6,10 +6,15 @@ given sensor numbers are determined empirically from .XMLCON files in 2016-2017 
 not via an official document, and may change according to SBE wishes.
 """
 
+import inspect
+import logging
+
 import gsw
 import numpy as np
 
 from ctdcal.oxy_fitting import oxy_umolkg_to_ml
+
+log = logging.getLogger(__name__)
 
 
 def _check_coefs(coefs_in, expected):
@@ -17,6 +22,22 @@ def _check_coefs(coefs_in, expected):
     missing_coefs = sorted(set(expected) - set(coefs_in))
     if missing_coefs != []:
         raise KeyError(f"Coefficient dictionary missing keys: {missing_coefs}")
+
+
+def _check_freq(freq):
+    """Convert to np.array, NaN out zeroes, convert to float if needed"""
+    freq = np.array(freq)
+    sensor = inspect.stack()[1].function  # name of function calling _check_freq
+
+    if freq.dtype != float:
+        log.warning(f"Attempting to convert {freq.dtype} to float for {sensor}")
+        freq = freq.astype(float)
+
+    if 0 in freq:
+        log.warning(f"Found 0 in {sensor} frequency, replacing with NaN")
+        freq[freq == 0] = np.nan
+
+    return freq
 
 
 def sbe3(freq, coefs, decimals=4):
@@ -37,15 +58,7 @@ def sbe3(freq, coefs, decimals=4):
         Converted temperature (ITS-90)
     """
     _check_coefs(coefs, ["G", "H", "I", "J", "F0"])
-    freq = np.array(freq)
-
-    if freq.dtype != float:  # can sometimes come in as object
-        freq = freq.astype(float)
-        # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
-
-    if 0 in freq:  # TODO: is this actually needed? what about other conversion funcs?
-        freq[freq == 0] = np.nan  # nan out zero frequencies
-        # TODO: (logger) e.g. "warning: converting zero frequency found in {} to nan"
+    freq = _check_freq(freq)
 
     t_ITS90 = (
         1
@@ -83,7 +96,9 @@ def sbe4(freq, t, p, coefs, decimals=4):
         Converted conductivity (mS/cm)
     """
     _check_coefs(coefs, ["G", "H", "I", "J", "CPcor", "CTcor"])
-    freq_kHz = freq * 1e-3  # equation expects kHz
+    freq_kHz = _check_freq(freq) * 1e-3  # equation expects kHz
+    t, p = np.array(t), np.array(p)
+
     c_S_m = (
         coefs["G"]
         + coefs["H"] * np.power(freq_kHz, 2)

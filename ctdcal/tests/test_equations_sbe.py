@@ -9,27 +9,37 @@ def make_coefs(*args, value=0):
     return {x: value for x in args[0]}
 
 
-def test_sbe3():
+def test_sbe3(caplog):
     freq = 99 * [0] + [1]
     coefs = ["G", "H", "I", "J", "F0"]
 
-    cnv = eqs.sbe3(freq, make_coefs(coefs, value=1))
-
     # check values are converted correctly
+    cnv = eqs.sbe3(freq, make_coefs(coefs, value=1))
+    breakpoint()
+    assert "int" in caplog.records[0].message  # check logging output
+    assert "sbe3" in caplog.records[1].message  # check logging output
     assert all(np.isnan(cnv[:-1]))
     assert cnv[-1] == -272.15  # t_ITS90 = (1 / 1) - 273.15
-    assert cnv.dtype == np.float64
+    assert cnv.dtype == float
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="F0"):
         eqs.sbe3(freq, make_coefs(coefs[:-1]))
 
 
-def test_sbe4():
+def test_sbe4(caplog):
     freq = 99 * [0] + [1]
     t = len(freq) * [0]
     p = len(freq) * [0]
     coefs = ["G", "H", "I", "J", "CPcor", "CTcor"]
+
+    # check values are converted correctly
+    cnv = eqs.sbe4(freq, t, p, make_coefs(coefs, value=1))
+    assert "int" in caplog.records[0].message  # check logging output
+    assert "sbe4" in caplog.records[1].message  # check logging output
+    assert all(np.isnan(cnv[:-1]))
+    assert cnv[-1] == 1
+    assert cnv.dtype == float
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="CTcor"):

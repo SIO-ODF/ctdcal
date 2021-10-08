@@ -8,6 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 * Set up [Codecov](https://app.codecov.io/gh/cchdo/ctdcal/)
 
 ### Changed
+* Renamed `master` branch to `main`
 * Fix sphinx/RTD version bug by importing ctdcal._version instead of importlib.metadata.version("ctdcal")
 * Fix GitHub Action `run-tests` bug which triggered twice when pushing tagged commits
 * `ctd_plots` functions now return axis handle if filename is not given
