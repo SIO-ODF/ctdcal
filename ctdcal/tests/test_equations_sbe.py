@@ -109,22 +109,52 @@ def test_sbe_altimeter(caplog):
         eqs.sbe_altimeter(volts, make_coefs(coefs[:-1]))
 
 
-def test_sbe43():
-    freq = 99 * [0] + [1]
-    t = len(freq) * [0]
-    p = len(freq) * [0]
-    c = len(freq) * [0]
-    coefs = ["Soc", "Voffset", "Tau20", "A", "B", "C", "E"]
+def test_sbe43(caplog):
+    volts = 99 * [0] + [1]
+    p = len(volts) * [0]
+    t = len(volts) * [0]
+    c = len(volts) * [0]
+    coefs = ["Soc", "offset", "Tau20", "A", "B", "C", "E"]
+
+    # check values are converted correctly
+    cnv = eqs.sbe43(volts, p, t, c, make_coefs(coefs, value=1))
+    assert "int" in caplog.records[0].message
+    assert "sbe43" in caplog.records[0].message
+    assert all(cnv[:-1] == 10.2314)
+    assert cnv[-1] == 20.4628
+    assert cnv.dtype == float
+
+    # check there are no warnings if volts are float with no zeroes
+    no_warn = eqs.sbe43(np.ones(len(volts)), p, t, c, make_coefs(coefs, value=1))
+    assert len(caplog.records) == 1
+    assert all(no_warn == 20.4628)
+    assert no_warn.dtype == float
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="E"):
-        eqs.sbe43(freq, p, t, c, make_coefs(coefs[:-1]))
+        eqs.sbe43(volts, p, t, c, make_coefs(coefs[:-1]))
 
 
-def test_sbe43_hysteresis_voltage():
+def test_sbe43_hysteresis_voltage(caplog):
     volts = 99 * [0] + [1]
     p = len(volts) * [0]
     coefs = ["H1", "H2", "H3", "offset"]
+
+    # check values are converted correctly
+    cnv = eqs.sbe43_hysteresis_voltage(volts, p, make_coefs(coefs, value=1))
+    assert "int" in caplog.records[0].message
+    assert "sbe43_hysteresis_voltage" in caplog.records[0].message
+    assert all(cnv[:-1] == 0)
+    assert cnv[-1] == 1
+    assert cnv.dtype == float
+
+    # check there are no warnings if volts are float with no zeroes
+    no_warn = eqs.sbe43_hysteresis_voltage(
+        np.ones(len(volts)), p, make_coefs(coefs, value=1)
+    )
+    assert len(caplog.records) == 1
+    assert all(no_warn == 1)
+    assert no_warn.dtype == float
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="offset"):

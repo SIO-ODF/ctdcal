@@ -112,14 +112,13 @@ def sbe4(freq, t, p, coefs, decimals=4):
     """
     _check_coefs(coefs, ["G", "H", "I", "J", "CPcor", "CTcor"])
     freq_kHz = _check_freq(freq) * 1e-3  # equation expects kHz
-    t, p = np.array(t), np.array(p)
 
     c_S_m = (
         coefs["G"]
         + coefs["H"] * np.power(freq_kHz, 2)
         + coefs["I"] * np.power(freq_kHz, 3)
         + coefs["J"] * np.power(freq_kHz, 4)
-    ) / (10 * (1 + coefs["CTcor"] * t + coefs["CPcor"] * p))
+    ) / (10 * (1 + coefs["CTcor"] * np.array(t) + coefs["CPcor"] * np.array(p)))
     c_mS_cm = c_S_m * 10  # S/m to mS/cm
 
     return np.around(c_mS_cm, decimals)
@@ -223,7 +222,7 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0, decimals=4):
     c : array-like
         Converted conductivity (mS/cm)
     coefs : dict
-        Dictionary of calibration coefficients (Soc, Voffset, Tau20, A, B, C, E)
+        Dictionary of calibration coefficients (Soc, offset, Tau20, A, B, C, E)
     lat : array-like, optional
         Latitude (decimal degrees north)
     lon : array-like, optional
@@ -234,10 +233,12 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0, decimals=4):
     oxy_ml_l : array-like
         Converted oxygen (mL/L)
     """
-    _check_coefs(coefs, ["Soc", "Voffset", "Tau20", "A", "B", "C", "E"])
     # TODO: is there any reason for this to output mL/L? if oxygen eq uses o2sol
     # in umol/kg, result is in umol/kg... which is what we use at the end anyway?
-    t_Kelvin = t + 273.15
+
+    _check_coefs(coefs, ["Soc", "offset", "Tau20", "A", "B", "C", "E"])
+    volts = _check_volts(volts)
+    t_Kelvin = np.array(t) + 273.15
 
     SP = gsw.SP_from_C(c, t, p)
     SA = gsw.SA_from_SP(SP, p, lon, lat)
@@ -256,12 +257,12 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0, decimals=4):
         * (volts + coefs["offset"])
         * (
             1.0
-            + coefs["A"] * t
+            + coefs["A"] * np.array(t)
             + coefs["B"] * np.power(t, 2)
             + coefs["C"] * np.power(t, 3)
         )
         * o2sol_ml_l
-        * np.exp(coefs["E"] * p / t_Kelvin)
+        * np.exp(coefs["E"] * np.array(p) / t_Kelvin)
     )
     return np.around(oxy_ml_l, decimals)
 
@@ -297,10 +298,13 @@ def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
 
     See Application Note 64-3 for more information.
     """
-    _check_coefs(coefs, ["H1", "H2", "H3", "offset"])
     # TODO: vectorize (if possible), will probably require matrix inversion
+
+    _check_coefs(coefs, ["H1", "H2", "H3", "offset"])
+    volts = _check_volts(volts)
+
     dt = 1 / sample_freq
-    D = 1 + coefs["H1"] * (np.exp(p / coefs["H2"]) - 1)
+    D = 1 + coefs["H1"] * (np.exp(np.array(p) / coefs["H2"]) - 1)
     C = np.exp(-1 * dt / coefs["H3"])
 
     oxy_volts = volts + coefs["offset"]
