@@ -1,0 +1,76 @@
+# Lookup table for Sea-Bird sensor data
+0:
+  long_name: Altitude
+  short_name: ALT
+  type: float64
+  units: M
+3:
+  long_name: SBE 4 Conductivity
+  short_name: CTDCOND
+  type: float64
+  units: MSPCM
+11:
+  long_name: Seapoint Fluorometer
+  short_name: FLUOR
+  type: float64
+  units: 0-5VDC
+20:
+  long_name: WetlabECO_AFL_FL_Sensor
+  short_name: CTDFLUOR
+  type: float64
+  units: 0-5VDC
+27:
+  long_name: empty
+  short_name: FREE
+  type: NA
+  units: NA
+38:
+  long_name: SBE 43 Oxygen
+  short_name: CTDOXY
+  type: float64
+  units: MLPL
+42:
+  long_name: PAR/Irradiance, Biospherical/Licor
+  short_name: PAR
+  type: float64
+  units: 0-5VDC
+45:
+  long_name: SBE 9+ Pressure
+  short_name: CTDPRS
+  type: float64
+  units: DBAR
+51:
+  long_name: Surface PAR/Irradiance, Biospherical/Licor
+  short_name: REF_PAR
+  type: float64
+  units: 0-5VDC
+55:
+  long_name: SBE 3+ Temperature
+  short_name: CTDTMP
+  type: float64
+  units: ITS-90
+61:
+  long_name: user defined, polynomial
+  short_name: U_DEF_poly
+  type: float64
+  units: 0-5VDC
+70:
+  long_name: WetlabECO_BB_Sensor
+  short_name: CTDBACKSCATTER
+  type: float64
+  units: 0-5VDC
+71:
+  long_name: CStar
+  short_name: CTDXMISS
+  type: float64
+  units: 0-5VDC
+80:
+  long_name: user defined, exponential
+  short_name: U_DEF_e
+  type: float64
+  units: 0-5VDC
+1000:
+  long_name: Salinity (C1 T1)
+  short_name: CTDSAL
+  type: float64
+  units: PSU

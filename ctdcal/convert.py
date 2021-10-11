@@ -1,12 +1,14 @@
+import logging
+from importlib import resources
 from pathlib import Path
 
 import gsw
-import logging
 import numpy as np
 import pandas as pd
+import yaml
 
-from . import get_ctdcal_config
 from . import equations_sbe as sbe_eq
+from . import get_ctdcal_config
 from . import process_bottle as btl
 from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
@@ -14,97 +16,12 @@ from . import sbe_reader as sbe_rd
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
-# TODO: move this to a separate file?
-# lookup table for sensor data
-# DOUBLE CHECK TYPE IS CORRECT #
-short_lookup = {
-    "55": {
-        "short_name": "CTDTMP",
-        "long_name": "SBE 3+ Temperature",
-        "units": "ITS-90",
-        "type": "float64",
-    },
-    "45": {
-        "short_name": "CTDPRS",
-        "long_name": "SBE 9+ Pressure",
-        "units": "DBAR",
-        "type": "float64",
-    },
-    "3": {
-        "short_name": "CTDCOND",
-        "long_name": "SBE 4 Conductivity",
-        "units": "MSPCM",
-        "type": "float64",
-    },
-    "38": {
-        "short_name": "CTDOXY",
-        "long_name": "SBE 43 Oxygen",
-        "units": "MLPL",
-        "type": "float64",
-    },
-    # '38':{'short_name': 'CTDOXYVOLTS', 'long_name':'SBE 43 Oxygen Volts', 'units': '0-5VDC', 'type':'float64'},
-    "11": {
-        "short_name": "FLUOR",
-        "long_name": "Seapoint Fluorometer",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "27": {"short_name": "FREE", "long_name": "empty", "units": "NA", "type": "NA"},
-    "0": {
-        "short_name": "ALT",
-        "long_name": "Altitude",
-        "units": "M",
-        "type": "float64",
-    },
-    "71": {
-        "short_name": "CTDXMISS",
-        "long_name": "CStar",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "61": {
-        "short_name": "U_DEF_poly",
-        "long_name": "user defined, polynomial",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "80": {
-        "short_name": "U_DEF_e",
-        "long_name": "user defined, exponential",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "1000": {
-        "short_name": "CTDSAL",
-        "long_name": "Salinity (C1 T1)",
-        "units": "PSU",
-        "type": "float64",
-    },
-    "20": {
-        "short_name": "CTDFLUOR",
-        "long_name": "WetlabECO_AFL_FL_Sensor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "42": {
-        "short_name": "PAR",
-        "long_name": "PAR/Irradiance, Biospherical/Licor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "51": {
-        "short_name": "REF_PAR",
-        "long_name": "Surface PAR/Irradiance, Biospherical/Licor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "70": {
-        "short_name": "CTDBACKSCATTER",
-        "long_name": "WetlabECO_BB_Sensor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-}
+
+with resources.open_text("ctdcal", "sensor_lookup.yaml") as f:
+    short_lookup = yaml.safe_load(f)
+
+# convert keys to str (from int) to mesh with current code
+short_lookup = {str(k): v for k, v in short_lookup.items()}
 
 
 def hex_to_ctd(ssscc_list):
