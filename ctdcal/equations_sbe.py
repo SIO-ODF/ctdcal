@@ -50,7 +50,11 @@ def _check_volts(volts, v_min=0, v_max=5):
         volts = volts.astype(float)
 
     if any(volts < v_min) or any(volts > v_max):
-        breakpoint()
+        log.warning(
+            f"{sensor} has values outside of {v_min}-{v_max}V, replacing with NaN"
+        )
+        volts[volts < v_min] = np.nan
+        volts[volts > v_max] = np.nan
 
     return volts
 
@@ -299,6 +303,7 @@ def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
     See Application Note 64-3 for more information.
     """
     # TODO: vectorize (if possible), will probably require matrix inversion
+    # TODO: any NaNs will be propagated through entire timeseries: feature or bug?
 
     _check_coefs(coefs, ["H1", "H2", "H3", "offset"])
     volts = _check_volts(volts)

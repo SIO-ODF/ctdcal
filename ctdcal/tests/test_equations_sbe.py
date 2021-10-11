@@ -104,6 +104,14 @@ def test_sbe_altimeter(caplog):
     assert all(no_warn == 301)
     assert no_warn.dtype == float
 
+    # check voltages outside 0-5V are replaced with NaNs
+    bad_range = eqs.sbe_altimeter(np.arange(-1, 7), make_coefs(coefs, value=1))
+    assert "sbe_altimeter" in caplog.records[-1].message
+    assert "outside of 0-5V" in caplog.records[-1].message
+    assert np.isnan(bad_range[0])
+    assert np.isnan(bad_range[-1])
+    assert not all(np.isnan(bad_range[1:-1]))
+
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="Offset"):
         eqs.sbe_altimeter(volts, make_coefs(coefs[:-1]))
@@ -130,6 +138,16 @@ def test_sbe43(caplog):
     assert all(no_warn == 20.4628)
     assert no_warn.dtype == float
 
+    # check voltages outside 0-5V are replaced with NaNs
+    volts = np.arange(-1, 7)
+    p, t, c = tuple(np.ones(len(volts)) for x in [1, 2, 3])  # definition shorthand
+    bad_range = eqs.sbe43(volts, p, t, c, make_coefs(coefs, value=1))
+    assert "sbe43" in caplog.records[-1].message
+    assert "outside of 0-5V" in caplog.records[-1].message
+    assert np.isnan(bad_range[0])
+    assert np.isnan(bad_range[-1])
+    assert not all(np.isnan(bad_range[1:-1]))
+
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="E"):
         eqs.sbe43(volts, p, t, c, make_coefs(coefs[:-1]))
@@ -155,6 +173,21 @@ def test_sbe43_hysteresis_voltage(caplog):
     assert len(caplog.records) == 1
     assert all(no_warn == 1)
     assert no_warn.dtype == float
+
+    # check voltages outside 0-5V are replaced with NaNs
+    volts = np.arange(0, 7)
+    p = np.ones(len(volts))
+    bad_range = eqs.sbe43_hysteresis_voltage(volts, p, make_coefs(coefs, value=1))
+    assert "sbe43_hysteresis_voltage" in caplog.records[-1].message
+    assert "outside of 0-5V" in caplog.records[-1].message
+    assert not all(np.isnan(bad_range[:-1]))
+    assert np.isnan(bad_range[-1])
+
+    # check NaNs are propagated through hysteresis correction
+    volts = np.arange(-1, 7)
+    p = np.ones(len(volts))
+    bad_range = eqs.sbe43_hysteresis_voltage(volts, p, make_coefs(coefs, value=1))
+    assert all(np.isnan(bad_range))
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="offset"):
@@ -184,9 +217,17 @@ def test_wetlabs_eco_fl(caplog):
     assert all(no_warn == 0)
     assert no_warn.dtype == float
 
+    # check voltages outside 0-5V are replaced with NaNs
+    bad_range = eqs.wetlabs_eco_fl(np.arange(-1, 7), make_coefs(coefs, value=1))
+    assert "wetlabs_eco_fl" in caplog.records[-1].message
+    assert "outside of 0-5V" in caplog.records[-1].message
+    assert np.isnan(bad_range[0])
+    assert np.isnan(bad_range[-1])
+    assert not all(np.isnan(bad_range[1:-1]))
+
     # return volts if "DarkOutput" or "Vblank" not in coefs
     no_cnv = eqs.wetlabs_eco_fl(np.ones(len(volts)), make_coefs(["ScaleFactor"]))
-    assert "returning voltage" in caplog.records[2].message
+    assert "returning voltage" in caplog.records[-1].message
     assert all(no_cnv == np.ones(len(volts)))
 
 
@@ -209,6 +250,18 @@ def test_wetlabs_cstar(caplog):
     assert len(caplog.records) == 1
     assert all(no_warn[0] == 2)
     assert all(no_warn[1] == -5.2983)
+
+    # check voltages outside 0-5V are replaced with NaNs
+    bad_range = eqs.wetlabs_cstar(np.arange(-1, 7), make_coefs(coefs, value=1))
+    xmiss, c = bad_range
+    assert "wetlabs_cstar" in caplog.records[-1].message
+    assert "outside of 0-5V" in caplog.records[-1].message
+    assert np.isnan(xmiss[0])
+    assert np.isnan(xmiss[-1])
+    assert not all(np.isnan(xmiss[1:-1]))
+    assert np.isnan(c[0])
+    assert np.isnan(c[-1])
+    assert not all(np.isnan(c[1:-1]))
 
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="PathLength"):
