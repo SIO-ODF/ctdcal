@@ -6,13 +6,60 @@ given sensor numbers are determined empirically from .XMLCON files in 2016-2017 
 not via an official document, and may change according to SBE wishes.
 """
 
+import inspect
+import logging
+
 import gsw
 import numpy as np
 
 from ctdcal.oxy_fitting import oxy_umolkg_to_ml
 
+log = logging.getLogger(__name__)
 
-def sbe3(freq, coefs):
+
+def _check_coefs(coefs_in, expected):
+    """Compare function input coefs with expected"""
+    missing_coefs = sorted(set(expected) - set(coefs_in))
+    if missing_coefs != []:
+        raise KeyError(f"Coefficient dictionary missing keys: {missing_coefs}")
+
+
+def _check_freq(freq):
+    """Convert to np.array, NaN out zeroes, convert to float if needed"""
+    freq = np.array(freq)
+    sensor = inspect.stack()[1].function  # name of function calling _check_freq
+
+    if freq.dtype != float:  # can sometimes come in as object
+        log.warning(f"Attempting to convert {freq.dtype} to float for {sensor}")
+        freq = freq.astype(float)
+
+    if 0 in freq:
+        log.warning(f"Found 0 in {sensor} frequency, replacing with NaN")
+        freq[freq == 0] = np.nan
+
+    return freq
+
+
+def _check_volts(volts, v_min=0, v_max=5):
+    """Convert to np.array, NaN out values outside of 0-5V, convert to float if needed"""
+    volts = np.array(volts)
+    sensor = inspect.stack()[1].function  # name of function calling _check_volts
+
+    if volts.dtype != float:  # can sometimes come in as object
+        log.warning(f"Attempting to convert {volts.dtype} to float for {sensor}")
+        volts = volts.astype(float)
+
+    if any(volts < v_min) or any(volts > v_max):
+        log.warning(
+            f"{sensor} has values outside of {v_min}-{v_max}V, replacing with NaN"
+        )
+        volts[volts < v_min] = np.nan
+        volts[volts > v_max] = np.nan
+
+    return volts
+
+
+def sbe3(freq, coefs, decimals=4):
     """
     SBE equation for converting SBE3 frequency to temperature.
     SensorID: 55
@@ -29,15 +76,8 @@ def sbe3(freq, coefs):
     t_ITS90 : array-like
         Converted temperature (ITS-90)
     """
-    freq = np.array(freq)
-
-    if freq.dtype != float:  # can sometimes come in as object
-        freq = freq.astype(float)
-        # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
-
-    if 0 in freq:  # TODO: is this actually needed? what about other conversion funcs?
-        freq[freq == 0] = np.nan  # nan out zero frequencies
-        # TODO: (logger) e.g. "warning: converting zero frequency found in {} to nan"
+    _check_coefs(coefs, ["G", "H", "I", "J", "F0"])
+    freq = _check_freq(freq)
 
     t_ITS90 = (
         1
@@ -49,10 +89,10 @@ def sbe3(freq, coefs):
         )
         - 273.15
     )
-    return np.around(t_ITS90, 4)
+    return np.around(t_ITS90, decimals)
 
 
-def sbe4(freq, t, p, coefs):
+def sbe4(freq, t, p, coefs, decimals=4):
     """
     SBE equation for converting SBE4 frequency to conductivity. This conversion
     is valid for both SBE4C (profiling) and SBE4M (mooring).
@@ -74,19 +114,21 @@ def sbe4(freq, t, p, coefs):
     c_mS_cm : array-like
         Converted conductivity (mS/cm)
     """
-    freq_kHz = freq * 1e-3  # equation expects kHz
+    _check_coefs(coefs, ["G", "H", "I", "J", "CPcor", "CTcor"])
+    freq_kHz = _check_freq(freq) * 1e-3  # equation expects kHz
+
     c_S_m = (
         coefs["G"]
         + coefs["H"] * np.power(freq_kHz, 2)
         + coefs["I"] * np.power(freq_kHz, 3)
         + coefs["J"] * np.power(freq_kHz, 4)
-    ) / (10 * (1 + coefs["CTcor"] * t + coefs["CPcor"] * p))
+    ) / (10 * (1 + coefs["CTcor"] * np.array(t) + coefs["CPcor"] * np.array(p)))
     c_mS_cm = c_S_m * 10  # S/m to mS/cm
 
-    return np.around(c_mS_cm, 5)
+    return np.around(c_mS_cm, decimals)
 
 
-def sbe9(freq, t_probe, coefs):
+def sbe9(freq, t_probe, coefs, decimals=4):
     """
     SBE/STS(?) equation for converting SBE9 frequency to pressure.
     SensorID: 45
@@ -106,10 +148,18 @@ def sbe9(freq, t_probe, coefs):
     p_dbar : array-like
         Converted pressure (dbar)
     """
-    freq = np.array(freq)
-    t_probe = np.array(t_probe).astype(int)
-    freq_MHz = freq * 1e-6  # equation expects MHz
-    t_probe = (coefs["AD590M"] * t_probe) + coefs["AD590B"]
+    _check_coefs(
+        coefs,
+        (
+            ["T1", "T2", "T3", "T4", "T5"]
+            + ["C1", "C2", "C3"]
+            + ["D1", "D2"]
+            + ["AD590M", "AD590B"]
+        ),
+    )
+    freq_MHz = _check_freq(freq) * 1e-6  # equation expects MHz
+    t_probe = (coefs["AD590M"] * np.array(t_probe).astype(int)) + coefs["AD590B"]
+
     T0 = (
         coefs["T1"]
         + coefs["T2"] * t_probe
@@ -123,10 +173,10 @@ def sbe9(freq, t_probe, coefs):
         * (1 - (coefs["D1"] + coefs["D2"] * t_probe) * w)
         - 14.7
     )
-    return np.around(p_dbar, 4)
+    return np.around(p_dbar, decimals)
 
 
-def sbe_altimeter(volts, coefs):
+def sbe_altimeter(volts, coefs, decimals=1):
     """
     SBE equation for converting altimeter voltages to meters. This conversion
     is valid for altimeters integrated with any Sea-Bird CTD (e.g. 9+, 19, 25).
@@ -151,18 +201,15 @@ def sbe_altimeter(volts, coefs):
     While the SBE documentation refers to a Teledyne Benthos or Valeport altimeter,
     the equation works for all altimeters typically found in the wild.
     """
-    volts = np.array(volts)
-    if volts.dtype != float:  # can sometimes come in as object
-        volts = volts.astype(float)
-        # TODO: (logger) e.g. "warning: converting {dtype} to float" or something
+    _check_coefs(coefs, ["ScaleFactor", "Offset"])
+    volts = _check_volts(volts)
 
-    bottom_distance = np.around(
-        ((300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]), 1
-    )
-    return bottom_distance
+    bottom_distance = (300 * volts / coefs["ScaleFactor"]) + coefs["Offset"]
+
+    return np.around(bottom_distance, decimals)
 
 
-def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
+def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0, decimals=4):
     # NOTE: lat/lon = 0 is not "acceptable" for GSW, come up with something else?
     """
     SBE equation for converting SBE43 engineering units to oxygen (ml/l).
@@ -179,7 +226,7 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
     c : array-like
         Converted conductivity (mS/cm)
     coefs : dict
-        Dictionary of calibration coefficients (Soc, Voffset, Tau20, A, B, C, E)
+        Dictionary of calibration coefficients (Soc, offset, Tau20, A, B, C, E)
     lat : array-like, optional
         Latitude (decimal degrees north)
     lon : array-like, optional
@@ -192,7 +239,10 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
     """
     # TODO: is there any reason for this to output mL/L? if oxygen eq uses o2sol
     # in umol/kg, result is in umol/kg... which is what we use at the end anyway?
-    t_Kelvin = t + 273.15
+
+    _check_coefs(coefs, ["Soc", "offset", "Tau20", "A", "B", "C", "E"])
+    volts = _check_volts(volts)
+    t_Kelvin = np.array(t) + 273.15
 
     SP = gsw.SP_from_C(c, t, p)
     SA = gsw.SA_from_SP(SP, p, lon, lat)
@@ -211,14 +261,14 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0):
         * (volts + coefs["offset"])
         * (
             1.0
-            + coefs["A"] * t
+            + coefs["A"] * np.array(t)
             + coefs["B"] * np.power(t, 2)
             + coefs["C"] * np.power(t, 3)
         )
         * o2sol_ml_l
-        * np.exp(coefs["E"] * p / t_Kelvin)
+        * np.exp(coefs["E"] * np.array(p) / t_Kelvin)
     )
-    return np.around(oxy_ml_l, 4)
+    return np.around(oxy_ml_l, decimals)
 
 
 def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
@@ -253,8 +303,13 @@ def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
     See Application Note 64-3 for more information.
     """
     # TODO: vectorize (if possible), will probably require matrix inversion
+    # TODO: any NaNs will be propagated through entire timeseries: feature or bug?
+
+    _check_coefs(coefs, ["H1", "H2", "H3", "offset"])
+    volts = _check_volts(volts)
+
     dt = 1 / sample_freq
-    D = 1 + coefs["H1"] * (np.exp(p / coefs["H2"]) - 1)
+    D = 1 + coefs["H1"] * (np.exp(np.array(p) / coefs["H2"]) - 1)
     C = np.exp(-1 * dt / coefs["H3"])
 
     oxy_volts = volts + coefs["offset"]
@@ -270,7 +325,7 @@ def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
     return volts_corrected
 
 
-def wetlabs_eco_fl(volts, coefs):
+def wetlabs_eco_fl(volts, coefs, decimals=4):
     """
     SBE equation for converting ECO-FL fluorometer voltage to concentration.
     SensorID: 20
@@ -292,17 +347,22 @@ def wetlabs_eco_fl(volts, coefs):
     Chlorophyll units depend on scale factor (e.g. ug/L-volt, ug/L-counts, ppb/volts),
     see Application Note 62 for more information.
     """
+    volts = _check_volts(volts)
+
     if "DarkOutput" in coefs.keys():
         chl = coefs["ScaleFactor"] * (volts - coefs["DarkOutput"])
     elif "Vblank" in coefs.keys():  # from older calibration sheets
         chl = coefs["ScaleFactor"] * (volts - coefs["Vblank"])
     else:
-        print("No dark cast info in calibration coefficients, returning raw voltage.")
+        log.warning(
+            "No dark cast coefficient ('DarkOutput' or 'Vblank'), returning voltage."
+        )
         chl = volts
-    return chl
+
+    return np.around(chl, decimals)
 
 
-def wetlabs_cstar(volts, coefs):
+def wetlabs_cstar(volts, coefs, decimals=4):
     """
     SBE equation for converting C-Star transmissometer voltage to light transmission.
     SensorID: 71
@@ -332,14 +392,15 @@ def wetlabs_cstar(volts, coefs):
 
     See Application Note 91 for more information.
     """
-
+    _check_coefs(coefs, ["M", "B", "PathLength"])
+    volts = _check_volts(volts)
     xmiss = (coefs["M"] * volts) + coefs["B"]  # xmiss as a percentage
     c = -(1 / coefs["PathLength"]) * np.log(xmiss * 100)  # needs xmiss as a decimal
 
-    return xmiss, c
+    return np.around(xmiss, decimals), np.around(c, decimals)
 
 
-def seapoint_fluor(volts, coefs):
+def seapoint_fluor(volts, coefs, decimals=6):
     """
     Raw voltage supplied from fluorometer right now, after looking at xmlcon.
     The method will do nothing but spit out the exact values that came in.
@@ -361,9 +422,10 @@ def seapoint_fluor(volts, coefs):
     -----
     According to .xmlcon, GainSetting "is an array index, not the actual gain setting."
     """
+    _check_coefs(coefs, ["GainSetting", "Offset"])
     # TODO: actual calibration/conversion/something?
     # TODO: move this to different module? edge case since it's the only Seapoint sensor
     volts = np.array(volts)
-    fluoro = np.around(volts, 6)
+    fluoro = np.around(volts, decimals)
 
     return fluoro
