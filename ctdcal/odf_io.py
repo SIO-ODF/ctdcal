@@ -1,7 +1,5 @@
 import csv
-import datetime as dt
 import logging
-import sys
 from collections import OrderedDict
 from pathlib import Path
 
@@ -92,22 +90,22 @@ def _salt_loader(ssscc, salt_dir):
 
 def remove_autosal_drift(saltDF, refDF):
     """Calculate linear CR drift between reference values"""
-    if len(refDF) != 2:
+    if refDF.shape != (2, 2):
         ssscc = f"{saltDF['STNNBR'].unique()[0]:03d}{saltDF['CASTNO'].unique()[0]:02d}"
         log.warning(
             f"Failed to find start/end reference readings for {ssscc}, check salt file"
         )
+    else:
+        # find rate of drift
+        diff = refDF.diff(axis="index").dropna()
+        time_coef = (diff["CRavg"] / diff["IndexTime"]).iloc[0]
 
-        return saltDF.drop(labels="IndexTime", axis="columns")
+        # apply offset as a linear function of time
+        saltDF = saltDF.copy(deep=True)  # avoid modifying input dataframe
+        saltDF["CRavg"] += saltDF["IndexTime"] * time_coef
+        saltDF["CRavg"] = saltDF["CRavg"].round(5)  # match initial precision
 
-    diff = refDF.diff(axis="index").dropna()
-    time_coef = (diff["CRavg"] / diff["IndexTime"]).iloc[0]
-
-    saltDF["CRavg"] += saltDF["IndexTime"] * time_coef
-    saltDF["CRavg"] = saltDF["CRavg"].round(5)  # match initial precision
-    saltDF = saltDF.drop(labels="IndexTime", axis="columns")
-
-    return saltDF
+    return saltDF.drop(labels="IndexTime", axis="columns")
 
 
 def _salt_exporter(
@@ -156,7 +154,7 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
             saltDF = remove_autosal_drift(saltDF, refDF)
             saltDF["SALNTY"] = gsw.SP_salinometer(
                 (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
-            )#.round(4)
+            )  # .round(4)
             _salt_exporter(saltDF, salt_dir)
 
     return True
