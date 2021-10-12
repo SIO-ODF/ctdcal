@@ -120,13 +120,11 @@ def _salt_exporter(
         stn_salts = saltDF[saltDF[stn_col] == station]
         casts = stn_salts[cast_col].unique()
         for cast in casts:
-            stn_cast_salts = stn_salts[stn_salts[cast_col] == cast]
+            stn_cast_salts = stn_salts[stn_salts[cast_col] == cast].copy()
             stn_cast_salts.dropna(axis=1, how="all", inplace=True)  # drop empty columns
-            outfile = (  # format to SSSCC_salts.csv
-                outdir + "{0:03}".format(station) + "{0:02}".format(cast) + "_salts.csv"
-            )
-            if Path(outfile).exists():
-                log.debug(outfile + " already exists...skipping")
+            outfile = Path(outdir) / f"{station:03.0f}{cast:02.0f}_salts.csv"  # SSSCC_*
+            if outfile.exists():
+                log.info(str(outfile) + " already exists...skipping")
                 continue
             stn_cast_salts.to_csv(outfile, index=False)
 
