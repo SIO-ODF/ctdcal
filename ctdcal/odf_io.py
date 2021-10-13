@@ -1,6 +1,6 @@
 import csv
+import io
 import logging
-from collections import OrderedDict
 from pathlib import Path
 
 import gsw
@@ -13,21 +13,30 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(ssscc, salt_dir):
+def _salt_loader(filename):
     """
     Load raw file into salt and reference DataFrames.
     """
-    saltpath = salt_dir + ssscc  # salt files have no extension
-    with open(saltpath, newline="") as f:
-        saltF = csv.reader(
-            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
-        )
-        saltArray = []
-        for row in saltF:
-            saltArray.append(row)
-        del saltArray[0]  # remove header
 
-    header = OrderedDict(  # having this as a dict streamlines next steps
+    csv_opts = dict(delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True")
+    if isinstance(filename, (str, Path)):
+        with open(filename, newline="") as f:
+            saltF = csv.reader(f, **csv_opts)
+            saltArray = [row for row in saltF]
+            ssscc = Path(filename).stem
+    elif isinstance(filename, io.StringIO):
+        saltF = csv.reader(filename, **csv_opts)
+        saltArray = [row for row in saltF]
+        ssscc = "test_odf_io"
+    else:
+        raise NotImplementedError(
+            "Salt loader only able to read in str, Path, or StringIO classes"
+        )
+
+    del saltArray[0]  # remove file header
+    saltDF = pd.DataFrame.from_records(saltArray)
+
+    cols = dict(  # having this as a dict streamlines next steps
         [
             ("STNNBR", int),
             ("CASTNO", int),
@@ -41,12 +50,11 @@ def _salt_loader(ssscc, salt_dir):
             ("Attempts", int),
         ]
     )
-    saltDF = pd.DataFrame.from_records(saltArray)
 
     # add as many "Reading#"s as needed
-    for ii in range(0, len(saltDF.columns) - len(header)):
-        header["Reading{}".format(ii + 1)] = float
-    saltDF.columns = list(header.keys())  # name columns
+    for ii in range(0, len(saltDF.columns) - len(cols)):
+        cols["Reading{}".format(ii + 1)] = float
+    saltDF.columns = list(cols.keys())  # name columns
 
     # TODO: check autosalSAMPNO against SAMPNO for mismatches?
     # TODO: handling for re-samples?
@@ -83,7 +91,7 @@ def _salt_loader(ssscc, salt_dir):
     refDF = saltDF.loc[
         saltDF["autosalSAMPNO"] == "worm", ["IndexTime", "CRavg"]
     ].astype(float)
-    saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"].astype(header)  # force dtypes
+    saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"].astype(cols)  # force dtypes
 
     return saltDF, refDF
 
@@ -145,7 +153,7 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
     for ssscc in ssscc_list:
         if not Path(salt_dir + ssscc + "_salts.csv").exists():
             try:
-                saltDF, refDF = _salt_loader(ssscc, salt_dir)
+                saltDF, refDF = _salt_loader(salt_dir + ssscc)
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue

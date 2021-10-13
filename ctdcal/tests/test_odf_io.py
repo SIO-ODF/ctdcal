@@ -1,3 +1,4 @@
+import io
 import logging
 from pathlib import Path
 
@@ -5,6 +6,58 @@ import numpy as np
 import pandas as pd
 
 from ctdcal import odf_io
+
+
+def make_salt_file(commented=None, flagged=None, to_file=None):
+    # build dummy DataFrame
+    constants = {"STNNBR": "0001", "CASTNO": "01", "BathTemp": 21, "unk": 5907}
+    salts = pd.DataFrame(data=constants, index=np.arange(12))
+    salts.insert(2, "SAMPNO", [f"{x:02.0f}" for x in salts.index])
+    salts.insert(4, "CRavg", np.linspace(1.95, 1.98, 12)[::-1])
+    salts.insert(5, "autosalSAMPNO", salts["SAMPNO"].astype(int))
+    salts.loc[[0, 11], "autosalSAMPNO"] = "worm"
+    times = pd.date_range(start="18:32:04", end="19:36:03", periods=24)
+    salts["StartTime"] = times[::2].strftime("%H:%M:%S")
+    salts["EndTime"] = times[1::2].strftime("%H:%M:%S")
+
+    # assign CR values around mean
+    salts["Reading1"] = salts["CRavg"] + 1e-4
+    salts["Reading2"] = salts["CRavg"] - 1e-4
+    rng = np.random.default_rng(seed=100)  # only give some samples 3 readings
+    salts["Reading3"] = salts["CRavg"] * rng.choice([1, np.nan], 12)
+    attempts = salts[["Reading1", "Reading2", "Reading3"]].count(axis=1)
+    salts.insert(9, "Attempts", attempts.map("{:02.0f}".format))
+
+    # final formatting, remove blank Reading3 cells to match Autosal
+    header = "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408"
+    string_df = salts.to_string(
+        header=False, index=False, float_format="{:.5f}".format, na_rep=""
+    )
+    text_out = "\n".join([header, string_df.replace("        ", "")])
+
+    if to_file is not None:
+        with open(to_file, "w+") as f:
+            f.write(text_out)
+    else:
+        return text_out
+
+
+def test_salt_loader():
+    # check salt file loads in correctly
+    salt_file = make_salt_file()
+    saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
+
+    assert saltDF.shape == (10, 14)
+    assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
+    assert all(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]].dtypes == float)
+    assert all(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]].dtypes == int)
+    assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
+    assert all(saltDF.index == np.arange(1, 11))
+    assert saltDF["Reading3"].isna().sum() == 5
+
+    assert refDF.shape == (2, 2)
+    assert all(refDF.dtypes == float)
+    assert all(refDF.index == [0, 11])
 
 
 def test_remove_autosal_drift(caplog):
