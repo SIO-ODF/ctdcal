@@ -54,9 +54,9 @@ def make_salt_file(stn=1, cast=1, comment=None, flag=False, to_file=None):
     if comment is not None:
         salts["STNNBR"] = rng.choice(["", comment], 12, p=[0.8, 0.2]) + salts["STNNBR"]
 
-    # add comment marker (#, x)
+    # add LabView "quality"(?) flag
     if flag:
-        salts["EndTime"] = rng.choice(["", "*"], 12, p=[0.8, 0.2]) + salts["EndTime"]
+        salts["EndTime"] = salts["EndTime"] + rng.choice(["", "*"], 12, p=[0.8, 0.2])
 
     # final formatting, remove blank Reading3 cells to match Autosal
     header = "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408"
