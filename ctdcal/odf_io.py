@@ -13,7 +13,7 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(filename):
+def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
     """
     Load raw file into salt and reference DataFrames.
     """
@@ -72,16 +72,14 @@ def _salt_loader(filename):
     if flagged.any():
         # remove asterisks from EndTime and flag samples
         log.debug(f"Found * in {ssscc} salt file, flagging value(s) as questionable")
-        saltDF["EndTime"] = saltDF["EndTime"].str.rstrip("*")
+        saltDF["EndTime"] = saltDF["EndTime"].str.strip("*")
         questionable = pd.DataFrame()
         questionable["SAMPNO"] = saltDF.loc[flagged, "SAMPNO"].astype(int)
         questionable.insert(0, "SSSCC", ssscc)
         questionable["diff"] = np.nan
         questionable["salinity_flag"] = 3
         questionable["comments"] = "Auto-flagged by processing function (had * in row)"
-        questionable.to_csv(
-            "tools/salt_flags_handcoded.csv", mode="a+", index=False, header=None
-        )
+        questionable.to_csv(flag_file, mode="a+", index=False, header=None)
 
     # add time (in seconds) needed for autosal drift removal step
     saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"])

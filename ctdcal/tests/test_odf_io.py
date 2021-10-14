@@ -8,7 +8,7 @@ import pandas as pd
 from ctdcal import odf_io
 
 
-def make_salt_file(comment=None, flag=None, to_file=None):
+def make_salt_file(comment=None, flag=False, to_file=None):
     #  seed RNG for Reading3, comments, and flags
     rng = np.random.default_rng(seed=100)
 
@@ -34,6 +34,10 @@ def make_salt_file(comment=None, flag=None, to_file=None):
     if comment is not None:
         salts["STNNBR"] = rng.choice(["", comment], 12, p=[0.8, 0.2]) + salts["STNNBR"]
 
+    # add comment marker (#, x)
+    if flag:
+        salts["EndTime"] = rng.choice(["", "*"], 12, p=[0.8, 0.2]) + salts["EndTime"]
+
     # final formatting, remove blank Reading3 cells to match Autosal
     header = "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408"
     string_df = salts.to_string(
@@ -48,7 +52,7 @@ def make_salt_file(comment=None, flag=None, to_file=None):
         return text_out
 
 
-def test_salt_loader(caplog):
+def test_salt_loader(caplog, tmp_path):
     # check salt file loads in correctly
     salt_file = make_salt_file()
     saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
@@ -65,7 +69,7 @@ def test_salt_loader(caplog):
     assert all(refDF.dtypes == float)
     assert all(refDF.index == [0, 11])
 
-    # check commented lines are ignored (1, 4, 10)
+    # check commented lines are ignored ("bottles" 1, 4, 10)
     salt_file = make_salt_file(comment="#")
     with caplog.at_level(logging.DEBUG):
         saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
@@ -82,6 +86,42 @@ def test_salt_loader(caplog):
     assert refDF.shape == (2, 2)
     assert all(refDF.dtypes == float)
     assert all(refDF.index == [0, 11])
+
+    # check flagged EndTimes are added to flag_file ("bottles" 1, 4, 10)
+    salt_file = make_salt_file(flag=True)
+    with caplog.at_level(logging.DEBUG):
+        f_out = io.StringIO()
+        saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file), flag_file=f_out)
+        flagged = f_out.getvalue().split("\n")
+        assert "Found * in test_odf_io" in caplog.messages[1]
+        assert "test_odf_io,1,,3,Auto-flagged" in flagged[0]
+        assert "test_odf_io,4,,3,Auto-flagged" in flagged[1]
+        assert "test_odf_io,10,,3,Auto-flagged" in flagged[2]
+        assert flagged[3] == ""
+    assert saltDF.shape == (10, 14)
+    assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
+    assert all(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]].dtypes == float)
+    assert all(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]].dtypes == int)
+    assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
+    assert all(saltDF.index == np.arange(1, 11))
+    assert saltDF["Reading3"].isna().sum() == 5
+
+    assert refDF.shape == (2, 2)
+    assert all(refDF.dtypes == float)
+    assert all(refDF.index == [0, 11])
+
+    # check behavior with filename (saves time not writing full file to disk 3x)
+    d = tmp_path / "salt"
+    d.mkdir()
+    fake_file = d / "90909"
+    fake_file.write_text("\n1 2 3 4 5 6 7 00:01 00:02 10 11")
+    saltDF, refDF = odf_io._salt_loader(fake_file)
+    assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
+    assert all(saltDF[["CRavg", "Reading1"]].dtypes == float)
+    assert all(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]].dtypes == int)
+    assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
+    assert saltDF.shape == (1, 12)
+    assert refDF.empty
 
 
 def test_remove_autosal_drift(caplog):
