@@ -8,6 +8,21 @@ import pandas as pd
 from ctdcal import odf_io
 
 
+def check_type(to_check, sub_dtype):
+    """
+    Type comparisons can fail on Windows due to int32/int64 behavior.
+    This function checks subtypes so that tests don't fail on Windows.
+
+    See https://stackoverflow.com/q/64901822/13155619 for more info
+    """
+    if sub_dtype is int:
+        np_type = np.integer
+    elif sub_dtype is float:
+        np_type = np.floating
+
+    return all([np.issubdtype(dtype, np_type) for dtype in to_check.dtypes])
+
+
 def make_salt_file(comment=None, flag=False, to_file=None):
     #  seed RNG for Reading3, comments, and flags
     rng = np.random.default_rng(seed=100)
@@ -59,9 +74,9 @@ def test_salt_loader(caplog, tmp_path):
 
     assert saltDF.shape == (10, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
-    assert all(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]].dtypes == float)
-    assert all(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]].dtypes == int)
-    assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
+    assert check_type(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]], float)
+    assert check_type(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]], int)
+    assert check_type(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]], int)
     assert all(saltDF.index == np.arange(1, 11))
     assert saltDF["Reading3"].isna().sum() == 5
 
@@ -77,9 +92,9 @@ def test_salt_loader(caplog, tmp_path):
         assert "test_odf_io" in caplog.messages[0]
     assert saltDF.shape == (7, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
-    assert all(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]].dtypes == float)
-    assert all(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]].dtypes == int)
-    assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
+    assert check_type(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]], float)
+    assert check_type(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]], int)
+    assert check_type(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]], int)
     assert all(saltDF.index == [2, 3, 5, 6, 7, 8, 9])
     assert saltDF["Reading3"].isna().sum() == 3
 
@@ -100,9 +115,9 @@ def test_salt_loader(caplog, tmp_path):
         assert flagged[3] == ""
     assert saltDF.shape == (10, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
-    assert all(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]].dtypes == float)
-    assert all(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]].dtypes == int)
-    assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
+    assert check_type(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]], float)
+    assert check_type(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]], int)
+    assert check_type(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]], int)
     assert all(saltDF.index == np.arange(1, 11))
     assert saltDF["Reading3"].isna().sum() == 5
 
@@ -117,9 +132,9 @@ def test_salt_loader(caplog, tmp_path):
     fake_file.write_text("\n1 2 3 4 5 6 7 00:01 00:02 10 11")
     saltDF, refDF = odf_io._salt_loader(fake_file)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
-    assert all(saltDF[["CRavg", "Reading1"]].dtypes == float)
-    assert all(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]].dtypes == int)
-    assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
+    assert check_type(saltDF[["CRavg", "Reading1"]], float)
+    assert check_type(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]], int)
+    assert check_type(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]], int)
     assert saltDF.shape == (1, 12)
     assert refDF.empty
 
