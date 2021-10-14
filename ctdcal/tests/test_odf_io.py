@@ -8,7 +8,10 @@ import pandas as pd
 from ctdcal import odf_io
 
 
-def make_salt_file(commented=None, flagged=None, to_file=None):
+def make_salt_file(comment=None, flag=None, to_file=None):
+    #  seed RNG for Reading3, comments, and flags
+    rng = np.random.default_rng(seed=100)
+
     # build dummy DataFrame
     constants = {"STNNBR": "0001", "CASTNO": "01", "BathTemp": 21, "unk": 5907}
     salts = pd.DataFrame(data=constants, index=np.arange(12))
@@ -20,13 +23,16 @@ def make_salt_file(commented=None, flagged=None, to_file=None):
     salts["StartTime"] = times[::2].strftime("%H:%M:%S")
     salts["EndTime"] = times[1::2].strftime("%H:%M:%S")
 
-    # assign CR values around mean
+    # assign CR values around mean (give only some samples 3 readings)
     salts["Reading1"] = salts["CRavg"] + 1e-4
     salts["Reading2"] = salts["CRavg"] - 1e-4
-    rng = np.random.default_rng(seed=100)  # only give some samples 3 readings
     salts["Reading3"] = salts["CRavg"] * rng.choice([1, np.nan], 12)
     attempts = salts[["Reading1", "Reading2", "Reading3"]].count(axis=1)
     salts.insert(9, "Attempts", attempts.map("{:02.0f}".format))
+
+    # add comment marker (#, x)
+    if comment is not None:
+        salts["STNNBR"] = rng.choice(["", comment], 12, p=[0.8, 0.2]) + salts["STNNBR"]
 
     # final formatting, remove blank Reading3 cells to match Autosal
     header = "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408"
@@ -42,7 +48,7 @@ def make_salt_file(commented=None, flagged=None, to_file=None):
         return text_out
 
 
-def test_salt_loader():
+def test_salt_loader(caplog):
     # check salt file loads in correctly
     salt_file = make_salt_file()
     saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
@@ -54,6 +60,24 @@ def test_salt_loader():
     assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
     assert all(saltDF.index == np.arange(1, 11))
     assert saltDF["Reading3"].isna().sum() == 5
+
+    assert refDF.shape == (2, 2)
+    assert all(refDF.dtypes == float)
+    assert all(refDF.index == [0, 11])
+
+    # check commented lines are ignored (1, 4, 10)
+    salt_file = make_salt_file(comment="#")
+    with caplog.at_level(logging.DEBUG):
+        saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
+        assert "(#, x)" in caplog.messages[0]
+        assert "test_odf_io" in caplog.messages[0]
+    assert saltDF.shape == (7, 14)
+    assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
+    assert all(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]].dtypes == float)
+    assert all(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]].dtypes == int)
+    assert all(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]].dtypes == int)
+    assert all(saltDF.index == [2, 3, 5, 6, 7, 8, 9])
+    assert saltDF["Reading3"].isna().sum() == 3
 
     assert refDF.shape == (2, 2)
     assert all(refDF.dtypes == float)
