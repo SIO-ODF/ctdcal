@@ -23,12 +23,17 @@ def check_type(to_check, sub_dtype):
     return all([np.issubdtype(dtype, np_type) for dtype in to_check.dtypes])
 
 
-def make_salt_file(comment=None, flag=False, to_file=None):
+def make_salt_file(stn=1, cast=1, comment=None, flag=False, to_file=None):
     #  seed RNG for Reading3, comments, and flags
     rng = np.random.default_rng(seed=100)
 
     # build dummy DataFrame
-    constants = {"STNNBR": "0001", "CASTNO": "01", "BathTemp": 21, "unk": 5907}
+    constants = {
+        "STNNBR": f"{stn:04.0f}",
+        "CASTNO": f"{cast:02.0f}",
+        "BathTemp": 21,
+        "unk": 5907,
+    }
     salts = pd.DataFrame(data=constants, index=np.arange(12))
     salts.insert(2, "SAMPNO", [f"{x:02.0f}" for x in salts.index])
     salts.insert(4, "CRavg", np.linspace(1.95, 1.98, 12)[::-1])
@@ -201,3 +206,24 @@ def test_salt_exporter(tmp_path, caplog):
         empty = pd.read_csv(f)
         assert "Reading1" in empty.columns
         assert "Reading2" not in empty.columns
+
+
+def test_process_salts(tmp_path, caplog):
+    # check missing salt files are logged and skipped
+    odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
+    assert "90909 does not exist" in caplog.messages[0]
+
+    # check salt file is processed through to .csv without errors
+    f_path = tmp_path / "90909"
+    assert not Path(tmp_path / "90909").exists()
+    make_salt_file(stn=909, cast=9, to_file=f_path)  # outfile name depends on stn/cast
+    with caplog.at_level(logging.INFO):
+        assert not Path(tmp_path / "90909_salts.csv").exists()
+        odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
+        assert len(caplog.messages) == 1
+        assert Path(tmp_path / "90909_salts.csv").exists()
+
+    # check nothing happens if .csv already exists
+    with caplog.at_level(logging.INFO):
+        odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
+        assert "90909_salts.csv already exists" in caplog.messages[1]

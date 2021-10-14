@@ -149,9 +149,12 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
 
     """
     for ssscc in ssscc_list:
-        if not Path(salt_dir + ssscc + "_salts.csv").exists():
+        if (Path(salt_dir) / f"{ssscc}_salts.csv").exists():
+            log.info(f"{ssscc}_salts.csv already exists in {salt_dir}... skipping")
+            continue
+        else:
             try:
-                saltDF, refDF = _salt_loader(salt_dir + ssscc)
+                saltDF, refDF = _salt_loader(Path(salt_dir) / ssscc)
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue
@@ -160,5 +163,3 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
                 (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
             )  # .round(4)
             _salt_exporter(saltDF, salt_dir)
-
-    return True
