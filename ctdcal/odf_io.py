@@ -1,8 +1,6 @@
 import csv
-import datetime as dt
+import io
 import logging
-import sys
-from collections import OrderedDict
 from pathlib import Path
 
 import gsw
@@ -15,21 +13,30 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(ssscc, salt_dir):
+def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
     """
     Load raw file into salt and reference DataFrames.
     """
-    saltpath = salt_dir + ssscc  # salt files have no extension
-    with open(saltpath, newline="") as f:
-        saltF = csv.reader(
-            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
-        )
-        saltArray = []
-        for row in saltF:
-            saltArray.append(row)
-        del saltArray[0]  # remove header
 
-    header = OrderedDict(  # having this as a dict streamlines next steps
+    csv_opts = dict(delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True")
+    if isinstance(filename, (str, Path)):
+        with open(filename, newline="") as f:
+            saltF = csv.reader(f, **csv_opts)
+            saltArray = [row for row in saltF]
+            ssscc = Path(filename).stem
+    elif isinstance(filename, io.StringIO):
+        saltF = csv.reader(filename, **csv_opts)
+        saltArray = [row for row in saltF]
+        ssscc = "test_odf_io"
+    else:
+        raise NotImplementedError(
+            "Salt loader only able to read in str, Path, or StringIO classes"
+        )
+
+    del saltArray[0]  # remove file header
+    saltDF = pd.DataFrame.from_records(saltArray)
+
+    cols = dict(  # having this as a dict streamlines next steps
         [
             ("STNNBR", int),
             ("CASTNO", int),
@@ -43,12 +50,11 @@ def _salt_loader(ssscc, salt_dir):
             ("Attempts", int),
         ]
     )
-    saltDF = pd.DataFrame.from_records(saltArray)
 
     # add as many "Reading#"s as needed
-    for ii in range(0, len(saltDF.columns) - len(header)):
-        header["Reading{}".format(ii + 1)] = float
-    saltDF.columns = list(header.keys())  # name columns
+    for ii in range(0, len(saltDF.columns) - len(cols)):
+        cols["Reading{}".format(ii + 1)] = float
+    saltDF.columns = list(cols.keys())  # name columns
 
     # TODO: check autosalSAMPNO against SAMPNO for mismatches?
     # TODO: handling for re-samples?
@@ -66,16 +72,14 @@ def _salt_loader(ssscc, salt_dir):
     if flagged.any():
         # remove asterisks from EndTime and flag samples
         log.debug(f"Found * in {ssscc} salt file, flagging value(s) as questionable")
-        saltDF["EndTime"] = saltDF["EndTime"].str.rstrip("*")
+        saltDF["EndTime"] = saltDF["EndTime"].str.strip("*")
         questionable = pd.DataFrame()
         questionable["SAMPNO"] = saltDF.loc[flagged, "SAMPNO"].astype(int)
         questionable.insert(0, "SSSCC", ssscc)
         questionable["diff"] = np.nan
         questionable["salinity_flag"] = 3
         questionable["comments"] = "Auto-flagged by processing function (had * in row)"
-        questionable.to_csv(
-            "tools/salt_flags_handcoded.csv", mode="a+", index=False, header=None
-        )
+        questionable.to_csv(flag_file, mode="a+", index=False, header=None)
 
     # add time (in seconds) needed for autosal drift removal step
     saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"])
@@ -85,29 +89,29 @@ def _salt_loader(ssscc, salt_dir):
     refDF = saltDF.loc[
         saltDF["autosalSAMPNO"] == "worm", ["IndexTime", "CRavg"]
     ].astype(float)
-    saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"].astype(header)  # force dtypes
+    saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"].astype(cols)  # force dtypes
 
     return saltDF, refDF
 
 
 def remove_autosal_drift(saltDF, refDF):
     """Calculate linear CR drift between reference values"""
-    if len(refDF) != 2:
+    if refDF.shape != (2, 2):
         ssscc = f"{saltDF['STNNBR'].unique()[0]:03d}{saltDF['CASTNO'].unique()[0]:02d}"
         log.warning(
             f"Failed to find start/end reference readings for {ssscc}, check salt file"
         )
+    else:
+        # find rate of drift
+        diff = refDF.diff(axis="index").dropna()
+        time_coef = (diff["CRavg"] / diff["IndexTime"]).iloc[0]
 
-        return saltDF.drop(labels="IndexTime", axis="columns")
+        # apply offset as a linear function of time
+        saltDF = saltDF.copy(deep=True)  # avoid modifying input dataframe
+        saltDF["CRavg"] += saltDF["IndexTime"] * time_coef
+        saltDF["CRavg"] = saltDF["CRavg"].round(5)  # match initial precision
 
-    diff = refDF.diff(axis="index").dropna()
-    time_coef = (diff["CRavg"] / diff["IndexTime"]).iloc[0]
-
-    saltDF["CRavg"] += saltDF["IndexTime"] * time_coef
-    saltDF["CRavg"] = saltDF["CRavg"].round(5)  # match initial precision
-    saltDF = saltDF.drop(labels="IndexTime", axis="columns")
-
-    return saltDF
+    return saltDF.drop(labels="IndexTime", axis="columns")
 
 
 def _salt_exporter(
@@ -122,13 +126,11 @@ def _salt_exporter(
         stn_salts = saltDF[saltDF[stn_col] == station]
         casts = stn_salts[cast_col].unique()
         for cast in casts:
-            stn_cast_salts = stn_salts[stn_salts[cast_col] == cast]
+            stn_cast_salts = stn_salts[stn_salts[cast_col] == cast].copy()
             stn_cast_salts.dropna(axis=1, how="all", inplace=True)  # drop empty columns
-            outfile = (  # format to SSSCC_salts.csv
-                outdir + "{0:03}".format(station) + "{0:02}".format(cast) + "_salts.csv"
-            )
-            if Path(outfile).exists():
-                log.debug(outfile + " already exists...skipping")
+            outfile = Path(outdir) / f"{station:03.0f}{cast:02.0f}_salts.csv"  # SSSCC_*
+            if outfile.exists():
+                log.info(str(outfile) + " already exists...skipping")
                 continue
             stn_cast_salts.to_csv(outfile, index=False)
 
@@ -147,16 +149,17 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
 
     """
     for ssscc in ssscc_list:
-        if not Path(salt_dir + ssscc + "_salts.csv").exists():
+        if (Path(salt_dir) / f"{ssscc}_salts.csv").exists():
+            log.info(f"{ssscc}_salts.csv already exists in {salt_dir}... skipping")
+            continue
+        else:
             try:
-                saltDF, refDF = _salt_loader(ssscc, salt_dir)
+                saltDF, refDF = _salt_loader(Path(salt_dir) / ssscc)
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue
             saltDF = remove_autosal_drift(saltDF, refDF)
             saltDF["SALNTY"] = gsw.SP_salinometer(
                 (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
-            )#.round(4)
+            )  # .round(4)
             _salt_exporter(saltDF, salt_dir)
-
-    return True
