@@ -25,7 +25,12 @@ def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
                 units = idx + 1  # units row immediately follows column names
 
     return pd.read_csv(
-        btl_file, skiprows=[0, units], skipfooter=1, engine="python", comment="#"
+        btl_file,
+        skiprows=[0, units],
+        skipfooter=1,
+        engine="python",
+        comment="#",
+        skipinitialspace=True,
     )
 
 
@@ -54,8 +59,6 @@ def write_pressure_details(stacast, log_file, start, end):
     add_header = not Path(log_file).exists()  # add header iff file doesn't exist
     with open(log_file, "a") as f:
         df.to_csv(f, mode="a", header=add_header, index=False)
-
-    return True
 
 
 def write_cast_details(
