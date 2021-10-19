@@ -8,3 +8,14 @@ write_to_template = 'version = "{version}"'
 
 [tool.isort]
 profile = "black"
+
+[tool.mypy]
+python_version = 3.8
+files = "ctdcal/ctd_io.py"
+
+[[tool.mypy.overrides]]
+module = [
+    "pandas",
+    "numpy"
+]
+ignore_missing_imports = true
