@@ -1,9 +1,5 @@
-#!/usr/bin/env python
-import csv
 import logging
-import math
 import warnings
-from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,10 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import oxy_fitting as oxy_fitting
-from . import report_ctd as report_ctd
+from . import ctd_io, get_ctdcal_config, oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -69,7 +62,7 @@ def cast_details(df, ssscc, log_file=None):
     b_lon = float(np.around(df_cast["GPSLON"][p_max_ind], 4))
     b_alt = float(np.around(df_cast["ALT"][p_max_ind], 4))
 
-    report_ctd.report_cast_details(
+    ctd_io.write_cast_details(
         ssscc,
         log_file,
         time_start,
@@ -370,7 +363,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
 
     # Log ondeck pressures
     if log_file is not None:
-        report_ctd.report_pressure_details(stacast, log_file, start_p, end_p)
+        ctd_io.write_pressure_details(stacast, log_file, start_p, end_p)
 
     return trimmed_df
 

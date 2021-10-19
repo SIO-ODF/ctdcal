@@ -4,7 +4,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## v0.1.3b (unreleased)
 
 ### Added
-* Created `io` module to hold all reading/writing functions
+* Created `ctd_io` module to hold all non-ODF-specific reading/writing functions
 * `isort` pre-commit hook
 * Set up [Codecov](https://app.codecov.io/gh/cchdo/ctdcal/)
 * `equations_sbe` conversion functions will now return a list of missing coefficients (instead of first missing in equation)

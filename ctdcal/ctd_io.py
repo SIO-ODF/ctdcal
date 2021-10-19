@@ -1,12 +1,35 @@
-#!/usr/bin/env python
-import datetime
 from pathlib import Path
+from typing import Union
 
-import numpy as np
 import pandas as pd
 
 
-def report_pressure_details(stacast, log_file, start, end):
+def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
+    """
+    Load WHP-exchange bottle file (_hy1.csv) into DataFrame.
+
+    Parameters
+    ----------
+    btl_file : str or Path
+        Name of file to be loaded
+
+    Returns
+    -------
+    df : DataFrame
+        Loaded bottle file
+    """
+    with open(btl_file) as f:
+        file = f.readlines()
+        for idx, line in enumerate(file):
+            if line.startswith("EXPOCODE"):
+                units = idx + 1  # units row immediately follows column names
+
+    return pd.read_csv(
+        btl_file, skiprows=[0, units], skipfooter=1, engine="python", comment="#"
+    )
+
+
+def write_pressure_details(stacast, log_file, start, end):
     """
     Write start/end deck pressure to ondeck_pressure.csv log file.
 
@@ -35,7 +58,7 @@ def report_pressure_details(stacast, log_file, start, end):
     return True
 
 
-def report_cast_details(
+def write_cast_details(
     stacast, c_file, start, end, bottom, start_p, max_p, b_alt, b_lat, b_lon
 ):
     """
@@ -85,5 +108,3 @@ def report_cast_details(
     add_header = not Path(c_file).exists()  # add header iff file doesn't exist
     with open(c_file, "a") as f:
         df.to_csv(f, mode="a", header=add_header, index=False)
-
-    return

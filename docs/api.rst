@@ -11,6 +11,7 @@ API reference
    :recursive:
 
    convert
+   ctd_io
    ctd_plots
    equations_sbe
    fit_ctd
@@ -20,6 +21,5 @@ API reference
    oxy_fitting
    process_bottle
    process_ctd
-   report_ctd
    rinko
    sbe_reader
