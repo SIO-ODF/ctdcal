@@ -49,12 +49,12 @@ def test_write_pressure_details(tmp_path):
 
     # check only new data are appended (not another header)
     ctd_io.write_pressure_details("00201", f_path, "00:05:01", "00:09:01")
-    with open(f_path) as f:
+    with open(f_path, "rb") as f:
         contents = f.readlines()
         assert len(contents) == 3
-        assert "SSSCC" in contents[0]
-        assert "00101" in contents[1]
-        assert "00201" in contents[2]
+        assert b"SSSCC" in contents[0]
+        assert b"00101" in contents[1]
+        assert b"00201" in contents[2]
 
 
 def test_write_cast_details(tmp_path):
@@ -71,9 +71,9 @@ def test_write_cast_details(tmp_path):
     ctd_io.write_cast_details(
         "00201", f_path, 2.0, 3.0, 4.0, 0.0, 99.0, 6.0, -70.0, 170.0
     )
-    with open(f_path) as f:
+    with open(f_path, "rb") as f:
         contents = f.readlines()
         assert len(contents) == 3
-        assert "SSSCC" in contents[0]
-        assert "00101" in contents[1]
-        assert "00201" in contents[2]
+        assert b"SSSCC" in contents[0]
+        assert b"00101" in contents[1]
+        assert b"00201" in contents[2]
