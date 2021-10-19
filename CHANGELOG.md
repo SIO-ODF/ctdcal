@@ -4,6 +4,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## v0.1.3b (unreleased)
 
 ### Added
+* Created `io` module to hold all reading/writing functions
 * `isort` pre-commit hook
 * Set up [Codecov](https://app.codecov.io/gh/cchdo/ctdcal/)
 * `equations_sbe` conversion functions will now return a list of missing coefficients (instead of first missing in equation)
@@ -20,6 +21,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 * `cmocean` is no longer a package dependency
 * Remove hardcoded cruise report plot code from `ctd_plots` module in favor of `ctdcal/scripts/cruise_report.py`
 * Outdated code in top-level `old` folder has been removed in favor of `SBEReader` class and `equations_sbe` module
+* Outdated `merge_codes` module has been removed
 
 ## v0.1.2b (2021-09-29)
 
