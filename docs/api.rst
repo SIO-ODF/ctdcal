@@ -11,7 +11,7 @@ API reference
    :recursive:
 
    convert
-   ctd_io
+   io
    ctd_plots
    equations_sbe
    fit_ctd

@@ -1,6 +1,6 @@
 import numpy as np
 
-from ctdcal import ctd_io
+from ctdcal import io
 
 
 def check_type(to_check, sub_dtype):
@@ -30,13 +30,13 @@ def test_load_exchange_btl(tmp_path):
         f.write("END_DATA")
 
     # check file read produces correct results
-    hy1 = ctd_io.load_exchange_btl(tmp_path / "test_hy1.csv")
+    hy1 = io.load_exchange_btl(tmp_path / "test_hy1.csv")
     assert hy1.shape == (2, 5)
     assert check_type(hy1[["EXPOCODE", "STNNBR", "CASTNO", "SAMPNO"]], int)
     assert all(hy1["SECT_ID"] == "ABC")  # should not have any leading spaces
 
     # check read works with str as well
-    assert hy1.equals(ctd_io.load_exchange_btl(f"{str(tmp_path)}/test_hy1.csv"))
+    assert hy1.equals(io.load_exchange_btl(f"{str(tmp_path)}/test_hy1.csv"))
 
 
 def test_write_pressure_details(tmp_path):
@@ -44,11 +44,11 @@ def test_write_pressure_details(tmp_path):
 
     # check file is created if it doesn't exist
     assert not (f_path).exists()
-    ctd_io.write_pressure_details("00101", f_path, "00:00:01", "00:04:01")
+    io.write_pressure_details("00101", f_path, "00:00:01", "00:04:01")
     assert (f_path).exists()
 
     # check only new data are appended (not another header)
-    ctd_io.write_pressure_details("00201", f_path, "00:05:01", "00:09:01")
+    io.write_pressure_details("00201", f_path, "00:05:01", "00:09:01")
     with open(f_path, "rb") as f:
         contents = f.readlines()
         assert len(contents) == 3
@@ -62,15 +62,11 @@ def test_write_cast_details(tmp_path):
 
     # check file is created if it doesn't exist
     assert not f_path.exists()
-    ctd_io.write_cast_details(
-        "00101", f_path, 1.0, 2.0, 3.0, 0.0, 100.0, 5.0, -70.0, 170.0
-    )
+    io.write_cast_details("00101", f_path, 1.0, 2.0, 3.0, 0.0, 100.0, 5.0, -70.0, 170.0)
     assert f_path.exists()
 
     # check only new data are appended (not another header)
-    ctd_io.write_cast_details(
-        "00201", f_path, 2.0, 3.0, 4.0, 0.0, 99.0, 6.0, -70.0, 170.0
-    )
+    io.write_cast_details("00201", f_path, 2.0, 3.0, 4.0, 0.0, 99.0, 6.0, -70.0, 170.0)
     with open(f_path, "rb") as f:
         contents = f.readlines()
         assert len(contents) == 3
