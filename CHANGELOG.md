@@ -1,7 +1,9 @@
 # Change Log
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## v0.1.3b (unreleased)
+## v0.1.4b (unreleased)
+
+## v0.1.3b (2021-10-21)
 
 ### Added
 * Created `ctdcal.io` module to hold all non-ODF-specific reading/writing functions
