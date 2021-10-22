@@ -11,12 +11,14 @@ profile = "black"
 
 [tool.mypy]
 python_version = 3.8
-files = "ctdcal/io.py"
+files = "ctdcal/io.py, ctdcal/convert.py"
 
 [[tool.mypy.overrides]]
 module = [
+    "gsw",
     "pandas",
     "numpy",
-    "requests"
+    "requests",
+    "yaml"
 ]
 ignore_missing_imports = true

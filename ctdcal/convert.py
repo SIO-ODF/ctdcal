@@ -1,6 +1,7 @@
 import logging
 from importlib import resources
 from pathlib import Path
+from typing import Sequence, Union
 
 import gsw
 import numpy as np
@@ -24,49 +25,69 @@ with resources.open_text("ctdcal", "sensor_lookup.yaml") as f:
 short_lookup = {str(k): v for k, v in short_lookup.items()}
 
 
-def hex_to_ctd(ssscc_list):
+def hex_to_ctd(ssscc: Union[str, Sequence[str]]) -> None:
     # TODO: add (some) error handling from odf_convert_sbe.py
     """
     Convert raw CTD data and export to .pkl files.
 
     Parameters
     ----------
-    ssscc_list : list of str
-        List of stations to convert
+    ssscc : str or list of str
+        Station(s) to convert
 
     Returns
     -------
-
+    None
     """
-    log.info("Converting .hex files")
-    for ssscc in ssscc_list:
-        if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
-            hexFile = cfg.dirs["raw"] + ssscc + ".hex"
-            xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
+    if isinstance(ssscc, str):
+        ssscc = [ssscc]
+    log.info(f"Converting {len(ssscc)} .hex file(s)")
+    for stn in ssscc:
+        f_out = cfg.dirs["converted"] + stn + ".pkl"
+        if Path(f_out).exists():
+            log.info(f"{f_out} already exists... skipping")
+        else:
+            hexFile = cfg.dirs["raw"] + stn + ".hex"
+            xmlconFile = cfg.dirs["raw"] + stn + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader)
-            converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
-
-    return True
+            converted_df.to_pickle(f_out)
 
 
-def make_time_files(ssscc_list):
-    log.info("Generating time.pkl files")
-    for ssscc in ssscc_list:
-        if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
-            converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+def make_time_files(ssscc: Union[str, Sequence[str]]) -> None:
+    """
+    Convert full cast .pkl files to downcast time-series files.
+
+    Parameters
+    ----------
+    ssscc : str or list of str
+        Station(s) to convert
+
+    Returns
+    -------
+    None
+    """
+    if isinstance(ssscc, str):
+        ssscc = [ssscc]
+    log.info(f"Generating {len(ssscc)} time.pkl file(s)")
+    for stn in ssscc:
+        f_out = cfg.dirs["time"] + stn + "_time.pkl"
+        if Path(f_out).exists():
+            log.info(f"{f_out} already exists... skipping")
+        else:
+            converted_df = pd.read_pickle(cfg.dirs["converted"] + stn + ".pkl")
 
             # Remove any pressure spikes
             bad_rows = converted_df["CTDPRS"].abs() > 6500
             if bad_rows.any():
-                log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
+                log.debug(f"{stn}: {bad_rows.sum()} bad pressure points removed.")
             converted_df.loc[bad_rows, :] = np.nan
             converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
-                ssscc,
+                stn,
                 log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
             )
 
@@ -98,32 +119,36 @@ def make_time_files(ssscc_list):
             # Trim to downcast
             cast_data = process_ctd.cast_details(
                 filter_data,
-                ssscc,
+                stn,
                 log_file=cfg.dirs["logs"] + "cast_details.csv",
             )
 
-            cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
+            cast_data.to_pickle(f_out)
 
 
-def make_btl_mean(ssscc_list):
+def make_btl_mean(ssscc: Union[str, Sequence[str]]) -> None:
     # TODO: add (some) error handling from odf_process_bottle.py
     """
     Create "bottle mean" files from continuous CTD data averaged at the bottle stops.
 
     Parameters
     ----------
-    ssscc_list : list of str
-        List of stations to convert
+    ssscc : str or list of str
+        Station(s) to convert
 
     Returns
     -------
-    boolean
-        bottle averaging of mean has finished successfully
+    None
     """
-    log.info("Generating btl_mean.pkl files")
-    for ssscc in ssscc_list:
-        if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
-            imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+    if isinstance(ssscc, str):
+        ssscc = [ssscc]
+    log.info(f"Generating {len(ssscc)} btl_mean.pkl file(s)")
+    for stn in ssscc:
+        f_out = cfg.dirs["bottle"] + stn + "_btl_mean.pkl"
+        if Path(f_out).exists():
+            log.info(f"{f_out} already exists... skipping")
+        else:
+            imported_df = pd.read_pickle(cfg.dirs["converted"] + stn + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
 
@@ -138,14 +163,12 @@ def make_btl_mean(ssscc_list):
 
             bot_df = mean_df[[datetime_col, "GPSLAT", "GPSLON"]].head(1)
             bot_df.columns = ["bottom_time", "latitude", "longitude"]
-            bot_df.insert(0, "SSSCC", ssscc)
+            bot_df.insert(0, "stn", stn)
             add_header = not Path(fname).exists()  # add header iff file doesn't exist
             with open(fname, "a") as f:
                 bot_df.to_csv(f, mode="a", header=add_header, index=False)
 
-            mean_df.to_pickle(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl")
-
-    return True
+            mean_df.to_pickle(f_out)
 
 
 def convertFromSBEReader(sbeReader):
