@@ -25,10 +25,24 @@ with resources.open_text("ctdcal", "sensor_lookup.yaml") as f:
 short_lookup = {str(k): v for k, v in short_lookup.items()}
 
 
-def hex_to_ctd(ssscc: Union[str, Sequence[str]]) -> None:
+def _check_files(f_in, f_out):
+    """Warn if file in doesn't exist, inform if file out does exist"""
+    if not f_in.exists():
+        log.warning(f"{f_in} does not exist... skipping")
+        return True
+    elif f_out.exists():
+        log.info(f"{f_out} already exists... skipping")
+        return True
+
+
+def hex_to_ctd(
+    ssscc: Union[str, Sequence[str]],
+    raw_dir: Union[str, Path] = cfg.dirs["raw"],
+    cnv_dir: Union[str, Path] = cfg.dirs["converted"],
+) -> None:
     # TODO: add (some) error handling from odf_convert_sbe.py
     """
-    Convert raw CTD data and export to .pkl files.
+    Convert raw, hexadecimal CTD data into engineering units and export to .pkl files.
 
     Parameters
     ----------
@@ -43,18 +57,24 @@ def hex_to_ctd(ssscc: Union[str, Sequence[str]]) -> None:
         ssscc = [ssscc]
     log.info(f"Converting {len(ssscc)} .hex file(s)")
     for stn in ssscc:
-        f_out = cfg.dirs["converted"] + stn + ".pkl"
-        if Path(f_out).exists():
-            log.info(f"{f_out} already exists... skipping")
+        f_hex = Path(raw_dir) / f"{stn}.hex"
+        f_xmlcon = Path(raw_dir) / f"{stn}.XMLCON"
+        f_out = Path(cnv_dir) / f"{stn}.pkl"
+
+        if _check_files(f_hex, f_out) or _check_files(f_xmlcon, f_out):
+            continue
         else:
-            hexFile = cfg.dirs["raw"] + stn + ".hex"
-            xmlconFile = cfg.dirs["raw"] + stn + ".XMLCON"
-            sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
+            sbeReader = sbe_rd.SBEReader.from_paths(f_hex, f_xmlcon)
             converted_df = convertFromSBEReader(sbeReader)
             converted_df.to_pickle(f_out)
 
 
-def make_time_files(ssscc: Union[str, Sequence[str]]) -> None:
+def make_time_files(
+    ssscc: Union[str, Sequence[str]],
+    cnv_dir: Union[str, Path] = cfg.dirs["converted"],
+    time_dir: Union[str, Path] = cfg.dirs["time"],
+    logs_dir: Union[str, Path] = cfg.dirs["logs"],
+) -> None:
     """
     Convert full cast .pkl files to downcast time-series files.
 
@@ -71,11 +91,13 @@ def make_time_files(ssscc: Union[str, Sequence[str]]) -> None:
         ssscc = [ssscc]
     log.info(f"Generating {len(ssscc)} time.pkl file(s)")
     for stn in ssscc:
-        f_out = cfg.dirs["time"] + stn + "_time.pkl"
-        if Path(f_out).exists():
-            log.info(f"{f_out} already exists... skipping")
+        f_cnv = Path(cnv_dir) / f"{stn}.pkl"
+        f_out = Path(time_dir) / f"{stn}_time.pkl"
+
+        if _check_files(f_cnv, f_out):
+            continue
         else:
-            converted_df = pd.read_pickle(cfg.dirs["converted"] + stn + ".pkl")
+            converted_df = pd.read_pickle(f_cnv)
 
             # Remove any pressure spikes
             bad_rows = converted_df["CTDPRS"].abs() > 6500
@@ -88,7 +110,7 @@ def make_time_files(ssscc: Union[str, Sequence[str]]) -> None:
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
                 stn,
-                log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
+                log_file=Path(logs_dir) / "ondeck_pressure.csv",
             )
 
             # # TODO: switch to loop instead, e.g.:
@@ -120,13 +142,18 @@ def make_time_files(ssscc: Union[str, Sequence[str]]) -> None:
             cast_data = process_ctd.cast_details(
                 filter_data,
                 stn,
-                log_file=cfg.dirs["logs"] + "cast_details.csv",
+                log_file=Path(logs_dir) / "cast_details.csv",
             )
 
             cast_data.to_pickle(f_out)
 
 
-def make_btl_mean(ssscc: Union[str, Sequence[str]]) -> None:
+def make_btl_mean(
+    ssscc: Union[str, Sequence[str]],
+    cnv_dir: Union[str, Path] = cfg.dirs["converted"],
+    btl_dir: Union[str, Path] = cfg.dirs["bottle"],
+    log_dir: Union[str, Path] = cfg.dirs["logs"],
+) -> None:
     # TODO: add (some) error handling from odf_process_bottle.py
     """
     Create "bottle mean" files from continuous CTD data averaged at the bottle stops.
@@ -144,16 +171,18 @@ def make_btl_mean(ssscc: Union[str, Sequence[str]]) -> None:
         ssscc = [ssscc]
     log.info(f"Generating {len(ssscc)} btl_mean.pkl file(s)")
     for stn in ssscc:
-        f_out = cfg.dirs["bottle"] + stn + "_btl_mean.pkl"
-        if Path(f_out).exists():
-            log.info(f"{f_out} already exists... skipping")
+        f_cnv = Path(cnv_dir) / f"{stn}.pkl"
+        f_out = Path(btl_dir) / f"{stn}_btl_mean.pkl"
+
+        if _check_files(f_cnv, f_out):
+            continue
         else:
-            imported_df = pd.read_pickle(cfg.dirs["converted"] + stn + ".pkl")
+            imported_df = pd.read_pickle(f_cnv)
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
 
             # export bottom bottle time/lat/lon info
-            fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
+            fname = Path(log_dir) / "bottom_bottle_details.csv"
             datetime_col = "nmea_datetime"
             if datetime_col not in mean_df.columns:
                 log.debug(

@@ -11,12 +11,11 @@ API reference
    :recursive:
 
    convert
-   io
    ctd_plots
    equations_sbe
    fit_ctd
    flagging
-   merge_codes
+   io
    odf_io
    oxy_fitting
    process_bottle

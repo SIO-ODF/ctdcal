@@ -11,7 +11,7 @@ profile = "black"
 
 [tool.mypy]
 python_version = 3.8
-files = "ctdcal/io.py, ctdcal/convert.py"
+files = ["ctdcal/convert.py", "ctdcal/io.py"]
 
 [[tool.mypy.overrides]]
 module = [
