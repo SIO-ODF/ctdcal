@@ -32,7 +32,7 @@ jobs:
         python3 -m pip install .[tests]
     - name: Run mypy
       run: |
-        mypy -v --config-file pyproject.toml
+        mypy -v
     - name: Run pytest
       run: |
         pytest -v --cov-report xml --cov=ctdcal

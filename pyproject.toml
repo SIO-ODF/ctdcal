@@ -17,8 +17,11 @@ files = ["ctdcal/convert.py", "ctdcal/io.py"]
 module = [
     "gsw",
     "pandas",
+    "pytz",
+    "matplotlib.*",
     "numpy",
     "requests",
+    "scipy.*",
     "yaml"
 ]
 ignore_missing_imports = true
