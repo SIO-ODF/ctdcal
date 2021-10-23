@@ -1,2 +1,3 @@
 include ctdcal/_version.py
 include ctdcal/user_settings.yaml
+include ctdcal/tests/data/90909.XMLCON
