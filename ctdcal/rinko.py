@@ -1,18 +1,13 @@
+import logging
 from collections import namedtuple
 from pathlib import Path
 
-import logging
 import numpy as np
 import pandas as pd
 import scipy
+from numpy.typing import ArrayLike
 
-from . import (
-    ctd_plots,
-    get_ctdcal_config,
-    flagging,
-    process_ctd,
-    oxy_fitting,
-)
+from . import ctd_plots, flagging, get_ctdcal_config, oxy_fitting, process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -76,7 +71,7 @@ def correct_pressure(P, d, E):
     return P_d
 
 
-def salinity_correction(DO_c, T, S):
+def salinity_correction(DO_c: ArrayLike, T: ArrayLike, S: ArrayLike) -> ArrayLike:
     """
     Oxygen optode is not able to detect salinity, so a correction is applied to
     account for the effect of salt on oxygen concentration. See Uchida (2010) in
@@ -133,8 +128,8 @@ def _Uchida_DO_eq(coefs, inputs):
     V_r, P, T, S, o2_sol = inputs
 
     K_sv = c0 + (c1 * T) + (c2 * T ** 2)  # Stern-Volmer constant (Tengberg et al. 2006)
-    V0 = (1 + d0 * T)  # voltage at zero oxygen (Uchida 2010, eq. 10)
-    Vc = (d1 + d2 * V_r)  # raw voltage (Uchida 2010, eq. 10)
+    V0 = 1 + d0 * T  # voltage at zero oxygen (Uchida 2010, eq. 10)
+    Vc = d1 + d2 * V_r  # raw voltage (Uchida 2010, eq. 10)
     o2_sat = ((V0 / Vc) - 1) / K_sv  # oxygen saturation [%] (Uchida 2010, eq. 6)
 
     DO = o2_sat * o2_sol  # dissolved oxygen concentration
@@ -448,87 +443,93 @@ def rinko_oxy_fit(
 ### Everything below is old code (not necessarily bad)
 
 
-
 def rinko_o2_cal_parameters(**kwargs):
     """
     Calibration coefficients for the oxygen calculations (from RinkoIII manual).
     """
     A = kwargs.get("A", -4.524084e1)
-    B = kwargs.get("B",  1.449377e2)
+    B = kwargs.get("B", 1.449377e2)
     C = kwargs.get("C", -3.051590e-1)
-    D = kwargs.get("D",  1.065300e-2)
-    E = kwargs.get("E",  4.000000e-3)
-    F = kwargs.get("F",  6.250000e-5)
-    G = kwargs.get("G",  0.000000e0)
-    H = kwargs.get("H",  1.000000e0)
-    return RinkoO2Cal(A,B,C,D,E,F,G,H)
+    D = kwargs.get("D", 1.065300e-2)
+    E = kwargs.get("E", 4.000000e-3)
+    F = kwargs.get("F", 6.250000e-5)
+    G = kwargs.get("G", 0.000000e0)
+    H = kwargs.get("H", 1.000000e0)
+    return RinkoO2Cal(A, B, C, D, E, F, G, H)
+
 
 def rinko_temperature_cal_parameters(**kwargs):
     A = kwargs.get("A", -5.305905e0)
-    B = kwargs.get("B",  1.666857e1)
+    B = kwargs.get("B", 1.666857e1)
     C = kwargs.get("C", -2.142681e0)
-    D = kwargs.get("D",  4.582805e-1)
-    return RinkoTMPCal(A,B,C,D)
+    D = kwargs.get("D", 4.582805e-1)
+    return RinkoTMPCal(A, B, C, D)
 
-def rinko_temperature(v, tmp_cal:RinkoTMPCal):
+
+def rinko_temperature(v, tmp_cal: RinkoTMPCal):
     if type(tmp_cal) is not RinkoTMPCal:
         raise ValueError("tmp_cal must be of type RinkoTMPCal")
 
     A, B, C, D = tmp_cal
-    return A + B*v + C*v**2 + D*v**3
+    return A + B * v + C * v ** 2 + D * v ** 3
 
-def rinko_pprime_aro_cav(v, t, o2_cal:RinkoO2Cal):
+
+def rinko_pprime_aro_cav(v, t, o2_cal: RinkoO2Cal):
     """
     Calculates Rinko P' of the equation P = G + H * P'
     where P is DO physical value IN PERCENT [%]
     """
     A, B, C, D, E, F, G, H = o2_cal
 
-    term_1_denominator = 1 + D*(t-25) + F*(t-25)**2
-    term_1 = A/term_1_denominator
+    term_1_denominator = 1 + D * (t - 25) + F * (t - 25) ** 2
+    term_1 = A / term_1_denominator
 
-    term_2_denominator = v * (1 + D*(t-25) + F*(t-25)**2) + C
-    term_2 = B/term_2_denominator
+    term_2_denominator = v * (1 + D * (t - 25) + F * (t - 25) ** 2) + C
+    term_2 = B / term_2_denominator
 
     return term_1 + term_2
 
-def rinko_saturation(pprime, o2_cal:RinkoO2Cal):
+
+def rinko_saturation(pprime, o2_cal: RinkoO2Cal):
     """
-        Calculates Rinko P of the equation P = G + H * P'
-        where P is DO physical value IN PERCENT [%]
+    Calculates Rinko P of the equation P = G + H * P'
+    where P is DO physical value IN PERCENT [%]
     """
 
     A, B, C, D, E, F, G, H = o2_cal
 
     return G + H * pprime
 
-def rinko_correct_for_pressure(p, d, o2_cal:RinkoO2Cal):
+
+def rinko_correct_for_pressure(p, d, o2_cal: RinkoO2Cal):
     """Note that the pressure term, d, must be in MPa
 
     1 decibar = 0.01 Mpa
     """
     A, B, C, D, E, F, G, H = o2_cal
 
-    return p*(1 + E*d)
+    return p * (1 + E * d)
+
 
 def rinko_saturation(df, film="B", model="ARO-CAV", **kwargs):
     pass
 
-def rinko_oxy_eq(press, temp, oxyvo, os, o2_cal:RinkoO2Cal):
 
-    #Calculate pprime
+def rinko_oxy_eq(press, temp, oxyvo, os, o2_cal: RinkoO2Cal):
 
-    pprime = rinko_pprime_aro_cav(oxyvo,temp,o2_cal)
+    # Calculate pprime
+
+    pprime = rinko_pprime_aro_cav(oxyvo, temp, o2_cal)
 
     # Calculate P (DO physical value in %)
 
-    #p = rinko_saturation(pprime, o2_cal)
+    # p = rinko_saturation(pprime, o2_cal)
 
     # Correct for pressure * d is pressure in Mpa *
 
     d = press * 0.01
 
-    p_corr = rinko_correct_for_pressure(pprime,d,o2_cal)
+    p_corr = rinko_correct_for_pressure(pprime, d, o2_cal)
 
     # Divide by 100 to get percents in the form of 0.xx
 
@@ -539,6 +540,7 @@ def rinko_oxy_eq(press, temp, oxyvo, os, o2_cal:RinkoO2Cal):
     DO = p_corr * os
 
     return DO
+
 
 def rinko_curve_fit_eq(X, a, b, c, d, e, f, g, h):
     """
@@ -549,19 +551,19 @@ def rinko_curve_fit_eq(X, a, b, c, d, e, f, g, h):
     press, temp, oxyvo, os = X
     o2_cal = RinkoO2Cal(a, b, c, d, e, f, g, h)
 
-    #Calculate pprime
+    # Calculate pprime
 
-    pprime = rinko_pprime_aro_cav(oxyvo,temp,o2_cal)
+    pprime = rinko_pprime_aro_cav(oxyvo, temp, o2_cal)
 
     # Calculate P (DO physical value in %)
 
-    #p = rinko_saturation(pprime, o2_cal)
+    # p = rinko_saturation(pprime, o2_cal)
 
     # Correct for pressure * d is pressure in Mpa *
 
     d = press * 0.01
 
-    p_corr = rinko_correct_for_pressure(pprime,d,o2_cal)
+    p_corr = rinko_correct_for_pressure(pprime, d, o2_cal)
 
     # Divide by 100 to get percents in the form of 0.xx
 
@@ -573,9 +575,10 @@ def rinko_curve_fit_eq(X, a, b, c, d, e, f, g, h):
 
     return DO
 
-def rinko_oxygen_cal(o2_cal,pressure,temp,oxyvolts,os,ref_oxy,switch):
 
-    """"
+def rinko_oxygen_cal(o2_cal, pressure, temp, oxyvolts, os, ref_oxy, switch):
+
+    """ "
 
     Rinko oxygen fitting routine using the equation:
         Calculates Rinko P of the equation P = G + H * P'
@@ -595,67 +598,112 @@ def rinko_oxygen_cal(o2_cal,pressure,temp,oxyvolts,os,ref_oxy,switch):
 
     rinko_oxy = rinko_oxy_eq(pressure, temp, oxyvolts, os, o2_cal)
 
-    #Weight Determination
+    # Weight Determination
     if switch == 1:
 
         weights = oxy_fitting.calculate_weights(pressure)
 
-        resid = ((weights * (ref_oxy - rinko_oxy))**2) / (np.sum(weights)**2) #Original way (np.sum(weights)**2)
+        resid = ((weights * (ref_oxy - rinko_oxy)) ** 2) / (
+            np.sum(weights) ** 2
+        )  # Original way (np.sum(weights)**2)
 
     elif switch == 2:
-        #L2 Norm
-        resid = (ref_oxy - rinko_oxy)**2
+        # L2 Norm
+        resid = (ref_oxy - rinko_oxy) ** 2
 
     elif switch == 3:
-        #ODF residuals
+        # ODF residuals
 
-        resid = np.sqrt(((ref_oxy - rinko_oxy)**2) / (np.std(rinko_oxy)**2))
+        resid = np.sqrt(((ref_oxy - rinko_oxy) ** 2) / (np.std(rinko_oxy) ** 2))
 
     elif switch == 4:
         # Weighted ODF residuals
 
         weights = oxy_fitting.calculate_weights(pressure)
-        resid = np.sqrt(weights * ((ref_oxy - rinko_oxy)**2) / (np.sum(weights)**2))#(np.std(ctd_oxy_mlL)**2))
+        resid = np.sqrt(
+            weights * ((ref_oxy - rinko_oxy) ** 2) / (np.sum(weights) ** 2)
+        )  # (np.std(ctd_oxy_mlL)**2))
 
     elif switch == 5:
 
         weights = oxy_fitting.calculate_weights(pressure)
 
-        resid = ((weights * (ref_oxy - rinko_oxy))**2) / (np.sum(weights**2))
-
+        resid = ((weights * (ref_oxy - rinko_oxy)) ** 2) / (np.sum(weights ** 2))
 
     return resid
 
-def rinko_weighted_residual(coefs,weights,inputs,refoxy):
-    a, b, c, d, e, f, g, h = coefs
-    return np.sum((weights*(refoxy-rinko_curve_fit_eq(inputs, a, b, c, d, e, f, g, h))**2))/np.sum(weights**2)
 
-def match_sigmas(btl_prs, btl_oxy, btl_sigma, ctd_sigma, ctd_os, ctd_prs, ctd_tmp, rinkovolts, btl_ssscc=None):
+def rinko_weighted_residual(coefs, weights, inputs, refoxy):
+    a, b, c, d, e, f, g, h = coefs
+    return np.sum(
+        (weights * (refoxy - rinko_curve_fit_eq(inputs, a, b, c, d, e, f, g, h)) ** 2)
+    ) / np.sum(weights ** 2)
+
+
+def match_sigmas(
+    btl_prs,
+    btl_oxy,
+    btl_sigma,
+    ctd_sigma,
+    ctd_os,
+    ctd_prs,
+    ctd_tmp,
+    rinkovolts,
+    btl_ssscc=None,
+):
 
     # Construct Dataframe from bottle and ctd values for merging
-    if 'btl_ssscc' in locals():
-        btl_dict = {'CTDPRS_rinko_btl':btl_prs, 'REFOXY_rinko':btl_oxy, 'sigma_rinko_btl':btl_sigma, 'SSSCC_rinko':btl_ssscc}
+    if "btl_ssscc" in locals():
+        btl_dict = {
+            "CTDPRS_rinko_btl": btl_prs,
+            "REFOXY_rinko": btl_oxy,
+            "sigma_rinko_btl": btl_sigma,
+            "SSSCC_rinko": btl_ssscc,
+        }
     else:
-        btl_dict = {'CTDPRS_rinko_btl':btl_prs, 'REFOXY_rinko':btl_oxy, 'sigma_rinko_btl':btl_sigma}
+        btl_dict = {
+            "CTDPRS_rinko_btl": btl_prs,
+            "REFOXY_rinko": btl_oxy,
+            "sigma_rinko_btl": btl_sigma,
+        }
     btl_data = pd.DataFrame(btl_dict)
-    time_dict = {'CTDPRS_rinko_ctd':ctd_prs, 'sigma_rinko_ctd':ctd_sigma, 'OS_rinko_ctd':ctd_os, 'CTDTMP_rinko':ctd_tmp, 'CTDRINKOVOLTS':rinkovolts}
+    time_dict = {
+        "CTDPRS_rinko_ctd": ctd_prs,
+        "sigma_rinko_ctd": ctd_sigma,
+        "OS_rinko_ctd": ctd_os,
+        "CTDTMP_rinko": ctd_tmp,
+        "CTDRINKOVOLTS": rinkovolts,
+    }
     time_data = pd.DataFrame(time_dict)
 
     # Sort DataFrames by sigma0
-    time_data.sort_values('sigma_rinko_ctd', inplace=True)
-    btl_data.sort_values('sigma_rinko_btl', inplace=True)
-    btl_data.dropna(subset=['REFOXY_rinko'], inplace=True)
+    time_data.sort_values("sigma_rinko_ctd", inplace=True)
+    btl_data.sort_values("sigma_rinko_btl", inplace=True)
+    btl_data.dropna(subset=["REFOXY_rinko"], inplace=True)
 
     # Merge DF
-    merged_df = pd.merge_asof(btl_data, time_data, left_on='sigma_rinko_btl', right_on='sigma_rinko_ctd', direction='nearest', suffixes=['_btl','_ctd'])
+    merged_df = pd.merge_asof(
+        btl_data,
+        time_data,
+        left_on="sigma_rinko_btl",
+        right_on="sigma_rinko_ctd",
+        direction="nearest",
+        suffixes=["_btl", "_ctd"],
+    )
 
     # Apply coef and calculate CTDRINKO
     rinko_coef0 = rinko_o2_cal_parameters()
-    merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],rinko_coef0)
+    merged_df["CTDRINKO"] = rinko_oxy_eq(
+        merged_df["CTDPRS_rinko_ctd"],
+        merged_df["CTDTMP_rinko"],
+        merged_df["CTDRINKOVOLTS"],
+        merged_df["OS_rinko_ctd"],
+        rinko_coef0,
+    )
 
     return merged_df
 
-    
+
 def rinko_oxygen_fit(merged_df, rinko_coef0=None, f_out=None):
 
     # Create DF for good and questionable values
@@ -670,59 +718,73 @@ def rinko_oxygen_fit(merged_df, rinko_coef0=None, f_out=None):
     p0 = [x for x in rinko_coef0]
 
     # Curve fit (weighted)
-    weights = oxy_fitting.calculate_weights(merged_df['CTDPRS_rinko_ctd'])
+    weights = oxy_fitting.calculate_weights(merged_df["CTDPRS_rinko_ctd"])
     cfw_coefs = scipy.optimize.fmin(
         rinko_weighted_residual,
         x0=p0,
         args=(
-            weights,(
-                merged_df['CTDPRS_rinko_ctd'],
-                merged_df['CTDTMP_rinko'],
-                merged_df['CTDRINKOVOLTS'], 
-                merged_df['OS_rinko_ctd']
+            weights,
+            (
+                merged_df["CTDPRS_rinko_ctd"],
+                merged_df["CTDTMP_rinko"],
+                merged_df["CTDRINKOVOLTS"],
+                merged_df["OS_rinko_ctd"],
             ),
-            merged_df['REFOXY_rinko'],
+            merged_df["REFOXY_rinko"],
         ),
         maxfun=10000,
     )
-    merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coefs)
-    
-    merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
-    stdres = np.std(merged_df['res_rinko'])
+    merged_df["CTDRINKO"] = rinko_oxy_eq(
+        merged_df["CTDPRS_rinko_ctd"],
+        merged_df["CTDTMP_rinko"],
+        merged_df["CTDRINKOVOLTS"],
+        merged_df["OS_rinko_ctd"],
+        cfw_coefs,
+    )
+
+    merged_df["res_rinko"] = merged_df["REFOXY_rinko"] - merged_df["CTDRINKO"]
+    stdres = np.std(merged_df["res_rinko"])
     cutoff = stdres * 2.8
 
-    thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+    thrown_values = merged_df[np.abs(merged_df["res_rinko"]) > cutoff]
     bad_df = pd.concat([bad_df, thrown_values])
-    merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
+    merged_df = merged_df[np.abs(merged_df["res_rinko"]) <= cutoff]
 
     while not thrown_values.empty:  # runs as long as there are thrown_values
 
         p0 = cfw_coefs
-        weights = oxy_fitting.calculate_weights(merged_df['CTDPRS_rinko_ctd'])
+        weights = oxy_fitting.calculate_weights(merged_df["CTDPRS_rinko_ctd"])
         cfw_coefs = scipy.optimize.fmin(
             rinko_weighted_residual,
             x0=p0,
             args=(
-                weights,(
-                    merged_df['CTDPRS_rinko_ctd'],
-                    merged_df['CTDTMP_rinko'],
-                    merged_df['CTDRINKOVOLTS'], 
-                    merged_df['OS_rinko_ctd']
+                weights,
+                (
+                    merged_df["CTDPRS_rinko_ctd"],
+                    merged_df["CTDTMP_rinko"],
+                    merged_df["CTDRINKOVOLTS"],
+                    merged_df["OS_rinko_ctd"],
                 ),
-                merged_df['REFOXY_rinko'],
+                merged_df["REFOXY_rinko"],
             ),
             maxfun=10000,
         )
-        merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coefs)
+        merged_df["CTDRINKO"] = rinko_oxy_eq(
+            merged_df["CTDPRS_rinko_ctd"],
+            merged_df["CTDTMP_rinko"],
+            merged_df["CTDRINKOVOLTS"],
+            merged_df["OS_rinko_ctd"],
+            cfw_coefs,
+        )
 
-        merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
-        stdres = np.std(merged_df['res_rinko'])
+        merged_df["res_rinko"] = merged_df["REFOXY_rinko"] - merged_df["CTDRINKO"]
+        stdres = np.std(merged_df["res_rinko"])
         cutoff = stdres * 2.8
-        thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+        thrown_values = merged_df[np.abs(merged_df["res_rinko"]) > cutoff]
         print(len(thrown_values))
         print(p0)
         bad_df = pd.concat([bad_df, thrown_values])
-        merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
+        merged_df = merged_df[np.abs(merged_df["res_rinko"]) <= cutoff]
 
     # try:
     #     cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq,
@@ -738,7 +800,6 @@ def rinko_oxygen_fit(merged_df, rinko_coef0=None, f_out=None):
     #     bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
     #     bad_df = pd.concat([bad_df, bad_values])
     #     merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
-
 
     #     while not thrown_values.empty:
 
@@ -796,24 +857,24 @@ def rinko_oxygen_fit(merged_df, rinko_coef0=None, f_out=None):
     #             bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
     #             merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
 
-
-    #coef_dict[station] = cfw_coef
+    # coef_dict[station] = cfw_coef
     good_df = pd.concat([good_df, merged_df])
-    good_df['CTDRINKO_FLAG_W'] = 2
+    good_df["CTDRINKO_FLAG_W"] = 2
     bad_df = pd.concat([bad_df, bad_values])
-    bad_df['CTDRINKO_FLAG_W'] = 3
-    df = pd.concat([good_df,bad_df])
-    df.sort_values(by='CTDPRS_rinko_btl',ascending=False,inplace=True)
+    bad_df["CTDRINKO_FLAG_W"] = 3
+    df = pd.concat([good_df, bad_df])
+    df.sort_values(by="CTDPRS_rinko_btl", ascending=False, inplace=True)
     oxy_df = df.copy()
 
     return cfw_coef, df
 
 
-
 if __name__ == "__main__":
     print(rinko_temperature(1.565323565, rinko_temperature_cal_parameters()))
-    print(rinko_correct_for_pressure(
-    rinko_pprime_aro_cav(1.5421, 0.442, rinko_o2_cal_parameters()),
-    2/100,
-    rinko_o2_cal_parameters()
-    ))
+    print(
+        rinko_correct_for_pressure(
+            rinko_pprime_aro_cav(1.5421, 0.442, rinko_o2_cal_parameters()),
+            2 / 100,
+            rinko_o2_cal_parameters(),
+        )
+    )
