@@ -1,11 +1,11 @@
 import logging
-from collections import namedtuple
 from pathlib import Path
+from typing import NamedTuple, Union
 
 import numpy as np
 import pandas as pd
 import scipy
-from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 
 from . import ctd_plots, flagging, get_ctdcal_config, oxy_fitting, process_ctd
 
@@ -13,7 +13,7 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def salinity_correction(DO_c: ArrayLike, T: ArrayLike, S: ArrayLike) -> ArrayLike:
+def salinity_correction(DO_c: NDArray, T: NDArray, S: NDArray) -> NDArray:
     """
     Oxygen optode is not able to detect salinity, so a correction is applied to
     account for the effect of salt on oxygen concentration. See Uchida (2010) in
@@ -383,18 +383,43 @@ def rinko_oxy_fit(
 
 
 ### This section is specific to Rinko equations from JFE Advantech (not used by ODF)
-RinkoO2Cal = namedtuple("RinkoO2Cal", [*"ABCDEFGH"])
-RinkoTMPCal = namedtuple("RinkoTMPCal", [*"ABCD"])
+# this is currently (10/26/21) the best way to type check this (as a NamedTuple)
+# TODO: stop using NamedTuple in favor of ..?
+class O2_cal(NamedTuple):
+    A: float
+    B: float
+    C: float
+    D: float
+    E: float
+    F: float
+    G: float
+    H: float
 
 
-def rinko_temperature(v, tmp_cal: RinkoTMPCal):
-    """Calculate Rinko temperature from raw voltage"""
+class T_cal(NamedTuple):
+    A: float
+    B: float
+    C: float
+    D: float
+
+
+def rinko_temperature(N: NDArray, tmp_cal: Union[tuple, T_cal]) -> NDArray:
+    """
+    Calculate Rinko temperature from raw voltage
+
+    Parameters
+    ----------
+    N : array-like
+        Raw instrument output
+    tmp_cal : namedtuple of float
+        Calibration coefficients for temperature sensor
+    """
     A, B, C, D = tmp_cal
 
-    return A + B * v + C * v ** 2 + D * v ** 3
+    return A + B * N + C * N ** 2 + D * N ** 3
 
 
-def rinko_p_prime(N, t, o2_cal: RinkoO2Cal):
+def rinko_p_prime(N: NDArray, t: NDArray, o2_cal: Union[tuple, O2_cal]) -> NDArray:
     """
     Per RinkoIII manual: 'The film sensing the water is affect by environment
     temperature and pressure at the depth where it is deployed. Based on experiments,
@@ -406,26 +431,45 @@ def rinko_p_prime(N, t, o2_cal: RinkoO2Cal):
         Raw instrument output
     t : array-like
         Temperature [degC]
-    A-H : float
-        Calibration parameters
+    o2_cal : namedtuple of float
+        Calibration coefficients for oxygen sensor
+
+    Returns
+    -------
+    P_prime : array-like
+        Dissolved oxygen [%], uncorrected for sensor drift
     """
     A, B, C, D, E, F, G, H = o2_cal
 
     return A / (1 + D * (t - 25)) + B / ((N - F) * (1 + D * (t - 25)) + C + F)
 
 
-def rinko_saturation(pprime, o2_cal: RinkoO2Cal):
+def rinko_saturation(P_prime: NDArray, o2_cal: Union[tuple, O2_cal]) -> NDArray:
     """
     Calculate the dissolved oxygen percentage using the equation P = G + H * P'
     where P is DO physical value IN PERCENT [%]
+
+    Parameters
+    ----------
+    P_prime: array-like
+        Temperature-corrected DO [%], uncorrected for sensor drift
+    o2_cal : namedtuple of float
+        Calibration coefficients for oxygen sensor
+
+    Returns
+    -------
+    P : array-like
+        Temperature-corrected DO [%], corrected for sensor drift
     """
     # TODO: allow for other films or Rinko models?
     A, B, C, D, E, F, G, H = o2_cal
 
-    return G + H * pprime
+    return G + H * P_prime
 
 
-def rinko_pressure_correction(P, d, o2_cal: RinkoO2Cal):
+def rinko_pressure_correction(
+    P: NDArray, d: NDArray, o2_cal: Union[tuple, O2_cal]
+) -> NDArray:
     """
     Parameters
     ----------
@@ -450,7 +494,13 @@ def rinko_pressure_correction(P, d, o2_cal: RinkoO2Cal):
     return P * (1 + E * d)
 
 
-def rinko_oxy_eq(pressure, temperature, oxy_volts, OS, o2_cal: RinkoO2Cal):
+def rinko_DO(
+    p: NDArray,
+    t: NDArray,
+    oxy_volts: NDArray,
+    OS: NDArray,
+    o2_cal: Union[tuple, O2_cal],
+) -> NDArray:
     """
     Calculate RinkoIII dissolved oxygen from raw values
     and calibrated pressure and temperature.
@@ -458,11 +508,11 @@ def rinko_oxy_eq(pressure, temperature, oxy_volts, OS, o2_cal: RinkoO2Cal):
     Parameters
     ----------
     p : array-like
-        Temperature-corrected DO [%]
+        CTD pressure [dbar]
     t : array-like
-        Pressure [MPa]
+        CTD temperature [degC]
     oxy_volts : array-like
-        Raw Rinko voltage output
+        Raw Rinko oxygen output [V]
     OS : array-like
         Oxygen saturation [ml/l or umol/kg]
 
@@ -476,11 +526,11 @@ def rinko_oxy_eq(pressure, temperature, oxy_volts, OS, o2_cal: RinkoO2Cal):
     DO will be returned in the units of OS (i.e., ml/l or umol/kg).
     """
 
-    P_prime = rinko_p_prime(oxy_volts, temperature, o2_cal)
+    P_prime = rinko_p_prime(oxy_volts, t, o2_cal)
     P = rinko_saturation(P_prime, o2_cal)
 
     # pressure must be in MPa for correction
-    P_corr = rinko_pressure_correction(P, pressure / 100, o2_cal)  # value is 0-100%
+    P_corr = rinko_pressure_correction(P, p / 100, o2_cal)  # value is 0-100%
 
     # multiply decimal percentage by OS to get dissolved oxygen
     return (P_corr / 100) * OS

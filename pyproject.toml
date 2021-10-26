@@ -11,12 +11,18 @@ profile = "black"
 
 [tool.mypy]
 python_version = 3.8
-files = "ctdcal/io.py"
+files = ["ctdcal/io.py", "ctdcal/rinko.py"]
 
 [[tool.mypy.overrides]]
 module = [
+    "gsw",
     "pandas",
     "numpy",
     "requests"
+    "pytz",
+    "matplotlib.*",
+    "numpy",
+    "scipy.*",
+    "yaml"
 ]
 ignore_missing_imports = true
