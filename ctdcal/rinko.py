@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import NamedTuple, Union
+from typing import NamedTuple, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -53,7 +53,7 @@ def salinity_correction(DO_c: NDArray, T: NDArray, S: NDArray) -> NDArray:
     return DO_sc
 
 
-def _Uchida_DO_eq(coefs, inputs):
+def _Uchida_DO_eq(coefs: Tuple[float, ...], inputs: Tuple[NDArray, ...]):
     """
     See Uchida et. al (2008) for more info:
     https://doi.org/10.1175/2008JTECHO549.1
@@ -61,13 +61,24 @@ def _Uchida_DO_eq(coefs, inputs):
 
     Parameters
     ----------
-    coefs : tuple
+    coefs : tuple of float
         (c0, c1, c2, d0, d1, d2, cp)
-    inputs : tuple
+    inputs : tuple of array-like
         (raw voltage, pressure, temperature, salinity, oxygen solubility)
+
+    Returns
+    -------
+    DO_sc : array-like
+        Pressure- and salinity-corrected dissolved oxygen
     """
-    c0, c1, c2, d0, d1, d2, cp = coefs
-    V_r, P, T, S, o2_sol = inputs
+    try:
+        c0, c1, c2, d0, d1, d2, cp = coefs
+    except ValueError:
+        raise ValueError(f"wrong number of coefficients (expected 7, got {len(coefs)})")
+    try:
+        V_r, P, T, S, o2_sol = inputs
+    except ValueError:
+        raise ValueError(f"wrong number of inputs (expected 5, got {len(inputs)})")
 
     K_sv = c0 + (c1 * T) + (c2 * T ** 2)  # Stern-Volmer constant (Tengberg et al. 2006)
     V0 = 1 + d0 * T  # voltage at zero oxygen (Uchida 2010, eq. 10)

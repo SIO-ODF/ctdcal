@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from ctdcal import rinko
 
@@ -15,6 +16,29 @@ def test_salinity_correction():
     assert corr[0] == corr[1]
     assert corr[2] == 0
     assert all(np.isnan(corr[3:]))
+
+
+def test_Uchida_DO_eq():
+
+    coefs = (-1, 1.5, 2, 4.5, 5, 6, 7)
+    inputs = (2.5, 1000, 2, 36.6, 90)
+
+    # check behavior with scalars
+    data = rinko._Uchida_DO_eq(coefs, inputs)
+    assert np.round(data, 4) == -7.0004
+
+    # check behavior with vectors
+    vector_inputs = (np.full(20, input) for input in inputs)
+    data = rinko._Uchida_DO_eq(coefs, vector_inputs)
+    assert len(data) == 20
+    assert all(np.round(data, 4) == -7.0004)
+
+    # error if wrong number of coefs or inputs
+    # note: need escape char since () is special in regex match
+    with pytest.raises(ValueError, match=r"coefficients \(expected 7, got 6\)"):
+        rinko._Uchida_DO_eq(coefs[:-1], inputs)
+    with pytest.raises(ValueError, match=r"inputs \(expected 5, got 4\)"):
+        rinko._Uchida_DO_eq(coefs, inputs[:-1])
 
 
 ### this section is specific to Rinko equations from JFE Advantech (not used by ODF)

@@ -11,6 +11,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 * `ctdcal qc` CLI command to launch interactive data flagging tool
 * Data flagging tool now has an exit button to halt the local server process
 
+### Changed
+* Rinko manufacturer (JFE Advantech) conversion functions are now consistently named as `rinko_*` in the `rinko` module (e.g., `ctdcal.rinko.rinko_DO()`) to differentiate from other functions
+
 ## v0.1.3b (2021-10-21)
 
 ### Added
