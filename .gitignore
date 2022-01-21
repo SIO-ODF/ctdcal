@@ -67,6 +67,7 @@ htmlcov/*
 ####################
 
 *.ipynb*
+!docs/notebooks/*.ipynb
 
 __pycache__/
 ctdcal/_version.py

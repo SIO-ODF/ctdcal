@@ -7,4 +7,4 @@ For more information on Jupyter itself, see `their web site <https://jupyter.org
    :caption: Basic tutorials
    :maxdepth: 1
 
-   notebooks/intro
+   notebooks/plotting
