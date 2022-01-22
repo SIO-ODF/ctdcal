@@ -1,31 +1,51 @@
+import logging
+from io import StringIO
 from pathlib import Path
 from typing import Union
 
 import pandas as pd
+import requests
+
+log = logging.getLogger(__name__)
 
 
 def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
     """
-    Load WHP-exchange bottle file (_hy1.csv) into DataFrame.
+    Load WHP-exchange bottle file (_hy1.csv) into DataFrame. File can be on local
+    file system or downloaded from an appropriate cchdo.ucsd.edu link
+    (e.g., https://cchdo.ucsd.edu/data/19436/325020210316_hy1.csv)
+
+    Adapted from cchdo.hydro package.
 
     Parameters
     ----------
     btl_file : str or Path
-        Name of file to be loaded
+        Name or URL of file to be loaded
 
     Returns
     -------
     df : DataFrame
         Loaded bottle file
     """
-    with open(btl_file) as f:
-        file = f.readlines()
-        for idx, line in enumerate(file):
-            if line.startswith("EXPOCODE"):
-                units = idx + 1  # units row immediately follows column names
+    # read from url
+    if isinstance(btl_file, (str, Path)) and str(btl_file).startswith("http"):
+        log.info("Loading bottle file from http link")
+        file = requests.get(btl_file).text.splitlines(keepends=True)
+
+    # read from file
+    elif isinstance(btl_file, (str, Path)):
+        log.info("Loading bottle file from local file")
+        with open(btl_file) as f:
+            file = f.readlines()
+
+    # find index of units row
+    for idx, line in enumerate(file):
+        if line.startswith("EXPOCODE"):
+            units = idx + 1  # units row immediately follows column names
+            break
 
     return pd.read_csv(
-        btl_file,
+        StringIO("".join(file)),
         skiprows=[0, units],
         skipfooter=1,
         engine="python",

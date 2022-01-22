@@ -1,4 +1,7 @@
+import logging
+
 import numpy as np
+import requests
 
 from ctdcal import io
 
@@ -18,25 +21,50 @@ def check_type(to_check, sub_dtype):
     return all([np.issubdtype(dtype, np_type) for dtype in to_check.dtypes])
 
 
-def test_load_exchange_btl(tmp_path):
+def test_load_exchange_btl(caplog, tmp_path, monkeypatch):
     # make fake/empty Exchange file
-    with open(tmp_path / "test_hy1.csv", "w+") as f:
-        f.write("BOTTLE,20210101ODFSIO\n")
-        f.write("#\n#\n#\n#\n")
-        f.write("EXPOCODE,SECT_ID,STNNBR,CASTNO,SAMPNO\n")
-        f.write(",,,,\n")
-        f.write("  123420210101,   ABC,     1,  2,      3\n")
-        f.write("  123420210101,   ABC,     1,  2,      4\n")
-        f.write("END_DATA")
+    content = [
+        "BOTTLE,20210101ODFSIO\n",
+        "#\n#\n#\n#\n",
+        "EXPOCODE,SECT_ID,STNNBR,CASTNO,SAMPNO\n",
+        ",,,,\n",
+        "  123420210101,   ABC,     1,  2,      3\n",
+        "  123420210101,   ABC,     1,  2,      4\n",
+        "END_DATA",
+    ]
 
-    # check file read produces correct results
-    hy1 = io.load_exchange_btl(tmp_path / "test_hy1.csv")
+    # write fake data and check read from file
+    with open(tmp_path / "test_hy1.csv", "w+") as f:
+        for line in content:
+            f.write(line)
+
+    with caplog.at_level(logging.INFO):
+        hy1 = io.load_exchange_btl(tmp_path / "test_hy1.csv")
     assert hy1.shape == (2, 5)
     assert check_type(hy1[["EXPOCODE", "STNNBR", "CASTNO", "SAMPNO"]], int)
     assert all(hy1["SECT_ID"] == "ABC")  # should not have any leading spaces
+    assert "from local file" in caplog.messages[0]
 
-    # check read works with str as well
-    assert hy1.equals(io.load_exchange_btl(f"{str(tmp_path)}/test_hy1.csv"))
+    # check read works with str path as well
+    with caplog.at_level(logging.INFO):
+        assert hy1.equals(io.load_exchange_btl(f"{str(tmp_path)}/test_hy1.csv"))
+        assert "from local file" in caplog.messages[1]
+
+    # mock downloading data from CCHDO
+    class MockResponse(object):
+        def __init__(self):
+            self.text = "".join(content)
+
+    def mock_get(*args, **kwargs):
+        return MockResponse()
+
+    # "overwrite" requests.get() call in ctdcal.io with mock_get()
+    monkeypatch.setattr(requests, "get", mock_get)
+
+    # check read works from URL
+    with caplog.at_level(logging.INFO):
+        assert hy1.equals(io.load_exchange_btl("http://fakeurl"))
+        assert "from http link" in caplog.messages[2]
 
 
 def test_write_pressure_details(tmp_path):
