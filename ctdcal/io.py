@@ -1,7 +1,9 @@
 import logging
-from io import StringIO
+from io import BufferedIOBase, BytesIO, StringIO
 from pathlib import Path
 from typing import Union
+from zipfile import ZipFile, is_zipfile
+from zipimport import ZipImportError
 
 import pandas as pd
 import requests
@@ -54,11 +56,13 @@ def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
     )
 
 
-def load_exchange_ctd(ctd_file: Union[str, Path]) -> pd.DataFrame:
+def load_exchange_ctd(
+    ctd_file: Union[str, Path, BufferedIOBase], recursed=False
+) -> pd.DataFrame:
     """
     Load WHP-exchange CTD file(s) (_ct1.csv) into DataFrame. File(s) can be on local
     file system or downloaded from an appropriate cchdo.ucsd.edu link
-    (e.g., https://cchdo.ucsd.edu/data/???)
+    (e.g., https://cchdo.ucsd.edu/data/19434/325020210316_ct1.zip)
 
     Adapted from cchdo.hydro package.
 
@@ -74,14 +78,39 @@ def load_exchange_ctd(ctd_file: Union[str, Path]) -> pd.DataFrame:
     """
     # read from url (.zip)
     if isinstance(ctd_file, (str, Path)) and str(ctd_file).startswith("http"):
-        log.info("Loading bottle file from http link (not yet implemented")
-        return
+        log.info("Loading CTD file from http link")
+        data_raw = BytesIO(requests.get(ctd_file).content)
 
     # read from file
     elif isinstance(ctd_file, (str, Path)):
-        log.info("Loading bottle file from local file")
-        with open(ctd_file) as f:
-            file = f.readlines()
+        log.info("Loading CTD file from local file")
+        with open(ctd_file, "rb") as f:
+            data_raw = BytesIO(f.read())
+
+    # read from open file
+    elif isinstance(ctd_file, BufferedIOBase):
+        log.info("Loading open file object")
+        data_raw = BytesIO(ctd_file.read())
+
+    # .zip special behavior
+    if is_zipfile(data_raw):
+        log.info("Loading CTD files from .zip")
+
+        if recursed is True:
+            raise ZipImportError("Recursive .zip files encountered... exiting")
+
+        data_raw.seek(0)  # is_zipfile moves cursor to EOF, reset to start
+        zip_contents = []
+        with ZipFile(data_raw) as zf:
+            for zipinfo in zf.infolist():
+                zip_contents.append(BytesIO(zf.read(zipinfo)))
+
+        # same as using functools.partial, slightly different syntax
+        return [load_exchange_ctd(zc, recursed=True) for zc in zip_contents]
+
+    else:
+        data_raw.seek(0)  # is_zipfile moves cursor to EOF, reset to start
+        file = data_raw.read().decode("utf8").splitlines(keepends=True)
 
     # find index of units row
     for idx, line in enumerate(file):
