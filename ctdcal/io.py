@@ -54,6 +54,52 @@ def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
     )
 
 
+def load_exchange_ctd(ctd_file: Union[str, Path]) -> pd.DataFrame:
+    """
+    Load WHP-exchange CTD file(s) (_ct1.csv) into DataFrame. File(s) can be on local
+    file system or downloaded from an appropriate cchdo.ucsd.edu link
+    (e.g., https://cchdo.ucsd.edu/data/???)
+
+    Adapted from cchdo.hydro package.
+
+    Parameters
+    ----------
+    ctd_file : str or Path
+        Name or URL of file to be loaded
+
+    Returns
+    -------
+    df : DataFrame
+        Loaded CTD file
+    """
+    # read from url (.zip)
+    if isinstance(ctd_file, (str, Path)) and str(ctd_file).startswith("http"):
+        log.info("Loading bottle file from http link (not yet implemented")
+        return
+
+    # read from file
+    elif isinstance(ctd_file, (str, Path)):
+        log.info("Loading bottle file from local file")
+        with open(ctd_file) as f:
+            file = f.readlines()
+
+    # find index of units row
+    for idx, line in enumerate(file):
+        if line.startswith("CTDPRS"):
+            columns = idx
+            units = idx + 1  # units row immediately follows column names
+            break
+
+    return pd.read_csv(
+        StringIO("".join(file)),
+        skiprows=list(range(0, columns)) + [units],  # skip up to column names (+ units)
+        skipfooter=1,
+        engine="python",
+        comment="#",
+        skipinitialspace=True,
+    )
+
+
 def write_pressure_details(
     ssscc: str, log_file: Union[str, Path], p_start: float, p_end: float
 ) -> None:
