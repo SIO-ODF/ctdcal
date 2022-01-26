@@ -1,6 +1,9 @@
 import logging
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
+from zipimport import ZipImportError
 
 import numpy as np
+import pytest
 import requests
 
 from ctdcal import io
@@ -65,6 +68,94 @@ def test_load_exchange_btl(caplog, tmp_path, monkeypatch):
     with caplog.at_level(logging.INFO):
         assert hy1.equals(io.load_exchange_btl("http://fakeurl"))
         assert "from http link" in caplog.messages[2]
+
+
+def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
+    # make fake/empty Exchange file
+    content = [
+        "CTD,20210101ODFSIO\n",
+        "#\n#\n#\n#\n",
+        "NUMBER_HEADERS = 11\n",
+        "EXPOCODE = 012345678910\n",
+        "SECT_ID = ABC\n",
+        "STNNBR = 1\n",
+        "CASTNO = 1\n",
+        "DATE = 20220101\n",
+        "TIME = 1234\n",
+        "LATITUDE = 45.6789\n",
+        "LONGITUDE = -50.1234\n",
+        "DEPTH = 96\n",
+        "INSTRUMENT_ID = 987\n",
+        "CTDPRS,CTDTMP,CTDTMP_FLAG_W,CTDSAL,CTDSAL_FLAG_W,CTDOXY,CTDOXY_FLAG_W\n",
+        "DBAR,ITS-90,,PSS-78,,UMOL/KG,\n",
+        "      0.0,   2.8000,1,  32.5320,2,    330.0,3\n",
+        "      2.0,   2.8070,2,  33.0000,3,    200.0,4\n",
+        "END_DATA",
+    ]
+
+    # write fake data and check read from file
+    with open(tmp_path / "test_ct1.csv", "w+") as f:
+        for line in content:
+            f.write(line)
+
+    with caplog.at_level(logging.INFO):
+        ct1 = io.load_exchange_ctd(tmp_path / "test_ct1.csv")
+    assert ct1.shape == (2, 7)
+    assert check_type(ct1[["CTDPRS", "CTDTMP", "CTDSAL", "CTDOXY"]], float)
+    assert check_type(ct1[["CTDTMP_FLAG_W", "CTDSAL_FLAG_W", "CTDOXY_FLAG_W"]], int)
+    assert "from local file" in caplog.messages[0]
+
+    # check read works with str path as well
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        assert ct1.equals(io.load_exchange_ctd(f"{str(tmp_path)}/test_ct1.csv"))
+        assert "from local file" in caplog.messages[0]
+
+    # mock downloading data from CCHDO (single cast file; .zip tested separately)
+    class MockResponse(object):
+        def __init__(self):
+            self.content = "".join(content).encode("utf8")
+
+    def mock_get(*args, **kwargs):
+        return MockResponse()
+
+    # "overwrite" requests.get() call in ctdcal.io with mock_get()
+    monkeypatch.setattr(requests, "get", mock_get)
+
+    # check read works from URL
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        assert ct1.equals(io.load_exchange_ctd("http://fakeurl"))
+        assert "from http link" in caplog.messages[0]
+
+    # write fake data (x3 files) to .zip
+    with ZipFile(tmp_path / "test_ctd.zip", "w") as zf:
+        for n in [1, 2, 3]:
+            zf.writestr(
+                ZipInfo(filename=f"CTD_{n}_ct1.csv"),
+                "".join(content).encode("utf8"),
+                compress_type=ZIP_DEFLATED,
+            )
+
+    # check read works from .zip
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        zipped = io.load_exchange_ctd(tmp_path / "test_ctd.zip")
+    assert "from local file" in caplog.messages[0]
+    assert "from .zip" in caplog.messages[1]
+    assert all(["open file object" in caplog.messages[n] for n in [2, 3, 4]])
+    assert len(zipped) == 3
+    assert all([zipped[n].equals(ct1) for n in [0, 1, 2]])
+
+    # write nested zip (including "real" data is not important)
+    with ZipFile(tmp_path / "level1.zip", "w") as zf1:
+        zf1.writestr(ZipInfo(filename="test.csv"), " ".encode("utf8"))
+    with ZipFile(tmp_path / "level0.zip", "w") as zf0:
+        zf0.write(tmp_path / "level1.zip")
+
+    # check error on recursive .zip
+    with pytest.raises(ZipImportError, match="Recursive .zip files"):
+        io.load_exchange_ctd(tmp_path / "level0.zip")
 
 
 def test_write_pressure_details(tmp_path):
