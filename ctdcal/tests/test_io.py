@@ -99,8 +99,9 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
             f.write(line)
 
     with caplog.at_level(logging.INFO):
-        ct1 = io.load_exchange_ctd(tmp_path / "test_ct1.csv")
+        header, ct1 = io.load_exchange_ctd(tmp_path / "test_ct1.csv")
     assert ct1.shape == (2, 7)
+    assert len(header) == 11
     assert check_type(ct1[["CTDPRS", "CTDTMP", "CTDSAL", "CTDOXY"]], float)
     assert check_type(ct1[["CTDTMP_FLAG_W", "CTDSAL_FLAG_W", "CTDOXY_FLAG_W"]], int)
     assert "from local file" in caplog.messages[0]
@@ -108,7 +109,9 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # check read works with str path as well
     caplog.clear()
     with caplog.at_level(logging.INFO):
-        assert ct1.equals(io.load_exchange_ctd(f"{str(tmp_path)}/test_ct1.csv"))
+        header_str, ct1_str = io.load_exchange_ctd(f"{str(tmp_path)}/test_ct1.csv")
+        assert ct1.equals(ct1_str)
+        assert header_str == header
         assert "from local file" in caplog.messages[0]
 
     # mock downloading data from CCHDO (single cast file; .zip tested separately)
@@ -125,7 +128,9 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # check read works from URL
     caplog.clear()
     with caplog.at_level(logging.INFO):
-        assert ct1.equals(io.load_exchange_ctd("http://fakeurl"))
+        header_url, ct1_url = io.load_exchange_ctd("http://fakeurl")
+        assert ct1.equals(ct1_url)
+        assert header_url == header
         assert "from http link" in caplog.messages[0]
 
     # write fake data (x3 files) to .zip
@@ -140,12 +145,24 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # check read works from .zip
     caplog.clear()
     with caplog.at_level(logging.INFO):
-        zipped = io.load_exchange_ctd(tmp_path / "test_ctd.zip")
+        header_zip, ct1_zip = io.load_exchange_ctd(tmp_path / "test_ctd.zip")
     assert "from local file" in caplog.messages[0]
     assert "from .zip" in caplog.messages[1]
     assert all(["open file object" in caplog.messages[n] for n in [2, 3, 4]])
-    assert len(zipped) == 3
-    assert all([zipped[n].equals(ct1) for n in [0, 1, 2]])
+    assert len(ct1_zip) == 3
+    assert all([ct1_zip[n].equals(ct1) for n in [0, 1, 2]])
+    assert all([header_zip[n] == header for n in [0, 1, 2]])
+
+    # check reading specific # of files from .zip works
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        header_zip, zipped = io.load_exchange_ctd(tmp_path / "test_ctd.zip", n_files=2)
+    assert "from local file" in caplog.messages[0]
+    assert "from .zip" in caplog.messages[1]
+    assert all(["open file object" in caplog.messages[n] for n in [2, 3]])
+    assert len(zipped) == 2
+    assert all([zipped[n].equals(ct1) for n in [0, 1]])
+    assert all([header_zip[n] == header for n in [0, 1]])
 
     # write nested zip (including "real" data is not important)
     with ZipFile(tmp_path / "level1.zip", "w") as zf1:

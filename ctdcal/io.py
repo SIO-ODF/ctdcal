@@ -57,7 +57,9 @@ def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
 
 
 def load_exchange_ctd(
-    ctd_file: Union[str, Path, BufferedIOBase], recursed=False
+    ctd_file: Union[str, Path, BufferedIOBase],
+    n_files=None,
+    recursed=False,
 ) -> pd.DataFrame:
     """
     Load WHP-exchange CTD file(s) (_ct1.csv) into DataFrame. File(s) can be on local
@@ -71,10 +73,15 @@ def load_exchange_ctd(
     ctd_file : str or Path
         Name or URL of file to be loaded
 
+    n_files : int, optional
+        Number of files to load from .zip archive
+
     Returns
     -------
-    df : DataFrame
-        Loaded CTD file
+    header : dict or list of dict
+        File metadata from header(s) (e.g., EXPOCODE, STNNBR, CASTNO)
+    df : DataFrame or list of DataFrame
+        Loaded CTD file(s)
     """
     # read from url (.zip)
     if isinstance(ctd_file, (str, Path)) and str(ctd_file).startswith("http"):
@@ -105,21 +112,34 @@ def load_exchange_ctd(
             for zipinfo in zf.infolist():
                 zip_contents.append(BytesIO(zf.read(zipinfo)))
 
-        # same as using functools.partial, slightly different syntax
-        return [load_exchange_ctd(zc, recursed=True) for zc in zip_contents]
+        # list comprehension is same as using functools.partial, just different syntax
+        return zip(
+            *[load_exchange_ctd(zc, recursed=True) for zc in zip_contents[:n_files]]
+        )
 
     else:
         data_raw.seek(0)  # is_zipfile moves cursor to EOF, reset to start
         file = data_raw.read().decode("utf8").splitlines(keepends=True)
 
-    # find index of units row
+    # process metadata
     for idx, line in enumerate(file):
+        # find header info
+        if line.startswith("NUMBER_HEADERS"):
+            header_ind = idx
+
+        # find index of units row
         if line.startswith("CTDPRS"):
             columns = idx
             units = idx + 1  # units row immediately follows column names
             break
 
-    return pd.read_csv(
+    # break down header rows
+    header = {}
+    for line in file[header_ind:columns]:
+        k, v = line.strip("\n").split("=")
+        header[k.strip()] = v.strip()
+
+    return header, pd.read_csv(
         StringIO("".join(file)),
         skiprows=list(range(0, columns)) + [units],  # skip up to column names (+ units)
         skipfooter=1,
