@@ -8,3 +8,4 @@ For more information on Jupyter itself, see `their web site <https://jupyter.org
    :maxdepth: 1
 
    notebooks/plotting
+   notebooks/calibration
