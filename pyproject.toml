@@ -16,6 +16,7 @@ files = "ctdcal/io.py"
 [[tool.mypy.overrides]]
 module = [
     "pandas",
-    "numpy"
+    "numpy",
+    "requests"
 ]
 ignore_missing_imports = true

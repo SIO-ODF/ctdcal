@@ -3,6 +3,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## v0.1.4b (unreleased)
 
+### Added
+* `ctdcal.io` has two new functions for reading Exchange data files from local filesystem or URL, `load_exchange_btl` and `load_exchange_ctd` (see [CCHDO File Formats](https://cchdo.ucsd.edu/formats))
+* Tutorial notebooks on how to use `ctdcal` can be found in the [docs](https://ctdcal.readthedocs.io/en/latest/)
+
 ## v0.1.3b (2021-10-21)
 
 ### Added

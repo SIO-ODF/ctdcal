@@ -1,32 +1,147 @@
+import logging
+from io import BufferedIOBase, BytesIO, StringIO
 from pathlib import Path
 from typing import Union
+from zipfile import ZipFile, is_zipfile
+from zipimport import ZipImportError
 
 import pandas as pd
+import requests
+
+log = logging.getLogger(__name__)
 
 
 def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
     """
-    Load WHP-exchange bottle file (_hy1.csv) into DataFrame.
+    Load WHP-exchange bottle file (_hy1.csv) into DataFrame. File can be on local
+    file system or downloaded from an appropriate cchdo.ucsd.edu link
+    (e.g., https://cchdo.ucsd.edu/data/19436/325020210316_hy1.csv)
+
+    Adapted from cchdo.hydro package.
 
     Parameters
     ----------
     btl_file : str or Path
-        Name of file to be loaded
+        Name or URL of file to be loaded
 
     Returns
     -------
     df : DataFrame
         Loaded bottle file
     """
-    with open(btl_file) as f:
-        file = f.readlines()
-        for idx, line in enumerate(file):
-            if line.startswith("EXPOCODE"):
-                units = idx + 1  # units row immediately follows column names
+    # read from url
+    if isinstance(btl_file, (str, Path)) and str(btl_file).startswith("http"):
+        log.info("Loading bottle file from http link")
+        file = requests.get(btl_file).text.splitlines(keepends=True)
+
+    # read from file
+    elif isinstance(btl_file, (str, Path)):
+        log.info("Loading bottle file from local file")
+        with open(btl_file) as f:
+            file = f.readlines()
+
+    # find index of units row
+    for idx, line in enumerate(file):
+        if line.startswith("EXPOCODE"):
+            units = idx + 1  # units row immediately follows column names
+            break
 
     return pd.read_csv(
-        btl_file,
+        StringIO("".join(file)),
         skiprows=[0, units],
+        skipfooter=1,
+        engine="python",
+        comment="#",
+        skipinitialspace=True,
+    )
+
+
+def load_exchange_ctd(
+    ctd_file: Union[str, Path, BufferedIOBase],
+    n_files=None,
+    recursed=False,
+) -> pd.DataFrame:
+    """
+    Load WHP-exchange CTD file(s) (_ct1.csv) into DataFrame. File(s) can be on local
+    file system or downloaded from an appropriate cchdo.ucsd.edu link
+    (e.g., https://cchdo.ucsd.edu/data/19434/325020210316_ct1.zip)
+
+    Adapted from cchdo.hydro package.
+
+    Parameters
+    ----------
+    ctd_file : str or Path
+        Name or URL of file to be loaded
+
+    n_files : int, optional
+        Number of files to load from .zip archive
+
+    Returns
+    -------
+    header : dict or list of dict
+        File metadata from header(s) (e.g., EXPOCODE, STNNBR, CASTNO)
+    df : DataFrame or list of DataFrame
+        Loaded CTD file(s)
+    """
+    # read from url (.zip)
+    if isinstance(ctd_file, (str, Path)) and str(ctd_file).startswith("http"):
+        log.info("Loading CTD file from http link")
+        data_raw = BytesIO(requests.get(ctd_file).content)
+
+    # read from file
+    elif isinstance(ctd_file, (str, Path)):
+        log.info("Loading CTD file from local file")
+        with open(ctd_file, "rb") as f:
+            data_raw = BytesIO(f.read())
+
+    # read from open file
+    elif isinstance(ctd_file, BufferedIOBase):
+        log.info("Loading open file object")
+        data_raw = BytesIO(ctd_file.read())
+
+    # .zip special behavior
+    if is_zipfile(data_raw):
+        log.info("Loading CTD files from .zip")
+
+        if recursed is True:
+            raise ZipImportError("Recursive .zip files encountered... exiting")
+
+        data_raw.seek(0)  # is_zipfile moves cursor to EOF, reset to start
+        zip_contents = []
+        with ZipFile(data_raw) as zf:
+            for zipinfo in zf.infolist():
+                zip_contents.append(BytesIO(zf.read(zipinfo)))
+
+        # list comprehension is same as using functools.partial, just different syntax
+        return zip(
+            *[load_exchange_ctd(zc, recursed=True) for zc in zip_contents[:n_files]]
+        )
+
+    else:
+        data_raw.seek(0)  # is_zipfile moves cursor to EOF, reset to start
+        file = data_raw.read().decode("utf8").splitlines(keepends=True)
+
+    # process metadata
+    for idx, line in enumerate(file):
+        # find header info
+        if line.startswith("NUMBER_HEADERS"):
+            header_ind = idx
+
+        # find index of units row
+        if line.startswith("CTDPRS"):
+            columns = idx
+            units = idx + 1  # units row immediately follows column names
+            break
+
+    # break down header rows
+    header = {}
+    for line in file[header_ind:columns]:
+        k, v = line.strip("\n").split("=")
+        header[k.strip()] = v.strip()
+
+    return header, pd.read_csv(
+        StringIO("".join(file)),
+        skiprows=list(range(0, columns)) + [units],  # skip up to column names (+ units)
         skipfooter=1,
         engine="python",
         comment="#",
