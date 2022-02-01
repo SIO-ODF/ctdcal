@@ -24,18 +24,18 @@ from bokeh.models import (
 # TODO: following above, make parts reusable?
 
 # load continuous CTD data and make into a dict (only ~20MB)
-file_list = sorted(glob.glob("../data/pressure/*ct1.csv"))
-ssscc_list = [ssscc.strip("../data/pressure/")[:5] for ssscc in file_list]
+file_list = sorted(glob.glob("../../data/pressure/*ct1.csv"))
+ssscc_list = [ssscc.strip("../../data/pressure/")[:5] for ssscc in file_list]
 ctd_data = []
 for f in file_list:
     print(f"Loading {f}")
     df = pd.read_csv(f, header=12, skiprows=[13], skipfooter=1, engine="python")
-    df["SSSCC"] = f.strip("../data/pressure/")[:5]
+    df["SSSCC"] = f.strip("../../data/pressure/")[:5]
     ctd_data.append(df)
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
 # load bottle file
-fname = glob.glob("../data/pressure/*hy1.csv")[0]
+fname = glob.glob("../../data/pressure/*hy1.csv")[0]
 btl_data = pd.read_csv(fname, skiprows=[0, 2], skipfooter=1, engine="python", na_values=-999)
 btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"

@@ -51,7 +51,8 @@ def init():
 
     for sub_dir in cfg.dirs.values():
         Path(sub_dir).mkdir(parents=True)
-
+    import shutil
+    shutil.copy2("fit_coefs.yaml", "./data/logs/fit_coefs.yaml")
 
 @cli.command("import")  # click workaround to get a command named 'import'
 def import_data():
