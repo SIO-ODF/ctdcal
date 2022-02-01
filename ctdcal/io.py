@@ -42,7 +42,12 @@ def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
 
     # find index of units row
     for idx, line in enumerate(file):
-        if line.startswith("EXPOCODE"):
+        # skip comment lines (which may reference EXPOCODE and break membership test)
+        if line.strip().startswith("#"):
+            continue
+
+        # find index of units row
+        if "EXPOCODE" in line:
             units = idx + 1  # units row immediately follows column names
             break
 
@@ -123,12 +128,16 @@ def load_exchange_ctd(
 
     # process metadata
     for idx, line in enumerate(file):
+        # skip comment lines (which may reference CTDPRS and break membership test)
+        if line.strip().startswith("#"):
+            continue
+
         # find header info
         if line.startswith("NUMBER_HEADERS"):
             header_ind = idx
 
         # find index of units row
-        if line.startswith("CTDPRS"):
+        if "CTDPRS" in line:
             columns = idx
             units = idx + 1  # units row immediately follows column names
             break

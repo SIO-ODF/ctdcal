@@ -28,6 +28,7 @@ def test_load_exchange_btl(caplog, tmp_path, monkeypatch):
     # make fake/empty Exchange file
     content = [
         "BOTTLE,20210101ODFSIO\n",
+        "# comment about EXPOCODE\n",
         "#\n#\n#\n#\n",
         "EXPOCODE,SECT_ID,STNNBR,CASTNO,SAMPNO\n",
         ",,,,\n",
@@ -74,6 +75,8 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # make fake/empty Exchange file
     content = [
         "CTD,20210101ODFSIO\n",
+        "# comment about NUMBER_HEADERS\n",
+        "# comment about CTDPRS\n",
         "#\n#\n#\n#\n",
         "NUMBER_HEADERS = 11\n",
         "EXPOCODE = 012345678910\n",
