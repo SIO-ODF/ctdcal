@@ -1,7 +1,12 @@
+import logging
 from pathlib import Path
 
 import click
-import logging
+from bokeh.application import Application
+from bokeh.application.handlers.script import ScriptHandler
+from bokeh.server.server import Server
+from tornado.ioloop import IOLoop
+
 from . import get_ctdcal_config
 
 # Rich handling
@@ -94,6 +99,17 @@ def cruise_report():
     from .scripts.cruise_report import cruise_report_residuals
 
     cruise_report_residuals()
+
+
+@cli.command()
+def qc():
+    """Launch interactive data flagging web app for QA/QC"""
+    io_loop = IOLoop.current()
+    bokeh_app = Application(ScriptHandler(filename="ctdcal/tools/data_qc.py"))
+    server = Server(bokeh_app, io_loop=io_loop)
+    server.start()
+    server.show("/")
+    io_loop.start()
 
 
 if __name__ == "__main__":
