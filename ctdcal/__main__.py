@@ -1,4 +1,5 @@
 import logging
+from importlib import resources
 from pathlib import Path
 
 import click
@@ -40,6 +41,8 @@ cfg = get_ctdcal_config()
 
 
 @click.group()
+# @click.option('--debug/--no-debug', default=False)
+# https://click.palletsprojects.com/en/8.0.x/commands/
 def cli():
     """The ctdcal command creates and manipulates data directories
 
@@ -67,7 +70,7 @@ def import_data():
     # TODO: smart imports based on file ext? .hex, .xmlcon, .cap
     # NOTE: ODF file types vs. others (oxygen, salt)
 
-    pass
+    raise NotImplementedError
 
 
 @cli.command()
@@ -89,7 +92,7 @@ def process(group, type):
         odf_process_all()
     elif group == "PMEL":
         # pmel_process()
-        pass
+        raise NotImplementedError
 
 
 @cli.command()
@@ -102,10 +105,11 @@ def cruise_report():
 
 
 @cli.command()
-def qc():
+def qc():  # pragma: no cover
     """Launch interactive data flagging web app for QA/QC"""
     io_loop = IOLoop.current()
-    bokeh_app = Application(ScriptHandler(filename="ctdcal/tools/data_qc.py"))
+    with resources.path("ctdcal.tools", "data_qc.py") as fname:
+        bokeh_app = Application(ScriptHandler(filename=fname))
     server = Server(bokeh_app, io_loop=io_loop)
     server.start()
     server.show("/")
