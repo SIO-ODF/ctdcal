@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path, PosixPath, WindowsPath
 
 from click.testing import CliRunner
 
@@ -32,7 +33,10 @@ def test_init(tmp_path, caplog):
         assert "Building default /data/ directories" in caplog.messages[0]
         assert result_rerun.exit_code == 1
         assert isinstance(result_rerun.exception, FileExistsError)
-        assert "data/ssscc" in result_rerun.exception.filename
+        if isinstance(Path.cwd(), PosixPath):
+            assert "data/ssscc" in result_rerun.exception.filename
+        elif isinstance(Path.cwd(), WindowsPath):
+            assert "data\\ssscc" in result_rerun.exception.filename
 
 
 def test_import_data():
