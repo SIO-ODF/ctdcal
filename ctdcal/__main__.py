@@ -2,6 +2,7 @@ from pathlib import Path
 
 import click
 import logging
+import time
 from . import get_ctdcal_config
 
 # Rich handling
@@ -79,6 +80,7 @@ def import_data():
 def process(group, type):
     """Process data using a particular group's methodology"""
 
+    t = time.time()
     if group == "ODF":
         from .scripts.odf_process_all import odf_process_all
 
@@ -86,7 +88,8 @@ def process(group, type):
     elif group == "PMEL":
         # pmel_process()
         pass
-
+    elapsed = time.time() - t
+    log.info("Processing complete: " + str(round(elapsed/60)) + " minutes and " + str(round((elapsed/60 - elapsed%60)*60)) + " seconds.")
 
 @cli.command()
 def cruise_report():
@@ -95,6 +98,21 @@ def cruise_report():
     from .scripts.cruise_report import cruise_report_residuals
 
     cruise_report_residuals()
+
+@cli.command()  #   MK
+def qc():
+    """Launch interactive data flagging web app for QA/QC"""
+    from bokeh.application import Application
+    from bokeh.application.handlers.script import ScriptHandler
+    from bokeh.server.server import Server
+    from tornado.ioloop import IOLoop
+    io_loop = IOLoop.current()
+    bokeh_app = Application(ScriptHandler(filename="ctdcal/tools/data_qc.py"))
+    server = Server(bokeh_app, io_loop=io_loop)
+    server.start()
+    server.show("/")    #   Blank tab, no output
+    io_loop.start()
+
 
 
 if __name__ == "__main__":

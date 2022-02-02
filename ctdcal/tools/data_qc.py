@@ -3,6 +3,7 @@ import pandas as pd
 import glob
 import pickle
 import gsw
+import sys
 
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
@@ -121,6 +122,7 @@ comment_box = TextInput(value="", title="Comment:")
 # button_type: default, primary, success, warning or danger
 flag_button = Button(label="Apply to selected", button_type="primary")
 comment_button = Button(label="Apply to selected", button_type="warning")
+exit_button = Button(label="Exit flagging tool", button_type="danger")  #   From MK
 
 vspace = Div(text=""" """, width=200, height=65)
 residual_guide_text = Div(
@@ -336,6 +338,9 @@ def save_data():
     # save it
     df_out.to_csv("salt_flags_handcoded.csv", index=None)
 
+def exit_bokeh():   #   From MK
+    print("Stopping flagging software")
+    sys.exit()
 
 def selected_from_plot(attr, old, new):
 
@@ -358,6 +363,7 @@ flag_list.on_change("value", lambda attr, old, new: update_selectors())
 flag_button.on_click(apply_flag)
 comment_button.on_click(apply_comment)
 save_button.on_click(save_data)
+exit_button.on_click(exit_bokeh)    #   From MK
 src_table.on_change("data", lambda attr, old, new: edit_flag())
 src_table.selected.on_change("indices", selected_from_table)
 btl_sal.data_source.selected.on_change("indices", selected_from_plot)
@@ -438,6 +444,7 @@ controls = column(
     comment_button,
     vspace,
     save_button,
+    exit_button,    #   MK
     width=170,
 )
 tables = column(

@@ -60,7 +60,7 @@ column = {
     "sal": "CTDSAL",
     # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
     # "s2": "CTDSAL2",
-    "rinko_oxy": "FREE1",  # CHECK THIS!
+    "rinko_oxy": "U_DEF_poly1",
     "oxyvolts": "CTDOXYVOLTS",
     "refT": "REFTMP",
     "refC": "BTLCOND",
@@ -69,7 +69,11 @@ column = {
     "lat": "GPSLAT",
     "lon": "GPSLON",
 }
-
+# try:
+#     column["rinko_oxy"] = "FREE1"  # CHECK THIS!
+# except:
+#     column["rinko_oxy"] = "U_DEF_poly1"
+#     print("Using 'U_DEF_poly1'")    #   Include in log? Worth the import?
 # List of columns to filter
 filter_cols = []
 for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]:

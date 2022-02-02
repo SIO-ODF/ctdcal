@@ -805,8 +805,15 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         log.info(ssscc + " density matching done")
 
     # Only fit using OXYGEN flagged good (2)
-    all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
-
+    try:
+        all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    except: #   Known bug, unsure what the problem is exactly.
+        print(all_sbe43_merged.columns)   #   Slow and steady troubleshooting - add function to __main__ to skip any functionalities? -> Missing params for calibration here?
+        print(all_sbe43_merged.head())
+        print(btl_df["OXYGEN_FLAG_W"])
+        print(btl_df['OXYGEN_FLAG_W'] == 2)
+        print(btl_df)
+        print(len(btl_df))
     # Fit ALL oxygen stations together to get initial coefficient guess
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
     sbe43_dict["ox0"] = sbe_coef0

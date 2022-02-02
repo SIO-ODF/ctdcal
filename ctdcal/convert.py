@@ -124,12 +124,14 @@ def hex_to_ctd(ssscc_list):
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
+            log.info("Station: " + ssscc)
             hexFile = cfg.dirs["raw"] + ssscc + ".hex"
             xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
-
+        else:
+            log.info("Station: " + ssscc + " pickle already exists -- skipping.")
     return True
 
 
@@ -440,7 +442,7 @@ def convertFromSBEReader(sbeReader):
 
         ### Aux block
         else:
-            print("Passing along Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            print("Passing along Sensor ID:", meta["sensor_id"] + ",", sensor_name) #   Comment here for fewer outputs in hex_to_ctd...
             converted_df[col] = raw_df[meta["column"]]
 
     # Set the column name for the index
