@@ -16,6 +16,22 @@ def test_cli():
     assert "qc" in result.output
 
 
+def test_debug(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        # default options
+        result = runner.invoke(main.cli, "process")
+        assert "Debug mode off" in result.output
+
+        # no debug
+        result_no_debug = runner.invoke(main.cli, ["--no-debug", "process"])
+        assert "Debug mode off" in result_no_debug.output
+
+        # debug (run last so Logger("ctdcal").level=NOTSET for other tests)
+        result_debug = runner.invoke(main.cli, ["--debug", "process"])
+        assert "Debug mode on" in result_debug.output
+
+
 def test_init(tmp_path, caplog):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):

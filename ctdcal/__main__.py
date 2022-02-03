@@ -29,7 +29,7 @@ handler = logging.StreamHandler()
 handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
 FORMAT = "%(funcName)s: %(message)s"
 logging.basicConfig(
-    level="NOTSET",
+    level=logging.NOTSET,
     format=FORMAT,
     datefmt="[%X]",
     handlers=[handler],
@@ -41,14 +41,18 @@ cfg = get_ctdcal_config()
 
 
 @click.group()
-# @click.option('--debug/--no-debug', default=False)
-# https://click.palletsprojects.com/en/8.0.x/commands/
-def cli():
+@click.option("--debug/--no-debug", default=False)
+def cli(debug):
     """The ctdcal command creates and manipulates data directories
 
     Documentation: tbd
     """
-    pass
+    if debug:
+        click.echo("Debug mode on (logging all levels)")
+        logging.getLogger("ctdcal").setLevel(logging.NOTSET)
+    else:
+        click.echo("Debug mode off (logging 'WARNING' and higher levels)")
+        logging.getLogger("ctdcal").setLevel(logging.WARNING)
 
 
 @cli.command()
@@ -80,10 +84,13 @@ def import_data():
     type=click.Choice(["ODF", "PMEL"], case_sensitive=False),
     default="ODF",
 )
-@click.option(
-    "-t", "--type", type=click.Choice(["bottle", "ctd", "all"], case_sensitive=False)
-)
-def process(group, type):
+# @click.option(
+#     "-t",
+#     "--type",
+#     type=click.Choice(["bottle", "ctd", "all"], case_sensitive=False),
+#     default="all",
+# )
+def process(group):
     """Process data using a particular group's methodology"""
 
     if group == "ODF":
