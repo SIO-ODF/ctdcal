@@ -22,24 +22,24 @@ def load_cnv(cnv_file: Union[str, Path]) -> pd.DataFrame:
     info = dict()
     cols = []
     for idx, line in enumerate(file):
-        if line.startswith("*"):
-            if line.startswith("*END*"):
-                data_index = idx + 1
-                break
-            continue
-
         # get variable info
-        elif line.strip("# \n").startswith(("nquan", "nvalues", "units", "bad_flag")):
+        if line.strip("# \n").startswith(("nquan", "nvalues", "units", "bad_flag")):
             k, v = line.strip("# \n").split("=")
             info[k.strip()] = v.strip()
 
         # get column names
         elif line.strip("# ").startswith("name"):
+            # expected format is:   # name 0 = col_name: long_description
             cols.append(line.split(":")[0].split("=")[-1].strip())
 
-        # skip additional comment lines
-        elif line.startswith("#"):
-            continue
+        # last row before data begins
+        elif line.startswith("*END*"):
+            data_index = idx + 1
+            break
+
+        # anything else is a comment line
+        else:
+            continue  # pragma: no cover
 
     # read data
     return pd.read_csv(
