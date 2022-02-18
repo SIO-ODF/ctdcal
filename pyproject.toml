@@ -17,11 +17,10 @@ files = ["ctdcal/io.py", "ctdcal/rinko.py"]
 module = [
     "gsw",
     "pandas",
-    "numpy",
-    "requests"
     "pytz",
     "matplotlib.*",
     "numpy",
+    "requests",
     "scipy.*",
     "yaml"
 ]
