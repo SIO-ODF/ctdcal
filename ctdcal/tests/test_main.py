@@ -96,3 +96,15 @@ def test_quick_convert(tmp_path, caplog):
             result = runner.invoke(main.quick_convert)
         assert result.exit_code == 0
         assert "Found 0 .cnv files" in caplog.messages[0]
+
+        caplog.clear()
+        with caplog.at_level(logging.INFO):
+            result_ctd = runner.invoke(main.quick_convert, ["-f", "ct1"])
+        assert result_ctd.exit_code == 0
+        assert "Found 0 .cnv files" in caplog.messages[0]
+
+        caplog.clear()
+        with caplog.at_level(logging.INFO):
+            result_btl = runner.invoke(main.quick_convert, ["-f", "hy1"])
+        assert result_btl.exit_code == 1
+        assert isinstance(result_btl.exception, NotImplementedError)

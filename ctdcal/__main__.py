@@ -123,12 +123,27 @@ def qc():  # pragma: no cover
     io_loop.start()
 
 
+@click.option(
+    "-f",
+    "--file",
+    type=click.Choice(["hy1", "ct1", "all"], case_sensitive=False),
+    default="all",
+)
 @cli.command()
-def quick_convert():
+def quick_convert(file):
     """Convert Sea-Bird .cnv files to Exchange CTD (ct1) and bottle (hy1) files."""
-    from .scripts.quick_convert import quick_convert
+    from .scripts.quick_convert import cnv_to_ct1
 
-    quick_convert()
+    if file == "ct1":
+        cnv_to_ct1()
+    elif file == "hy1":
+        # cnv_to_hy1()
+        raise NotImplementedError
+    elif file == "all":
+        cnv_to_ct1()
+        # cnv_to_hy1()
+
+    # should we have non-Exchange output options?
 
 
 if __name__ == "__main__":

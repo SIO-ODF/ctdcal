@@ -8,10 +8,10 @@ log = logging.getLogger(__name__)
 cfg = get_ctdcal_config()
 
 
-def quick_convert():
+def cnv_to_ct1():
     """
-    A script for converting Sea-Bird .cnv files to Exchange CTD and bottle files
-    WITHOUT calibration for plotting and QA/QC purposes.
+    A script for converting Sea-Bird .cnv files to uncalibrated Exchange CTD files
+    for plotting and QA/QC purposes (in ODV, etc.).
     """
     cnv_files = list(Path(cfg.dirs["converted"]).glob("*.cnv"))
     log.info(f"Found {len(cnv_files)} .cnv files, attempting to convert")
@@ -43,7 +43,19 @@ def quick_convert():
         # TODO: replace this with a to_exchange() function (should live in ctdcal.io)
         df.to_csv(f"{cfg.dirs['pressure']}{f.stem}_ct1.csv", na_rep="-999")
 
+
+def cnv_to_hy1():
+    """
+    A script for converting Sea-Bird .cnv files to an uncalibrated Exchange bottle file
+    for plotting and QA/QC purposes (in ODV, etc.).
+    """
     # TODO: make bottle file
+    # this will probably have significant overlap with cnv_to_ct1()
+    # maybe there should be three functions in this file?:
+    # _load_cnv_files (load/map names, add flags)
+    # cnv_to_ct1 (bin to 2db and export file)
+    # cnv_to_hy1 (match to data from .bl and export file)
+
     # something like this to start:
 
     # bl_files = list(Path(cfg.dirs["converted"]).glob("*.bl"))
@@ -51,3 +63,4 @@ def quick_convert():
     #     log.warning("Not .bl files found - cannot make Exchange bottle files")
 
     # find data to average using .bl file
+    pass
