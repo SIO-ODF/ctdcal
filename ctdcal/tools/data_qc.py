@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +17,7 @@ from bokeh.models import (
     TextInput,
 )
 from bokeh.plotting import figure
+from click import progressbar
 
 from ctdcal import get_ctdcal_config, io
 
@@ -30,11 +30,12 @@ cfg = get_ctdcal_config()
 file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
 ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
 ctd_data = []
-for f in file_list:
-    print(f"Loading {f}")
-    header, df = io.load_exchange_ctd(f)
-    df["SSSCC"] = header["STNNBR"].zfill(3) + header["CASTNO"].zfill(2)
-    ctd_data.append(df)
+with progressbar(file_list) as bar:
+    for f in bar:
+        # print(f"Loading {f}")
+        header, df = io.load_exchange_ctd(f)
+        df["SSSCC"] = header["STNNBR"].zfill(3) + header["CASTNO"].zfill(2)
+        ctd_data.append(df)
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
 # load bottle file
@@ -344,7 +345,10 @@ def save_data():
 
 def exit_bokeh():
     print("Stopping flagging software")
-    sys.exit()
+    from tornado.ioloop import IOLoop
+
+    io_loop = IOLoop.current()
+    io_loop.stop()
 
 
 def selected_from_plot(attr, old, new):
