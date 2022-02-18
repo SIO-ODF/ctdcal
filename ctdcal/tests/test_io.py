@@ -24,6 +24,32 @@ def check_type(to_check, sub_dtype):
     return all([np.issubdtype(dtype, np_type) for dtype in to_check.dtypes])
 
 
+def test_load_cnv(tmp_path):
+    # make fake/empty .cnv file
+    content = [
+        "* header rows\n* header rows\n* header rows\n* header rows\n",
+        "# nquan = 3\n# nvalues = 4\n# units = specified\n",
+        "# name 0 = prDM\n# name 1 = depSM\n# name 2 = t090C\n",
+        "# bad_flag = -9.990e-29\n",
+        "# comment rows\n# comment rows\n# comment rows\n",
+        "*END*\n",
+        "      4.000      3.962     8.9121\n",
+        "      6.000      5.943     8.9125\n",
+        "      8.000      7.924     8.9123\n",
+        "     10.000      9.905     8.9126\n",
+    ]
+
+    # write fake data and check read from file
+    with open(tmp_path / "test_1.cnv", "w+") as f:
+        for line in content:
+            f.write(line)
+
+    cnv = io.load_cnv(tmp_path / "test_1.cnv")
+    assert cnv.shape == (4, 3)
+    assert check_type(cnv, float)
+    assert cnv.columns.tolist() == ["prDM", "depSM", "t090C"]
+
+
 def test_load_exchange_btl(caplog, tmp_path, monkeypatch):
     # make fake/empty Exchange file
     content = [

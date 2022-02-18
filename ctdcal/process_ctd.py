@@ -612,7 +612,7 @@ def make_ssscc_list(fname="data/ssscc.csv"):
     """
     raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
     ssscc_list = sorted([f.stem for f in raw_files])
-    pd.Series(ssscc_list).to_csv(fname, header=None, index=False, mode="x")
+    pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
 
     return ssscc_list
 

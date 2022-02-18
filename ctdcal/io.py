@@ -11,6 +11,48 @@ import requests
 log = logging.getLogger(__name__)
 
 
+def load_cnv(cnv_file: Union[str, Path]) -> pd.DataFrame:
+    """
+    Load Sea-Bird converted (.cnv) cast file into DataFrame
+    """
+    with open(cnv_file) as f:
+        file = f.readlines()
+
+    # parse column names
+    info = dict()
+    cols = []
+    for idx, line in enumerate(file):
+        # get variable info
+        if line.strip("# \n").startswith(("nquan", "nvalues", "units", "bad_flag")):
+            k, v = line.strip("# \n").split("=")
+            info[k.strip()] = v.strip()
+
+        # get column names
+        elif line.strip("# ").startswith("name"):
+            # expected format is:   # name 0 = col_name: long_description
+            cols.append(line.split(":")[0].split("=")[-1].strip())
+
+        # last row before data begins
+        elif line.startswith("*END*"):
+            data_index = idx + 1
+            break
+
+        # anything else is a comment line
+        else:
+            continue  # pragma: no cover
+
+    # read data
+    return pd.read_csv(
+        cnv_file,
+        skiprows=range(0, data_index),
+        delim_whitespace=True,
+        names=cols,
+        engine="python",
+        skipinitialspace=True,
+        na_values=info["bad_flag"],
+    )
+
+
 def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
     """
     Load WHP-exchange bottle file (_hy1.csv) into DataFrame. File can be on local

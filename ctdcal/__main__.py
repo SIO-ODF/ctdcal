@@ -1,7 +1,13 @@
+import logging
+from importlib import resources
 from pathlib import Path
 
 import click
-import logging
+from bokeh.application import Application
+from bokeh.application.handlers.script import ScriptHandler
+from bokeh.server.server import Server
+from tornado.ioloop import IOLoop
+
 from . import get_ctdcal_config
 
 # Rich handling
@@ -23,7 +29,7 @@ handler = logging.StreamHandler()
 handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
 FORMAT = "%(funcName)s: %(message)s"
 logging.basicConfig(
-    level="NOTSET",
+    level=logging.NOTSET,
     format=FORMAT,
     datefmt="[%X]",
     handlers=[handler],
@@ -35,12 +41,18 @@ cfg = get_ctdcal_config()
 
 
 @click.group()
-def cli():
+@click.option("--debug/--no-debug", default=False)
+def cli(debug):
     """The ctdcal command creates and manipulates data directories
 
     Documentation: tbd
     """
-    pass
+    if debug:
+        click.echo("Debug mode on (logging all levels)")
+        logging.getLogger("ctdcal").setLevel(logging.NOTSET)
+    else:
+        click.echo("Debug mode off (logging 'WARNING' and higher levels)")
+        logging.getLogger("ctdcal").setLevel(logging.WARNING)
 
 
 @cli.command()
@@ -62,7 +74,7 @@ def import_data():
     # TODO: smart imports based on file ext? .hex, .xmlcon, .cap
     # NOTE: ODF file types vs. others (oxygen, salt)
 
-    pass
+    raise NotImplementedError
 
 
 @cli.command()
@@ -72,10 +84,13 @@ def import_data():
     type=click.Choice(["ODF", "PMEL"], case_sensitive=False),
     default="ODF",
 )
-@click.option(
-    "-t", "--type", type=click.Choice(["bottle", "ctd", "all"], case_sensitive=False)
-)
-def process(group, type):
+# @click.option(
+#     "-t",
+#     "--type",
+#     type=click.Choice(["bottle", "ctd", "all"], case_sensitive=False),
+#     default="all",
+# )
+def process(group):
     """Process data using a particular group's methodology"""
 
     if group == "ODF":
@@ -84,7 +99,7 @@ def process(group, type):
         odf_process_all()
     elif group == "PMEL":
         # pmel_process()
-        pass
+        raise NotImplementedError
 
 
 @cli.command()
@@ -94,6 +109,41 @@ def cruise_report():
     from .scripts.cruise_report import cruise_report_residuals
 
     cruise_report_residuals()
+
+
+@cli.command()
+def qc():  # pragma: no cover
+    """Launch interactive data flagging web app for QA/QC"""
+    io_loop = IOLoop.current()
+    with resources.path("ctdcal.tools", "data_qc.py") as fname:
+        bokeh_app = Application(ScriptHandler(filename=fname))
+    server = Server(bokeh_app, io_loop=io_loop)
+    server.start()
+    server.show("/")
+    io_loop.start()
+
+
+@click.option(
+    "-f",
+    "--file",
+    type=click.Choice(["hy1", "ct1", "all"], case_sensitive=False),
+    default="all",
+)
+@cli.command()
+def quick_convert(file):
+    """Convert Sea-Bird .cnv files to Exchange CTD (ct1) and bottle (hy1) files."""
+    from .scripts.quick_convert import cnv_to_ct1
+
+    if file == "ct1":
+        cnv_to_ct1()
+    elif file == "hy1":
+        # cnv_to_hy1()
+        raise NotImplementedError
+    elif file == "all":
+        cnv_to_ct1()
+        # cnv_to_hy1()
+
+    # should we have non-Exchange output options?
 
 
 if __name__ == "__main__":
