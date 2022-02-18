@@ -123,5 +123,13 @@ def qc():  # pragma: no cover
     io_loop.start()
 
 
+@cli.command()
+def quick_convert():
+    """Convert Sea-Bird .cnv files to Exchange CTD (ct1) and bottle (hy1) files."""
+    from .scripts.quick_convert import quick_convert
+
+    quick_convert()
+
+
 if __name__ == "__main__":
     cli()

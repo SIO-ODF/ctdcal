@@ -87,3 +87,12 @@ def test_cruise_report(tmp_path, caplog):
             result = runner.invoke(main.cruise_report)
         assert isinstance(result.exception, FileNotFoundError)
         assert "report_data.csv" in result.exception.filename
+
+
+def test_quick_convert(tmp_path, caplog):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        with caplog.at_level(logging.INFO):
+            result = runner.invoke(main.quick_convert)
+        assert result.exit_code == 0
+        assert "Found 0 .cnv files" in caplog.messages[0]
