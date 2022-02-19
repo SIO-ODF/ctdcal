@@ -1,8 +1,8 @@
-from ctdcal import flagging
 import numpy as np
 import pandas as pd
 import pytest
 
+from ctdcal import flagging
 
 # TODO: make a class and recycle 3 data sets, separating outliers and NaNs:
 # data = [np.nan] + 97 * [0] + [100, 100]
@@ -84,6 +84,8 @@ def test_outliers():
     assert all(flagging.outliers(data, n_sigma1=10) == 2)
 
 
+# ignore NumPy divide by zero warning caused by fake data
+@pytest.mark.filterwarnings("ignore: invalid value encountered in true_divide")
 def test_by_percent_diff():
     data = [np.nan] + 97 * [0] + [100, 100]
     ref = (len(data) - 1) * [0] + [80]

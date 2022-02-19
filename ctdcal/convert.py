@@ -71,6 +71,7 @@ def hex_to_ctd(
 
 def make_time_files(
     ssscc: Union[str, Sequence[str]],
+    filter_cols: list = cfg.filter_cols,
     cnv_dir: Union[str, Path] = cfg.dirs["converted"],
     time_dir: Union[str, Path] = cfg.dirs["time"],
     logs_dir: Union[str, Path] = cfg.dirs["logs"],
@@ -135,7 +136,7 @@ def make_time_files(
             filter_data = process_ctd.raw_ctd_filter(
                 trimmed_df,
                 window="triangle",
-                parameters=cfg.filter_cols,
+                parameters=filter_cols,
             )
 
             # Trim to downcast
