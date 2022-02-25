@@ -92,7 +92,7 @@ def residual_vs_pressure(
     ax = plt.axes()
 
     # color scatter by stations if given
-    if stn is not None:
+    if (stn is not None) and (len(stn) > 1):    # Apply colorbar formatting if more than 1 stn
         idx, uniques = pd.factorize(stn)  # find unique stations #s and index them
         sc = ax.scatter(diff, prs, c=idx, marker="+")
         cbar = plt.colorbar(sc, ax=ax, pad=0.1)  # set cbar ticks to station names

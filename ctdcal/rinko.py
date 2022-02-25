@@ -26,7 +26,7 @@ def rinko_DO(p_prime, G, H):
     Calculates the dissolved oxygen percentage.
     """
 
-    DO = G + H * p_prime
+    DO = np.add(G, H * p_prime)
 
     return DO
 

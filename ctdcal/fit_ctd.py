@@ -346,7 +346,8 @@ def calibrate_temp(btl_df, time_df):
         T_flag, T_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:
             # 0) load ssscc subset to be fit together
-            ssscc_sublist = pd.read_csv(f, header=None, dtype="str").squeeze().to_list()
+            ssscc_sublist = list(pd.read_csv(f, header=None, dtype="str").squeeze("columns"))  #  If sublist is only one entry, add blank line and convert to list
+
             btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
             good_rows = btl_rows & (btl_df["REFTMP_FLAG_W"] == 2)
             time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
@@ -513,7 +514,8 @@ def calibrate_cond(btl_df, time_df):
         C_flag, C_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:
             # 0) grab ssscc chunk to fit
-            ssscc_sublist = pd.read_csv(f, header=None, dtype="str").squeeze().to_list()
+            ssscc_sublist = list(pd.read_csv(f, header=None, dtype="str").squeeze("columns")) #.to_list()
+            
             btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
             good_rows = btl_rows & (btl_df["SALNTY_FLAG_W"] == 2)
             time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
