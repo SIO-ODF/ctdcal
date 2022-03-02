@@ -1,3 +1,6 @@
+"""
+A module for all Rinko oxygen functions and calculations.
+"""
 from collections import namedtuple
 from pathlib import Path
 

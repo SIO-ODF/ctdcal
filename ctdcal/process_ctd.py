@@ -1,3 +1,6 @@
+"""
+A module for handling ctd metadata, trimming, and corrections on continuous data.
+"""
 import logging
 import warnings
 from datetime import datetime, timezone
@@ -449,7 +452,8 @@ def pressure_sequence(df, p_col="CTDPRS", direction="down"):
 
 
 def binning_df(df, p_column="CTDPRS", bin_size=2):
-    """Calculate the bin-mean of each column in input dataframe
+    """
+    Calculate the bin-mean of each column in input dataframe.
 
     Parameters
     ----------
@@ -608,7 +612,7 @@ def make_depth_log(time_df, threshold=80):
 
 def make_ssscc_list(fname="data/ssscc.csv"):
     """
-    Attempt to automatically generate list of station/casts from raw files.
+    Attempt to automatically generate list of station/casts from raw .hex files.
     """
     raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
     ssscc_list = sorted([f.stem for f in raw_files])

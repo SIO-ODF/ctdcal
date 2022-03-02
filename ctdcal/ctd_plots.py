@@ -1,3 +1,6 @@
+"""
+A module for generating ctd plots in reports or documents.
+"""
 import logging
 from pathlib import Path
 

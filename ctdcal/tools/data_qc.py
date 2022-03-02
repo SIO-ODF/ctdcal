@@ -1,3 +1,11 @@
+"""
+A tool for quality control of processed ctd and bottle data.
+
+Loads .ct1 and .hy1 into Bokeh visualization, where flags can be adjusted and exported manually.
+
+Flags follow WOCE definitions in section 4.5.2 of the WOCE manual.
+https://cchdo.github.io/hdo-assets/documentation/manuals/pdf/90_1/chap4.pdf
+"""
 import numpy as np
 import pandas as pd
 import glob
@@ -47,7 +55,7 @@ btl_data["Comments"] = ""
 btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
 
 # update with old handcoded flags if file exists
-handcoded_file = "salt_flags_handcoded.csv"
+handcoded_file = "../../data/salt_flags_handcoded.csv"
 if glob.glob(handcoded_file):
     handcodes = pd.read_csv(handcoded_file, dtype={"SSSCC": str}, keep_default_na=False)
     handcodes = handcodes.rename(columns={"salinity_flag": "New Flag"}).drop(
@@ -203,8 +211,6 @@ ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 
 # define callback functions
-
-
 def update_selectors():
 
     print("exec update_selectors()")
@@ -336,7 +342,7 @@ def save_data():
     )
 
     # save it
-    df_out.to_csv("salt_flags_handcoded.csv", index=None)
+    df_out.to_csv("../../data/salt_flags_handcoded.csv", index=None)
 
 def exit_bokeh():   #   From MK
     print("Stopping flagging software")

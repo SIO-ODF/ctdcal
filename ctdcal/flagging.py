@@ -1,3 +1,6 @@
+"""
+A module for assigning and assessing flags in main ctdcal routines.
+"""
 import numpy as np
 import pandas as pd
 

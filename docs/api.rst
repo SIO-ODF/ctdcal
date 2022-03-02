@@ -17,7 +17,7 @@ API reference
    fit_ctd
    flagging
    merge_codes
-   odf_io
+   salts
    oxy_fitting
    process_bottle
    process_ctd

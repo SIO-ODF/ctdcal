@@ -7,11 +7,11 @@ from .. import (
     convert,
     fit_ctd,
     get_ctdcal_config,
-    odf_io,
     oxy_fitting,
     process_bottle,
     process_ctd,
     rinko,
+    salts,
 )
 
 import logging
@@ -48,7 +48,7 @@ def odf_process_all():
     convert.make_btl_mean(ssscc_list)
 
     # generate salt .csv files
-    odf_io.process_salts(ssscc_list)
+    salts.process_salts(ssscc_list)
 
     # generate reftemp .csv files
     process_bottle.process_reft(ssscc_list)

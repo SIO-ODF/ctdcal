@@ -19,7 +19,9 @@ log = logging.getLogger(__name__)
 
 
 def load_fit_yaml(fname=f"{cfg.dirs['logs']}fit_coefs.yaml", to_object=False):
-    """Load polynomail fit order information from .yaml file."""
+    """
+    Load polynomial fit order information from .yaml file.
+    """
 
     with open(fname, "r") as f:
         ymlfile = yaml.safe_load(f)
@@ -347,7 +349,6 @@ def calibrate_temp(btl_df, time_df):
         for f in ssscc_subsets:
             # 0) load ssscc subset to be fit together
             ssscc_sublist = list(pd.read_csv(f, header=None, dtype="str").squeeze("columns"))  #  If sublist is only one entry, add blank line and convert to list
-
             btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
             good_rows = btl_rows & (btl_df["REFTMP_FLAG_W"] == 2)
             time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
@@ -470,7 +471,10 @@ def calibrate_cond(btl_df, time_df):
 
     Returns
     --------
-
+    btl_df : DataFrame
+        Adjusted CTD data at bottle stops
+    time_df : DataFrame
+        Adjusted continuous CTD data
     """
     log.info("Calibrating conductivity")
     # calculate BTLCOND values from autosal data
@@ -481,17 +485,15 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["p"]],
     )
 
-    # merge in handcoded salt flags
-    # TODO: make salt flagger move .csv somewhere else? or just always have it
-    # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
-    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
-    if Path(salt_file).exists():
+    # Merge in handcoded salt flags
+    salt_file = "salt_flags_handcoded.csv"  # abstract to config.py (was /tools/salt_flags_handcoded.csv)
+    if Path(salt_file).exists():  # If QC has been run and there exist manual flags
         handcoded_salts = pd.read_csv(
             salt_file, dtype={"SSSCC": str, "salinity_flag": int}
         )
         handcoded_salts = handcoded_salts.rename(
             columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
-        ).drop(columns=["diff", "Comments"])
+        ).drop(columns=["diff", "Comments"])    #  Only keep the bottle fire num and flag for that SSSCC
         btl_df = btl_df.merge(handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left")
         # TODO: may be easier to try using flagging._merge_flags()?
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(

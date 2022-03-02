@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ctdcal import odf_io
+from ctdcal import salts
 
 
 def check_type(to_check, sub_dtype):
@@ -75,7 +75,7 @@ def make_salt_file(stn=1, cast=1, comment=None, flag=False, to_file=None):
 def test_salt_loader(caplog, tmp_path):
     # check salt file loads in correctly
     salt_file = make_salt_file()
-    saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
+    saltDF, refDF = salts._salt_loader(io.StringIO(salt_file))
 
     assert saltDF.shape == (10, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
@@ -92,9 +92,9 @@ def test_salt_loader(caplog, tmp_path):
     # check commented lines are ignored ("bottles" 1, 4, 10)
     salt_file = make_salt_file(comment="#")
     with caplog.at_level(logging.DEBUG):
-        saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
+        saltDF, refDF = salts._salt_loader(io.StringIO(salt_file))
         assert "(#, x)" in caplog.messages[0]
-        assert "test_odf_io" in caplog.messages[0]
+        assert "test_salts" in caplog.messages[0]
     assert saltDF.shape == (7, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
     assert check_type(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]], float)
@@ -111,12 +111,12 @@ def test_salt_loader(caplog, tmp_path):
     salt_file = make_salt_file(flag=True)
     with caplog.at_level(logging.DEBUG):
         f_out = io.StringIO()
-        saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file), flag_file=f_out)
+        saltDF, refDF = salts._salt_loader(io.StringIO(salt_file), flag_file=f_out)
         flagged = f_out.getvalue().split("\n")
-        assert "Found * in test_odf_io" in caplog.messages[1]
-        assert "test_odf_io,1,,3,Auto-flagged" in flagged[0]
-        assert "test_odf_io,4,,3,Auto-flagged" in flagged[1]
-        assert "test_odf_io,10,,3,Auto-flagged" in flagged[2]
+        assert "Found * in test_salts" in caplog.messages[1]
+        assert "test_salts,1,,3,Auto-flagged" in flagged[0]
+        assert "test_salts,4,,3,Auto-flagged" in flagged[1]
+        assert "test_salts,10,,3,Auto-flagged" in flagged[2]
         assert flagged[3] == ""
     assert saltDF.shape == (10, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
@@ -135,7 +135,7 @@ def test_salt_loader(caplog, tmp_path):
     d.mkdir()
     fake_file = d / "90909"
     fake_file.write_text("\n1 2 3 4 5 6 7 00:01 00:02 10 11")
-    saltDF, refDF = odf_io._salt_loader(fake_file)
+    saltDF, refDF = salts._salt_loader(fake_file)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
     assert check_type(saltDF[["CRavg", "Reading1"]], float)
     assert check_type(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]], int)
@@ -152,7 +152,7 @@ def test_remove_autosal_drift(caplog):
     refDF = pd.DataFrame(data={"IndexTime": index_time[::6], "CRavg": CRavg[::6]})
 
     # check that drift is removed correctly
-    removed = odf_io.remove_autosal_drift(saltDF, refDF)
+    removed = salts.remove_autosal_drift(saltDF, refDF)
     np.testing.assert_allclose(removed["CRavg"], np.arange(1.5, 2, 0.1)[::-1])
     assert "IndexTime" not in removed.columns
 
@@ -161,7 +161,7 @@ def test_remove_autosal_drift(caplog):
     assert all(refDF["CRavg"] == CRavg[::6])
 
     # return unmodified saltDF if refDF is wrong size
-    original = odf_io.remove_autosal_drift(saltDF, refDF.iloc[0])
+    original = salts.remove_autosal_drift(saltDF, refDF.iloc[0])
     assert all(original["CRavg"] == saltDF["CRavg"])
     assert "IndexTime" not in original.columns
     assert "start/end reference" in caplog.messages[0]
@@ -174,24 +174,24 @@ def test_salt_exporter(tmp_path, caplog):
 
     # check test data completes round trip
     assert not Path(tmp_path / "00101_salts.csv").exists()
-    odf_io._salt_exporter(saltDF, outdir=str(tmp_path))
+    salts._salt_exporter(saltDF, outdir=str(tmp_path))
     assert Path(tmp_path / "00101_salts.csv").exists()
     with open(Path(tmp_path / "00101_salts.csv")) as f:
         assert saltDF.equals(pd.read_csv(f))
 
     # check "file already exists" message
     with caplog.at_level(logging.INFO):
-        odf_io._salt_exporter(saltDF, outdir=str(tmp_path))
+        salts._salt_exporter(saltDF, outdir=str(tmp_path))
         assert "00101_salts.csv already exists" in caplog.messages[0]
 
     # check file write with multiple stations
     saltDF["STNNBR"] = [1, 1, 2, 2, 2]
-    odf_io._salt_exporter(saltDF, outdir=str(tmp_path))
+    salts._salt_exporter(saltDF, outdir=str(tmp_path))
     assert Path(tmp_path / "00201_salts.csv").exists()
 
     # check file write with multiple casts
     saltDF["CASTNO"] = [1, 2, 1, 2, 3]
-    odf_io._salt_exporter(saltDF, outdir=str(tmp_path))
+    salts._salt_exporter(saltDF, outdir=str(tmp_path))
     assert Path(tmp_path / "00102_salts.csv").exists()
     assert Path(tmp_path / "00202_salts.csv").exists()
     assert Path(tmp_path / "00203_salts.csv").exists()
@@ -201,7 +201,7 @@ def test_salt_exporter(tmp_path, caplog):
     saltDF["Reading1"] = 1
     saltDF["Reading2"] = np.nan
     assert not Path(tmp_path / "00301_salts.csv").exists()
-    odf_io._salt_exporter(saltDF, outdir=str(tmp_path))
+    salts._salt_exporter(saltDF, outdir=str(tmp_path))
     with open(Path(tmp_path / "00301_salts.csv")) as f:
         empty = pd.read_csv(f)
         assert "Reading1" in empty.columns
@@ -210,7 +210,7 @@ def test_salt_exporter(tmp_path, caplog):
 
 def test_process_salts(tmp_path, caplog):
     # check missing salt files are logged and skipped
-    odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
+    salts.process_salts(["90909"], salt_dir=str(tmp_path))
     assert "90909 does not exist" in caplog.messages[0]
 
     # check salt file is processed through to .csv without errors
@@ -219,11 +219,11 @@ def test_process_salts(tmp_path, caplog):
     make_salt_file(stn=909, cast=9, to_file=f_path)  # outfile name depends on stn/cast
     with caplog.at_level(logging.INFO):
         assert not Path(tmp_path / "90909_salts.csv").exists()
-        odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
+        salts.process_salts(["90909"], salt_dir=str(tmp_path))
         assert len(caplog.messages) == 1
         assert Path(tmp_path / "90909_salts.csv").exists()
 
     # check nothing happens if .csv already exists
     with caplog.at_level(logging.INFO):
-        odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
+        salts.process_salts(["90909"], salt_dir=str(tmp_path))
         assert "90909_salts.csv already exists" in caplog.messages[1]

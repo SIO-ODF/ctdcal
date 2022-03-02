@@ -1,3 +1,6 @@
+"""
+A module of functions for converting from SBE formats to .pkl files.
+"""
 from pathlib import Path
 
 import gsw
@@ -136,6 +139,18 @@ def hex_to_ctd(ssscc_list):
 
 
 def make_time_files(ssscc_list):
+    """
+    Write time pickle files to data/time/ after data smoothing.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to convert
+
+    Returns
+    -------
+
+    """
     log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
@@ -234,8 +249,14 @@ def make_btl_mean(ssscc_list):
 
 
 def convertFromSBEReader(sbeReader):
-    """Handler to convert engineering data to sci units automatically.
+    """
+    Handler to convert engineering data to sci units automatically.
     Takes SBEReader object that is already connected to the .hex and .XMLCON files.
+    
+    Returns
+    -------
+    converted_df : pandas DataFrame
+        Metadata and converted sensor data.
     """
 
     # Retrieve parsed scans and convert to dataframe

@@ -89,7 +89,7 @@ def process(group, type):
         # pmel_process()
         pass
     elapsed = time.time() - t
-    log.info("Processing complete: " + str(round(elapsed/60)) + " minutes and " + str(round((elapsed/60 - elapsed%60)*60)) + " seconds.")
+    log.info("Processing complete: " + str(round(elapsed/60)) + " minutes and " + str(round(elapsed)) + " seconds.")
 
 @cli.command()
 def cruise_report():
@@ -112,7 +112,6 @@ def qc():
     server.start()
     server.show("/")    #   Blank tab, no output
     io_loop.start()
-
 
 
 if __name__ == "__main__":
