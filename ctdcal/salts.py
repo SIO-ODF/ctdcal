@@ -30,7 +30,7 @@ def _salt_loader(filename, flag_file="../data/salt_flags_handcoded.csv"):
     elif isinstance(filename, io.StringIO):
         saltF = csv.reader(filename, **csv_opts)
         saltArray = [row for row in saltF]
-        ssscc = "test_odf_io"
+        ssscc = "test_salts"
     else:
         raise NotImplementedError(
             "Salt loader only able to read in str, Path, or StringIO classes"
