@@ -113,6 +113,12 @@ def qc():
     server.show("/")    #   Blank tab, no output
     io_loop.start()
 
+@cli.command()
+def vis():
+    """Launch data_vis"""
+    from .tools import data_vis
+
+    data_vis  #   ...can I just run it?
 
 if __name__ == "__main__":
     cli()
