@@ -104,6 +104,12 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    "13": {
+        "short_name": "FLF_FLUOR",
+        "long_name": "FluoroSeatechWetlabsFLF_Sensor",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
 }
 
 
@@ -127,6 +133,7 @@ def hex_to_ctd(ssscc_list):
             hexFile = cfg.dirs["raw"] + ssscc + ".hex"
             xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
+            breakpoint
             converted_df = convertFromSBEReader(sbeReader)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
