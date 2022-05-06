@@ -54,6 +54,7 @@ def init():
         Path(sub_dir).mkdir(parents=True)
     import shutil
     shutil.copy2("fit_coefs.yaml", "./data/logs/fit_coefs.yaml")
+    shutil.copy2("o2flasks.vol", "./data/oxygen/o2flasks.vol")
 
 @cli.command("import")  # click workaround to get a command named 'import'
 def import_data():
