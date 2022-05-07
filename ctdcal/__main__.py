@@ -1,3 +1,4 @@
+from distutils import filelist
 from pathlib import Path
 
 import click
@@ -55,6 +56,33 @@ def init():
     import shutil
     shutil.copy2("fit_coefs.yaml", "./data/logs/fit_coefs.yaml")
     shutil.copy2("o2flasks.vol", "./data/oxygen/o2flasks.vol")
+
+@cli.command()
+def offload():
+    """Move everything that was processed/non-essential out for a fresh ctdcal run"""
+
+    import os
+    import shutil
+    import glob
+
+    folder = "".join(map(str, time.localtime()[0:6])) + "/"  #   Create a distinct folder from current date and time
+    Path(folder).mkdir()
+
+    #   List subfolders of data
+    subfolderlist = glob.glob('data/*/')
+    for f in subfolderlist:
+        #   Create list of files in each folder
+        h = f + '*.csv'
+        i = f + '*.pkl'
+        csv = glob.glob(h)
+        pkl = glob.glob(i)
+        #   Now use shutil.move to grab each csv in csv from f and every pkl in pkl from f
+        # filelist = os.listdir(f)
+        # for ff in filelist:
+            
+    #   
+
+    log.info(f"")
 
 @cli.command("import")  # click workaround to get a command named 'import'
 def import_data():

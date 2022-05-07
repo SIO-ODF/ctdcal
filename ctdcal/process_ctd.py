@@ -1,6 +1,3 @@
-"""
-A module for handling ctd metadata, trimming, and corrections on continuous data.
-"""
 import logging
 import warnings
 from datetime import datetime, timezone
@@ -452,8 +449,7 @@ def pressure_sequence(df, p_col="CTDPRS", direction="down"):
 
 
 def binning_df(df, p_column="CTDPRS", bin_size=2):
-    """
-    Calculate the bin-mean of each column in input dataframe.
+    """Calculate the bin-mean of each column in input dataframe
 
     Parameters
     ----------
@@ -612,7 +608,7 @@ def make_depth_log(time_df, threshold=80):
 
 def make_ssscc_list(fname="data/ssscc.csv"):
     """
-    Attempt to automatically generate list of station/casts from raw .hex files.
+    Attempt to automatically generate list of station/casts from raw files.
     """
     raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
     ssscc_list = sorted([f.stem for f in raw_files])
@@ -742,6 +738,9 @@ def export_ct1(df, ssscc_list):
 
     # check that all columns are there
     try:
+        #   P02 05/06/2022 AM quickfix for new fluorometer
+        if 'FLF_FLUOR' in df.columns:
+            df['CTDFLUOR'] = df['FLF_FLUOR']
         df[cfg.ctd_col_names]
         # this is lazy, do better
     except KeyError as err:
