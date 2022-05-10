@@ -18,9 +18,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import oxy_fitting as oxy_fitting
+from ctdcal import (
+    flagging as flagging,
+    get_ctdcal_config,
+    oxy_fitting as oxy_fitting
+)
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -187,7 +189,7 @@ def load_all_btl_files(ssscc_list, cols=None):
         reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
         try:
             reft_data = _load_reft_data(reft_file)
-        except FileNotFoundError:
+        except FileNotFoundError:   # If there is no processed refTEMP file
             log.warning(
                 "Missing (or misnamed) REFT Data Station: "
                 + ssscc
@@ -196,12 +198,13 @@ def load_all_btl_files(ssscc_list, cols=None):
             reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
             reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
             reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
+            reft_data["REFTMP_FLAG_W"] = reft_data["T90"]
 
         ### load REFC data
         refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
         try:
             refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
-        except FileNotFoundError:
+        except FileNotFoundError:   # If there is no processed refCOND file
             log.warning(
                 "Missing (or misnamed) REFC Data Station: "
                 + ssscc
@@ -349,7 +352,7 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
 
     """
     for ssscc in ssscc_list:
-        if not Path(reft_dir + ssscc + "_reft.csv").exists():
+        if not Path(reft_dir + ssscc + "_reft.csv").exists():   # If the reft has not been assessed yet
             try:
                 reftDF = _reft_loader(ssscc, reft_dir)
                 reftDF.to_csv(reft_dir + ssscc + "_reft.csv", index=False)
