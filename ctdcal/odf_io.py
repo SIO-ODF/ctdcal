@@ -7,7 +7,7 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import get_ctdcal_config
+from ctdcal import get_ctdcal_config
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -154,7 +154,13 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
             continue
         else:
             try:
-                saltDF, refDF = _salt_loader(Path(salt_dir) / ssscc)
+                try:
+                    saltDF, refDF = _salt_loader(Path(salt_dir) / ssscc)
+                #   Some salt files are grouped, two per run. In case you start on an even run.
+                except FileNotFoundError:
+                    lower_ssscc = str(int(ssscc[0:3])-1).zfill(3)+ssscc[3:]
+                    log.info(f"Salt file for cast {ssscc} missing, checking for {lower_ssscc}")
+                    saltDF, refDF = _salt_loader(Path(salt_dir) / lower_ssscc)
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue

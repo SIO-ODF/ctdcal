@@ -360,7 +360,7 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
                 log.warning(
                     "refT file for cast " + ssscc + " does not exist... skipping"
                 )
-                return
+                continue
 
 
 def add_btlnbr_cols(df, btl_num_col):
@@ -404,12 +404,18 @@ def export_report_data(df):
     ]
 
     # add in missing flags
-    df["CTDTMP1_FLAG_W"] = flagging.by_residual(
-        df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
-    )
-    df["CTDTMP2_FLAG_W"] = flagging.by_residual(
-        df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
-    )
+    if any(df['REFTMP_FLAG_W'].notnull()):
+        df["CTDTMP1_FLAG_W"] = flagging.by_residual(
+            df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
+        )
+        df["CTDTMP2_FLAG_W"] = flagging.by_residual(
+            df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
+        )
+    else:
+        log.warning("No refT found. Flagging temperatures as questionable.")
+        df["REFTMP"] = np.nan
+        df["CTDTMP1_FLAG_W"] = 3
+        df["CTDTMP2_FLAG_W"] = 3
     df["CTDCOND1_FLAG_W"] = flagging.by_residual(
         df["CTDCOND1"], df["BTLCOND"], df["CTDPRS"]
     )

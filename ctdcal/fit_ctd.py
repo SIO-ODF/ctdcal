@@ -8,11 +8,13 @@ import pandas as pd
 from scipy.ndimage.interpolation import shift
 import yaml
 
-from . import convert as convert
-from . import ctd_plots as ctd_plots
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import process_ctd as process_ctd
+from ctdcal import (
+    convert as convert,
+    ctd_plots as ctd_plots,
+    flagging as flagging,
+    get_ctdcal_config,
+    process_ctd as process_ctd
+)
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -349,105 +351,113 @@ def calibrate_temp(btl_df, time_df):
             ssscc_sublist = pd.read_csv(f, header=None, dtype="str").squeeze().to_list()
             btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
             good_rows = btl_rows & (btl_df["REFTMP_FLAG_W"] == 2)
-            time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
+            if any(good_rows):  # If there is at least one refT value
+                time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
 
-            # 1) plot pre-fit residual
-            f_stem = f.stem  # get "ssscc_t*" from path
-            ctd_plots._intermediate_residual_plot(
-                btl_df.loc[btl_rows, cfg.column["refT"]]
-                - btl_df.loc[btl_rows, cfg.column[tN]],
-                btl_df.loc[btl_rows, cfg.column["p"]],
-                btl_df.loc[btl_rows, "SSSCC"],
-                xlabel=f"{tN.upper()} Residual (T90 C)",
-                f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}_prefit.pdf",
-            )
+                # 1) plot pre-fit residual
+                f_stem = f.stem  # get "ssscc_t*" from path
+                ctd_plots._intermediate_residual_plot(
+                    btl_df.loc[btl_rows, cfg.column["refT"]]
+                    - btl_df.loc[btl_rows, cfg.column[tN]],
+                    btl_df.loc[btl_rows, cfg.column["p"]],
+                    btl_df.loc[btl_rows, "SSSCC"],
+                    xlabel=f"{tN.upper()} Residual (T90 C)",
+                    f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}_prefit.pdf",
+                )
 
-            # 2) prepare data for fitting
-            # NOTE: df_bad will be overwritten during post-fit data flagging but is
-            # left here for future debugging (if necessary)
-            df_good, df_bad = _prepare_fit_data(
-                btl_df[good_rows],
-                cfg.column[tN],
-                cfg.column["refT"],
-                zRange=fit_yaml[tN][f_stem]["zRange"],
-            )
-            ctd_plots._intermediate_residual_plot(
-                df_good["Diff"],
-                df_good[cfg.column["p"]],
-                df_good["SSSCC"],
-                xlabel=f"{tN.upper()} Residual (T90 C)",
-                f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}_fit_data.pdf",
-            )
+                # 2) prepare data for fitting
+                # NOTE: df_bad will be overwritten during post-fit data flagging but is
+                # left here for future debugging (if necessary)
+                df_good, df_bad = _prepare_fit_data(
+                    btl_df[good_rows],
+                    cfg.column[tN],
+                    cfg.column["refT"],
+                    zRange=fit_yaml[tN][f_stem]["zRange"],
+                )
+                ctd_plots._intermediate_residual_plot(
+                    df_good["Diff"],
+                    df_good[cfg.column["p"]],
+                    df_good["SSSCC"],
+                    xlabel=f"{tN.upper()} Residual (T90 C)",
+                    f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}_fit_data.pdf",
+                )
 
-            # 3) calculate fit coefs
-            # TODO: truncate coefs (10 digits? look at historical data)
-            P_order = fit_yaml[tN][f_stem]["P_order"]
-            T_order = fit_yaml[tN][f_stem]["T_order"]
-            coef_dict = multivariate_fit(
-                df_good["Diff"],
-                (df_good[cfg.column["p"]], P_order),
-                (df_good[cfg.column[tN]], T_order),
-                coef_names=["cp", "ct"],
-            )
+                # 3) calculate fit coefs
+                # TODO: truncate coefs (10 digits? look at historical data)
+                P_order = fit_yaml[tN][f_stem]["P_order"]
+                T_order = fit_yaml[tN][f_stem]["T_order"]
+                coef_dict = multivariate_fit(
+                    df_good["Diff"],
+                    (df_good[cfg.column["p"]], P_order),
+                    (df_good[cfg.column[tN]], T_order),
+                    coef_names=["cp", "ct"],
+                )
 
-            # 4) apply fit
-            P_coefs = tuple(coef_dict[f"cp{n}"] for n in np.arange(1, P_order + 1))
-            T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1))
-            btl_df.loc[btl_rows, cfg.column[tN]] = apply_polyfit(
-                btl_df.loc[btl_rows, cfg.column[tN]],
-                (coef_dict["c0"],) + T_coefs,
-                (btl_df.loc[btl_rows, cfg.column["p"]], P_coefs),
-            )
-            time_df.loc[time_rows, cfg.column[tN]] = apply_polyfit(
-                time_df.loc[time_rows, cfg.column[tN]],
-                (coef_dict["c0"],) + T_coefs,
-                (time_df.loc[time_rows, cfg.column["p"]], P_coefs),
-            )
+                # 4) apply fit
+                P_coefs = tuple(coef_dict[f"cp{n}"] for n in np.arange(1, P_order + 1))
+                T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1))
+                btl_df.loc[btl_rows, cfg.column[tN]] = apply_polyfit(
+                    btl_df.loc[btl_rows, cfg.column[tN]],
+                    (coef_dict["c0"],) + T_coefs,
+                    (btl_df.loc[btl_rows, cfg.column["p"]], P_coefs),
+                )
+                time_df.loc[time_rows, cfg.column[tN]] = apply_polyfit(
+                    time_df.loc[time_rows, cfg.column[tN]],
+                    (coef_dict["c0"],) + T_coefs,
+                    (time_df.loc[time_rows, cfg.column["p"]], P_coefs),
+                )
 
-            # 4.5) flag CTDTMP and make residual plots
-            df_ques, df_bad = _flag_btl_data(
-                btl_df[btl_rows],
-                param=cfg.column[tN],
-                ref=cfg.column["refT"],
-                f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}.pdf",
-            )
+                # 4.5) flag CTDTMP and make residual plots
+                df_ques, df_bad = _flag_btl_data(
+                    btl_df[btl_rows],
+                    param=cfg.column[tN],
+                    ref=cfg.column["refT"],
+                    f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}.pdf",
+                )
 
-            # 5) handle quality flags
-            T_flag = pd.concat([T_flag, df_bad, df_ques])
+                # 5) handle quality flags
+                T_flag = pd.concat([T_flag, df_bad, df_ques])
 
-            # 6) handle fit params
-            coef_df = pd.DataFrame()
-            coef_df["SSSCC"] = ssscc_sublist
-            coef_names = ["cp2", "cp1", "ct2", "ct1", "c0"]
-            coef_df[coef_names] = 0.0
-            for k, v in coef_dict.items():
-                coef_df[k] = v
+                # 6) handle fit params
+                coef_df = pd.DataFrame()
+                coef_df["SSSCC"] = ssscc_sublist
+                coef_names = ["cp2", "cp1", "ct2", "ct1", "c0"]
+                coef_df[coef_names] = 0.0
+                for k, v in coef_dict.items():
+                    coef_df[k] = v
 
-            T_fit_coefs = pd.concat([T_fit_coefs, coef_df])
-
+                T_fit_coefs = pd.concat([T_fit_coefs, coef_df])
+            else:
+                log.warning(f"No good refT values found. Skipping flagging and plotting.")
         # one more fig with all cuts
-        ctd_plots._intermediate_residual_plot(
-            btl_df[cfg.column["refT"]] - btl_df[cfg.column[tN]],
-            btl_df[cfg.column["p"]],
-            btl_df["SSSCC"],
-            xlabel=f"{tN.upper()} Residual (T90 C)",
-            show_thresh=True,
-            f_out=f"{cfg.fig_dirs[tN]}residual_all_postfit.pdf",
-        )
+        if cfg.column['refT'] in btl_df:     # If at least one file was fit
+            ctd_plots._intermediate_residual_plot(
+                btl_df[cfg.column["refT"]] - btl_df[cfg.column[tN]],
+                btl_df[cfg.column["p"]],
+                btl_df["SSSCC"],
+                xlabel=f"{tN.upper()} Residual (T90 C)",
+                show_thresh=True,
+                f_out=f"{cfg.fig_dirs[tN]}residual_all_postfit.pdf",
+            )
+            # export temp quality flags
+            # TODO: make these flags useful/less cluttered
+            T_flag.sort_index().to_csv(f"{cfg.dirs['logs']}qual_flag_{tN}.csv", index=False)
 
-        # export temp quality flags
-        # TODO: make these flags useful/less cluttered
-        T_flag.sort_index().to_csv(f"{cfg.dirs['logs']}qual_flag_{tN}.csv", index=False)
+            # export temp fit params (formated to 5 sig figs, scientific notation)
+            T_fit_coefs[coef_names] = T_fit_coefs[coef_names].applymap(
+                lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
+            )
+            T_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{tN}.csv", index=False)
 
-        # export temp fit params (formated to 5 sig figs, scientific notation)
-        T_fit_coefs[coef_names] = T_fit_coefs[coef_names].applymap(
-            lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
-        )
-        T_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{tN}.csv", index=False)
-
+        else:
+            log.info(f"No casts fit. Check REFT/REFC steps.")
+        
     # flag temperature data
     # TODO: CTDTMP_FLAG_W historically not included in hy1 file... should it be?
-    time_df["CTDTMP_FLAG_W"] = 2  # TODO: flag w/ REFT somehow? discrete vs continuous
+    if any(btl_df["REFTMP_FLAG_W"].notnull()):
+        time_df["CTDTMP_FLAG_W"] = 2  # TODO: flag w/ REFT somehow? discrete vs continuous
+    else:
+        time_df["CTDTMP_FLAG_W"] = 3    # Questionable until proven innocent (no refT)
 
     return True
 
