@@ -13,7 +13,7 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
+def _salt_loader(filename, flag_file="salt_flags_handcoded.csv"):
     """
     Load raw file into salt and reference DataFrames.
     """
