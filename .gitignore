@@ -152,3 +152,4 @@ ctdcal/_version.py
 00101 data/time/00101_time.pkl
 00101 data/time/00102_time.pkl
 .gitignore
+salt_flags_handcoded.csv
