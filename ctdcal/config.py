@@ -38,6 +38,7 @@ dirs = {
     "reft": "data/reft/",
     "oxygen": "data/oxygen/",
     "logs": "data/logs/",
+    "scratch_folder": "data/scratch_folder" #   Temp 20220126
 }
 fig_dirs = {
     "t1": "data/logs/fitting_figs/temp_primary/",
