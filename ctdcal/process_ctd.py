@@ -588,7 +588,7 @@ def make_depth_log(time_df, threshold=80):
             "alt": df.loc[idx_p_max, "ALT"],
         }
     )
-    bottom_df.loc[bottom_df["alt"] > threshold, "alt"] = np.nan
+    bottom_df.loc[bottom_df["alt"] > threshold, "alt"] = np.nan # If the alt isn't below threshold, NaN this (will write out as -999). Fix by maintaining manual depth log.
     # pandas 1.2.1 ufunc issue workaround with pd.to_numpy()
     bottom_df["DEPTH"] = (
         (

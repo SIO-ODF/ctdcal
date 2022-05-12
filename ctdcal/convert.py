@@ -136,7 +136,7 @@ def hex_to_ctd(ssscc_list):
             xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             breakpoint
-            converted_df = convertFromSBEReader(sbeReader)
+            converted_df = convertFromSBEReader(sbeReader, ssscc)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
@@ -240,7 +240,7 @@ def make_btl_mean(ssscc_list):
     return True
 
 
-def convertFromSBEReader(sbeReader):
+def convertFromSBEReader(sbeReader, ssscc):
     """Handler to convert engineering data to sci units automatically.
     Takes SBEReader object that is already connected to the .hex and .XMLCON files.
     """
@@ -371,6 +371,7 @@ def convertFromSBEReader(sbeReader):
 
     for meta in queue_metadata:
 
+        #   Break up sensor metadata
         col = f"{short_lookup[meta['sensor_id']]['short_name']}{meta['channel_pos']}"
         sensor_name = short_lookup[meta["sensor_id"]]["long_name"]
         sensor_units = short_lookup[meta["sensor_id"]]["units"]
@@ -381,8 +382,16 @@ def convertFromSBEReader(sbeReader):
             print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
             converted_df[col] = sbe_eq.sbe3(raw_df[meta["column"]], coefs)
             if meta["list_id"] == 0:
-                t_array = converted_df[col].astype(float)
-                print("\tPrimary temperature first reading:", t_array[0], sensor_units)
+                if ssscc == "00801":    #   P02
+                    print("\tPrimary tmperature skipped for cast", ssscc)
+                else:
+                    t_array = converted_df[col].astype(float)
+                    print("\tPrimary temperature first reading:", t_array[0], sensor_units)
+            if meta["list_id"] == 3:
+                if ssscc == "00801":
+                    t_array = converted_df[col].astype(float)
+                    print("\tSecondary temperature first reading:", t_array[0], sensor_units)
+
 
         ### Pressure block
         elif meta["sensor_id"] == "45":

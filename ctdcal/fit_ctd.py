@@ -493,21 +493,21 @@ def calibrate_cond(btl_df, time_df):
     # merge in handcoded salt flags
     # TODO: make salt flagger move .csv somewhere else? or just always have it
     # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
-    salt_file = "salt_flags_handcoded.csv"  # abstract to config.py
-    if Path(salt_file).exists():
-        handcoded_salts = pd.read_csv(
-            salt_file, dtype={"SSSCC": str, "salinity_flag": int}
-        )
-        handcoded_salts = handcoded_salts.rename(
-            columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
-        ).drop(columns=["diff", "Comments"])
-        btl_df = btl_df.merge(handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left")
-        # TODO: may be easier to try using flagging._merge_flags()?
-        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
-            btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
-        )
-    else:
-        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
+    # salt_file = "salt_flags_handcoded.csv"  # abstract to config.py
+    # if Path(salt_file).exists():
+    #     handcoded_salts = pd.read_csv(
+    #         salt_file, dtype={"SSSCC": str, "salinity_flag": int}
+    #     )
+    #     handcoded_salts = handcoded_salts.rename(
+    #         columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
+    #     ).drop(columns=["diff", "Comments"])
+    #     btl_df = btl_df.merge(handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left")
+    #     # TODO: may be easier to try using flagging._merge_flags()?
+    #     btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
+    #         btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
+    #     )
+    # else:
+    btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"]) #   P02 salt_flags_handcoded writeout isn't working, ignore flagging
 
     ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
