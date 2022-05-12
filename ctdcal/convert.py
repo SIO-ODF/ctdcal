@@ -137,6 +137,12 @@ def hex_to_ctd(ssscc_list):
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             breakpoint
             converted_df = convertFromSBEReader(sbeReader, ssscc)
+
+            if ssscc == "00801":    #   P02: Evolve this into import NaN check and determine which sensor is "reliable" enough for SAL/OXY calculations
+                converted_df["CTDTMP1"] = converted_df["CTDTMP2"]
+                print("***Using T2 as primary T for cast " + ssscc + "***")
+            elif ssscc == "00904":
+                converted_df["CTDTMP2"] = np.nan
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
@@ -251,7 +257,7 @@ def convertFromSBEReader(sbeReader, ssscc):
     raw_df.index.name = "index"
 
     # Metadata needs to be processed seperately and then joined with the converted data
-    print("Building metadata dataframe...")
+    print("Building metadata dataframe for", ssscc)
     metaArray = [line.split(",") for line in sbeReader._parse_scans_meta().tolist()]
     meta_cols, meta_dtypes = sbeReader._breakdown_header()
     meta_df = pd.DataFrame(metaArray)

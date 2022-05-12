@@ -153,3 +153,276 @@ ctdcal/_version.py
 00101 data/time/00102_time.pkl
 .gitignore
 salt_flags_handcoded.csv
+data (test 00801)/ssscc.csv
+data (test 00801)/bottle/00701_btl_mean.pkl
+data (test 00801)/bottle/00801_btl_mean.pkl
+data (test 00801)/converted/00701.pkl
+data (test 00801)/converted/00801.pkl
+data (test 00801)/logs/bottom_bottle_details.csv
+data (test 00801)/logs/cast_details.csv
+data (test 00801)/logs/depth_log.csv
+data (test 00801)/logs/fit_coef_c1.csv
+data (test 00801)/logs/fit_coef_c2.csv
+data (test 00801)/logs/fit_coef_t1.csv
+data (test 00801)/logs/fit_coef_t2.csv
+data (test 00801)/logs/fit_coefs.yaml
+data (test 00801)/logs/manual_depth_log.csv
+data (test 00801)/logs/ondeck_pressure.csv
+data (test 00801)/logs/qual_flag_c1.csv
+data (test 00801)/logs/qual_flag_c2.csv
+data (test 00801)/logs/qual_flag_t1.csv
+data (test 00801)/logs/qual_flag_t2.csv
+data (test 00801)/logs/rinko_coefs.csv
+data (test 00801)/logs/sbe43_coefs.csv
+data (test 00801)/logs/fitting_figs/cond_primary/residual_all_postfit.pdf
+data (test 00801)/logs/fitting_figs/cond_primary/residual_ssscc_c1_fit_data.pdf
+data (test 00801)/logs/fitting_figs/cond_primary/residual_ssscc_c1_postfit_flag2.pdf
+data (test 00801)/logs/fitting_figs/cond_primary/residual_ssscc_c1_postfit.pdf
+data (test 00801)/logs/fitting_figs/cond_primary/residual_ssscc_c1_prefit.pdf
+data (test 00801)/logs/fitting_figs/cond_secondary/residual_all_postfit.pdf
+data (test 00801)/logs/fitting_figs/cond_secondary/residual_ssscc_c1_fit_data.pdf
+data (test 00801)/logs/fitting_figs/cond_secondary/residual_ssscc_c1_postfit_flag2.pdf
+data (test 00801)/logs/fitting_figs/cond_secondary/residual_ssscc_c1_postfit.pdf
+data (test 00801)/logs/fitting_figs/cond_secondary/residual_ssscc_c1_prefit.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_00701_prefit.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_00701.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_00801_prefit.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_00801.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_all_postfit_flag2.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_all_postfit.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_all_prefit.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_ox0_prefit.pdf
+data (test 00801)/logs/fitting_figs/oxy_primary/sbe43_residual_ox0.pdf
+data (test 00801)/logs/fitting_figs/oxy_rinko/rinko_residual_00701.pdf
+data (test 00801)/logs/fitting_figs/oxy_rinko/rinko_residual_00801.pdf
+data (test 00801)/logs/fitting_figs/oxy_rinko/rinko_residual_all_postfit_flag2.pdf
+data (test 00801)/logs/fitting_figs/oxy_rinko/rinko_residual_all_postfit.pdf
+data (test 00801)/logs/fitting_figs/oxy_rinko/rinko_residual_r0.pdf
+data (test 00801)/logs/fitting_figs/oxy_rinko/rinko_residual_ssscc_r1.pdf
+data (test 00801)/logs/fitting_figs/temp_primary/residual_all_postfit.pdf
+data (test 00801)/logs/fitting_figs/temp_primary/residual_ssscc_t1_fit_data.pdf
+data (test 00801)/logs/fitting_figs/temp_primary/residual_ssscc_t1_postfit_flag2.pdf
+data (test 00801)/logs/fitting_figs/temp_primary/residual_ssscc_t1_postfit.pdf
+data (test 00801)/logs/fitting_figs/temp_primary/residual_ssscc_t1_prefit.pdf
+data (test 00801)/logs/fitting_figs/temp_secondary/residual_all_postfit.pdf
+data (test 00801)/logs/fitting_figs/temp_secondary/residual_ssscc_t1_fit_data.pdf
+data (test 00801)/logs/fitting_figs/temp_secondary/residual_ssscc_t1_postfit_flag2.pdf
+data (test 00801)/logs/fitting_figs/temp_secondary/residual_ssscc_t1_postfit.pdf
+data (test 00801)/logs/fitting_figs/temp_secondary/residual_ssscc_t1_prefit.pdf
+data (test 00801)/oxygen/00701
+data (test 00801)/oxygen/00801
+data (test 00801)/oxygen/o2flasks.vol
+data (test 00801)/pressure/33RR20220430_hy1.csv
+data (test 00801)/pressure/00701_ct1.csv
+data (test 00801)/pressure/00801_ct1.csv
+data (test 00801)/raw/00701.bl
+data (test 00801)/raw/00701.hdr
+data (test 00801)/raw/00701.hex
+data (test 00801)/raw/00701.XMLCON
+data (test 00801)/raw/00801.bl
+data (test 00801)/raw/00801.hdr
+data (test 00801)/raw/00801.hex
+data (test 00801)/raw/00801.XMLCON
+data (test 00801)/reft/00701_reft.csv
+data (test 00801)/reft/00701.cap
+data (test 00801)/reft/00801_reft.csv
+data (test 00801)/reft/00801.cap
+data (test 00801)/salt/00701
+data (test 00801)/salt/00701_salts.csv
+data (test 00801)/salt/00801_salts.csv
+data (test 00801)/scratch_folder/report_data.csv
+data (test 00801)/ssscc/ssscc_c1.csv
+data (test 00801)/ssscc/ssscc_r1.csv
+data (test 00801)/ssscc/ssscc_t1.csv
+data (test 00801)/time/00701_time.pkl
+data (test 00801)/time/00801_time.pkl
+ctdcal/convert.py
+data all/ssscc.csv
+data all/converted/00102.pkl
+data all/converted/00301.pkl
+data all/converted/00401.pkl
+data all/converted/00501.pkl
+data all/converted/00601.pkl
+data all/converted/00701.pkl
+data all/converted/00801.pkl
+data all/converted/00904.pkl
+data all/converted/01001.pkl
+data all/converted/01101.pkl
+data all/converted/01201.pkl
+data all/converted/01301.pkl
+data all/converted/01401.pkl
+data all/converted/01501.pkl
+data all/converted/01601.pkl
+data all/converted/01701.pkl
+data all/converted/01801.pkl
+data all/converted/01901.pkl
+data all/converted/02001.pkl
+data all/converted/02101.pkl
+data all/converted/02201.pkl
+data all/converted/02302.pkl
+data all/converted/02401.pkl
+data all/converted/02501.pkl
+data all/converted/02602.pkl
+data all/converted/02701.pkl
+data all/converted/02801.pkl
+data all/logs/cast_details.csv
+data all/logs/fit_coefs.yaml
+data all/logs/manual_depth_log.csv
+data all/logs/ondeck_pressure.csv
+data all/oxygen/00102
+data all/oxygen/00301
+data all/oxygen/00401
+data all/oxygen/00501
+data all/oxygen/00601
+data all/oxygen/00701
+data all/oxygen/00801
+data all/oxygen/00904
+data all/oxygen/01001
+data all/oxygen/01101
+data all/oxygen/01201
+data all/oxygen/01301
+data all/oxygen/01401
+data all/oxygen/01501
+data all/oxygen/01601
+data all/oxygen/01701
+data all/oxygen/01801
+data all/oxygen/01901
+data all/oxygen/02001
+data all/oxygen/02101
+data all/oxygen/02201
+data all/oxygen/02302
+data all/oxygen/02401
+data all/oxygen/02501
+data all/oxygen/02602
+data all/oxygen/02701
+data all/oxygen/02801
+data all/oxygen/o2flasks.vol
+data all/raw/00102.bl
+data all/raw/00102.hex
+data all/raw/00102.XMLCON
+data all/raw/00301.bl
+data all/raw/00301.hex
+data all/raw/00301.XMLCON
+data all/raw/00401.bl
+data all/raw/00401.hex
+data all/raw/00401.XMLCON
+data all/raw/00501.bl
+data all/raw/00501.hex
+data all/raw/00501.XMLCON
+data all/raw/00601.bl
+data all/raw/00601.hex
+data all/raw/00601.XMLCON
+data all/raw/00701.bl
+data all/raw/00701.hex
+data all/raw/00701.XMLCON
+data all/raw/00801.bl
+data all/raw/00801.hex
+data all/raw/00801.XMLCON
+data all/raw/00904.bl
+data all/raw/00904.hex
+data all/raw/00904.XMLCON
+data all/raw/01001.bl
+data all/raw/01001.hex
+data all/raw/01001.XMLCON
+data all/raw/01101.bl
+data all/raw/01101.hex
+data all/raw/01101.XMLCON
+data all/raw/01201.bl
+data all/raw/01201.hex
+data all/raw/01201.XMLCON
+data all/raw/01301.bl
+data all/raw/01301.hex
+data all/raw/01301.XMLCON
+data all/raw/01401.bl
+data all/raw/01401.hex
+data all/raw/01401.XMLCON
+data all/raw/01501.bl
+data all/raw/01501.hex
+data all/raw/01501.XMLCON
+data all/raw/01601.bl
+data all/raw/01601.hex
+data all/raw/01601.XMLCON
+data all/raw/01701.bl
+data all/raw/01701.hex
+data all/raw/01701.XMLCON
+data all/raw/01801.bl
+data all/raw/01801.hex
+data all/raw/01801.XMLCON
+data all/raw/01901.bl
+data all/raw/01901.hex
+data all/raw/01901.XMLCON
+data all/raw/02001.bl
+data all/raw/02001.hex
+data all/raw/02001.XMLCON
+data all/raw/02101.bl
+data all/raw/02101.hex
+data all/raw/02101.XMLCON
+data all/raw/02201.bl
+data all/raw/02201.hex
+data all/raw/02201.XMLCON
+data all/raw/02302.bl
+data all/raw/02302.hex
+data all/raw/02302.XMLCON
+data all/raw/02401.bl
+data all/raw/02401.hex
+data all/raw/02401.XMLCON
+data all/raw/02501.bl
+data all/raw/02501.hex
+data all/raw/02501.XMLCON
+data all/raw/02602.bl
+data all/raw/02602.hex
+data all/raw/02602.XMLCON
+data all/raw/02701.bl
+data all/raw/02701.hex
+data all/raw/02701.XMLCON
+data all/raw/02801.bl
+data all/raw/02801.hex
+data all/raw/02801.XMLCON
+data all/reft/00102.cap
+data all/reft/00301.cap
+data all/reft/00401.cap
+data all/reft/00501.cap
+data all/reft/00601.cap
+data all/reft/00701.cap
+data all/reft/00801.cap
+data all/reft/00904.cap
+data all/reft/01201.cap
+data all/reft/01301.cap
+data all/reft/01401.cap
+data all/reft/01501.cap
+data all/reft/01601.cap
+data all/reft/01701.cap
+data all/reft/01801.cap
+data all/reft/01901.cap
+data all/reft/02001.cap
+data all/reft/02101.cap
+data all/reft/02201.cap
+data all/reft/02302.cap
+data all/reft/02401.cap
+data all/reft/02501.cap
+data all/reft/02602.cap
+data all/reft/02701.cap
+data all/reft/02801.cap
+data all/salt/00301
+data all/salt/00501
+data all/salt/00701
+data all/salt/00904
+data all/salt/01101
+data all/salt/01301
+data all/salt/01501
+data all/salt/01701
+data all/salt/01901
+data all/salt/02101
+data all/salt/02302
+data all/salt/02501
+data all/salt/02701
+data all/time/00102_time.pkl
+data all/time/00301_time.pkl
+data all/time/00401_time.pkl
+data all/time/00501_time.pkl
+data all/time/00601_time.pkl
+data all/time/00701_time.pkl
+data all/time/00801_time.pkl
+data all/time/00904_time.pkl
+data all/time/01001_time.pkl
+data all/time/01101_time.pkl
