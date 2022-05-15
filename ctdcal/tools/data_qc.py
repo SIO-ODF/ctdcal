@@ -1,42 +1,46 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import glob
-import pickle
-import gsw
-
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
-from bokeh.plotting import figure
 from bokeh.models import (
+    BoxSelectTool,
     Button,
     ColumnDataSource,
     DataTable,
-    TableColumn,
-    Select,
-    MultiSelect,
-    StringFormatter,  # https://docs.bokeh.org/en/latest/_modules/bokeh/models/widgets/tables.html#DataTable
     Div,
+    MultiSelect,
+    Select,
+    StringFormatter,
+    TableColumn,
     TextInput,
-    BoxSelectTool,
 )
+from bokeh.plotting import figure
+from click import progressbar
+
+from ctdcal import get_ctdcal_config, io
+
+cfg = get_ctdcal_config()
 
 # TODO: abstract parts of this to a separate file
 # TODO: following above, make parts reusable?
 
 # load continuous CTD data and make into a dict (only ~20MB)
-file_list = sorted(glob.glob("../data/pressure/*ct1.csv"))
-ssscc_list = [ssscc.strip("../data/pressure/")[:5] for ssscc in file_list]
+file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
+ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
 ctd_data = []
-for f in file_list:
-    print(f"Loading {f}")
-    df = pd.read_csv(f, header=12, skiprows=[13], skipfooter=1, engine="python")
-    df["SSSCC"] = f.strip("../data/pressure/")[:5]
-    ctd_data.append(df)
+with progressbar(file_list) as bar:
+    for f in bar:
+        # print(f"Loading {f}")
+        header, df = io.load_exchange_ctd(f)
+        df["SSSCC"] = header["STNNBR"].zfill(3) + header["CASTNO"].zfill(2)
+        ctd_data.append(df)
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
 # load bottle file
-fname = glob.glob("../data/pressure/*hy1.csv")[0]
-btl_data = pd.read_csv(fname, skiprows=[0, 2], skipfooter=1, engine="python", na_values=-999)
+fname = list(Path(cfg.dirs["pressure"]).glob("*hy1.csv"))[0]
+btl_data = io.load_exchange_btl(fname).replace(-999, np.nan)
 btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"
 ].apply(lambda x: f"{x:02d}")
@@ -46,8 +50,7 @@ btl_data["Comments"] = ""
 btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
 
 # update with old handcoded flags if file exists
-handcoded_file = "salt_flags_handcoded.csv"
-if glob.glob(handcoded_file):
+if (handcoded_file := Path(cfg.dirs["salt"]) / "salt_flags_handcoded.csv").exists():
     handcodes = pd.read_csv(handcoded_file, dtype={"SSSCC": str}, keep_default_na=False)
     handcodes = handcodes.rename(columns={"salinity_flag": "New Flag"}).drop(
         columns="diff"
@@ -72,14 +75,13 @@ for ssscc in ssscc_list:
         df[v] = np.interp(
             btl_data.loc[btl_rows, "CTDPRS"],
             ctd_data.loc[ctd_rows, "CTDPRS"],
-            ctd_data.loc[ctd_rows, v]
+            ctd_data.loc[ctd_rows, v],
         )
     downcast_data.append(df)
 
 downcast_data = pd.concat(downcast_data)
 
 # intialize widgets
-save_button = Button(label="Save flagged data", button_type="success")
 parameter = Select(
     title="Parameter", options=["CTDSAL", "CTDTMP", "CTDOXY"], value="CTDSAL"
 )
@@ -121,8 +123,10 @@ comment_box = TextInput(value="", title="Comment:")
 # button_type: default, primary, success, warning or danger
 flag_button = Button(label="Apply to selected", button_type="primary")
 comment_button = Button(label="Apply to selected", button_type="warning")
+save_button = Button(label="Save flagged data", button_type="success")
+exit_button = Button(label="Exit flagging tool", button_type="danger")
 
-vspace = Div(text=""" """, width=200, height=65)
+vspace = Div(text=""" """, width=200, height=50)
 residual_guide_text = Div(
     text="""<br><br>
     <u>Questionable Limits</u><br>
@@ -259,10 +263,12 @@ def edit_flag():
     print("exec edit_flag()")
 
     btl_data.loc[
-        btl_data["SSSCC"] == src_table.data["SSSCC"].values[0], "New Flag",
+        btl_data["SSSCC"] == src_table.data["SSSCC"].values[0],
+        "New Flag",
     ] = src_table.data["flag"].values
     btl_data.loc[
-        btl_data["SSSCC"] == src_table.data["SSSCC"].values[0], "Comments",
+        btl_data["SSSCC"] == src_table.data["SSSCC"].values[0],
+        "Comments",
     ] = src_table.data["Comments"].values
 
     edited_rows = (btl_data["New Flag"].isin([3, 4])) | (btl_data["Comments"] != "")
@@ -334,7 +340,15 @@ def save_data():
     )
 
     # save it
-    df_out.to_csv("salt_flags_handcoded.csv", index=None)
+    df_out.to_csv(handcoded_file, index=None)
+
+
+def exit_bokeh():
+    print("Stopping flagging software")
+    from tornado.ioloop import IOLoop
+
+    io_loop = IOLoop.current()
+    io_loop.stop()
 
 
 def selected_from_plot(attr, old, new):
@@ -358,6 +372,7 @@ flag_list.on_change("value", lambda attr, old, new: update_selectors())
 flag_button.on_click(apply_flag)
 comment_button.on_click(apply_comment)
 save_button.on_click(save_data)
+exit_button.on_click(exit_bokeh)
 src_table.on_change("data", lambda attr, old, new: edit_flag())
 src_table.selected.on_change("indices", selected_from_table)
 btl_sal.data_source.selected.on_change("indices", selected_from_plot)
@@ -366,7 +381,16 @@ btl_sal.data_source.selected.on_change("indices", selected_from_plot)
 # build data tables
 columns = []
 fields = ["SSSCC", "SAMPNO", "CTDPRS", "CTDSAL", "SALNTY", "diff", "flag", "Comments"]
-titles = ["SSSCC", "Bottle", "CTDPRS", "CTDSAL", "SALNTY", "Residual", "Flag", "Comments"]
+titles = [
+    "SSSCC",
+    "Bottle",
+    "CTDPRS",
+    "CTDSAL",
+    "SALNTY",
+    "Residual",
+    "Flag",
+    "Comments",
+]
 widths = [50, 40, 65, 65, 65, 65, 15, 200]
 for (field, title, width) in zip(fields, titles, widths):
     if field == "flag":
@@ -375,12 +399,14 @@ for (field, title, width) in zip(fields, titles, widths):
         strfmt_in = {}
     else:
         strfmt_in = {"text_align": "right"}
-    columns.append(TableColumn(
-        field=field,
-        title=title,
-        width=width,
-        formatter=StringFormatter(**strfmt_in)
-    ))
+    columns.append(
+        TableColumn(
+            field=field,
+            title=title,
+            width=width,
+            formatter=StringFormatter(**strfmt_in),
+        )
+    )
 
 columns_changed = []
 fields = ["SSSCC", "SAMPNO", "diff", "flag_old", "flag_new", "Comments"]
@@ -395,12 +421,14 @@ for (field, title, width) in zip(fields, titles, widths):
         strfmt_in = {}
     else:
         strfmt_in = {"text_align": "right"}
-    columns_changed.append(TableColumn(
-        field=field,
-        title=title,
-        width=width,
-        formatter=StringFormatter(**strfmt_in)
-    ))
+    columns_changed.append(
+        TableColumn(
+            field=field,
+            title=title,
+            width=width,
+            formatter=StringFormatter(**strfmt_in),
+        )
+    )
 
 data_table = DataTable(
     source=src_table,
@@ -438,6 +466,7 @@ controls = column(
     comment_button,
     vspace,
     save_button,
+    exit_button,
     width=170,
 )
 tables = column(
