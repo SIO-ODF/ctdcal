@@ -139,18 +139,26 @@ def hex_to_ctd(ssscc_list):
             converted_df = convertFromSBEReader(sbeReader, ssscc)
 
             if ssscc == "00801":    #   T1 failed #   P02: Evolve this into import NaN check and determine which sensor is "reliable" enough for SAL/OXY calculations
-                converted_df["CTDTMP1"] = converted_df["CTDTMP2"]
                 print("***Using T2 as primary T for cast " + ssscc + "***")
+                converted_df["CTDTMP1"] = converted_df["CTDTMP2"]
             elif ssscc == "00904":  #   Cast w/o T2
                 converted_df["CTDTMP2"] = np.nan
+            elif ssscc == "01201":  #   Restarted recording for ondeck pressure after accidently stopping
+                print("***Recording ended prematurely on 01201, concatinating second file...***")
+                hexFile2 = cfg.dirs["raw"] + ssscc + "A.hex"
+                xmlconFile2 = cfg.dirs["raw"] + ssscc + "A.hex"
+                sbeReader2 = sbe_rd.SBEReader.from_paths(hexFile2, xmlconFile2)
+                conv2 = convertFromSBEReader(sbeReader2, ssscc)
+                merge12 = [converted_df, conv2]
+                converted_df = pd.concat(merge12, ignore_index=True)
             elif ssscc == "01701":  #   "Fire bottle" accidently pressed after 36: Maybe do check like this (#fired bottles > 36) if last index is greater than 95% of the way through the cast?
+                print("***Bottle was accidently fired 37 times during " + ssscc + "***")
                 a = pd.DataFrame()
                 a['btl_fire_num'] = (((converted_df['btl_fire'])&(converted_df['btl_fire']!=converted_df['btl_fire'].shift(1))).astype(int).cumsum())
                 a = a['btl_fire_num'].diff()    #   boolean
                 a = a.index[a == 1].tolist()    #   indices where bottles were fired in continuous file
                 converted_df["btl_fire"].iloc[a[-1]:] = False
-                print("***Bottle was accidently fired 37 times during " + ssscc + "***")
-                
+
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True

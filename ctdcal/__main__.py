@@ -108,17 +108,18 @@ def import_data():
 )
 def process(group, type):
     """Process data using a particular group's methodology"""
-
+    from math import floor
     t = time.time()
+
     if group == "ODF":
         from .scripts.odf_process_all import odf_process_all
-
         odf_process_all()
     elif group == "PMEL":
         # pmel_process()
         pass
+
     elapsed = time.time() - t
-    log.info("Processing complete: " + str(round(elapsed/60)) + " minutes and " + str(round(elapsed)) + " seconds.")
+    log.info("Processing complete: " + str(floor(elapsed/60)) + " minutes and " + str(floor(elapsed % 60)) + " seconds.")
 
 @cli.command()
 def cruise_report():
