@@ -40,6 +40,8 @@ def load_winkler_oxy(oxy_file):
         List of oxygen parameters used in titration
     """
 
+    #   TODO: Add a check for each new line for 0.53736, which is always on the header.
+    #   TODO: Add a check that the total bottle num <= 36 and are in order.
     with open(oxy_file, newline="") as f:
         oxyF = csv.reader(
             f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
