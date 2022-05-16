@@ -145,12 +145,12 @@ def qc():  # pragma: no cover
     server.show("/")
     io_loop.start()
 
-@cli.command()
-def vis():
-    """Launch data_vis"""
-    from .tools import data_vis
+# @cli.command()
+# def vis():
+#     """Launch data_vis"""
+#     from .tools import data_vis
 
-    data_vis  #   ...can I just run it?
+#     data_vis  #   ...can I just run it?
 
 if __name__ == "__main__":
     cli()

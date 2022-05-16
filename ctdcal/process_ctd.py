@@ -323,7 +323,10 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
         log.warning(
             f"{stacast}: Only {start_seconds:0.1f} seconds of start pressure averaged."
         )
-        start_p = np.average(start_df.iloc[fl2:start_samples])
+        if start_samples > fl2:
+            start_p = np.average(start_df.iloc[fl2:start_samples])
+        else:   #   P02 stations 02902 and 03802 may not have gotten rinsed between deployments (bio is brief). Same approach to end_p
+            start_p = np.average(start_df)
 
     end_samples = len(end_df)
     if end_samples > time_delay:
