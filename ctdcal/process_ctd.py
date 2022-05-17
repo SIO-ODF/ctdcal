@@ -339,6 +339,9 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
         end_p = np.average(end_df)  # just average whatever there is
 
     # Remove ondeck start and end pressures
+    if stacast == "04003":  #   Logging restarted in the water. Manually assign start_p, use whole cast.
+        start_df = downcast.iloc[0:1]
+        start_p = 0.031     #   From console log
     if len(start_df) == 0:
         log.warning("Failed to find starting deck pressure.")
         for n in [1, 2]:
