@@ -23,18 +23,19 @@ from . import get_ctdcal_config
 
 handler = logging.StreamHandler()
 handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
+logfile = logging.FileHandler('ctdcal.log')
+logfile.addFilter(logging.Filter("ctdcal"))
 FORMAT = "%(funcName)s: %(message)s"
 logging.basicConfig(
     level="NOTSET",
     format=FORMAT,
     datefmt="[%X]",
-    handlers=[handler],
+    handlers=[handler, logfile],
     # handlers=[RichHandler(console=Console(stderr=True))],
 )
 
 log = logging.getLogger(__name__)
 cfg = get_ctdcal_config()
-
 
 @click.group()
 def cli():
@@ -109,8 +110,12 @@ def import_data():
 def process(group, type):
     """Process data using a particular group's methodology"""
     from math import floor
-    t = time.time()
 
+    t = time.time()
+    log.info(
+        "\n******* New Run beginning at: "+
+        time.strftime('%m-%d %H:%M:%S')+
+        " *******")
     if group == "ODF":
         from .scripts.odf_process_all import odf_process_all
         odf_process_all()
