@@ -113,18 +113,23 @@ def process(group, type):
 
     t = time.time()
     log.info(
-        "\n******* New Run beginning at: "+
+        "******* New "+
+        group+
+        " run beginning at: "+
         time.strftime('%m-%d %H:%M:%S')+
-        " *******")
+        " *******\n")
     if group == "ODF":
         from .scripts.odf_process_all import odf_process_all
         odf_process_all()
     elif group == "PMEL":
         # pmel_process()
         pass
+    elif group == "WHOI":
+        # whoi_process()
+        pass
 
     elapsed = time.time() - t
-    log.info("Processing complete: " + str(floor(elapsed/60)) + " minutes and " + str(floor(elapsed % 60)) + " seconds.")
+    log.info("Processing complete: " + str(floor(elapsed/60)) + " minutes and " + str(floor(elapsed % 60)) + " seconds.\n")
 
 @cli.command()
 def cruise_report():

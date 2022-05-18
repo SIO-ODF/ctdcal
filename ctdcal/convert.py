@@ -151,10 +151,17 @@ def hex_to_ctd(ssscc_list):
                 conv2 = convertFromSBEReader(sbeReader2, ssscc)
                 merge12 = [converted_df, conv2]
                 converted_df = pd.concat(merge12, ignore_index=True)
-            elif ssscc == "01701":  #   "Fire bottle" accidently pressed after 36: Maybe do check like this (#fired bottles > 36) if last index is greater than 95% of the way through the cast?
+            elif ssscc == "01701" or "04301":  #   "Fire bottle" accidently pressed after 36: Maybe do check like this (#fired bottles > 36) if last index is greater than 95% of the way through the cast?
                 print("***Bottle was accidently fired 37 times during " + ssscc + "***")
                 a = pd.DataFrame()
-                a['btl_fire_num'] = (((converted_df['btl_fire'])&(converted_df['btl_fire']!=converted_df['btl_fire'].shift(1))).astype(int).cumsum())
+                a['btl_fire_num'] = (
+                    (
+                        (converted_df['btl_fire'])
+                        &(converted_df['btl_fire']!=converted_df['btl_fire'].shift(1))
+                        )
+                    .astype(int)
+                    .cumsum()
+                )
                 a = a['btl_fire_num'].diff()    #   boolean
                 a = a.index[a == 1].tolist()    #   indices where bottles were fired in continuous file
                 converted_df["btl_fire"].iloc[a[-1]:] = False
