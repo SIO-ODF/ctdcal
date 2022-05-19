@@ -151,7 +151,7 @@ def hex_to_ctd(ssscc_list):
                 conv2 = convertFromSBEReader(sbeReader2, ssscc)
                 merge12 = [converted_df, conv2]
                 converted_df = pd.concat(merge12, ignore_index=True)
-            elif ssscc == "01701" or "04301":  #   "Fire bottle" accidently pressed after 36: Maybe do check like this (#fired bottles > 36) if last index is greater than 95% of the way through the cast?
+            elif ssscc == ("01701" or "04301"):  #   "Fire bottle" accidently pressed after 36: Maybe do check like this (#fired bottles > 36) if last index is greater than 95% of the way through the cast?
                 print("***Bottle was accidently fired 37 times during " + ssscc + "***")
                 a = pd.DataFrame()
                 a['btl_fire_num'] = (
@@ -280,7 +280,7 @@ def convertFromSBEReader(sbeReader, ssscc):
     raw_df.index.name = "index"
 
     # Metadata needs to be processed seperately and then joined with the converted data
-    print("Building metadata dataframe for", ssscc)
+    log.info("Building metadata dataframe for " + ssscc)
     metaArray = [line.split(",") for line in sbeReader._parse_scans_meta().tolist()]
     meta_cols, meta_dtypes = sbeReader._breakdown_header()
     meta_df = pd.DataFrame(metaArray)
@@ -495,7 +495,7 @@ def convertFromSBEReader(sbeReader, ssscc):
 
     print("Joining metadata dataframe with converted data...")
     converted_df = converted_df.join(meta_df)
-    print("Success!")
+    log.info("Success!")
 
     # return the converted data as a dataframe
     return converted_df
