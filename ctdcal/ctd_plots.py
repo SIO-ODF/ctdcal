@@ -220,6 +220,82 @@ def _intermediate_residual_plot(
     # save to path or return axis (primarily for testing)
     return _save_fig(ax, f_out)
 
+def residual_3(
+):
+    """
+    Visualize ΔΤ1 and ref, T2 and ref, T1 and T2 (or cond, or SBE43 and RINKO vs winkler).
+    """
+    #   Can't develop until VS code is sorted out
+
+def residual_bars(
+
+):
+    """
+    Take the absolute sum of the residuals for the given params for given SSSCC
+    """
+
+def residual_depth_bar(
+
+):
+    """
+    Bin data by depth of size X and stack bars of SSSCC for that depth
+    """
+
+def residual_btl_scatter(
+
+):
+    """
+    Take the residuals for individual bottles of each cast and plot against depth (color code btl#/SSSCC)
+    """
+
+def TC_residual_corr(
+
+):
+    """
+    Scatter of TX vs CX residuals, linear fit line w/ statistics
+    """
+
+def sensor_drift_plot(
+
+):
+    """
+    Scatter of residuals from first of SSSCC sublist, and last of SSSCC sublist
+    """
+
+def btl_fits_plot(
+):
+    """
+    Plot TX vs depth before and after fitting from the btl files. Include coefs in title.
+    """
+
+def interpolate_ssscc(
+
+):
+    """
+    Plot param vs depth, calculating distance between SSSCC and interpolating between them.
+    """
+
+def ssscc_geo(
+
+):
+    """
+    Plot station locations, with SSSCC and depth labels
+    """
+
+def plot_bio(
+
+):
+    """
+    Depth plot of biologically-important sensors: TS, Fluor, Xmiss, Oxy
+    """
+
+def TS_route(
+
+):
+    """
+    Plot temperature vs salinity, colored by depth, for individual SSSCCs.
+    """
+
 
 # TODO: more plots! what does ODV have?
 # section plots (w/ PyDiva)

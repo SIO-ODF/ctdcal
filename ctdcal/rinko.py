@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import (
+from ctdcal import (
     ctd_plots,
     get_ctdcal_config,
     flagging,
@@ -122,6 +122,8 @@ def _Uchida_DO_eq(coefs, inputs):
     https://doi.org/10.1175/2008JTECHO549.1
     and Uchida et. al (2010) - GO-SHIP manual
 
+    Converts raw voltage to DO
+
     Parameters
     ----------
     coefs : tuple
@@ -133,13 +135,13 @@ def _Uchida_DO_eq(coefs, inputs):
     V_r, P, T, S, o2_sol = inputs
 
     K_sv = c0 + (c1 * T) + (c2 * T ** 2)  # Stern-Volmer constant (Tengberg et al. 2006)
-    V0 = (1 + d0 * T)  # voltage at zero oxygen (Uchida 2010, eq. 10)
-    Vc = (d1 + d2 * V_r)  # raw voltage (Uchida 2010, eq. 10)
-    o2_sat = ((V0 / Vc) - 1) / K_sv  # oxygen saturation [%] (Uchida 2010, eq. 6)
+    V0 = (1 + d0 * T)                     # voltage at zero oxygen (Uchida 2010, eq. 10)
+    Vc = (d1 + d2 * V_r)                  # raw voltage (Uchida 2010, eq. 10)
+    o2_sat = ((V0 / Vc) - 1) / K_sv       # oxygen saturation [%] (Uchida 2010, eq. 6)
 
-    DO = o2_sat * o2_sol  # dissolved oxygen concentration
+    DO = o2_sat * o2_sol                        # dissolved oxygen concentration
     DO_c = DO * (1 + cp * P / 1000) ** (1 / 3)  # pressure compensated DO
-    DO_sc = salinity_correction(DO_c, T, S)  # salinity + pressure compensated DO
+    DO_sc = salinity_correction(DO_c, T, S)     # salinity + pressure compensated DO
 
     return DO_sc
 
@@ -382,10 +384,10 @@ def rinko_oxy_fit(
         x0=rinko_coef0,
         args=(weights, fit_data, btl_df[cfg.column["refO"]]),
         bounds=coef_bounds,
-    )
+    )   # Generates 7 coefs (x) for _Uchida_DO_eq
 
     cfw_coefs = res.x
-    btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data)
+    btl_df["RINKO_OXY"] = _Uchida_DO_eq(cfw_coefs, fit_data) # Convert voltage to DO
     btl_df["residual"] = btl_df[cfg.column["refO"]] - btl_df["RINKO_OXY"]
 
     cutoff = 2.8 * np.std(btl_df["residual"])

@@ -60,7 +60,7 @@ column = {
     "sal": "CTDSAL",
     # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
     # "s2": "CTDSAL2",
-    "rinko_oxy": "FREE1",  # CHECK THIS!
+    "rinko_oxy": "U_DEF_poly1",  # CHECK THIS! FREE1 or U_DEF_poly1
     "oxyvolts": "CTDOXYVOLTS",
     "refT": "REFTMP",
     "refC": "BTLCOND",

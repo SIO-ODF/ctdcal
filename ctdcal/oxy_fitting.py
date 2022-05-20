@@ -895,5 +895,6 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
     ).applymap(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
     sbe43_coefs.to_csv(cfg.dirs["logs"] + "sbe43_coefs.csv")
+    log.info("SBE43 coeffs written out.")
 
     return True

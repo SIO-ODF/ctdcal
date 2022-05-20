@@ -146,12 +146,12 @@ def hex_to_ctd(ssscc_list):
             elif ssscc == "01201":  #   Restarted recording for ondeck pressure after accidently stopping
                 print("***Recording ended prematurely on 01201, concatinating second file...***")
                 hexFile2 = cfg.dirs["raw"] + ssscc + "A.hex"
-                xmlconFile2 = cfg.dirs["raw"] + ssscc + "A.hex"
+                xmlconFile2 = cfg.dirs["raw"] + ssscc + "A.XMLCON"
                 sbeReader2 = sbe_rd.SBEReader.from_paths(hexFile2, xmlconFile2)
                 conv2 = convertFromSBEReader(sbeReader2, ssscc)
                 merge12 = [converted_df, conv2]
                 converted_df = pd.concat(merge12, ignore_index=True)
-            elif ssscc == ("01701" or "04301"):  #   "Fire bottle" accidently pressed after 36: Maybe do check like this (#fired bottles > 36) if last index is greater than 95% of the way through the cast?
+            elif ssscc == "01701" or ssscc == "04301":  #   "Fire bottle" accidently pressed after 36: Maybe do check like this (#fired bottles > 36) if last index is greater than 95% of the way through the cast?
                 print("***Bottle was accidently fired 37 times during " + ssscc + "***")
                 a = pd.DataFrame()
                 a['btl_fire_num'] = (
@@ -484,7 +484,15 @@ def convertFromSBEReader(sbeReader, ssscc):
                     p_array,
                     coefs,
                 )
-
+            elif meta["sensor_info"]["SensorName"] == "RINKO":  #   P02 ...== ("Rinko02v" or "RINKO"): didn't work
+                print("Processing Sensor ID:", meta["sensor_id"]+",", sensor_name, "(RINKO)")
+                # hysteresis correct then pass through voltage (see Uchida, 2010)
+                coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
+                converted_df[col] = sbe_eq.sbe43_hysteresis_voltage(
+                    raw_df[meta["column"]],
+                    p_array,
+                    coefs,
+                )
         ### Aux block
         else:
             print("Passing along Sensor ID:", meta["sensor_id"] + ",", sensor_name)
