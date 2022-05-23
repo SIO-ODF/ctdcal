@@ -176,6 +176,8 @@ def make_time_files(ssscc_list):
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
             converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+            if "U_DEF_poly11" in converted_df.columns:  #   Weird problem occasionally happening on P02 .hex conversion
+                converted_df = converted_df.rename(columns={'U_DEF_poly11': 'U_DEF_poly1'})
 
             # Remove any pressure spikes
             bad_rows = converted_df["CTDPRS"].abs() > 6500
