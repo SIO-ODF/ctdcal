@@ -188,9 +188,13 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Only fit using OXYGEN flagged good (2)
     good_data = btl_df[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    
+    #   P02 bad SSSCC ==
+    naughty_list = ["01001", "01101", "01201"]  #   Where RINKO cable was bad
+    good_data2 = good_data[~good_data["SSSCC"].isin(naughty_list)]    #   Exclude them from initial fit
 
     # Fit ALL oxygen stations together to get initial coefficient guess
-    (rinko_coefs0, _) = rinko_oxy_fit(good_data, f_suffix="_r0")
+    (rinko_coefs0, _) = rinko_oxy_fit(good_data2, f_suffix="_r0")
     coefs_df.loc["r0"] = rinko_coefs0  # log for comparison
 
     # fit station groups, like T/C fitting (ssscc_r1, _r2, etc.)
@@ -205,7 +209,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
-        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str").squeeze().to_list()
         f_stem = f.stem
         (rinko_coefs_group, _) = rinko_oxy_fit(
             good_data.loc[good_data["SSSCC"].isin(ssscc_sublist)].copy(),
@@ -800,15 +804,15 @@ def rinko_oxygen_fit(merged_df, rinko_coef0=None, f_out=None):
 
 
     #coef_dict[station] = cfw_coef
-    good_df = pd.concat([good_df, merged_df])
-    good_df['CTDRINKO_FLAG_W'] = 2
-    bad_df = pd.concat([bad_df, bad_values])
-    bad_df['CTDRINKO_FLAG_W'] = 3
-    df = pd.concat([good_df,bad_df])
-    df.sort_values(by='CTDPRS_rinko_btl',ascending=False,inplace=True)
-    oxy_df = df.copy()
+    # good_df = pd.concat([good_df, merged_df])
+    # good_df['CTDRINKO_FLAG_W'] = 2
+    # bad_df = pd.concat([bad_df, bad_values])
+    # bad_df['CTDRINKO_FLAG_W'] = 3
+    # df = pd.concat([good_df,bad_df])
+    # df.sort_values(by='CTDPRS_rinko_btl',ascending=False,inplace=True)
+    # oxy_df = df.copy()
 
-    return cfw_coef, df
+    # return cfw_coef, df
 
 
 
