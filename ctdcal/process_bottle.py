@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+pd.options.mode.chained_assignment = None
 
 from ctdcal import (
     flagging as flagging,
@@ -242,7 +243,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
             oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
             oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
-
+            
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
         btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
@@ -490,8 +491,11 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     )
 
     # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+    bad_list = ["01001", "01101", "01201"]  #   P02
+    print(f"Using Rinko as CTDOXY excluding SSSCC:", ", ".join(bad_list))
+    throw_loc = btl_data.index[~btl_data["SSSCC"].isin(bad_list)]
+    btl_data["CTDOXY"].iloc[throw_loc] = btl_data.loc[throw_loc, "CTDRINKO"]
+    btl_data["CTDOXY_FLAG_W"].iloc[throw_loc] = btl_data.loc[throw_loc, "CTDRINKO_FLAG_W"]
 
     #   P02 add in FLUOR, XMISS flags per Barna's instructions
     btl_data["CTDFLUOR_FLAG_W"] = 1
