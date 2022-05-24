@@ -778,15 +778,18 @@ def export_ct1(df, ssscc_list):
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
-    for ssscc in ssscc_list:
-
+    for ssscc in ssscc_list:   
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
-        # switch oxygen primary sensor to rinko
-        # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
-        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        
+        bad_list = ["01001", "01101", "01201"]  #   P02
+        if ssscc in bad_list:
+            print(f"Using SBE43 as CTDOXY for {ssscc}")
+        else:   # switch oxygen primary sensor to rinko
+            print(f"Using Rinko as CTDOXY for {ssscc}")
+            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
