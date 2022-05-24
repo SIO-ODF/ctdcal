@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import pandas as pd
 import scipy
+pd.options.mode.chained_assignment = None
 
 from ctdcal import (
     ctd_plots,
@@ -196,6 +197,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # Fit ALL oxygen stations together to get initial coefficient guess
     (rinko_coefs0, _) = rinko_oxy_fit(good_data2, f_suffix="_r0")
     coefs_df.loc["r0"] = rinko_coefs0  # log for comparison
+    log.info("Initial RINKO coeffs determined")
 
     # fit station groups, like T/C fitting (ssscc_r1, _r2, etc.)
     ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_r*.csv"))
@@ -211,6 +213,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     for f in ssscc_subsets:
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str").squeeze().to_list()
         f_stem = f.stem
+        log.info(f"Determining coeffs for {f_stem}")
         (rinko_coefs_group, _) = rinko_oxy_fit(
             good_data.loc[good_data["SSSCC"].isin(ssscc_sublist)].copy(),
             rinko_coef0=rinko_coefs0,
@@ -321,6 +324,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     coefs_df.applymap(
         lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
     ).to_csv(cfg.dirs["logs"] + "rinko_coefs.csv")
+    log.info("RINKO coeffs written out.")
 
     return True
 
