@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import ctd_plots as ctd_plots
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
+from ctdcal import ctd_plots as ctd_plots
+from ctdcal import flagging as flagging
+from ctdcal import get_ctdcal_config
+from ctdcal import process_ctd as process_ctd
+from ctdcal import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -73,7 +73,8 @@ def load_winkler_oxy(oxy_file):
     df = df[df["TITR_VOL"] > 0]  # remove "ABORTED DATA"
     df = df.sort_values("BOTTLENO_OXY").reset_index(drop=True)
     df["FLASKNO"] = df["FLASKNO"].astype(str)
-
+    if len(df)>36 and any(df["BOTTLENO_OXY"]>36):   
+        df = df[df["BOTTLENO_OXY"]<37]  #   In case of second dummy
     return df, params
 
 
@@ -814,6 +815,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_dict["ox0"] = sbe_coef0
 
     # Fit each cast individually
+    log.info("Running SBE43 fitting, generating figures")
     for ssscc in ssscc_list:
         sbe_coef, sbe_df = sbe43_oxy_fit(
             all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
