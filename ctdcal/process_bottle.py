@@ -200,7 +200,9 @@ def load_all_btl_files(ssscc_list, cols=None):
             reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
             reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
             reft_data["REFTMP_FLAG_W"] = reft_data["T90"]
-
+        if len(reft_data) > 36:
+            log.warning(f"Length of RefT data exceeds 36 bottles for {ssscc}")
+        
         ### load REFC data
         refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
         try:
@@ -217,6 +219,8 @@ def load_all_btl_files(ssscc_list, cols=None):
                 dtype=float,
             )
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
+        if len(refc_data) > 36:
+            log.warning(f"Length of RefC data exceeds 36 bottles for {ssscc}")
 
         ### load OXY data
         oxy_file = cfg.dirs["oxygen"] + ssscc
@@ -243,7 +247,10 @@ def load_all_btl_files(ssscc_list, cols=None):
             oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
             oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
             oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
-            
+        if len(oxy_data) > 36:
+            log.warning(f"Length of Oxy Winkler data exceeds 36 bottles for {ssscc}")
+
+
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
         btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
