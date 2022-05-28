@@ -8,6 +8,28 @@ import pandas as pd
 
 log = logging.getLogger(__name__)
 
+def _btl_ql(filepath):
+    """
+    A bottle quick-loader for testing plotting routines on hy1 file
+    Code originally by MK, data_qc.py
+    """
+    from ctdcal import io
+    btl_data = io.load_exchange_btl(filepath).replace(-999, np.nan)
+    btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
+        "CASTNO"
+    ].apply(lambda x: f"{x:02d}")
+    return btl_data
+
+def _btl_fl():
+    """
+    Load all of the bottle data for testing plotting routines prior to hy1 file generation
+    """
+    from ctdcal import process_bottle
+    if not 'ssscc_list' in locals():
+        from ctdcal import process_ctd
+        ssscc_list = process_ctd.get_ssscc_list()
+    btl_data = process_bottle.load_all_btl_files(ssscc_list)
+    return btl_data
 
 def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid, fontsize=12):
     plt.xlim(xlim)
@@ -220,18 +242,51 @@ def _intermediate_residual_plot(
     # save to path or return axis (primarily for testing)
     return _save_fig(ax, f_out)
 
-def residual_3(
+def residual_3(x1, x2, xr, stn, f_out=None
 ):
     """
-    Visualize ΔΤ1 and ref, T2 and ref, T1 and T2 (or cond, or SBE43 and RINKO vs winkler).
+    Visualize Δ Τ1 and ref, T2 and ref, T1 and T2 (or cond, or SBE43 and RINKO vs winkler).
+    Intended for 5 stations or more.
+    x : Pandas Series
+        Respective "CTDVARX", where xr is the reference parameter (CTDCOND1, CTDCOND2, SALNTY for example)
+    stn: Pandas Series
+        Station number, direct from bottle file (_btl_fl)
     """
-    #   Can't develop until VS code is sorted out
+    idx, uniques = pd.factorize(stn)
+
+    delX1r = xr - x1    #   Δ = ref - meas, consistent with other methods in ctdcal
+    delX2r = xr - x2
+    delX12 = x2 - x1
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.set_xlabel('Reference - Primary')
+    ax.set_ylabel('Reference - Secondary')
+    ax.set_zlabel('Primary - Secondary')
+    ax.set_ylim(-0.5, 0.5)
+    ax.set_xlim(-0.5, 0.5)
+    ax.set_zlim(-0.5, 0.5)
+    sc = ax.scatter(delX1r, delX2r, delX12, c=idx, marker = '+')
+    if len(uniques > 4):
+        cbar = plt.colorbar(sc, ax=ax, pad=0.15)  # set cbar ticks to station names
+        tick_locator = ticker.MaxNLocator(nbins=5)  #   Set 5 bins, 
+        cbar.locator = tick_locator
+        cbar.update_ticks()
+        cbar.ax.set_yticklabels(uniques[0:-1:int(len(uniques)/5)])
+
+    return _save_fig(ax, f_out)
 
 def residual_bars(
 
 ):
     """
     Take the absolute sum of the residuals for the given params for given SSSCC
+    """
+
+def residual_hist(
+
+):
+    """
+    Count the residuals within a specific range (A05 2020 example).
     """
 
 def residual_depth_bar(
@@ -262,6 +317,20 @@ def sensor_drift_plot(
     Scatter of residuals from first of SSSCC sublist, and last of SSSCC sublist
     """
 
+def autosal_offset(
+
+):
+    """
+    For all SSSCC provided, do a scatter of the autosal offset applied to each run (individual files; A05 2020 example).
+    """
+
+def pressure_offset_vis(
+
+):
+    """
+    For all SSSCC provided, do a scatter of the SBE9+ on-deck pre- vs post-cast pressures. Include dotted line as a "healthy" offset boundary.
+    """
+
 def btl_fits_plot(
 ):
     """
@@ -287,6 +356,13 @@ def plot_bio(
 ):
     """
     Depth plot of biologically-important sensors: TS, Fluor, Xmiss, Oxy
+    """
+
+def corr(
+
+):
+    """
+    Create color-coded correlation matrix between CTD parameters
     """
 
 def TS_route(
