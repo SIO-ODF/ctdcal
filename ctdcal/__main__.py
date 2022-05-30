@@ -131,6 +131,7 @@ def process(group, type):
     elapsed = time.time() - t
     log.info("Processing complete: " + str(floor(elapsed/60)) + " minutes and " + str(floor(elapsed % 60)) + " seconds.\n")
 
+@cli.command()
 def process_bio():
     """
     P02: "process" for bio casts (need to do new type)
