@@ -33,6 +33,7 @@ dirs = {
     "converted": "data/converted/",
     "time": "data/time/",
     "pressure": "data/pressure/",
+    "bio": "data/pressure/bio/", #   Temp P02
     "bottle": "data/bottle/",
     "salt": "data/salt/",
     "reft": "data/reft/",
