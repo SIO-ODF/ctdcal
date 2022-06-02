@@ -57,6 +57,7 @@ def init():
     import shutil
     shutil.copy2("fit_coefs.yaml", "./data/logs/fit_coefs.yaml")
     shutil.copy2("o2flasks.vol", "./data/oxygen/o2flasks.vol")
+    print("Don't forget to check for O2flasks.vol, fit_coefs.yaml, and define your SSSCCs!")
 
 @cli.command()
 def offload():

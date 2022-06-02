@@ -30,6 +30,7 @@ for (param, attrs) in ctd_outputs.items():
 dirs = {
     "ssscc": "data/ssscc/",
     "raw": "data/raw/",
+    "raw_bio": "data/raw_bio/", #   Temp P02
     "converted": "data/converted/",
     "time": "data/time/",
     "pressure": "data/pressure/",
