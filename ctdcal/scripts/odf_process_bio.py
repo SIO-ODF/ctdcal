@@ -71,7 +71,7 @@ def odf_process_bio():
         ssscc_list = [line.strip() for line in filename]
 
     #   Step 3: Convert the hex into bottle averages and time .pkl
-    log.info("Converting .hex files")
+    log.info("Converting .hex files")   #   Essentially convert.hex_to_ctd
     for ssscc in ssscc_list:
         #   Stash .pkl files in the normal folders
         if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
@@ -85,7 +85,7 @@ def odf_process_bio():
     convert.make_btl_mean(ssscc_list)
     log.info('All .pkl files generated.')
 
-    #   Might as well process the refT files for the bio casts, saves trouble of calibrate temp
+    #   Process the refT files for the bio casts, as the refT data still exists
     process_bottle.process_reft(ssscc_list)
 
     #   Step 4: Get the time and bottle data into the workspace
@@ -97,8 +97,6 @@ def odf_process_bio():
         btl_data_all["btl_fire_num"].loc[btl_data_all["SSSCC"] == "05301"] = bottles_05301
 
     log.info('Time and Bottle data loaded.')
-    # print(time_data_all.head())
-    # print(btl_data_all.head())
 
     #   Add SSSCC2 column, incrementing up from bio num to full num
     btl_data_all["SSSCC2"] = btl_data_all["SSSCC"].str.replace(r"01", "02") #   Sorry Mike
@@ -114,8 +112,7 @@ def odf_process_bio():
 
     #   Step 6: Make the depth log
     #   Note: Bio is really shallow, so all the depths will be -999
-    #   To fix: Look for int(SSSCC)+1 in the depth log list and use that
-    # process_ctd.make_depth_log(time_data_all) #   (Overwrites existing log)
+    #   Solve this by pulling depths from full cast
     depth_log_bio(time_data_all)
 
     #   Step 7: Calibrate the temperature
@@ -302,10 +299,9 @@ def calibrate_sbe43_bio(btl_df, time_df, sbe43_coefs):
     #     all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
 
 def prepare_rinko_bio(btl_df, time_df, rinko_coefs):
-    #   This may be easier that the SBE43, since Uchida_DO_eq allows for us to feed coefs in
+    #   Uchida_DO_eq allows for us to feed coefs in, even premade ones
     #   Get SSSCC coefs in, get the voltage for each SSSCC, pass to Uchida
     ssscc_list2 = btl_df["SSSCC2"].dropna().unique()
-    varnames = ["c0", "c1", "c2", "d0", "d1", "d2", "cp"]
     btl_df["CTDRINKO"] = np.nan
     time_df["CTDRINKO"] = np.nan
     for ssscc in ssscc_list2:
@@ -313,6 +309,7 @@ def prepare_rinko_bio(btl_df, time_df, rinko_coefs):
         ssscc_coefs = ssscc_coefs.iloc[0]
         ssscc_coefs = tuple(ssscc_coefs[1:])
 
+        #   Get CTDRINKO made by passing the voltages in with the premade coefs
         btl_df["CTDRINKO"].loc[btl_df["SSSCC2"] == ssscc] = rinko._Uchida_DO_eq(
             ssscc_coefs, 
             (
@@ -331,7 +328,7 @@ def prepare_rinko_bio(btl_df, time_df, rinko_coefs):
                 time_df["CTDSAL"].loc[time_df["SSSCC2"] == ssscc],
                 time_df["OS"].loc[time_df["SSSCC2"] == ssscc],
             ))
-    btl_df["CTDRINKO_FLAG_W"] = 2
+    btl_df["CTDRINKO_FLAG_W"] = 2   #   TODO: Get flagging routine reimplemented
     time_df["CTDRINKO_FLAG_W"] = 2
 
     return True
@@ -359,14 +356,9 @@ def depth_log_bio(time_data_all):
     pull.index = bottom_df.index    #   Reindex to make replacement work
     bottom_df["DEPTH"] = pull
     #   The manual depth log is pulled when the ct1 and hy1 files are made.
-    #   Will need to tweak those functions to read from the bio_depth_log
-    #   I don't want to overwrite the existing log.
+    #   Don't want to overwrite the existing log for troubleshooting purposes.
     if any(bottom_df["DEPTH"] == -999):
-        # manual_depth_df = pd.read_csv(
-        #     cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
-        # )
-        # pull = manual_depth_df.loc[manual_depth_df.SSSCC.astype(float).isin(bottom_df.SSSCC2)]
-        #   Why are pandas indices so awful
+        #   Hardcoded temporarily
         bottom_df["DEPTH"].iloc[2] = 6221.0
         bottom_df["DEPTH"].iloc[3] = 6185.0
 
@@ -395,31 +387,14 @@ def export_ct1_bio(time_df):
     depth_df = pd.read_csv(
         cfg.dirs["logs"] + "depth_log_bio.csv", dtype={"SSSCC": str}, na_values=-999
     ).dropna()
-    #   depth_df actually looks good
-    # manual_depth_df = pd.read_csv(
-    #     cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
-    # )
-    # full_depth_df = pd.concat([depth_df, manual_depth_df])
-    # full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
     #   Iteratively writing the ct1 files out
     for ssscc in time_df["SSSCC"].unique():   
         time_data = time_df[time_df["SSSCC"] == ssscc].copy()
         time_data = process_ctd.pressure_sequence(time_data)
-        
-        bad_list = ["01001", "01101", "01201"]  #   P02
-        if ssscc in bad_list:
-            print(f"Using SBE43 as CTDOXY for {ssscc}")
-        else:   # switch oxygen primary sensor to rinko
-            print(f"Using Rinko as CTDOXY for {ssscc}")
-            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
-        
         time_data = time_data[cfg.ctd_col_names]
-        # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
-        # force flags back to int (TODO: make flags categorical)
         for col in time_data.columns:
             if col.endswith("FLAG_W"):
                 time_data[col] = time_data[col].astype(int)
@@ -437,7 +412,7 @@ def export_ct1_bio(time_df):
             .strftime("%Y%m%d %H%M")
             .split(" ")
         )
-        
+
         btm_lat = cast_dict["latitude"]
         btm_lon = cast_dict["longitude"]
 
@@ -452,8 +427,8 @@ def export_ct1_bio(time_df):
                 f"NUMBER_HEADERS = 11\n"
                 f"EXPOCODE = {cfg.expocode}\n"
                 f"SECT_ID = {cfg.section_id}\n"
-                f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
-                f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
+                f"STNNBR = {ssscc[:3].lstrip('0')}\n"  # STNNBR = SSS
+                f"CASTNO = {ssscc[3:].lstrip('0')}\n"  # CASTNO = CC   #   P02 report w/o leading 0
                 f"DATE = {b_datetime[0]}\n"
                 f"TIME = {b_datetime[1]}\n"
                 f"LATITUDE = {btm_lat:.4f}\n"
