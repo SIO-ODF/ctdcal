@@ -74,7 +74,7 @@ def load_winkler_oxy(oxy_file):
     df = df.sort_values("BOTTLENO_OXY").reset_index(drop=True)
     df["FLASKNO"] = df["FLASKNO"].astype(str)
     if len(df)>36 and any(df["BOTTLENO_OXY"]>36):   
-        df = df[df["BOTTLENO_OXY"]<37]  #   In case of second dummy
+        df = df[df["BOTTLENO_OXY"]<37]  #   In case of second dummy not previously caught (like 98)
     return df, params
 
 

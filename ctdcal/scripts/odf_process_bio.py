@@ -47,10 +47,6 @@ def odf_process_bio():
 
     #   Step 1: Import the fit coeffs for T, C, oxy, and Rinko
     #   Note: The refT for the bio casts exist and can be refit.
-    # fname_t1    = "data/logs/fit_coef_t1.csv"
-    # t1_coefs    = pd.read_csv(fname_t1)
-    # fname_t2    = "data/logs/fit_coef_t2.csv"
-    # t2_coefs    = pd.read_csv(fname_t2)
     fname_c1    = "data/logs/fit_coef_c1.csv"
     c1_coefs    = pd.read_csv(fname_c1)
     fname_c2    = "data/logs/fit_coef_c2.csv"
@@ -99,8 +95,8 @@ def odf_process_bio():
     log.info('Time and Bottle data loaded.')
 
     #   Add SSSCC2 column, incrementing up from bio num to full num
-    btl_data_all["SSSCC2"] = btl_data_all["SSSCC"].str.replace(r"01", "02") #   Sorry Mike
-    time_data_all["SSSCC2"] = time_data_all["SSSCC"].str.replace(r"01", "02")
+    btl_data_all["SSSCC2"] = btl_data_all["SSSCC"].str[:-2] + "02"
+    time_data_all["SSSCC2"] = time_data_all["SSSCC"].str[:-2] + "02"
     #   Station 032 is the only one where the bio SSSCC ends in a 2
     btl_data_all["SSSCC2"].loc[btl_data_all["SSSCC"]=='03202'] = '03203'
     time_data_all["SSSCC2"].loc[time_data_all["SSSCC"]=='03202'] = '03203'
@@ -119,7 +115,7 @@ def odf_process_bio():
     #   Note: The refT for the bio casts exist and can be refit.
     # calibrate_temp_bio(btl_data_all, time_data_all, t1_coefs, t2_coefs)
     fit_ctd.calibrate_temp(btl_data_all, time_data_all)
-    print("Temperature calibration successful...?")
+    print("BIO temp calibration complete.")
 
     #   Step 8: Calibrate the cond w/ pre-existing coeffs
     btl_data_all, time_data_all = calibrate_cond_bio(
@@ -143,7 +139,6 @@ def odf_process_bio():
     prepare_rinko_bio(btl_data_all, time_data_all, rinko_coefs)
     print('RINKO columns are up.')
 
-
     #   Step 11: Export the ct1 files
     export_ct1_bio(time_data_all)
 
@@ -155,36 +150,47 @@ def calibrate_cond_bio(btl_df, time_df, c1_coefs, c2_coefs):
     # import gsw
     log.info("Calibrating conductivity without AutoSal for bio casts...")
     btl_df["SALNTY_FLAG_W"] = 9 
+
+    #   These may not be writing out correctly in fit_ctd.calibrate_cond
+    # filt_c1 = c1_coefs.loc[c1_coefs["SSSCC"].isin(btl_df["SSSCC2"].dropna().astype(int))]
+    # filt_c2 = c2_coefs.loc[c2_coefs["SSSCC"].isin(btl_df["SSSCC2"].dropna().astype(int))]
+
     # ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
+
+    # fit_yaml = fit_ctd.load_fit_yaml()  #   Load yaml as a dict
     # for cN, tN in zip(["c1", "c2"], ["t1", "t2"]):
     #     for f in ssscc_subsets:
+    #         f_stem = f.stem
     #         ssscc_sublist = pd.read_csv(f, header=None, dtype="str").squeeze(axis=1).to_list()
-    #         #   Since no salts are processed, the ssscc should be pulled from the full cast
-    #         btl_rows = btl_df["SSSCC2"].isin(ssscc_sublist).values
-    #         time_rows = time_df["SSSCC2"].isin(ssscc_sublist).values
-            
-    #         #   Prepare data for fitting: I think I need the df_good, bad
-    #         #   Can't do that - no refC therefore no df_good
-    #         if cN == 'c1':
-    #             P_coefs = c1_coefs.cp1
-    #             T_coefs = c1_coefs.ct1
-    #             C_coefs = c1_coefs.c0
-    #         elif cN == 'c2':
-    #             P_coefs = c2_coefs.cp1
-    #             T_coefs = c2_coefs.ct1
-    #             C_coefs = c2_coefs.c0
-    #         btl_df.loc[btl_rows, cfg.column[cN]] = fit_ctd.apply_polyfit(
-    #             btl_df.loc[btl_rows, cfg.column[cN]],
-    #             C_coefs,
-    #             (btl_df.loc[btl_rows, cfg.column["p"]], P_coefs),
-    #             (btl_df.loc[btl_rows, cfg.column[tN]], T_coefs),
+    #         # btl_rows = btl_df["SSSCC2"].isin(ssscc_sublist).values
+    #         #   Skip bottle, time rows since only 1 ssscc
+    #         P_order = fit_yaml[cN][f_stem]["P_order"]
+    #         T_order = fit_yaml[cN][f_stem]["T_order"]   #   This is zero
+    #         C_order = fit_yaml[cN][f_stem]["C_order"]
+
+    #         #   Cond sensor never changed during P02, can use any row for coeffs
+    #         if cN == "c1":
+    #             coef_dict = {"cp1": c1_coefs["cp1"].iloc[0], "c0": c1_coefs["c0"].iloc[0]}  #   This has no ct0, cc0
+    #         elif cN == "c2":
+    #             coef_dict = {"cp1": c2_coefs["cp1"].iloc[0], "c0": c2_coefs["c0"].iloc[0]}
+
+    #         #   Apply the fit, overwriting the original CTDCOND1 and CTDCOND2 columns in this case
+    #         P_coefs = tuple(coef_dict[f"cp{n}"] for n in np.arange(1, P_order + 1))
+    #         T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1)) #   This is empty
+    #         C_coefs = tuple(coef_dict[f"cc{n}"] for n in np.arange(1, C_order + 1)) #   This is empty
+    #         btl_df.loc[:, cfg.column[cN]] = fit_ctd.apply_polyfit(
+    #             btl_df.loc[:, cfg.column[cN]],
+    #             (coef_dict["c0"],) + C_coefs,
+    #             (btl_df.loc[:, cfg.column["p"]], P_coefs),
+    #             (btl_df.loc[:, cfg.column[tN]], T_coefs),
+    #         )   #   This does nothing, presumably because T, C coeffs are empty
+    #         time_df.loc[:, cfg.column[cN]] = fit_ctd.apply_polyfit(
+    #             time_df.loc[:, cfg.column[cN]],
+    #             (coef_dict["c0"],) + C_coefs,
+    #             (time_df.loc[:, cfg.column["p"]], P_coefs),
+    #             (time_df.loc[:, cfg.column[tN]], T_coefs),
     #         )
-    #         time_df.loc[time_rows, cfg.column[cN]] = fit_ctd.apply_polyfit(
-    #             time_df.loc[time_rows, cfg.column[cN]],
-    #             C_coefs,
-    #             (time_df.loc[time_rows, cfg.column["p"]], P_coefs),
-    #             (time_df.loc[time_rows, cfg.column[tN]], T_coefs),
-    #         )
+
     time_df[cfg.column["sal"]] = gsw.SP_from_C(
         time_df[cfg.column["c1"]],
         time_df[cfg.column["t1"]],
@@ -197,8 +203,15 @@ def calibrate_cond_bio(btl_df, time_df, c1_coefs, c2_coefs):
     )
     time_df["SALNTY"] = np.nan
     btl_df["SALNTY"] = np.nan
-    time_df[cfg.column["sal"] + "_FLAG_W"] = 2 #   Questionable, since fitting with other coeffs
-    btl_df[cfg.column["sal"] + "_FLAG_W"] = 2
+    # time_df[cfg.column["sal"] + "_FLAG_W"] = 2 #   Questionable, since fitting with other coeffs
+    # btl_df[cfg.column["sal"] + "_FLAG_W"] = 2
+
+    #   Flag outliers in salinity, since no reference cond/salinity is available
+    time_df[cfg.column["sal"]+"_FLAG_W"] = flagging.outliers(time_df[cfg.column["sal"]])
+    btl_df[cfg.column["sal"]+"_FLAG_W"] = flagging.outliers(btl_df[cfg.column["sal"]])
+
+    #   Can't do residual flagging, so _flag_btl_data can't be used either
+    # time_df   #   COND columns aren't normally flagged?
 
     return btl_df, time_df
 
@@ -250,8 +263,9 @@ def prepare_oxy_bio(btl_df, time_df, ssscc_list):
     btl_df["CTDOXY"] = oxy_fitting.oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
     btl_df[cfg.column["refO"]] = np.nan
     time_df["CTDOXY"] = oxy_fitting.oxy_ml_to_umolkg(time_df["CTDOXY1"], time_df["sigma_btl"])
-    btl_df["CTDOXY_FLAG_W"] = 2
-    time_df["CTDOXY_FLAG_W"] = 2
+    
+    btl_df["CTDOXY_FLAG_W"] = flagging.outliers(btl_df["CTDOXY"])
+    time_df["CTDOXY_FLAG_W"] = flagging.outliers(time_df["CTDOXY"])
 
     #   Not sure where NAN rows are coming from on the tail end of 053.
     if any(btl_df["SSSCC"].isnull()):
@@ -328,8 +342,8 @@ def prepare_rinko_bio(btl_df, time_df, rinko_coefs):
                 time_df["CTDSAL"].loc[time_df["SSSCC2"] == ssscc],
                 time_df["OS"].loc[time_df["SSSCC2"] == ssscc],
             ))
-    btl_df["CTDRINKO_FLAG_W"] = 2   #   TODO: Get flagging routine reimplemented
-    time_df["CTDRINKO_FLAG_W"] = 2
+    btl_df["CTDRINKO_FLAG_W"] = flagging.outliers(btl_df["CTDRINKO"])
+    time_df["CTDRINKO_FLAG_W"] = flagging.outliers(time_df["CTDRINKO"])
 
     return True
 

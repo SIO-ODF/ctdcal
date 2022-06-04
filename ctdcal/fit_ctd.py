@@ -428,7 +428,7 @@ def calibrate_temp(btl_df, time_df):
 
                 T_fit_coefs = pd.concat([T_fit_coefs, coef_df])
             else:
-                log.warning(f"No good refT values found. Skipping flagging and plotting.")
+                log.warning(f"No good refT values found. Skipping flagging and plotting ({tN}).")
         # one more fig with all cuts
         if cfg.column['refT'] in btl_df:     # If at least one file was fit
             ctd_plots._intermediate_residual_plot(
