@@ -176,10 +176,10 @@ def calibrate_cond_bio(btl_df, time_df, c1_coefs, c2_coefs):
 
     #         #   Apply the fit, overwriting the original CTDCOND1 and CTDCOND2 columns in this case
     #         P_coefs = tuple(coef_dict[f"cp{n}"] for n in np.arange(1, P_order + 1))
-    #         T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1)) #   This is empty
+    #         T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1)) #   This is empty (should it be 0?)
     #         C_coefs = tuple(coef_dict[f"cc{n}"] for n in np.arange(1, C_order + 1)) #   This is empty
     #         btl_df.loc[:, cfg.column[cN]] = fit_ctd.apply_polyfit(
-    #             btl_df.loc[:, cfg.column[cN]],
+    #             btl_df[cfg.column[cN]],
     #             (coef_dict["c0"],) + C_coefs,
     #             (btl_df.loc[:, cfg.column["p"]], P_coefs),
     #             (btl_df.loc[:, cfg.column[tN]], T_coefs),
