@@ -165,6 +165,8 @@ def hex_to_ctd(ssscc_list):
                 a = a['btl_fire_num'].diff()    #   boolean
                 a = a.index[a == 1].tolist()    #   indices where bottles were fired in continuous file
                 converted_df["btl_fire"].iloc[a[-1]:] = False
+            #   Issues with btl_fire_num needing to be renumbered (SSSCC=10201) need to go in make_btl_mean
+
 
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
@@ -248,7 +250,15 @@ def make_btl_mean(ssscc_list):
         if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
             imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df)
+            if ssscc == "10201":    #   P02: User error incrememnted bottle from 30 to 31 during 10201. len = 35, no bottle 30
+                print("Manually reassigning bottle numbers on SSSCC 10201")
+                bottle_df.btl_fire_num.loc[bottle_df.btl_fire_num > 29] = (
+                    bottle_df.btl_fire_num.loc[bottle_df.btl_fire_num > 29] + 1
+                )
+                # print(any(bottle_df.btl_fire_num == 30))
             mean_df = btl.bottle_mean(bottle_df)
+            mean_df = mean_df[mean_df.btl_fire_num.notna()] #   If any bottle numbers were replaced, drop nan rows btl.bottle_mean made
+
 
             # export bottom bottle time/lat/lon info
             fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
