@@ -242,6 +242,39 @@ def _intermediate_residual_plot(
     # save to path or return axis (primarily for testing)
     return _save_fig(ax, f_out)
 
+def plot_bio(
+    pres, temp, sal, oxy, fluo, ssscc
+):
+    """
+    Plot T1, S, oxygen, and fluorometer from bio bottle file. Easily done following _btl_ql(filepath).
+    pres, temp, sal, oxy, fluo, ssscc : Array like
+        Respective variable series plotted against pressure, indexed by ssscc.
+    """
+    idx, uniques = pd.factorize(ssscc)  #   Extract the unique SSSCCs and their indices
+    plt.figure(figsize=(7, 6))
+    fig, axes = plt.subplots(nrows=2,ncols=2, sharey=True)  #   2x2
+    a = axes[0,0].scatter(temp, pres, c=idx, marker='+')
+    axes[0,0].set_title('Temp. (°C)')
+    axes[0,1].scatter(sal, pres, c=idx, marker='+')
+    axes[0,1].set_title('Salinity (PSU)')
+    axes[1,0].scatter(oxy, pres, c=idx, marker='+')
+    axes[1,0].set_title('Oxygen (\u03BCmol/kg)')
+    axes[1,1].scatter(fluo, pres, c=idx, marker='+')
+    axes[1,1].set_title('Fluorometer (volts)')
+
+    axes[0,0].set_ylabel('CTDPRES')
+    axes[1,0].set_ylabel('CTDPRES')
+
+    plt.tight_layout()
+    plt.gca().invert_yaxis()
+    cbar = plt.colorbar(a, ax=axes.ravel().tolist())    #   Branch colorbar over rows
+    tick_inds = cbar.get_ticks().astype(int)            #   Start assigning station ticks
+    cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
+    cbar.ax.set_yticklabels(uniques[tick_inds])
+    cbar.ax.set_title("Station")
+
+    return fig
+
 def residual_3(x1, x2, xr, stn, f_out=None
 ):
     """
