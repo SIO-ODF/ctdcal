@@ -104,6 +104,12 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    "13": {
+        "short_name": "CTDFLUOR",
+        "long_name": "FluoroSeatechWetlabsFLF_Sensor",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
 }
 
 
@@ -127,7 +133,7 @@ def hex_to_ctd(ssscc_list):
             hexFile = cfg.dirs["raw"] + ssscc + ".hex"
             xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
-            converted_df = convertFromSBEReader(sbeReader)
+            converted_df = convertFromSBEReader(sbeReader, ssscc)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
@@ -231,7 +237,7 @@ def make_btl_mean(ssscc_list):
     return True
 
 
-def convertFromSBEReader(sbeReader):
+def convertFromSBEReader(sbeReader, ssscc):
     """Handler to convert engineering data to sci units automatically.
     Takes SBEReader object that is already connected to the .hex and .XMLCON files.
     """
@@ -242,7 +248,7 @@ def convertFromSBEReader(sbeReader):
     raw_df.index.name = "index"
 
     # Metadata needs to be processed seperately and then joined with the converted data
-    print("Building metadata dataframe...")
+    log.info(f"Building metadata dataframe for {ssscc}")
     metaArray = [line.split(",") for line in sbeReader._parse_scans_meta().tolist()]
     meta_cols, meta_dtypes = sbeReader._breakdown_header()
     meta_df = pd.DataFrame(metaArray)
@@ -448,7 +454,7 @@ def convertFromSBEReader(sbeReader):
 
     print("Joining metadata dataframe with converted data...")
     converted_df = converted_df.join(meta_df)
-    print("Success!")
+    log.info("Success!")
 
     # return the converted data as a dataframe
     return converted_df
