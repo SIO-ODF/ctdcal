@@ -820,8 +820,8 @@ def export_ct1(df, ssscc_list):
                 f"NUMBER_HEADERS = 11\n"
                 f"EXPOCODE = {cfg.expocode}\n"
                 f"SECT_ID = {cfg.section_id}\n"
-                f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
-                f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
+                f"STNNBR = {ssscc[:3].lstrip('0')}\n"  # STNNBR = SSS
+                f"CASTNO = {ssscc[3:].lstrip('0')}\n"  # CASTNO = CC
                 f"DATE = {b_datetime[0]}\n"
                 f"TIME = {b_datetime[1]}\n"
                 f"LATITUDE = {btm_lat:.4f}\n"
