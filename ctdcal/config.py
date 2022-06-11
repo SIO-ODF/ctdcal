@@ -30,9 +30,11 @@ for (param, attrs) in ctd_outputs.items():
 dirs = {
     "ssscc": "data/ssscc/",
     "raw": "data/raw/",
+    "raw_bio": "data/raw_bio/",  # Temp P02
     "converted": "data/converted/",
     "time": "data/time/",
     "pressure": "data/pressure/",
+    "bio": "data/pressure/bio/",  # Temp P02
     "bottle": "data/bottle/",
     "salt": "data/salt/",
     "reft": "data/reft/",
@@ -59,7 +61,7 @@ column = {
     "sal": "CTDSAL",
     # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
     # "s2": "CTDSAL2",
-    "rinko_oxy": "FREE1",  # CHECK THIS!
+    "rinko_oxy": "U_DEF_poly1",  # CHECK THIS!
     "oxyvolts": "CTDOXYVOLTS",
     "refT": "REFTMP",
     "refC": "BTLCOND",
