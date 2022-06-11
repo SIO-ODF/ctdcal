@@ -103,6 +103,32 @@ def process(group):
 
 
 @cli.command()
+def process_bio():
+    """
+    P02: "process" for bio casts (need to do new type)
+    """
+    from math import floor
+
+    t = time.time()
+    log.info(
+        "******* New ODF run beginning at: "
+        + time.strftime("%m-%d %H:%M:%S")
+        + " *******\n"
+    )
+    from .scripts.odf_process_bio import odf_process_bio
+
+    odf_process_bio()
+    elapsed = time.time() - t
+    log.info(
+        "Processing complete: "
+        + str(floor(elapsed / 60))
+        + " minutes and "
+        + str(floor(elapsed % 60))
+        + " seconds.\n"
+    )
+
+
+@cli.command()
 def cruise_report():
     """Generate bottle residual figures for cruise report"""
 
