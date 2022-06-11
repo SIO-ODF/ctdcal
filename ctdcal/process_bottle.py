@@ -457,6 +457,10 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         "OXYGEN_FLAG_W": "",
         "REFTMP": "ITS-90",
         "REFTMP_FLAG_W": "",
+        "CTDFLUOR": "0-5VDC",  # P02 Barna wants FLUOR + XMISS
+        "CTDFLUOR_FLAG_W": "",
+        "CTDXMISS": "0-5VDC",
+        "CTDXMISS_FLAG_W": "",
     }
 
     # rename outputs as defined in user_settings.yaml
@@ -479,6 +483,10 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     # switch oxygen primary sensor to rinko
     btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
     btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+
+    #  P02 add in FLUOR, XMISS flags per Barna's instructions
+    btl_data["CTDFLUOR_FLAG_W"] = 1
+    btl_data["CTDXMISS_FLAG_W"] = 1
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
