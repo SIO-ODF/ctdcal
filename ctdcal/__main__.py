@@ -25,15 +25,26 @@ from . import get_ctdcal_config
 
 # log = logging.getLogger(__name__)
 
-handler = logging.StreamHandler()
-handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
-FORMAT = "%(funcName)s: %(message)s"
+## logging settings
+# terminal output
+stream = logging.StreamHandler()
+stream.setLevel(logging.WARNING)
+stream.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
+
+# ctdcal.log output
+logfile_FORMAT = "%(asctime)s | %(funcName)s |  %(levelname)s: %(message)s"
+logfile = logging.FileHandler("ctdcal.log")
+logfile.setLevel(logging.NOTSET)
+logfile.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
+logfile.setFormatter(logging.Formatter(logfile_FORMAT))
+
+# global configs
+FORMAT = "%(funcName)s: %(levelname)s: %(message)s"
 logging.basicConfig(
     level=logging.NOTSET,
     format=FORMAT,
     datefmt="[%X]",
-    handlers=[handler],
-    # handlers=[RichHandler(console=Console(stderr=True))],
+    handlers=[stream, logfile],
 )
 
 log = logging.getLogger(__name__)
@@ -48,11 +59,10 @@ def cli(debug):
     Documentation: tbd
     """
     if debug:
-        click.echo("Debug mode on (logging all levels)")
+        click.echo("Debug mode on (displaying all levels)")
         logging.getLogger("ctdcal").setLevel(logging.NOTSET)
     else:
-        click.echo("Debug mode off (logging 'WARNING' and higher levels)")
-        logging.getLogger("ctdcal").setLevel(logging.WARNING)
+        click.echo("Debug mode off (displaying 'WARNING' and higher levels)")
 
 
 @cli.command()
@@ -96,6 +106,7 @@ def process(group):
     if group == "ODF":
         from .scripts.odf_process_all import odf_process_all
 
+        log.info("Starting ODF processing run")
         odf_process_all()
     elif group == "PMEL":
         # pmel_process()
@@ -107,25 +118,10 @@ def process_bio():
     """
     P02: "process" for bio casts (need to do new type)
     """
-    from math import floor
-
-    t = time.time()
-    log.info(
-        "******* New ODF run beginning at: "
-        + time.strftime("%m-%d %H:%M:%S")
-        + " *******\n"
-    )
+    log.info("Starting bio processing run")
     from .scripts.odf_process_bio import odf_process_bio
 
     odf_process_bio()
-    elapsed = time.time() - t
-    log.info(
-        "Processing complete: "
-        + str(floor(elapsed / 60))
-        + " minutes and "
-        + str(floor(elapsed % 60))
-        + " seconds.\n"
-    )
 
 
 @cli.command()
