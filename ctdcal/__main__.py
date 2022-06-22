@@ -106,6 +106,7 @@ def process(group):
     if group == "ODF":
         from .scripts.odf_process_all import odf_process_all
 
+        log.info("")
         log.info("Starting ODF processing run")
         odf_process_all()
     elif group == "PMEL":
@@ -118,10 +119,11 @@ def process_bio():
     """
     P02: "process" for bio casts (need to do new type)
     """
-    log.info("Starting bio processing run")
-    from .scripts.odf_process_bio import odf_process_bio
+    log.info("")
+    log.info("Starting P02 (ODF+bio) processing run")
+    from .scripts.odf_process_all_p02 import odf_process_all_p02
 
-    odf_process_bio()
+    odf_process_all_p02()
 
 
 @cli.command()
@@ -136,6 +138,8 @@ def cruise_report():
 @cli.command()
 def qc():  # pragma: no cover
     """Launch interactive data flagging web app for QA/QC"""
+    log.info("")
+    log.info("Launching data_qc")
     io_loop = IOLoop.current()
     with resources.path("ctdcal.tools", "data_qc.py") as fname:
         bokeh_app = Application(ScriptHandler(filename=fname))
