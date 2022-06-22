@@ -193,7 +193,10 @@ def load_all_btl_files(ssscc_list, cols=None):
                 + ssscc
                 + "...filling with NaNs"
             )
-            reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
+            reft_data = pd.DataFrame(
+                index=btl_data.index, columns=["REFTMP"], dtype=float
+            )
+            reft_data["REFTMP_FLAG_W"] = 9
             reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
             reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 

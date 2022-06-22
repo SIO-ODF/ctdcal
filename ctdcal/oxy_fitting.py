@@ -154,12 +154,16 @@ def gather_oxy_params(oxy_file):
     df : DataFrame
         Oxygen measurement parameters
     """
-    with open(oxy_file, newline="") as f:
-        header = f.readline()
+    titr_columns = ["V_std", "V_blank", "N_KIO3", "V_KIO3", "T_KIO3", "T_thio"]
+    try:
+        with open(oxy_file, newline="") as f:
+            header = f.readline()
 
-    param_list = header.split()[:6]
-    params = pd.DataFrame(param_list, dtype=float).transpose()
-    params.columns = ["V_std", "V_blank", "N_KIO3", "V_KIO3", "T_KIO3", "T_thio"]
+        param_list = header.split()[:6]
+        params = pd.DataFrame(param_list, dtype=float).transpose()
+        params.columns = titr_columns
+    except FileNotFoundError:
+        params = pd.DataFrame(np.nan, index=[0], columns=titr_columns)
 
     return params
 
@@ -782,7 +786,15 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         # can't calibrate without bottle oxygen ("OXYGEN")
         if (btl_data["OXYGEN_FLAG_W"] == 9).all():
             sbe43_dict[ssscc] = np.full(5, np.nan)
-            log.warning(ssscc + " skipped, all oxy data is NaN")
+            sbe43_merged = btl_data[
+                ["CTDPRS", "CTDOXYVOLTS", "CTDTMP1", "dv_dt", "OS", "OXYGEN", "CTDOXY"]
+            ]
+            sbe43_merged = sbe43_merged.rename(
+                columns={"CTDTMP1": "CTDTMP", "OXYGEN": "REFOXY"}
+            )
+            sbe43_merged["SSSCC"] = ssscc
+            all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
+            log.warning(ssscc + " density matching skipped, all oxy data is NaN")
             continue
         sbe43_merged = match_sigmas(
             btl_data[cfg.column["p"]],
@@ -813,14 +825,17 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Fit each cast individually
     for ssscc in ssscc_list:
-        sbe_coef, sbe_df = sbe43_oxy_fit(
-            all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
-            sbe_coef0=sbe_coef0,
-            f_suffix=f"_{ssscc}",
-        )
-        # build coef dictionary
-        if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
+        # skip stations that are all NaN (will already be in dict)
+        if ssscc not in sbe43_dict.keys():
+            sbe_coef, sbe_df = sbe43_oxy_fit(
+                all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
+                sbe_coef0=sbe_coef0,
+                f_suffix=f"_{ssscc}",
+            )
+
+            # build coef dictionary
             sbe43_dict[ssscc] = sbe_coef
+
         # all non-NaN oxygen data with flags
         all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
 

@@ -216,6 +216,40 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         # NOTE (4/9/21): tried adding time drift term unsuccessfully
         # Uchida (2010) says fitting individual stations is the same (even preferred?)
         for ssscc in ssscc_sublist:
+            if good_data.loc[good_data["SSSCC"] == ssscc].empty:
+                log.warning(
+                    f"{ssscc} has no good oxygen values, skipping individual fit"
+                )
+                # apply group coefficients
+                btl_rows = btl_df["SSSCC"] == ssscc
+                time_rows = time_df["SSSCC"] == ssscc
+                rinko_coefs_ssscc = rinko_coefs_group
+                btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
+                    rinko_coefs_ssscc,
+                    (
+                        btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
+                        btl_df.loc[btl_rows, cfg.column["p"]],
+                        btl_df.loc[btl_rows, cfg.column["t1"]],
+                        btl_df.loc[btl_rows, cfg.column["sal"]],
+                        btl_df.loc[btl_rows, "OS"],
+                    ),
+                )
+                time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
+                    rinko_coefs_ssscc,
+                    (
+                        time_df.loc[time_rows, cfg.column["rinko_oxy"]],
+                        time_df.loc[time_rows, cfg.column["p"]],
+                        time_df.loc[time_rows, cfg.column["t1"]],
+                        time_df.loc[time_rows, cfg.column["sal"]],
+                        time_df.loc[time_rows, "OS"],
+                    ),
+                )
+
+                # save coefficients to dataframe
+                coefs_df.loc[ssscc] = rinko_coefs_ssscc
+                continue
+
+            # now that there is good data...
             (rinko_coefs_ssscc, _) = rinko_oxy_fit(
                 good_data.loc[good_data["SSSCC"] == ssscc].copy(),
                 rinko_coef0=rinko_coefs_group,

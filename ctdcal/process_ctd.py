@@ -778,7 +778,7 @@ def export_ct1(df, ssscc_list):
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
         # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
+        log.info(f"Using Rinko as CTDOXY for {ssscc}")
         time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
         time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[cfg.ctd_col_names]

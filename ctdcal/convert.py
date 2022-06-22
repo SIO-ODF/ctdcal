@@ -1,12 +1,12 @@
+import logging
 from pathlib import Path
 
 import gsw
-import logging
 import numpy as np
 import pandas as pd
 
-from . import get_ctdcal_config
 from . import equations_sbe as sbe_eq
+from . import get_ctdcal_config
 from . import process_bottle as btl
 from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
@@ -434,7 +434,7 @@ def convertFromSBEReader(sbeReader, ssscc):
             converted_df[col] = sbe_eq.sbe_altimeter(raw_df[meta["column"]], coefs)
 
         elif meta["sensor_id"] == "61":
-            if meta["sensor_info"]["SensorName"] == "RinkoO2V":
+            if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO"):
                 print("Processing Rinko O2")
                 # hysteresis correct then pass through voltage (see Uchida, 2010)
                 coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
