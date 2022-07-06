@@ -73,12 +73,12 @@ def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
     """
     # read from url
     if isinstance(btl_file, (str, Path)) and str(btl_file).startswith("http"):
-        log.info("Loading bottle file from http link")
+        log.info(f"Loading bottle file {Path(btl_file).name} from http link")
         file = requests.get(btl_file).text.splitlines(keepends=True)
 
     # read from file
     elif isinstance(btl_file, (str, Path)):
-        log.info("Loading bottle file from local file")
+        log.info(f"Loading bottle file {Path(btl_file.name)} from local file")
         with open(btl_file) as f:
             file = f.readlines()
 
@@ -132,12 +132,12 @@ def load_exchange_ctd(
     """
     # read from url (.zip)
     if isinstance(ctd_file, (str, Path)) and str(ctd_file).startswith("http"):
-        log.info("Loading CTD file from http link")
+        log.info(f"Loading CTD file {Path(ctd_file).name} from http link")
         data_raw = BytesIO(requests.get(ctd_file).content)
 
     # read from file
     elif isinstance(ctd_file, (str, Path)):
-        log.info("Loading CTD file from local file")
+        log.info(f"Loading CTD file {Path(ctd_file).name} from local file")
         with open(ctd_file, "rb") as f:
             data_raw = BytesIO(f.read())
 

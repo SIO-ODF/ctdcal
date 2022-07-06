@@ -34,7 +34,10 @@ def _check_freq(freq):
         freq = freq.astype(float)
 
     if 0 in freq:
-        log.warning(f"Found 0 in {sensor} frequency, replacing with NaN")
+        N_zeroes = (freq == 0).sum()
+        log.warning(
+            f"Found {N_zeroes} zero frequency readings in {sensor}, replacing with NaN"
+        )
         freq[freq == 0] = np.nan
 
     return freq

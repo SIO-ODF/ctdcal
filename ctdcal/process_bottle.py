@@ -246,6 +246,9 @@ def load_all_btl_files(ssscc_list, cols=None):
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
         btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
+        if len(btl_data) > 36:
+            log.error(f"len(btl_data) > 36 for {ssscc}, check reftmp file")
+
         btl_data = pd.merge(
             btl_data,
             refc_data,
@@ -253,6 +256,9 @@ def load_all_btl_files(ssscc_list, cols=None):
             right_on="SAMPNO_SALT",
             how="outer",
         )
+        if len(btl_data) > 36:
+            log.error(f"len(btl_data) > 36 for {ssscc}, check autosal file")
+
         btl_data = pd.merge(
             btl_data,
             oxy_data,
@@ -260,11 +266,8 @@ def load_all_btl_files(ssscc_list, cols=None):
             right_on="BOTTLENO_OXY",
             how="outer",
         )
-
         if len(btl_data) > 36:
-            log.error(
-                f"""Length of bottle data for {ssscc} is > 36, check for errors in reference parameter files"""
-            )
+            log.error(f"len(btl_data) > 36 for {ssscc}, check oxygen file")
 
         # Add bottom of cast information (date,time,lat,lon,etc.)
         btl_data = _add_btl_bottom_data(btl_data, ssscc)

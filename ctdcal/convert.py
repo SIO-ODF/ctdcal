@@ -262,7 +262,7 @@ def convertFromSBEReader(sbeReader, ssscc):
             # map from string "pseudo-boolean" to actual boolean values
             meta_df[col] = meta_df[col].map({"True": True, "False": False})
 
-    print("Success!")
+    log.info("Success!")
 
     t_probe = meta_df["pressure_temp_int"].tolist()  # raw int from Digitquartz T probe
 
@@ -375,33 +375,35 @@ def convertFromSBEReader(sbeReader, ssscc):
 
         ### Temperature block
         if meta["sensor_id"] == "55":
-            print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
             converted_df[col] = sbe_eq.sbe3(raw_df[meta["column"]], coefs)
             if meta["list_id"] == 0:
                 t_array = converted_df[col].astype(float)
-                print("\tPrimary temperature first reading:", t_array[0], sensor_units)
+                log.info(
+                    f"\tPrimary temperature first reading: {t_array[0]} {sensor_units}"
+                )
 
         ### Pressure block
         elif meta["sensor_id"] == "45":
-            print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
             converted_df[col] = sbe_eq.sbe9(raw_df[meta["column"]], t_probe, coefs)
             if meta["list_id"] == 2:
                 p_array = converted_df[col].astype(float)
-                print("\tPressure first reading:", p_array[0], sensor_units)
+                log.info(f"\tPressure first reading:  {p_array[0]} {sensor_units}")
 
         ### Conductivity block
         elif meta["sensor_id"] == "3":
-            print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
             converted_df[col] = sbe_eq.sbe4(
                 raw_df[meta["column"]], t_array, p_array, coefs
             )
             if meta["list_id"] == 1:
                 c_array = converted_df[col].astype(float)
-                print("\tPrimary cond first reading:", c_array[0], sensor_units)
+                log.info(f"\tPrimary cond first reading: {c_array[0]} {sensor_units}")
 
         ### Oxygen block
         elif meta["sensor_id"] == "38":
-            print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
             # TODO: put some kind of user-enabled flag in config.py, e.g.
             # if cfg["correct_oxy_hysteresis"]:
             V_corrected = sbe_eq.sbe43_hysteresis_voltage(
@@ -420,22 +422,22 @@ def convertFromSBEReader(sbeReader, ssscc):
 
         ### Fluorometer Seapoint block
         elif meta["sensor_id"] == "11":
-            print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
             converted_df[col] = sbe_eq.seapoint_fluoro(raw_df[meta["column"]], coefs)
 
         ### Salinity block
         elif meta["sensor_id"] == "1000":
-            print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
             converted_df[col] = gsw.SP_from_C(c_array, t_array, p_array)
 
         ### Altimeter block
         elif meta["sensor_id"] == "0":
-            print("Processing Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
             converted_df[col] = sbe_eq.sbe_altimeter(raw_df[meta["column"]], coefs)
 
         elif meta["sensor_id"] == "61":
             if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO"):
-                print("Processing Rinko O2")
+                log.info("Processing Rinko O2")
                 # hysteresis correct then pass through voltage (see Uchida, 2010)
                 coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
                 converted_df[col] = sbe_eq.sbe43_hysteresis_voltage(
@@ -446,13 +448,13 @@ def convertFromSBEReader(sbeReader, ssscc):
 
         ### Aux block
         else:
-            print("Passing along Sensor ID:", meta["sensor_id"] + ",", sensor_name)
+            log.info(f"Passing along Sensor ID: {meta['sensor_id']}, {sensor_name}")
             converted_df[col] = raw_df[meta["column"]]
 
     # Set the column name for the index
     converted_df.index.name = "index"
 
-    print("Joining metadata dataframe with converted data...")
+    log.info("Joining metadata dataframe with converted data...")
     converted_df = converted_df.join(meta_df)
     log.info("Success!")
 
