@@ -25,7 +25,7 @@ btl_df = pd.read_csv(btl_file)
 # OXYGEN vs. (OXYGEN - CTDOXY) (c=CTDPRS)
 
 
-def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
+def plot_residuals(outdir="data/report_figs/", ext=".svg"):
 
     #################################################################
     ##### Here lies the temperature plots, long may they rest.  #####
