@@ -31,6 +31,50 @@ def _btl_fl():
     btl_data = process_bottle.load_all_btl_files(ssscc_list)
     return btl_data
 
+#   Not sure where to put this
+def haversine(lat1, lon1, lat2, lon2, units='km'):
+    """
+    Calculate the great circle distance in kilometers between two points 
+    on the earth using the haversine formula.
+    For use on small distances (<4 degrees)
+    
+    Parameters
+    ----------
+    lat1, lon1, lat2, lon2 : Float
+        Latitude and longitude of coordinate points 1 and 2, respectively
+        in decimal degrees
+    units : String
+        Abbreviation of desired distance units (km, mi, or nmi)
+
+    Returns
+    -------
+    dout : Float
+        Calculated distance between points with units specified by 'units'
+    """
+    from math import radians, cos, sin, asin, sqrt
+
+    # convert decimal degrees to radians 
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    # haversine formula 
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    #   Discern output 
+    if units == "mi":
+        print("Desired output units of miles in haversine formula.")
+        r = 3956
+    elif units == "nmi":
+        print("Desired output units of nautical miles in haversine formula.")
+        r = 3440.1
+    else:
+        if units != "km":
+            print("Provided units:", units, "not recognized. Assuming kilomters output in haversine formula.")
+        r = 6371    #   Assume kilometers
+    dout = c * r
+    return dout
+
 def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid, fontsize=12):
     plt.xlim(xlim)
     plt.xticks(rotation=45)
@@ -383,6 +427,51 @@ def ssscc_geo(
     """
     Plot station locations, with SSSCC and depth labels
     """
+
+def section_plot(df, varname="CTDSAL"
+):
+    """
+    Scatter plot of a desired variable against section distance for a bottle file
+
+    Parameters
+    ----------
+    df : Pandas DataFrame
+        Bottle DataFrame with latitude, longitude, CTD pressure, and other variables
+    varname : String
+        String of variable intended to be plotted. Defaults to CTDSAL.
+
+    """
+    #   Create section distance column
+    x   = df.LATITUDE.diff()
+    idx = x[x != 0.0].index.tolist()
+    df["dist"] = np.nan
+    for i in idx:
+        if i == 0:
+            df["dist"].iloc[i] = 0.0
+            val_add = 0.0
+        else:
+            df["dist"].iloc[i] = haversine(
+            df.LATITUDE.iloc[i-1],
+            df.LONGITUDE.iloc[i-1],
+            df.LATITUDE.iloc[i],
+            df.LONGITUDE.iloc[i]
+        ) + val_add     #   Uses last assignment
+        val_add = df["dist"].iloc[i]   #       Define new value to add for the beginning of the next iteration
+    df["dist"].fillna(method="ffill", inplace=True) #   Forward fill the nans
+
+    plt.figure(figsize=(7, 6))
+    ax = plt.axes()
+    a  = ax.scatter(df["dist"], df["CTDPRS"], c=df[varname])
+    plt.colorbar(a, ax=ax)
+    plt.fill_between(df["dist"],df["DEPTH"], df["DEPTH"].max()+200,
+        interpolate=True, color='gray')
+    plt.tight_layout()
+    plt.gca().invert_yaxis()
+    plt.ylabel("CTDPRES")
+    plt.xlabel("Section Distance")
+
+    #   TODO: Allow "ignore station" list
+    #   TODO: Allow interpolation scheme between points, with iso-param lines?
 
 def plot_bio(
 
