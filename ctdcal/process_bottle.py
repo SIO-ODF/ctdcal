@@ -17,13 +17,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
 pd.options.mode.chained_assignment = None
 
-from ctdcal import (
-    flagging as flagging,
-    get_ctdcal_config,
-    oxy_fitting as oxy_fitting
-)
+from ctdcal import flagging as flagging, get_ctdcal_config, oxy_fitting as oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -34,7 +31,6 @@ BOTTLE_FIRE_NUM_COL = "btl_fire_num"
 
 # Retrieve the bottle data from a converted file.
 def retrieveBottleDataFromFile(converted_file):
-
     converted_df = pd.read_pickle(converted_file)
 
     return retrieveBottleData(converted_df)
@@ -190,7 +186,7 @@ def load_all_btl_files(ssscc_list, cols=None):
         reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
         try:
             reft_data = _load_reft_data(reft_file)
-        except FileNotFoundError:   # If there is no processed refTEMP file
+        except FileNotFoundError:  # If there is no processed refTEMP file
             log.warning(
                 "Missing (or misnamed) REFT Data Station: "
                 + ssscc
@@ -202,12 +198,12 @@ def load_all_btl_files(ssscc_list, cols=None):
             reft_data["REFTMP_FLAG_W"] = reft_data["T90"]
         if len(reft_data) > 36:
             log.warning(f"Length of RefT data exceeds 36 bottles for {ssscc}")
-        
+
         ### load REFC data
         refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
         try:
             refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
-        except FileNotFoundError:   # If there is no processed refCOND file
+        except FileNotFoundError:  # If there is no processed refCOND file
             log.warning(
                 "Missing (or misnamed) REFC Data Station: "
                 + ssscc
@@ -249,7 +245,6 @@ def load_all_btl_files(ssscc_list, cols=None):
             oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
         if len(oxy_data) > 36:
             log.warning(f"Length of Oxy Winkler data exceeds 36 bottles for {ssscc}")
-
 
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
@@ -360,7 +355,9 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
 
     """
     for ssscc in ssscc_list:
-        if not Path(reft_dir + ssscc + "_reft.csv").exists():   # If the reft has not been assessed yet
+        if not Path(
+            reft_dir + ssscc + "_reft.csv"
+        ).exists():  # If the reft has not been assessed yet
             try:
                 reftDF = _reft_loader(ssscc, reft_dir)
                 reftDF.to_csv(reft_dir + ssscc + "_reft.csv", index=False)
@@ -412,7 +409,7 @@ def export_report_data(df):
     ]
 
     # add in missing flags
-    if any(df['REFTMP_FLAG_W'].notnull()):
+    if any(df["REFTMP_FLAG_W"].notnull()):
         df["CTDTMP1_FLAG_W"] = flagging.by_residual(
             df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
         )
@@ -474,7 +471,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         # "OXYGEN_FLAG_W": "",
         "REFTMP": "ITS-90",
         "REFTMP_FLAG_W": "",
-        "CTDFLUOR": "0-5VDC",   # P02 Barna wants FLUOR + XMISS
+        "CTDFLUOR": "0-5VDC",  # P02 Barna wants FLUOR + XMISS
         "CTDFLUOR_FLAG_W": "",
         "CTDXMISS": "0-5VDC",
         "CTDXMISS_FLAG_W": "",
@@ -502,7 +499,9 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     print(f"Using Rinko as CTDOXY excluding SSSCC:", ", ".join(bad_list))
     throw_loc = btl_data.index[~btl_data["SSSCC"].isin(bad_list)]
     btl_data["CTDOXY"].iloc[throw_loc] = btl_data.loc[throw_loc, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"].iloc[throw_loc] = btl_data.loc[throw_loc, "CTDRINKO_FLAG_W"]
+    btl_data["CTDOXY_FLAG_W"].iloc[throw_loc] = btl_data.loc[
+        throw_loc, "CTDRINKO_FLAG_W"
+    ]
 
     #   P02 add in FLUOR, XMISS flags per Barna's instructions
     btl_data["CTDFLUOR_FLAG_W"] = 1

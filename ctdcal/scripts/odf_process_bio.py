@@ -39,6 +39,7 @@ from datetime import datetime, timezone
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
+
 def odf_process_bio():
     """
     Rebuilding based on procedure outlined in odf_process_all.py
@@ -47,11 +48,11 @@ def odf_process_bio():
 
     #   Step 1: Import the fit coeffs for T, C, oxy, and Rinko
     #   Note: The refT for the bio casts exist and can be refit.
-    fname_c1    = "data/logs/fit_coef_c1.csv"
-    c1_coefs    = pd.read_csv(fname_c1)
-    fname_c2    = "data/logs/fit_coef_c2.csv"
-    c2_coefs    = pd.read_csv(fname_c2)
-    fname_sbe4  = "data/logs/sbe43_coefs.csv"
+    fname_c1 = "data/logs/fit_coef_c1.csv"
+    c1_coefs = pd.read_csv(fname_c1)
+    fname_c2 = "data/logs/fit_coef_c2.csv"
+    c2_coefs = pd.read_csv(fname_c2)
+    fname_sbe4 = "data/logs/sbe43_coefs.csv"
     sbe43_coefs = pd.read_csv(fname_sbe4)
     fname_rinko = "data/logs/rinko_coefs.csv"
     rinko_coefs = pd.read_csv(fname_rinko)
@@ -67,11 +68,13 @@ def odf_process_bio():
         ssscc_list = [line.strip() for line in filename]
 
     #   Step 3: Convert the hex into bottle averages and time .pkl
-    log.info("Converting .hex files")   #   Essentially convert.hex_to_ctd
+    log.info("Converting .hex files")  #   Essentially convert.hex_to_ctd
     for ssscc in ssscc_list:
         #   Stash .pkl files in the normal folders
         if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
-            hexFile = "data/raw_bio/" + ssscc + ".hex"  #   Keep the raw files separated for safety
+            hexFile = (
+                "data/raw_bio/" + ssscc + ".hex"
+            )  #   Keep the raw files separated for safety
             xmlconFile = "data/raw_bio/" + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convert.convertFromSBEReader(sbeReader, ssscc)
@@ -79,27 +82,55 @@ def odf_process_bio():
 
     convert.make_time_files(ssscc_list)
     convert.make_btl_mean(ssscc_list)
-    log.info('All .pkl files generated.')
+    log.info("All .pkl files generated.")
 
     #   Process the refT files for the bio casts, as the refT data still exists
     process_bottle.process_reft(ssscc_list)
 
     #   Step 4: Get the time and bottle data into the workspace
-    time_data_all   = process_ctd.load_all_ctd_files(ssscc_list)
-    btl_data_all    = process_bottle.load_all_btl_files(ssscc_list) #   Extra cols should be full of NaNs
-    if '05301' in ssscc_list:
-        bottles_05301 = [float(bnum) for bnum in [1, 2, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21,
-        22, 23, 25, 27, 28, 29, 31, 33, 35]]    #   Custom bottle positions
-        btl_data_all["btl_fire_num"].loc[btl_data_all["SSSCC"] == "05301"] = bottles_05301
+    time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
+    btl_data_all = process_bottle.load_all_btl_files(
+        ssscc_list
+    )  #   Extra cols should be full of NaNs
+    if "05301" in ssscc_list:
+        bottles_05301 = [
+            float(bnum)
+            for bnum in [
+                1,
+                2,
+                3,
+                5,
+                7,
+                9,
+                11,
+                13,
+                15,
+                17,
+                19,
+                21,
+                22,
+                23,
+                25,
+                27,
+                28,
+                29,
+                31,
+                33,
+                35,
+            ]
+        ]  #   Custom bottle positions
+        btl_data_all["btl_fire_num"].loc[
+            btl_data_all["SSSCC"] == "05301"
+        ] = bottles_05301
 
-    log.info('Time and Bottle data loaded.')
+    log.info("Time and Bottle data loaded.")
 
     #   Add SSSCC2 column, incrementing up from bio num to full num
     btl_data_all["SSSCC2"] = btl_data_all["SSSCC"].str[:-2] + "02"
     time_data_all["SSSCC2"] = time_data_all["SSSCC"].str[:-2] + "02"
     #   Station 032 is the only one where the bio SSSCC ends in a 2
-    btl_data_all["SSSCC2"].loc[btl_data_all["SSSCC"]=='03202'] = '03203'
-    time_data_all["SSSCC2"].loc[time_data_all["SSSCC"]=='03202'] = '03203'
+    btl_data_all["SSSCC2"].loc[btl_data_all["SSSCC"] == "03202"] = "03203"
+    time_data_all["SSSCC2"].loc[time_data_all["SSSCC"] == "03202"] = "03203"
 
     #   Step 5: Apply the pressure offset
     process_ctd.apply_pressure_offset(btl_data_all)
@@ -119,7 +150,8 @@ def odf_process_bio():
 
     #   Step 8: Calibrate the cond w/ pre-existing coeffs
     btl_data_all, time_data_all = calibrate_cond_bio(
-        btl_data_all, time_data_all, c1_coefs, c2_coefs)
+        btl_data_all, time_data_all, c1_coefs, c2_coefs
+    )
     print("Conductivity has been 'calibrated'.")
 
     #   Step 9: Calibrate the SBE43 w/ pre-existing coeffs
@@ -137,7 +169,7 @@ def odf_process_bio():
 
     #   Step 10: Calibrate the Rinko w/ pre-existing coeffs
     prepare_rinko_bio(btl_data_all, time_data_all, rinko_coefs)
-    print('RINKO columns are up.')
+    print("RINKO columns are up.")
 
     #   Step 11: Export the ct1 files
     export_ct1_bio(time_data_all)
@@ -146,10 +178,11 @@ def odf_process_bio():
     #   Barna would prefer the hy1 files to be one big one that he doesn't need to merge himself
     export_hy1_bio(btl_data_all)
 
+
 def calibrate_cond_bio(btl_df, time_df, c1_coefs, c2_coefs):
     # import gsw
     log.info("Calibrating conductivity without AutoSal for bio casts...")
-    btl_df["SALNTY_FLAG_W"] = 9 
+    btl_df["SALNTY_FLAG_W"] = 9
 
     #   These may not be writing out correctly in fit_ctd.calibrate_cond
     # filt_c1 = c1_coefs.loc[c1_coefs["SSSCC"].isin(btl_df["SSSCC2"].dropna().astype(int))]
@@ -207,13 +240,16 @@ def calibrate_cond_bio(btl_df, time_df, c1_coefs, c2_coefs):
     # btl_df[cfg.column["sal"] + "_FLAG_W"] = 2
 
     #   Flag outliers in salinity, since no reference cond/salinity is available
-    time_df[cfg.column["sal"]+"_FLAG_W"] = flagging.outliers(time_df[cfg.column["sal"]])
-    btl_df[cfg.column["sal"]+"_FLAG_W"] = flagging.outliers(btl_df[cfg.column["sal"]])
+    time_df[cfg.column["sal"] + "_FLAG_W"] = flagging.outliers(
+        time_df[cfg.column["sal"]]
+    )
+    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.outliers(btl_df[cfg.column["sal"]])
 
     #   Can't do residual flagging, so _flag_btl_data can't be used either
     # time_df   #   COND columns aren't normally flagged?
 
     return btl_df, time_df
+
 
 def prepare_oxy_bio(btl_df, time_df, ssscc_list):
     btl_df["SA"] = gsw.SA_from_SP(
@@ -258,12 +294,18 @@ def prepare_oxy_bio(btl_df, time_df, ssscc_list):
         time_df[cfg.column["lon"]],
         time_df[cfg.column["lat"]],
     )
-    time_df["dv_dt"] = oxy_fitting.calculate_dV_dt(time_df["CTDOXYVOLTS"], time_df["scan_datetime"])
+    time_df["dv_dt"] = oxy_fitting.calculate_dV_dt(
+        time_df["CTDOXYVOLTS"], time_df["scan_datetime"]
+    )
     # Convert CTDOXY units
-    btl_df["CTDOXY"] = oxy_fitting.oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
+    btl_df["CTDOXY"] = oxy_fitting.oxy_ml_to_umolkg(
+        btl_df["CTDOXY1"], btl_df["sigma_btl"]
+    )
     btl_df[cfg.column["refO"]] = np.nan
-    time_df["CTDOXY"] = oxy_fitting.oxy_ml_to_umolkg(time_df["CTDOXY1"], time_df["sigma_btl"])
-    
+    time_df["CTDOXY"] = oxy_fitting.oxy_ml_to_umolkg(
+        time_df["CTDOXY1"], time_df["sigma_btl"]
+    )
+
     btl_df["CTDOXY_FLAG_W"] = flagging.outliers(btl_df["CTDOXY"])
     time_df["CTDOXY_FLAG_W"] = flagging.outliers(time_df["CTDOXY"])
 
@@ -274,13 +316,14 @@ def prepare_oxy_bio(btl_df, time_df, ssscc_list):
 
     return True
 
+
 def calibrate_sbe43_bio(btl_df, time_df, sbe43_coefs):
     log.info("Calibrating oxygen ")
     all_sbe43_merged = pd.DataFrame()
     sbe43_dict = {}
     all_sbe43_fit = pd.DataFrame()
     ssscc_list = btl_df["SSSCC"].dropna().unique()
-    ssscc_list2 = btl_df["SSSCC2"].dropna().unique() #   For grabbing other coefs
+    ssscc_list2 = btl_df["SSSCC2"].dropna().unique()  #   For grabbing other coefs
 
     #   No reference oxy, I think most of this will be skipped
     #   No density matching
@@ -312,6 +355,7 @@ def calibrate_sbe43_bio(btl_df, time_df, sbe43_coefs):
     #     # all non-NaN oxygen data with flags
     #     all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
 
+
 def prepare_rinko_bio(btl_df, time_df, rinko_coefs):
     #   Uchida_DO_eq allows for us to feed coefs in, even premade ones
     #   Get SSSCC coefs in, get the voltage for each SSSCC, pass to Uchida
@@ -325,27 +369,30 @@ def prepare_rinko_bio(btl_df, time_df, rinko_coefs):
 
         #   Get CTDRINKO made by passing the voltages in with the premade coefs
         btl_df["CTDRINKO"].loc[btl_df["SSSCC2"] == ssscc] = rinko._Uchida_DO_eq(
-            ssscc_coefs, 
+            ssscc_coefs,
             (
                 btl_df["U_DEF_poly1"].loc[btl_df["SSSCC2"] == ssscc],
                 btl_df["CTDPRS"].loc[btl_df["SSSCC2"] == ssscc],
                 btl_df["CTDTMP1"].loc[btl_df["SSSCC2"] == ssscc],
                 btl_df["CTDSAL"].loc[btl_df["SSSCC2"] == ssscc],
                 btl_df["OS"].loc[btl_df["SSSCC2"] == ssscc],
-            ))
+            ),
+        )
         time_df["CTDRINKO"].loc[time_df["SSSCC2"] == ssscc] = rinko._Uchida_DO_eq(
-            ssscc_coefs, 
+            ssscc_coefs,
             (
                 time_df["U_DEF_poly1"].loc[time_df["SSSCC2"] == ssscc],
                 time_df["CTDPRS"].loc[time_df["SSSCC2"] == ssscc],
                 time_df["CTDTMP1"].loc[time_df["SSSCC2"] == ssscc],
                 time_df["CTDSAL"].loc[time_df["SSSCC2"] == ssscc],
                 time_df["OS"].loc[time_df["SSSCC2"] == ssscc],
-            ))
+            ),
+        )
     btl_df["CTDRINKO_FLAG_W"] = flagging.outliers(btl_df["CTDRINKO"])
     time_df["CTDRINKO_FLAG_W"] = flagging.outliers(time_df["CTDRINKO"])
 
     return True
+
 
 def depth_log_bio(time_data_all):
     df = time_data_all[["SSSCC", "CTDPRS", "GPSLAT", "ALT"]].copy().reset_index()
@@ -363,11 +410,11 @@ def depth_log_bio(time_data_all):
     #   Keep this in.
     bottom_df.loc[bottom_df["alt"] > 80, "alt"] = np.nan
     #   Read in the depth log to get actual depths. Fix as per normal later on in hy1 writeout.
-    auto_depth_df   = pd.read_csv(cfg.dirs["logs"]+"depth_log.csv")
+    auto_depth_df = pd.read_csv(cfg.dirs["logs"] + "depth_log.csv")
     #   Bio casts always preceed a full cast. Look for ssscc + 1 in the auto depth log for the depth to use
-    bottom_df["SSSCC2"] = bottom_df["SSSCC"].astype(int)+1
+    bottom_df["SSSCC2"] = bottom_df["SSSCC"].astype(int) + 1
     pull = auto_depth_df["DEPTH"].loc[auto_depth_df["SSSCC"].isin(bottom_df["SSSCC2"])]
-    pull.index = bottom_df.index    #   Reindex to make replacement work
+    pull.index = bottom_df.index  #   Reindex to make replacement work
     bottom_df["DEPTH"] = pull
     #   The manual depth log is pulled when the ct1 and hy1 files are made.
     #   Don't want to overwrite the existing log for troubleshooting purposes.
@@ -380,13 +427,14 @@ def depth_log_bio(time_data_all):
         cfg.dirs["logs"] + "depth_log_bio.csv", index=False
     )
 
+
 def export_ct1_bio(time_df):
     time_df["CTDFLUOR_FLAG_W"] = 1
     time_df["CTDXMISS_FLAG_W"] = 1
     # rename outputs as defined in user_settings.yaml
     for param, attrs in cfg.ctd_outputs.items():
         if param not in time_df.columns:
-            print(param, 'being renamed from', attrs["sensor"])
+            print(param, "being renamed from", attrs["sensor"])
             time_df.rename(columns={attrs["sensor"]: param}, inplace=True)
 
     # check that all columns are there
@@ -403,7 +451,7 @@ def export_ct1_bio(time_df):
     ).dropna()
 
     #   Iteratively writing the ct1 files out
-    for ssscc in time_df["SSSCC"].unique():   
+    for ssscc in time_df["SSSCC"].unique():
         time_data = time_df[time_df["SSSCC"] == ssscc].copy()
         time_data = process_ctd.pressure_sequence(time_data)
         time_data = time_data[cfg.ctd_col_names]
@@ -458,6 +506,7 @@ def export_ct1_bio(time_df):
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")
 
+
 def export_hy1_bio(df, out_dir=cfg.dirs["bio"], org="ODF"):
     log.info("Exporting bottle file")
     btl_data = df.copy()
@@ -490,7 +539,7 @@ def export_hy1_bio(df, out_dir=cfg.dirs["bio"], org="ODF"):
         # "OXYGEN_FLAG_W": "",
         "REFTMP": "ITS-90",
         "REFTMP_FLAG_W": "",
-        "CTDFLUOR": "0-5VDC",   # P02 Barna wants FLUOR + XMISS
+        "CTDFLUOR": "0-5VDC",  # P02 Barna wants FLUOR + XMISS
         "CTDFLUOR_FLAG_W": "",
         "CTDXMISS": "0-5VDC",
         "CTDXMISS_FLAG_W": "",
@@ -499,13 +548,13 @@ def export_hy1_bio(df, out_dir=cfg.dirs["bio"], org="ODF"):
     # rename outputs as defined in user_settings.yaml
     for param, attrs in cfg.ctd_outputs.items():
         if param not in btl_data.columns:
-            print(param, 'renamed to', attrs["sensor"])
+            print(param, "renamed to", attrs["sensor"])
             btl_data.rename(columns={attrs["sensor"]: param}, inplace=True)
 
     if any(btl_data["SSSCC"].isnull()):
         print("Still need to look at the NaNs in the SSSCC..")
         #   Drop the rows where the SSSCC is NaN (which shouldn't be happening)
-        btl_data = btl_data.dropna(subset=['SSSCC'])
+        btl_data = btl_data.dropna(subset=["SSSCC"])
 
     btl_data["EXPOCODE"] = cfg.expocode
     btl_data["SECT_ID"] = cfg.section_id

@@ -8,36 +8,42 @@ import pandas as pd
 
 log = logging.getLogger(__name__)
 
+
 def _btl_ql(filepath):
     """
     A bottle quick-loader for testing plotting routines on hy1 file
     Code originally by MK, data_qc.py
     """
     from ctdcal import io
+
     btl_data = io.load_exchange_btl(filepath).replace(-999, np.nan)
     btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
         "CASTNO"
     ].apply(lambda x: f"{x:02d}")
     return btl_data
 
+
 def _btl_fl():
     """
     Load all of the bottle data for testing plotting routines prior to hy1 file generation
     """
     from ctdcal import process_bottle
-    if not 'ssscc_list' in locals():
+
+    if not "ssscc_list" in locals():
         from ctdcal import process_ctd
+
         ssscc_list = process_ctd.get_ssscc_list()
     btl_data = process_bottle.load_all_btl_files(ssscc_list)
     return btl_data
 
+
 #   Not sure where to put this
-def haversine(lat1, lon1, lat2, lon2, units='km'):
+def haversine(lat1, lon1, lat2, lon2, units="km"):
     """
-    Calculate the great circle distance in kilometers between two points 
+    Calculate the great circle distance in kilometers between two points
     on the earth using the haversine formula.
     For use on small distances (<4 degrees)
-    
+
     Parameters
     ----------
     lat1, lon1, lat2, lon2 : Float
@@ -53,15 +59,15 @@ def haversine(lat1, lon1, lat2, lon2, units='km'):
     """
     from math import radians, cos, sin, asin, sqrt
 
-    # convert decimal degrees to radians 
+    # convert decimal degrees to radians
     lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
 
-    # haversine formula 
-    dlon = lon2 - lon1 
-    dlat = lat2 - lat1 
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    # haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
     c = 2 * asin(sqrt(a))
-    #   Discern output 
+    #   Discern output
     if units == "mi":
         print("Desired output units of miles in haversine formula.")
         r = 3956
@@ -70,10 +76,15 @@ def haversine(lat1, lon1, lat2, lon2, units='km'):
         r = 3440.1
     else:
         if units != "km":
-            print("Provided units:", units, "not recognized. Assuming kilomters output in haversine formula.")
-        r = 6371    #   Assume kilometers
+            print(
+                "Provided units:",
+                units,
+                "not recognized. Assuming kilomters output in haversine formula.",
+            )
+        r = 6371  #   Assume kilometers
     dout = c * r
     return dout
+
 
 def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid, fontsize=12):
     plt.xlim(xlim)
@@ -286,9 +297,8 @@ def _intermediate_residual_plot(
     # save to path or return axis (primarily for testing)
     return _save_fig(ax, f_out)
 
-def plot_bio(
-    pres, temp, sal, oxy, fluo, ssscc
-):
+
+def plot_bio(pres, temp, sal, oxy, fluo, ssscc):
     """
     Plot T1, S, oxygen, and fluorometer from bio bottle file. Easily done following _btl_ql(filepath).
     pres, temp, sal, oxy, fluo, ssscc : Array like
@@ -296,31 +306,31 @@ def plot_bio(
     """
     idx, uniques = pd.factorize(ssscc)  #   Extract the unique SSSCCs and their indices
     plt.figure(figsize=(7, 6))
-    fig, axes = plt.subplots(nrows=2,ncols=2, sharey=True)  #   2x2
-    a = axes[0,0].scatter(temp, pres, c=idx, marker='+')
-    axes[0,0].set_title('Temp. (°C)')
-    axes[0,1].scatter(sal, pres, c=idx, marker='+')
-    axes[0,1].set_title('Salinity (PSU)')
-    axes[1,0].scatter(oxy, pres, c=idx, marker='+')
-    axes[1,0].set_title('Oxygen (\u03BCmol/kg)')
-    axes[1,1].scatter(fluo, pres, c=idx, marker='+')
-    axes[1,1].set_title('Fluorometer (volts)')
+    fig, axes = plt.subplots(nrows=2, ncols=2, sharey=True)  #   2x2
+    a = axes[0, 0].scatter(temp, pres, c=idx, marker="+")
+    axes[0, 0].set_title("Temp. (°C)")
+    axes[0, 1].scatter(sal, pres, c=idx, marker="+")
+    axes[0, 1].set_title("Salinity (PSU)")
+    axes[1, 0].scatter(oxy, pres, c=idx, marker="+")
+    axes[1, 0].set_title("Oxygen (\u03BCmol/kg)")
+    axes[1, 1].scatter(fluo, pres, c=idx, marker="+")
+    axes[1, 1].set_title("Fluorometer (volts)")
 
-    axes[0,0].set_ylabel('CTDPRES')
-    axes[1,0].set_ylabel('CTDPRES')
+    axes[0, 0].set_ylabel("CTDPRES")
+    axes[1, 0].set_ylabel("CTDPRES")
 
     plt.tight_layout()
     plt.gca().invert_yaxis()
-    cbar = plt.colorbar(a, ax=axes.ravel().tolist())    #   Branch colorbar over rows
-    tick_inds = cbar.get_ticks().astype(int)            #   Start assigning station ticks
+    cbar = plt.colorbar(a, ax=axes.ravel().tolist())  #   Branch colorbar over rows
+    tick_inds = cbar.get_ticks().astype(int)  #   Start assigning station ticks
     cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
     cbar.ax.set_yticklabels(uniques[tick_inds])
     cbar.ax.set_title("Station")
 
     return fig
 
-def residual_3(x1, x2, xr, stn, f_out=None
-):
+
+def residual_3(x1, x2, xr, stn, f_out=None):
     """
     Visualize Δ Τ1 and ref, T2 and ref, T1 and T2 (or cond, or SBE43 and RINKO vs winkler).
     Intended for 5 stations or more.
@@ -331,105 +341,95 @@ def residual_3(x1, x2, xr, stn, f_out=None
     """
     idx, uniques = pd.factorize(stn)
 
-    delX1r = xr - x1    #   Δ = ref - meas, consistent with other methods in ctdcal
+    delX1r = xr - x1  #   Δ = ref - meas, consistent with other methods in ctdcal
     delX2r = xr - x2
     delX12 = x2 - x1
     fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    ax.set_xlabel('Reference - Primary')
-    ax.set_ylabel('Reference - Secondary')
-    ax.set_zlabel('Primary - Secondary')
+    ax = fig.add_subplot(projection="3d")
+    ax.set_xlabel("Reference - Primary")
+    ax.set_ylabel("Reference - Secondary")
+    ax.set_zlabel("Primary - Secondary")
     ax.set_ylim(-0.5, 0.5)
     ax.set_xlim(-0.5, 0.5)
     ax.set_zlim(-0.5, 0.5)
-    sc = ax.scatter(delX1r, delX2r, delX12, c=idx, marker = '+')
+    sc = ax.scatter(delX1r, delX2r, delX12, c=idx, marker="+")
     if len(uniques > 4):
         cbar = plt.colorbar(sc, ax=ax, pad=0.15)  # set cbar ticks to station names
-        tick_locator = ticker.MaxNLocator(nbins=5)  #   Set 5 bins, 
+        tick_locator = ticker.MaxNLocator(nbins=5)  #   Set 5 bins,
         cbar.locator = tick_locator
         cbar.update_ticks()
-        cbar.ax.set_yticklabels(uniques[0:-1:int(len(uniques)/5)])
+        cbar.ax.set_yticklabels(uniques[0 : -1 : int(len(uniques) / 5)])
 
     return _save_fig(ax, f_out)
 
-def residual_bars(
 
-):
+def residual_bars():
     """
     Take the absolute sum of the residuals for the given params for given SSSCC
     """
 
-def residual_hist(
 
-):
+def residual_hist():
     """
     Count the residuals within a specific range (A05 2020 example).
     """
 
-def residual_depth_bar(
 
-):
+def residual_depth_bar():
     """
     Bin data by depth of size X and stack bars of SSSCC for that depth
     """
 
-def residual_btl_scatter(
 
-):
+def residual_btl_scatter():
     """
     Take the residuals for individual bottles of each cast and plot against depth (color code btl#/SSSCC)
     """
 
-def TC_residual_corr(
 
-):
+def TC_residual_corr():
     """
     Scatter of TX vs CX residuals, linear fit line w/ statistics
     """
 
-def sensor_drift_plot(
 
-):
+def sensor_drift_plot():
     """
     Scatter of residuals from first of SSSCC sublist, and last of SSSCC sublist
     """
 
-def autosal_offset(
 
-):
+def autosal_offset():
     """
     For all SSSCC provided, do a scatter of the autosal offset applied to each run (individual files; A05 2020 example).
     """
 
-def pressure_offset_vis(
 
-):
+def pressure_offset_vis():
     """
     For all SSSCC provided, do a scatter of the SBE9+ on-deck pre- vs post-cast pressures. Include dotted line as a "healthy" offset boundary.
     """
 
-def btl_fits_plot(
-):
+
+def btl_fits_plot():
     """
     Plot TX vs depth before and after fitting from the btl files. Include coefs in title.
     """
 
-def interpolate_ssscc(
 
-):
+def interpolate_ssscc():
     """
     Plot param vs depth, calculating distance between SSSCC and interpolating between them.
     """
 
-def ssscc_geo(
 
-):
+def ssscc_geo():
     """
     Plot station locations, with SSSCC and depth labels
     """
 
-def section_plot(df, varname="CTDSAL"
-):
+
+def section_plot(df, varname="CTDSAL"):
     """
     Scatter plot of a desired variable against section distance for a bottle file
 
@@ -442,7 +442,7 @@ def section_plot(df, varname="CTDSAL"
 
     """
     #   Create section distance column
-    x   = df.LATITUDE.diff()
+    x = df.LATITUDE.diff()
     idx = x[x != 0.0].index.tolist()
     df["dist"] = np.nan
     for i in idx:
@@ -450,21 +450,27 @@ def section_plot(df, varname="CTDSAL"
             df["dist"].iloc[i] = 0.0
             val_add = 0.0
         else:
-            df["dist"].iloc[i] = haversine(
-            df.LATITUDE.iloc[i-1],
-            df.LONGITUDE.iloc[i-1],
-            df.LATITUDE.iloc[i],
-            df.LONGITUDE.iloc[i]
-        ) + val_add     #   Uses last assignment
-        val_add = df["dist"].iloc[i]   #       Define new value to add for the beginning of the next iteration
-    df["dist"].fillna(method="ffill", inplace=True) #   Forward fill the nans
+            df["dist"].iloc[i] = (
+                haversine(
+                    df.LATITUDE.iloc[i - 1],
+                    df.LONGITUDE.iloc[i - 1],
+                    df.LATITUDE.iloc[i],
+                    df.LONGITUDE.iloc[i],
+                )
+                + val_add
+            )  #   Uses last assignment
+        val_add = df["dist"].iloc[
+            i
+        ]  #       Define new value to add for the beginning of the next iteration
+    df["dist"].fillna(method="ffill", inplace=True)  #   Forward fill the nans
 
     plt.figure(figsize=(7, 6))
     ax = plt.axes()
-    a  = ax.scatter(df["dist"], df["CTDPRS"], c=df[varname])
+    a = ax.scatter(df["dist"], df["CTDPRS"], c=df[varname])
     plt.colorbar(a, ax=ax)
-    plt.fill_between(df["dist"],df["DEPTH"], df["DEPTH"].max()+200,
-        interpolate=True, color='gray')
+    plt.fill_between(
+        df["dist"], df["DEPTH"], df["DEPTH"].max() + 200, interpolate=True, color="gray"
+    )
     plt.tight_layout()
     plt.gca().invert_yaxis()
     plt.ylabel("CTDPRES")
@@ -473,23 +479,20 @@ def section_plot(df, varname="CTDSAL"
     #   TODO: Allow "ignore station" list
     #   TODO: Allow interpolation scheme between points, with iso-param lines?
 
-def plot_bio(
 
-):
+def plot_bio():
     """
     Depth plot of biologically-important sensors: TS, Fluor, Xmiss, Oxy
     """
 
-def corr(
 
-):
+def corr():
     """
     Create color-coded correlation matrix between CTD parameters
     """
 
-def TS_route(
 
-):
+def TS_route():
     """
     Plot temperature vs salinity, colored by depth, for individual SSSCCs.
     """

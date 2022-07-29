@@ -25,7 +25,7 @@ from . import get_ctdcal_config
 
 handler = logging.StreamHandler()
 handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
-logfile = logging.FileHandler('ctdcal.log')
+logfile = logging.FileHandler("ctdcal.log")
 logfile.addFilter(logging.Filter("ctdcal"))
 FORMAT = "%(funcName)s: %(message)s"
 logging.basicConfig(
@@ -39,6 +39,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 cfg = get_ctdcal_config()
 
+
 @click.group()
 def cli():
     """The ctdcal command creates and manipulates data directories
@@ -49,7 +50,12 @@ def cli():
 
 
 @cli.command()
-@click.option('-r', '--rebuild', default = 0, help = "Option to save the current /data folder and rebuild from scratch. 0 (default) = No duplication. 1 = Fresh data folder. 2 = Copy raw only. 3 = Copy all non-processed files.")
+@click.option(
+    "-r",
+    "--rebuild",
+    default=0,
+    help="Option to save the current /data folder and rebuild from scratch. 0 (default) = No duplication. 1 = Fresh data folder. 2 = Copy raw only. 3 = Copy all non-processed files.",
+)
 def init(rebuild=0):
     """Setup data folder with appropriate subfolders"""
 
@@ -57,6 +63,7 @@ def init(rebuild=0):
 
     if rebuild != 0:
         import os
+
         source = "data/"
         target = "".join(map(str, time.localtime()[0:6])) + "/"
         log.info(f"Storing data within {target}")
@@ -67,32 +74,40 @@ def init(rebuild=0):
         if rebuild == 2:
             if sub_dir == "data/raw/":
                 log.info(f"Duplicating raw data only")
-                shutil.copytree(target+'/raw',source+'raw')
+                shutil.copytree(target + "/raw", source + "raw")
             else:
                 Path(sub_dir).mkdir(parents=True)
         elif rebuild == 3:
-            ignore_csv = lambda d, files: [f for f in files if os.path.isfile(os.path.join(d, f)) and f[-4:] == '.csv']
+            ignore_csv = lambda d, files: [
+                f
+                for f in files
+                if os.path.isfile(os.path.join(d, f)) and f[-4:] == ".csv"
+            ]
             if sub_dir == "data/ssscc/":
                 log.info(f"Duplicating all data for a fresh run")
-                shutil.copytree(target+'/ssscc',source+'ssscc')
-                shutil.copy2(target+'ssscc.csv',source+'ssscc.csv') #   Also copy ssscc file in parent
+                shutil.copytree(target + "/ssscc", source + "ssscc")
+                shutil.copy2(
+                    target + "ssscc.csv", source + "ssscc.csv"
+                )  #   Also copy ssscc file in parent
             elif sub_dir == "data/raw/":
-                log.info('Getting raw folder...')
-                shutil.copytree(target+'/raw',source+'raw')
+                log.info("Getting raw folder...")
+                shutil.copytree(target + "/raw", source + "raw")
             elif sub_dir == "data/salt/":
-                log.info('Getting unprocessed salt files...')
-                shutil.copytree(target+'/salt',source+'salt', ignore=ignore_csv)
+                log.info("Getting unprocessed salt files...")
+                shutil.copytree(target + "/salt", source + "salt", ignore=ignore_csv)
             elif sub_dir == "data/reft/":
-                log.info('Getting unprocessed reference temperature files...')
-                shutil.copytree(target+'/reft',source+'reft', ignore=ignore_csv)
+                log.info("Getting unprocessed reference temperature files...")
+                shutil.copytree(target + "/reft", source + "reft", ignore=ignore_csv)
             elif sub_dir == "data/oxygen/":
-                log.info('Getting oxygen files...')
-                shutil.copytree(target+'/oxygen',source+'oxygen')
+                log.info("Getting oxygen files...")
+                shutil.copytree(target + "/oxygen", source + "oxygen")
             elif sub_dir == "data/logs/":
-                log.info('Getting core logs...')
+                log.info("Getting core logs...")
                 Path(sub_dir).mkdir(parents=True)
-                shutil.copy2(target+'/logs/manual_depth_log.csv',
-                source+'logs/manual_depth_log.csv')
+                shutil.copy2(
+                    target + "/logs/manual_depth_log.csv",
+                    source + "logs/manual_depth_log.csv",
+                )
             else:
                 Path(sub_dir).mkdir(parents=True)
         else:
@@ -100,7 +115,8 @@ def init(rebuild=0):
 
     shutil.copy2("fit_coefs.yaml", "./data/logs/fit_coefs.yaml")
     shutil.copy2("o2flasks.vol", "./data/oxygen/o2flasks.vol")
-    log.info('All data directories successfully created')
+    log.info("All data directories successfully created")
+
 
 @cli.command("import")  # click workaround to get a command named 'import'
 def import_data():
@@ -130,13 +146,15 @@ def process(group, type):
 
     t = time.time()
     log.info(
-        "******* New "+
-        group+
-        " run beginning at: "+
-        time.strftime('%m-%d %H:%M:%S')+
-        " *******\n")
+        "******* New "
+        + group
+        + " run beginning at: "
+        + time.strftime("%m-%d %H:%M:%S")
+        + " *******\n"
+    )
     if group == "ODF":
         from .scripts.odf_process_all import odf_process_all
+
         odf_process_all()
     elif group == "PMEL":
         # pmel_process()
@@ -146,7 +164,14 @@ def process(group, type):
         pass
 
     elapsed = time.time() - t
-    log.info("Processing complete: " + str(floor(elapsed/60)) + " minutes and " + str(floor(elapsed % 60)) + " seconds.\n")
+    log.info(
+        "Processing complete: "
+        + str(floor(elapsed / 60))
+        + " minutes and "
+        + str(floor(elapsed % 60))
+        + " seconds.\n"
+    )
+
 
 @cli.command()
 def process_bio():
@@ -154,15 +179,25 @@ def process_bio():
     P02: "process" for bio casts (need to do new type)
     """
     from math import floor
+
     t = time.time()
     log.info(
-        "******* New ODF run beginning at: "+
-        time.strftime('%m-%d %H:%M:%S')+
-        " *******\n")
+        "******* New ODF run beginning at: "
+        + time.strftime("%m-%d %H:%M:%S")
+        + " *******\n"
+    )
     from .scripts.odf_process_bio import odf_process_bio
+
     odf_process_bio()
-    elapsed = time.time()-t
-    log.info("Processing complete: " + str(floor(elapsed/60)) + " minutes and " + str(floor(elapsed % 60)) + " seconds.\n")
+    elapsed = time.time() - t
+    log.info(
+        "Processing complete: "
+        + str(floor(elapsed / 60))
+        + " minutes and "
+        + str(floor(elapsed % 60))
+        + " seconds.\n"
+    )
+
 
 @cli.command()
 def cruise_report():
@@ -172,6 +207,7 @@ def cruise_report():
 
     cruise_report_residuals()
 
+
 @cli.command()  #   MK
 def qc():  # pragma: no cover
     from importlib import resources
@@ -179,6 +215,7 @@ def qc():  # pragma: no cover
     from bokeh.application.handlers.script import ScriptHandler
     from bokeh.server.server import Server
     from tornado.ioloop import IOLoop
+
     """Launch interactive data flagging web app for QA/QC"""
     io_loop = IOLoop.current()
     with resources.path("ctdcal.tools", "data_qc.py") as fname:
@@ -187,6 +224,7 @@ def qc():  # pragma: no cover
     server.start()
     server.show("/")
     io_loop.start()
+
 
 if __name__ == "__main__":
     cli()
