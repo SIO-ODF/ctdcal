@@ -81,7 +81,7 @@ def import_data():
 @click.option(
     "-g",
     "--group",
-    type=click.Choice(["ODF", "PMEL"], case_sensitive=False),
+    type=click.Choice(["ODF", "PMEL", "WHOI"], case_sensitive=False),
     default="ODF",
 )
 # @click.option(
@@ -101,10 +101,17 @@ def process(group):
         # pmel_process()
         raise NotImplementedError
 
+    elif group == "WHOI":
+        from .scripts.whoi_process_all import whoi_process_all
+
+        whoi_process_all()
+
 
 @cli.command()
 def cruise_report():
     """Generate bottle residual figures for cruise report"""
+
+    #   2022 OSNAP: Need additional figures for report
 
     from .scripts.cruise_report import cruise_report_residuals
 
