@@ -512,6 +512,35 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     # for col in ["CTDPRS", "CTDOXY", "OXYGEN"]:
     #     btl_data[col] = btl_data[col].round(1)
 
+    #   Manually flag station CTDOXY from manual post-cruise qc
+    btl_data["CTDOXY_FLAG_W"].loc[
+        btl_data["SSSCC"] == "00301"
+    ] = 3  #   Entire station seems off
+    btl_data["CTDOXY_FLAG_W"].loc[
+        (btl_data["SSSCC"] == "00701") & (btl_data.BTLNBR == 19)
+    ] = 3  #   High O2 low S, potential mistrip
+    btl_data["CTDOXY_FLAG_W"].loc[
+        (btl_data["SSSCC"] == "01001") & (btl_data.BTLNBR == 28)
+    ] = 3  #   High O2
+    btl_data["CTDOXY_FLAG_W"].loc[
+        (btl_data["SSSCC"] == "01101") & (btl_data.BTLNBR == 28)
+    ] = 3  #   Low O2
+    btl_data["CTDOXY_FLAG_W"].loc[
+        (btl_data["SSSCC"] == "04102") & (btl_data.BTLNBR == 16)
+    ] = 3  #   High O2
+    btl_data["CTDOXY_FLAG_W"].loc[
+        (btl_data["SSSCC"] == "04702") & (btl_data.BTLNBR == 19)
+    ] = 3  #   High O2
+    btl_data["CTDOXY_FLAG_W"].loc[
+        (btl_data["SSSCC"] == "05302") & (btl_data.BTLNBR == 19)
+    ] = 3  #   High O2
+    btl_data["CTDOXY_FLAG_W"].loc[
+        (btl_data["SSSCC"] == "07201") & (btl_data.BTLNBR == 16)
+    ] = 3  #   High O2
+    btl_data["CTDOXY_FLAG_W"].loc[
+        (btl_data["SSSCC"] == "08101") & (btl_data.BTLNBR == 24)
+    ] = 3  #   Low O2
+
     # add depth
     depth_df = pd.read_csv(
         cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
