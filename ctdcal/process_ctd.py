@@ -325,7 +325,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
         )
         if start_samples > fl2:
             start_p = np.average(start_df.iloc[fl2:start_samples])
-        else:   #   P02 stations 02902 and 03802 may not have gotten rinsed between deployments (bio is brief). Same approach to end_p
+        else:  #   P02 stations 02902 and 03802 may not have gotten rinsed between deployments (bio is brief). Same approach to end_p
             start_p = np.average(start_df)
 
     end_samples = len(end_df)
@@ -339,9 +339,11 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
         end_p = np.average(end_df)  # just average whatever there is
 
     # Remove ondeck start and end pressures
-    if stacast == "04003":  #   Logging restarted in the water. Manually assign start_p, use whole cast.
+    if (
+        stacast == "04003"
+    ):  #   Logging restarted in the water. Manually assign start_p, use whole cast.
         start_df = downcast.iloc[0:1]
-        start_p = 0.031     #   From console log
+        start_p = 0.031  #   From console log
     if len(start_df) == 0:
         log.warning("Failed to find starting deck pressure.")
         for n in [1, 2]:
@@ -594,7 +596,11 @@ def make_depth_log(time_df, threshold=80):
             "alt": df.loc[idx_p_max, "ALT"],
         }
     )
-    bottom_df.loc[bottom_df["alt"] > threshold, "alt"] = np.nan # If the alt isn't below threshold, NaN this (will write out as -999). Fix by maintaining manual depth log.
+    bottom_df.loc[
+        bottom_df["alt"] > threshold, "alt"
+    ] = (
+        np.nan
+    )  # If the alt isn't below threshold, NaN this (will write out as -999). Fix by maintaining manual depth log.
     # pandas 1.2.1 ufunc issue workaround with pd.to_numpy()
     bottom_df["DEPTH"] = (
         (
@@ -778,18 +784,18 @@ def export_ct1(df, ssscc_list):
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
-    for ssscc in ssscc_list:   
+    for ssscc in ssscc_list:
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
-        
+
         bad_list = ["01001", "01101", "01201"]  #   P02
         if ssscc in bad_list:
             print(f"Using SBE43 as CTDOXY for {ssscc}")
-        else:   # switch oxygen primary sensor to rinko
+        else:  # switch oxygen primary sensor to rinko
             print(f"Using Rinko as CTDOXY for {ssscc}")
             time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
             time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
-        
+
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
