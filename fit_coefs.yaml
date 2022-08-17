@@ -1,0 +1,58 @@
+t1:
+    ssscc_t1: 
+        P_order: 1
+        T_order: 0
+        zRange: "750:6000"
+    ssscc_t2: 
+        P_order: 1
+        T_order: 0
+        zRange: "1000:6000"
+    ssscc_t3: 
+        P_order: 1
+        T_order: 0
+        zRange: "500:6000"
+c1:
+    ssscc_c1: 
+        P_order: 1
+        T_order: 0
+        C_order: 0
+        zRange: "1000:6000"
+    ssscc_c2:
+        P_order: 2
+        T_order: 0
+        C_order: 1
+        zRange: "900:6000"
+    ssscc_c3:
+        P_order: 2
+        T_order: 0
+        C_order: 1
+        zRange: "900:6000"
+t2:
+    ssscc_t1: 
+        P_order: 1
+        T_order: 0
+        zRange: "750:6000"
+    ssscc_t2: 
+        P_order: 1
+        T_order: 0
+        zRange: "1000:6000"
+    ssscc_t3: 
+        P_order: 2
+        T_order: 0
+        zRange: "750:6000"
+c2:
+    ssscc_c1: 
+        P_order: 1
+        T_order: 0
+        C_order: 0
+        zRange: "1000:6000"
+    ssscc_c2:
+        P_order: 1
+        T_order: 1
+        C_order: 0
+        zRange: "1000:6000"
+    ssscc_c3:
+        P_order: 2
+        T_order: 0
+        C_order: 1
+        zRange: "1100:6000"

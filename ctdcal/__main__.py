@@ -3,6 +3,7 @@ from importlib import resources
 from pathlib import Path
 
 import click
+import time
 from bokeh.application import Application
 from bokeh.application.handlers.script import ScriptHandler
 from bokeh.server.server import Server
@@ -56,13 +57,72 @@ def cli(debug):
 
 
 @cli.command()
-def init():
+@click.option(
+    "-r",
+    "--rebuild",
+    default=0,
+    help="Option to save the current /data folder and rebuild from scratch. 0 (default) = No duplication. 1 = Fresh data folder. 2 = Copy raw only. 3 = Copy all non-processed files.",
+)
+def init(rebuild=0):
     """Setup data folder with appropriate subfolders"""
 
-    log.info(f"Building default /data/ directories: \n {*cfg.dirs.keys(),}")
+    import shutil
 
+    if rebuild != 0:
+        import os
+
+        source = "data/"
+        target = "".join(map(str, time.localtime()[0:6])) + "/"
+        log.info(f"Storing data within {target}")
+        os.rename(source, target)
+
+    log.info(f"Building default /data/ directories: \n {*cfg.dirs.keys(),}")
     for sub_dir in cfg.dirs.values():
-        Path(sub_dir).mkdir(parents=True)
+        if rebuild == 2:
+            if sub_dir == "data/raw/":
+                log.info(f"Duplicating raw data only")
+                shutil.copytree(target + "/raw", source + "raw")
+            else:
+                Path(sub_dir).mkdir(parents=True)
+        elif rebuild == 3:
+            ignore_csv = lambda d, files: [
+                f
+                for f in files
+                if os.path.isfile(os.path.join(d, f)) and f[-4:] == ".csv"
+            ]
+            if sub_dir == "data/ssscc/":
+                log.info(f"Duplicating all data for a fresh run")
+                shutil.copytree(target + "/ssscc", source + "ssscc")
+                shutil.copy2(
+                    target + "ssscc.csv", source + "ssscc.csv"
+                )  #   Also copy ssscc file in parent
+            elif sub_dir == "data/raw/":
+                log.info("Getting raw folder...")
+                shutil.copytree(target + "/raw", source + "raw")
+            elif sub_dir == "data/salt/":
+                log.info("Getting unprocessed salt files...")
+                shutil.copytree(target + "/salt", source + "salt", ignore=ignore_csv)
+            elif sub_dir == "data/reft/":
+                log.info("Getting unprocessed reference temperature files...")
+                shutil.copytree(target + "/reft", source + "reft", ignore=ignore_csv)
+            elif sub_dir == "data/oxygen/":
+                log.info("Getting oxygen files...")
+                shutil.copytree(target + "/oxygen", source + "oxygen")
+            elif sub_dir == "data/logs/":
+                log.info("Getting core logs...")
+                Path(sub_dir).mkdir(parents=True)
+                shutil.copy2(
+                    target + "/logs/manual_depth_log.csv",
+                    source + "logs/manual_depth_log.csv",
+                )
+            else:
+                Path(sub_dir).mkdir(parents=True)
+        else:
+            Path(sub_dir).mkdir(parents=True)
+
+    shutil.copy2("fit_coefs.yaml", "./data/logs/fit_coefs.yaml")
+    shutil.copy2("o2flasks.vol", "./data/oxygen/o2flasks.vol")
+    log.info("All data directories successfully created")
 
 
 @cli.command("import")  # click workaround to get a command named 'import'
