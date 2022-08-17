@@ -148,11 +148,22 @@ def import_data():
 # )
 def process(group):
     """Process data using a particular group's methodology"""
+    from math import floor
+
+    t = time.time()
+    log.info(
+        "******* New "
+        + group
+        + " run beginning at: "
+        + time.strftime("%m-%d %H:%M:%S")
+        + " *******\n"
+    )
 
     if group == "ODF":
         from .scripts.odf_process_all import odf_process_all
 
         odf_process_all()
+
     elif group == "PMEL":
         # pmel_process()
         raise NotImplementedError
@@ -161,6 +172,15 @@ def process(group):
         from .scripts.whoi_process_all import whoi_process_all
 
         whoi_process_all()
+
+    elapsed = time.time() - t
+    log.info(
+        "Processing complete: "
+        + str(floor(elapsed / 60))
+        + " minutes and "
+        + str(floor(elapsed % 60))
+        + " seconds.\n"
+    )
 
 
 @cli.command()
