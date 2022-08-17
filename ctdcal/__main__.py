@@ -11,30 +11,26 @@ from tornado.ioloop import IOLoop
 
 from . import get_ctdcal_config
 
-# Rich handling
-# from rich.logging import RichHandler
-# from rich.console import Console
-# handler = logging.StreamHandler()
-# handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
-# FORMAT = "%(funcName)s: %(message)s"
-# logging.basicConfig(
-#     level="INFO",
-#     format=FORMAT,
-#     datefmt="[%X]",
-#     handlers=[handler, RichHandler(console=Console(stderr=True))],
-# )
+## logging settings
+# terminal output
+stream = logging.StreamHandler()
+stream.setLevel(logging.WARNING)
+stream.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
 
-# log = logging.getLogger(__name__)
+# ctdcal.log output
+logfile_FORMAT = "%(asctime)s | %(funcName)s |  %(levelname)s: %(message)s"
+logfile = logging.FileHandler("ctdcal.log")
+logfile.setLevel(logging.NOTSET)
+logfile.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
+logfile.setFormatter(logging.Formatter(logfile_FORMAT))
 
-handler = logging.StreamHandler()
-handler.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
-FORMAT = "%(funcName)s: %(message)s"
+# global configs
+FORMAT = "%(funcName)s: %(levelname)s: %(message)s"
 logging.basicConfig(
     level=logging.NOTSET,
     format=FORMAT,
     datefmt="[%X]",
-    handlers=[handler],
-    # handlers=[RichHandler(console=Console(stderr=True))],
+    handlers=[stream, logfile],
 )
 
 log = logging.getLogger(__name__)
