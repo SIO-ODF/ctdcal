@@ -17,6 +17,7 @@ from .. import (
     process_bottle,
     process_ctd,
     rinko,
+    salts_io,
 )
 
 import logging
@@ -60,7 +61,8 @@ def whoi_process_all():
     #   Portasal files will require a new input method
     #   Unlikely that standards will be able to be run before and after a run
 
-    odf_io.process_salts(ssscc_list)
+    # odf_io.process_salts(ssscc_list)
+    salts_io.osnap_salts(ssscc_list)
 
     # generate reftemp .csv files
     #   NO SBE35: Perhaps flag by sensor differences from each other (flagging primary only?)
