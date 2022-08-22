@@ -268,7 +268,7 @@ def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
     return filter_df
 
 
-def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
+def remove_on_deck(df, stacast, group="ODF", cond_startup=20.0, log_file=None):
     """
     Find and remove times when rosette is on deck.
     Optionally log average pressure at start and end of cast.
@@ -301,65 +301,70 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     downcast = df.iloc[: (df["CTDPRS"].argmax() + 1)]
     upcast = df.iloc[(df["CTDPRS"].argmax() + 1) :]
 
-    # Search each half of df for minimum conductivity
-    # threshold to identify when rosette is out of water
-    start_df = downcast.loc[
-        (downcast[cfg.column["c1"]] < cond_startup)
-        & (downcast[cfg.column["c2"]] < cond_startup),
-        cfg.column["p"],
-    ]
-    end_df = upcast.loc[
-        (upcast[cfg.column["c1"]] < cond_startup)
-        & (upcast[cfg.column["c2"]] < cond_startup),
-        cfg.column["p"],
-    ]
+    #   OSNAP AR69-03 the cast begins and ends in the water, but still may want pressure details
+    if group == "ODF":
+        # Search each half of df for minimum conductivity
+        # threshold to identify when rosette is out of water
+        start_df = downcast.loc[
+            (downcast[cfg.column["c1"]] < cond_startup)
+            & (downcast[cfg.column["c2"]] < cond_startup),
+            cfg.column["p"],
+        ]
+        end_df = upcast.loc[
+            (upcast[cfg.column["c1"]] < cond_startup)
+            & (upcast[cfg.column["c2"]] < cond_startup),
+            cfg.column["p"],
+        ]
 
-    # Evaluate starting and ending pressures
-    start_samples = len(start_df)
-    if start_samples > time_delay:
-        start_p = np.average(start_df.iloc[fl2 : (start_samples - time_delay)])
-    else:
-        start_seconds = start_samples / fl
-        log.warning(
-            f"{stacast}: Only {start_seconds:0.1f} seconds of start pressure averaged."
-        )
-        start_p = np.average(start_df.iloc[fl2:start_samples])
+        # Evaluate starting and ending pressures
+        start_samples = len(start_df)
+        if start_samples > time_delay:
+            start_p = np.average(start_df.iloc[fl2 : (start_samples - time_delay)])
+        else:
+            start_seconds = start_samples / fl
+            log.warning(
+                f"{stacast}: Only {start_seconds:0.1f} seconds of start pressure averaged."
+            )
+            start_p = np.average(start_df.iloc[fl2:start_samples])
 
-    end_samples = len(end_df)
-    if end_samples > time_delay:
-        end_p = np.average(end_df.iloc[(time_delay):])
-    else:
-        end_seconds = end_samples / fl
-        log.warning(
-            f"{stacast}: Only {end_seconds:0.1f} seconds of end pressure averaged."
-        )
-        end_p = np.average(end_df)  # just average whatever there is
+        end_samples = len(end_df)
+        if end_samples > time_delay:
+            end_p = np.average(end_df.iloc[(time_delay):])
+        else:
+            end_seconds = end_samples / fl
+            log.warning(
+                f"{stacast}: Only {end_seconds:0.1f} seconds of end pressure averaged."
+            )
+            end_p = np.average(end_df)  # just average whatever there is
 
-    # Remove ondeck start and end pressures
-    if len(start_df) == 0:
-        log.warning("Failed to find starting deck pressure.")
-        for n in [1, 2]:
-            try:
-                (downcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
-            except KeyError:
-                log.warning(
-                    f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
-                )
-        breakpoint()
-    if len(end_df) == 0:
-        log.warning("Failed to find ending deck pressure.")
-        for n in [1, 2]:
-            try:
-                (upcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
-            except KeyError:
-                log.warning(
-                    f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
-                )
-        breakpoint()
-    # MK (3/23/20, 11am):
-    # auto end calculation failed bc cond2 is still >30
-    # may have to do manually or just use cond1 for station 00901
-    trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
+        # Remove ondeck start and end pressures
+        if len(start_df) == 0:
+            log.warning("Failed to find starting deck pressure.")
+            for n in [1, 2]:
+                try:
+                    (downcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
+                except KeyError:
+                    log.warning(
+                        f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
+                    )
+            breakpoint()
+        if len(end_df) == 0:
+            log.warning("Failed to find ending deck pressure.")
+            for n in [1, 2]:
+                try:
+                    (upcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
+                except KeyError:
+                    log.warning(
+                        f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
+                    )
+            breakpoint()
+        trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
+
+    elif group == "WHOI":
+        trimmed_df = df
+        start_p = trimmed_df[cfg.column["p"]].iloc[0]
+        end_p = trimmed_df[cfg.column["p"]].iloc[-1]
+        log.info("Start and end water pressures acquired for logging purposes.")
 
     # Log ondeck pressures
     if log_file is not None:
