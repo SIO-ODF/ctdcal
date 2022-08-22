@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from . import get_ctdcal_config
+from ctdcal import get_ctdcal_config
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -32,15 +32,17 @@ def sdl_loader(filename):
         sdl["BottleLabel"].str.contains("P")
     ]  #   Remove rows associated with standard (P coming from IAPSO batch)
     sdl = sdl[sdl["BottleLabel"].str.contains("P") == False]
+    sdl = sdl[sdl["Comments"].isnull() == True]
     sdl[["ID2", "Num"]] = sdl.SampleID.str.split("#", expand=True)
     sdl["SSS"] = sdl.ID2.str[0:3]
-    sdl["CC"] = sdl.ID2.str[3:5]  #   Create SSSCC columns
+    sdl["CC"] = sdl.ID2.str[-2:]  #   Create SSSCC columns. For OSNAP, CC = 01
     to_write = {
         "STNNBR": sdl.SSS,
         "CASTNO": sdl.CC,
         "SAMPNO": sdl.BottleLabel,
-        "BathTEMP": sdl.BathTemperature,
-        "CRavg": sdl.AdjustedRatio,
+        "BathTEMP": 24.0,  #   There is no option to export bath temp with decimals and is occasionally very wrong
+        "CRavg": 2
+        * sdl.AdjustedRatio,  #   SDL writes ratio out as half of what ODF routine does
         "CRraw": sdl.UncorrectedRatio,
         "autosalSAMPNO": sdl.SampleNumber,
         "Unknown": np.nan,
@@ -93,7 +95,7 @@ def sdl_std(saltDF, cut_std, salt_dir=cfg.dirs["salt"], infile="standards.csv"):
     else:  #   Append the standard lines to the standards file. Use current adjusted CR.
         print("Appending new standards to list.")
         std_list = pd.concat([std_list, cut_std], ignore_index=True)
-        std_list = std_list.drop_duplicated(
+        std_list = std_list.drop_duplicates(
             subset="DateTime", keep="first"
         )  #   In case of overlap
         std_list.to_csv(Path(outfile), index=False)
@@ -108,6 +110,7 @@ def sdl_exporter(saltDF, outdir=cfg.dirs["salt"], stn_col="STNNBR", cast_col="CA
     Export salt DataFrame to .csv file. Extra logic is included in the event that
     multiple stations and/or casts are included in a single raw salt file.
     """
+    saltDF = saltDF.drop("index", axis=1)  #   Not needed in written file
     stations = saltDF[stn_col].unique()
     for station in stations:
         stn_salts = saltDF[saltDF[stn_col] == station]
@@ -115,7 +118,7 @@ def sdl_exporter(saltDF, outdir=cfg.dirs["salt"], stn_col="STNNBR", cast_col="CA
         for cast in casts:
             stn_cast_salts = stn_salts[stn_salts[cast_col] == cast].copy()
             stn_cast_salts.dropna(axis=1, how="all", inplace=True)  # drop empty columns
-            outfile = Path(outdir) / f"{station:03.0f}{cast:02.0f}_salts.csv"  # SSSCC_*
+            outfile = Path(outdir) / f"{station}{cast}_salts.csv"  # SSSCC_*
             if outfile.exists():
                 log.info(str(outfile) + " already exists...skipping")
                 continue
@@ -125,6 +128,11 @@ def sdl_exporter(saltDF, outdir=cfg.dirs["salt"], stn_col="STNNBR", cast_col="CA
 def osnap_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
     """
     Basically a copy of odf_io.proces_salts using modified loader and standardization functions.
+    * Read in file with .dat extension
+    * Adjust the conductivity ratio by a flat correction
+        * If no conductivity ratio is in the file, read the last one (many casts per day)
+    * Calculate SALNTY with 2002 software exports
+    * Write the file, dropping any unnessesary columns
 
     Master salt processing function. Load in salt files for given station/cast list,
     calculate salinity, and export to .csv files.
@@ -143,12 +151,14 @@ def osnap_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
             continue
         else:
             try:
-                saltDF, cut_std = sdl_loader(Path(salt_dir) / ssscc)
+                ext = ".dat"
+                saltDF, cut_std = sdl_loader(Path(str(Path(salt_dir) / ssscc) + ext))
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue
             saltDF = sdl_std(saltDF, cut_std)
+            #   The ODF autosal writeout doubles the CRavg. Here we don't have to divide by 2.
             saltDF["SALNTY"] = gsw.SP_salinometer(
-                (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
+                (saltDF["CRavg"] / 2), saltDF["BathTEMP"]
             )  # .round(4)
             sdl_exporter(saltDF, salt_dir)
