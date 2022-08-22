@@ -18,9 +18,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import oxy_fitting as oxy_fitting
+from ctdcal import flagging as flagging
+from ctdcal import get_ctdcal_config
+from ctdcal import oxy_fitting as oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -183,6 +183,7 @@ def load_all_btl_files(ssscc_list, cols=None):
         btl_file = cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl"
         btl_data = _load_btl_data(btl_file, cols)
 
+        #   Nonexistant for OSNAP
         ### load REFT data
         reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
         try:
@@ -198,7 +199,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
         ### load REFC data
-        refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
+        refc_file = cfg.dirs["salt"] + ssscc + "01_salts.csv"
         try:
             refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
         except FileNotFoundError:
@@ -242,7 +243,9 @@ def load_all_btl_files(ssscc_list, cols=None):
 
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
-        btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
+        btl_data = pd.merge(
+            btl_data, reft_data, on="btl_fire_num", how="outer"
+        )  #   No REFT
         btl_data = pd.merge(
             btl_data,
             refc_data,

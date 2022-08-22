@@ -5,11 +5,11 @@ import logging
 import numpy as np
 import pandas as pd
 
-from . import get_ctdcal_config
-from . import equations_sbe as sbe_eq
-from . import process_bottle as btl
-from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
+from ctdcal import get_ctdcal_config
+from ctdcal import equations_sbe as sbe_eq
+from ctdcal import process_bottle as btl
+from ctdcal import process_ctd as process_ctd
+from ctdcal import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -104,6 +104,18 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    "67": {
+        "short_name": "TURBIDITY",
+        "long_name": "Turbidity Meter",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
+    "19": {
+        "short_name": "FLUOR_CDOM",
+        "long_name": "FluoroWetlabCDOM_Sensor",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
 }
 
 
@@ -124,8 +136,8 @@ def hex_to_ctd(ssscc_list):
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
-            hexFile = cfg.dirs["raw"] + ssscc + ".hex"
-            xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
+            hexFile = cfg.dirs["raw"] + "ar69-03_" + ssscc + ".hex"
+            xmlconFile = cfg.dirs["raw"] + "ar69-03_" + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
@@ -133,7 +145,7 @@ def hex_to_ctd(ssscc_list):
     return True
 
 
-def make_time_files(ssscc_list):
+def make_time_files(ssscc_list, group="ODF"):
     log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
@@ -150,6 +162,7 @@ def make_time_files(ssscc_list):
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
                 ssscc,
+                group,
                 log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
             )
 
@@ -225,6 +238,15 @@ def make_btl_mean(ssscc_list):
             add_header = not Path(fname).exists()  # add header iff file doesn't exist
             with open(fname, "a") as f:
                 bot_df.to_csv(f, mode="a", header=add_header, index=False)
+
+            #   Bottles 14, 15, 16, 17 are not mounted on OSNAP CTD
+            #   Entry number 14 -> 18 (add 4)
+            if len(mean_df) > 13:
+                mean_df.btl_fire_num.iloc[13:] = mean_df.btl_fire_num.iloc[13:] + 4
+
+            if ssscc == "001":
+                #   Bottle 13 was fired as 17, which is not mounted. Remove.
+                mean_df = mean_df.drop(index=13)
 
             mean_df.to_pickle(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl")
 

@@ -8,11 +8,11 @@ import pandas as pd
 from scipy.ndimage.interpolation import shift
 import yaml
 
-from . import convert as convert
-from . import ctd_plots as ctd_plots
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import process_ctd as process_ctd
+from ctdcal import convert as convert
+from ctdcal import ctd_plots as ctd_plots
+from ctdcal import flagging as flagging
+from ctdcal import get_ctdcal_config
+from ctdcal import process_ctd as process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
