@@ -199,7 +199,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
         ### load REFC data
-        refc_file = cfg.dirs["salt"] + ssscc + "01_salts.csv"
+        refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
         try:
             refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
         except FileNotFoundError:
