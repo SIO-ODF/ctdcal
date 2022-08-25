@@ -50,22 +50,32 @@ def sdl_loader(filename):
         if not commented.empty:
             micro = commented[commented.Comments.str.contains("cat")]
             if not micro.empty:
+                #   Cut out the columns they don't want
                 micro = pd.DataFrame.from_dict(
                     {
-                        "STNNBR": commented.SSS.astype,
-                        "BOTTLE": commented.BottleLabel.astype(int),
+                        "STNNBR": micro.SSS,
+                        "BOTTLE": micro.BottleLabel.astype(int),
                         "CRavg": 2
-                        * commented.AdjustedRatio,  #   SDL writes ratio out as half of what ODF routine does
-                        "CR_unadjusted": 2 * commented.UncorrectedRatio,
-                        "EndTime": commented.DateTime,
-                        "Comment": commented.Comments,
+                        * micro.AdjustedRatio,  #   SDL writes ratio out as half of what ODF routine does
+                        "CR_unadjusted": 2 * micro.UncorrectedRatio,
+                        "EndTime": micro.DateTime,
+                        "Comment": micro.Comments,
                     }
                 )
-                micro.to_csv(
-                    Path(cfg.dirs["salt"])
-                    / f"{micro.STNNBR.iloc[0]}_microcat_salt.csv",
-                    index=False,
-                )
+                if cut_std.empty:
+                    #   Need to pass through sdl_std
+                    micro.to_csv(
+                        Path(cfg.dirs["salt"])
+                        / f"microcat_salt_to_correct_{micro.STNNBR.iloc[0]}.csv",
+                        index=False,
+                    )
+                else:
+                    micro["SALNTY"] = gsw.SP_salinometer((micro["CRavg"] / 2), 24)
+                    micro.to_csv(
+                        Path(cfg.dirs["salt"])
+                        / f"microcat_salt_{micro.STNNBR.iloc[0]}.csv",
+                        index=False,
+                    )
 
         sdl = sdl[
             sdl["Comments"].isnull() == True
@@ -171,11 +181,25 @@ def sdl_exporter(saltDF, outdir=cfg.dirs["salt"], stn_col="STNNBR", cast_col="CA
         for cast in casts:
             stn_cast_salts = stn_salts[stn_salts[cast_col] == cast].copy()
             stn_cast_salts.dropna(axis=1, how="all", inplace=True)  # drop empty columns
-            outfile = Path(outdir) / f"{station}{cast}_salts.csv"  # SSSCC_*
+            outfile = Path(outdir) / f"{station}_salts.csv"  # SSS
             if outfile.exists():
                 log.info(str(outfile) + " already exists...skipping")
                 continue
             stn_cast_salts.to_csv(outfile, index=False)
+
+
+def osnap_microcat(salt_dir=cfg.dirs["salt"]):
+    import glob
+
+    microcat_list = glob.glob(salt_dir + "microcat_salt_to_correct*")
+    if len(microcat_list) != 0:
+        for microcat in microcat_list:
+            saltDF = pd.read_csv(microcat)
+            no_std = pd.DataFrame()
+            saltDF = sdl_std(saltDF, no_std)  #   Apply standard offset
+            saltDF["SALNTY"] = gsw.SP_salinometer((saltDF["CRavg"] / 2), 24)
+            outfile = str(Path(salt_dir)) + "/microcat_salt_" + microcat[-7:-4] + ".csv"
+            saltDF.to_csv(outfile, index=False)
 
 
 def osnap_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
@@ -215,3 +239,4 @@ def osnap_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
                 (saltDF["CRavg"] / 2), saltDF["BathTEMP"]
             )  # .round(4)
             sdl_exporter(saltDF, salt_dir)
+    osnap_microcat()  #   Correct CRavg and add SALNTY for any microcats
