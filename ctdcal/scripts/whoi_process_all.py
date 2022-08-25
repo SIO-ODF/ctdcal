@@ -22,6 +22,7 @@ from ctdcal import (
 
 import logging
 
+cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
@@ -73,6 +74,35 @@ def whoi_process_all(group="WHOI"):
 
     #   Calibrate conductivity
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
+
+    try:
+        import xarray as xr
+
+        outfile = cfg.dirs["pressure"] + "bottle_data"
+        save_cols = [
+            "btl_fire_num",
+            "CTDPRS",
+            "CTDTMP1",
+            "CTDTMP2",
+            "CTDTMP_FLAG_W",
+            "CTDCOND1",
+            "CTDCOND2",
+            "CTDSAL",
+            "CTDSAL_FLAG_W",
+            "CTDOXY1",
+            "ALT",
+            "CTDFLUOR",
+            "TURBIDITY",
+            "CTDXMISS",
+            "FLUOR_CDOM",
+            "GPSLAT",
+            "GPSLON",
+        ]
+        cond_btl_data = btl_data_all[save_cols].to_xarray()
+        cond_btl_data.to_netcdf(path=outfile + ".nc")
+        btl_data_all[save_cols].to_csv(outfile + ".csv")
+    except:
+        pass
 
     # calculate params needs for oxy calibration
     #   OXY titration data will be rare (2-4 points per cast), so fits may be looser
