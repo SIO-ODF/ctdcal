@@ -5,7 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+from ctdcal import get_ctdcal_config
 
+cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
@@ -331,7 +333,7 @@ def residual_3(x1, x2, xr, stn, f_out=None):
     return _save_fig(ax, f_out)
 
 
-def section_bottle_plot(df, varname="CTDSAL"):
+def section_bottle_plot(df, varname="CTDSAL", f_out=None, cmap="viridis"):
     """
     Scatter plot of a desired variable against section distance for a bottle file.
 
@@ -343,8 +345,13 @@ def section_bottle_plot(df, varname="CTDSAL"):
         String of variable intended to be plotted. Defaults to CTDSAL.
 
     """
+    from math import ceil
+
+    depth_max = ceil(df.DEPTH.max() / 500) * 500
+
     #   Create section distance column
     x = df.LATITUDE.diff()
+    x.reset_index(inplace=True, drop=True)
     idx = x[x != 0.0].index.tolist()
     df["dist"] = np.nan
     for i in idx:
@@ -366,17 +373,63 @@ def section_bottle_plot(df, varname="CTDSAL"):
         ]  #       Define new value to add for the beginning of the next iteration
     df["dist"].fillna(method="ffill", inplace=True)  #   Forward fill the nans
 
+    plt.set_cmap(cmap)
     plt.figure(figsize=(7, 6))
-    ax = plt.axes()
-    a = ax.scatter(df["dist"], df["CTDPRS"], c=df[varname])
-    plt.colorbar(a, ax=ax)
-    plt.fill_between(
-        df["dist"], df["DEPTH"], df["DEPTH"].max() + 200, interpolate=True, color="gray"
-    )
+    fig, ax1 = plt.subplots()
+    plt.fill_between(df["dist"], df["DEPTH"], depth_max, interpolate=True, color="gray")
+    ax1.tricontour(
+        df.dist, df.CTDPRS, df[varname]
+    )  #   Creates the irregularly-spaced bounds for the contour
+    cntr2 = ax1.tricontourf(df.dist, df.CTDPRS, df[varname])  #   Fills in the contour
+    ax1.scatter(df.dist, df.CTDPRS, s=5, color="k", zorder=3)
+    cbar = fig.colorbar(cntr2, ax=ax1)
+
+    plt.ylim(0, depth_max)
+    plt.ylabel("CTDPRS (dbar)")
+    plt.xlabel("Section Distance (km)")
     plt.tight_layout()
     plt.gca().invert_yaxis()
-    plt.ylabel("CTDPRES")
-    plt.xlabel("Section Distance")
+
+    return _save_fig(ax1, f_out)
+
+
+def osnap_suite(df):
+
+    #   Section plots with key params for each hydrographic line
+    line1 = [
+        "002",
+        "003",
+        "003",
+        "004",
+        "005",
+        "006",
+        "007",
+        "008",
+        "009",
+        "010",
+        "011",
+        "012",
+        "013",
+        "014",
+        "015",
+        "016",
+        "017",
+        "018",
+        "019",
+        "020",
+        "021",
+    ]
+    plt_btl = df.loc[df.SSSCC.isin(line1)]
+    f_out = cfg.dirs["logs"] + "temp_stations.png"
+    section_bottle_plot(
+        plt_btl, varname="CTDTMP1", f_out=cfg.dirs["logs"] + "CTDTEMP1.png", cmap="RdPu"
+    )
+    section_bottle_plot(
+        plt_btl, varname="CTDSAL", f_out=cfg.dirs["logs"] + "CTDSAL.png"
+    )
+    section_bottle_plot(
+        plt_btl, varname="CTDOXY1", f_out=cfg.dirs["logs"] + "CTDOXY.png"
+    )
 
 
 def osnap_plot_sensor_comparison():

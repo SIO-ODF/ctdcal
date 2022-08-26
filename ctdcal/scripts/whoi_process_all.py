@@ -18,7 +18,10 @@ from ctdcal import (
     process_ctd,
     salts_io,
     flagging,
+    ctd_plots,
 )
+
+import pandas as pd
 
 import logging
 
@@ -78,8 +81,24 @@ def whoi_process_all(group="WHOI"):
     try:
         import xarray as xr
 
+        
+        depth_df = pd.read_csv(
+            cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        ).dropna()
+        manual_depth_df = pd.read_csv(
+            cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+        )
+        full_depth_df = pd.concat([depth_df, manual_depth_df])
+        full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
+        btl_data_all["DEPTH"] = -999
+        for index, row in full_depth_df.iterrows():
+            btl_data_all.loc[btl_data_all["SSSCC"] == row["SSSCC"], "DEPTH"] = int(
+                row["DEPTH"]
+            )
         outfile = cfg.dirs["pressure"] + "bottle_data"
         save_cols = [
+            "GPSLAT",
+            "GPSLON",
             "btl_fire_num",
             "CTDPRS",
             "CTDTMP1",
@@ -95,12 +114,36 @@ def whoi_process_all(group="WHOI"):
             "TURBIDITY",
             "CTDXMISS",
             "FLUOR_CDOM",
-            "GPSLAT",
-            "GPSLON",
         ]
         cond_btl_data = btl_data_all[save_cols].to_xarray()
         cond_btl_data.to_netcdf(path=outfile + ".nc")
         btl_data_all[save_cols].to_csv(outfile + ".csv")
+        print("Exporting continuous .csv files...")
+        # process_ctd.export_ct1(time_data_all, ssscc_list)
+        time_cols = [
+            "GPSLAT",
+            "GPSLON",
+            "CTDPRS",
+            "CTDTMP",
+            "CTDTMP_FLAG_W",
+            "CTDCOND1",
+            "CTDCOND2",
+            "CTDSAL",
+            "CTDSAL_FLAG_W",
+            "CTDOXY",
+            "ALT",
+            "CTDFLUOR",
+            "TURBIDITY",
+            "CTDXMISS",
+            "FLUOR_CDOM",
+        ]
+        for ssscc in ssscc_list:
+            time_out = cfg.dirs["pressure"] + ssscc + "_profile.nc"
+            time_ssscc = time_data_all.loc[time_data_all.SSSCC == ssscc]
+            time_ssscc = time_ssscc[time_cols].to_xarray()
+            time_ssscc.to_netcdf(path=time_out)
+
+        ctd_plots.osnap_suite(btl_data_all)
     except:
         pass
 
