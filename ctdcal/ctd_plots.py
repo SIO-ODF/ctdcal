@@ -420,7 +420,6 @@ def osnap_suite(df):
         "021",
     ]
     plt_btl = df.loc[df.SSSCC.isin(line1)]
-    f_out = cfg.dirs["logs"] + "temp_stations.png"
     section_bottle_plot(
         plt_btl, varname="CTDTMP1", f_out=cfg.dirs["logs"] + "CTDTEMP1.png", cmap="RdPu"
     )
@@ -430,6 +429,7 @@ def osnap_suite(df):
     section_bottle_plot(
         plt_btl, varname="CTDOXY1", f_out=cfg.dirs["logs"] + "CTDOXY.png"
     )
+    osnap_plot_TS(plt_btl, f_out=cfg.dirs["logs"] + "TS.png")
 
 
 def osnap_plot_sensor_comparison():
@@ -455,12 +455,47 @@ def osnap_plot_autosal_residuals():
     pass
 
 
-def osnap_plot_TS():
+def osnap_plot_TS(df, f_out=None):
     """
     Line plot of temperature and salinity for a single cast or series of casts.
-    Inputting either the raw (.pkl) or calibrated (.extension_tbd) continuous downcast data.
+    Modified from: https://oceanpython.org/2013/02/17/t-s-diagram/
     """
-    pass
+    import matplotlib.ticker as tick
+    import gsw
+
+    #   Demarcate temperature, salinty, and limits for density
+    temp = df.CTDTMP1
+    salt = df.CTDSAL
+    smin = salt.min() - (0.01 * salt.min())
+    smax = salt.max() + (0.01 * salt.max())
+    tmin = temp.min() - (0.1 * temp.max())
+    tmax = temp.max() + (0.1 * temp.max())
+    #   Gridding for a contour
+    xdim = round((smax - smin) / 0.1 + 1.0)
+    ydim = round((tmax - tmin) + 1.0)
+    #   Creating density vectors to fill the grid with densities
+    dens = np.zeros((ydim, xdim))
+    si = np.linspace(1, xdim - 1, xdim) * 0.1 + smin
+    ti = np.linspace(1, ydim - 1, ydim) + tmin
+    for j in range(0, int(ydim)):
+        for i in range(0, int(xdim)):
+            dens[j, i] = gsw.rho(si[i], ti[j], 0)
+    dens = dens - 1000  #   Convert to sigma-theta
+
+    fig = plt.figure(figsize=(7, 6))
+    ax = fig.add_subplot()
+    #   Density contours
+    cs = plt.contour(si, ti, dens, linestyles="dashed", colors="k")
+    plt.clabel(cs, fontsize=12, inline=1, fmt="%0.1f")
+    #   Scatter of sample values
+    sc = ax.scatter(salt, temp, c=df.SSSCC.astype(int), marker="+")
+    sc.set_clim(vmin=1, vmax=df.SSSCC.astype(int).max())
+    ax.set_xlabel("Salinity")
+    ax.set_ylabel("Temperature (ºC)")
+    cbar = plt.colorbar(sc, format=tick.FormatStrFormatter("%.0f"))
+    cbar.set_label("Cast Number")
+
+    _save_fig(ax, f_out)
 
 
 def osnap_plot_rho():
