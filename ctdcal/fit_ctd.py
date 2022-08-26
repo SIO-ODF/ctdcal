@@ -513,7 +513,9 @@ def calibrate_cond(btl_df, time_df):
         C_flag, C_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:
             # 0) grab ssscc chunk to fit
-            ssscc_sublist = pd.read_csv(f, header=None, dtype="str").squeeze().to_list()
+            ssscc_sublist = (
+                pd.read_csv(f, header=None, dtype="str").squeeze(axis=1).to_list()
+            )
             btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
             good_rows = btl_rows & (btl_df["SALNTY_FLAG_W"] == 2)
             time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
