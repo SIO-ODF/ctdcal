@@ -178,25 +178,16 @@ def load_all_btl_files(ssscc_list, cols=None):
     """
     df_data_all = pd.DataFrame()
 
+    filepath = cfg.dirs["oxygen"] + "Winkler.xlsx"
+    oxy_data_all = pd.read_excel(filepath, sheet_name="Aaron")
+    oxy_data_all["SSSCC_oxy"] = (
+        oxy_data_all["Station/Cast"].astype(int).astype(str).str.zfill(3)
+    )  #   Drop floats and then to string
+
     for ssscc in ssscc_list:
         log.info("Loading BTL data for station: " + ssscc + "...")
         btl_file = cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl"
         btl_data = _load_btl_data(btl_file, cols)
-
-        #   Nonexistant for OSNAP
-        ### load REFT data
-        reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
-        try:
-            reft_data = _load_reft_data(reft_file)
-        except FileNotFoundError:
-            log.warning(
-                "Missing (or misnamed) REFT Data Station: "
-                + ssscc
-                + "...filling with NaNs"
-            )
-            reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
-            reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
-            reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
         ### load REFC data
         refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
@@ -216,36 +207,17 @@ def load_all_btl_files(ssscc_list, cols=None):
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
-        oxy_file = cfg.dirs["oxygen"] + ssscc
-        try:
-            oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
-        except FileNotFoundError:
-            log.warning(
-                "Missing (or misnamed) REFO Data Station: "
-                + ssscc
-                + "...filling with NaNs"
-            )
-            oxy_data = pd.DataFrame(
-                index=btl_data.index,
-                columns=[
-                    "FLASKNO",
-                    "TITR_VOL",
-                    "TITR_TEMP",
-                    "DRAW_TEMP",
-                    "TITR_TIME",
-                    "END_VOLTS",
-                ],
-                dtype=float,
-            )
-            oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
-            oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
-            oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
+        oxy_data = (
+            oxy_data_all.loc[oxy_data_all.SSSCC_oxy == ssscc]
+            .sort_values("Niskin")
+            .reset_index(drop=True)
+        )
 
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
-        btl_data = pd.merge(
-            btl_data, reft_data, on="btl_fire_num", how="outer"
-        )  #   No REFT
+        # btl_data = pd.merge(
+        #     btl_data, reft_data, on="btl_fire_num", how="outer"
+        # )  #   No REFT
         btl_data = pd.merge(
             btl_data,
             refc_data,
@@ -257,7 +229,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             btl_data,
             oxy_data,
             left_on="btl_fire_num",
-            right_on="BOTTLENO_OXY",
+            right_on="Niskin",
             how="outer",
         )
 

@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import ctd_plots as ctd_plots
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
+from ctdcal import ctd_plots as ctd_plots
+from ctdcal import flagging as flagging
+from ctdcal import get_ctdcal_config
+from ctdcal import process_ctd as process_ctd
+from ctdcal import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -381,6 +381,9 @@ def _get_sbe_coef(idx=0):
     # TODO: does scipy's minimize function needs a tuple? can this be improved further?
 
     station = process_ctd.get_ssscc_list()[idx]
+    #   OSNAP
+    if len(station) == 3:
+        station = "ar69-03_" + station
     xmlfile = cfg.dirs["raw"] + station + ".XMLCON"
 
     tree = ET.parse(xmlfile)
@@ -610,6 +613,8 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     bad_df = pd.concat([bad_df, thrown_values])
     merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
 
+    #   Problems arise if there was only one oxygen titration and that value gets thrown
+
     while not thrown_values.empty:  # runs as long as there are thrown_values
 
         p0 = tuple(cfw_coefs)  # initialize coefficients with previous results
@@ -634,16 +639,19 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
 
     # intermediate plots to diagnose data chunks goodness
     # TODO: implement into bokeh/flask dashboard
-    if f_suffix is not None:
-        f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}.pdf"
-        ctd_plots._intermediate_residual_plot(
-            merged_df["residual"],
-            merged_df["CTDPRS"],
-            merged_df["SSSCC"],
-            xlabel="CTDOXY Residual (umol/kg)",
-            f_out=f_out,
-            xlim=(-10, 10),
-        )
+    if not merged_df.empty:
+        if f_suffix is not None:
+            f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}.pdf"
+            ctd_plots._intermediate_residual_plot(
+                merged_df["residual"],
+                merged_df["CTDPRS"],
+                merged_df["SSSCC"],
+                xlabel="CTDOXY Residual (umol/kg)",
+                f_out=f_out,
+                xlim=(-10, 10),
+            )
+    else:
+        print("Can't generate", f_suffix, "plotting figure as 'merged_df' is empty.")
 
     merged_df["CTDOXY_FLAG_W"] = 2
     bad_df["CTDOXY_FLAG_W"] = 3
@@ -776,6 +784,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
+    print("Matching sigmas...")
     for ssscc in ssscc_list:
         time_data = time_df[time_df["SSSCC"] == ssscc].copy()
         btl_data = btl_df[btl_df["SSSCC"] == ssscc].copy()
@@ -783,7 +792,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         if (btl_data["OXYGEN_FLAG_W"] == 9).all():
             sbe43_dict[ssscc] = np.full(5, np.nan)
             log.warning(ssscc + " skipped, all oxy data is NaN")
-            continue
+            #   Can't calibrate, but let's try to apply the default coeffs
+            # continue  #   This continue statement would keep all_sbe43_merged from being of equal size to btl_df
         sbe43_merged = match_sigmas(
             btl_data[cfg.column["p"]],
             btl_data[cfg.column["refO"]],
@@ -805,7 +815,12 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         log.info(ssscc + " density matching done")
 
     # Only fit using OXYGEN flagged good (2)
-    all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    try:
+        all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    except ValueError:
+        print(
+            "Problem pulling the flags from the dataframe. Using all bottle files..."
+        )  #   Errors out if any station didn't have oxygen
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
@@ -813,16 +828,20 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Fit each cast individually
     for ssscc in ssscc_list:
-        sbe_coef, sbe_df = sbe43_oxy_fit(
-            all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
-            sbe_coef0=sbe_coef0,
-            f_suffix=f"_{ssscc}",
-        )
-        # build coef dictionary
-        if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
-            sbe43_dict[ssscc] = sbe_coef
-        # all non-NaN oxygen data with flags
-        all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
+        if not all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].empty:
+
+            sbe_coef, sbe_df = sbe43_oxy_fit(
+                all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
+                sbe_coef0=sbe_coef0,
+                f_suffix=f"_{ssscc}",
+            )
+            # build coef dictionary
+            if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
+                sbe43_dict[ssscc] = sbe_coef
+            # all non-NaN oxygen data with flags
+            all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
+        else:
+            print("Oxygen for", ssscc, "is empty. Fitting and plotting skipped.")
 
     # TODO: save outlier data from fits?
     # TODO: secondary oxygen flagging step (instead of just taking outliers from fit routine)
@@ -894,4 +913,4 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     ).applymap(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
     sbe43_coefs.to_csv(cfg.dirs["logs"] + "sbe43_coefs.csv")
 
-    return True
+    return btl_df, time_df

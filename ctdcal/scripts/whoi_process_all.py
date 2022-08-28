@@ -12,11 +12,11 @@ from ctdcal import (
     convert,
     fit_ctd,
     get_ctdcal_config,
-    odf_io,
     oxy_fitting,
     process_bottle,
     process_ctd,
     salts_io,
+    osnap_oxy,
     flagging,
     ctd_plots,
 )
@@ -33,7 +33,7 @@ def whoi_process_all(group="WHOI"):
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv)
     #####
-
+    print("Beginning processing. Checking files for conversion...")
     # load station/cast list from file
     try:
         ssscc_list = process_ctd.get_ssscc_list()
@@ -56,13 +56,16 @@ def whoi_process_all(group="WHOI"):
     # generate salt .csv files
     salts_io.osnap_salts(ssscc_list)
 
+    # load in all bottle and time data into DataFrame
+    time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
+    btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
+    print("Files loaded in to station", ssscc_list[-1])
+
     #####
     # Step 2: calibrate conductivity and oxygen
     #####
 
-    # load in all bottle and time data into DataFrame
-    time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
-    btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
+    print("Beginning data processing...")
 
     # create cast depth log file
     process_ctd.make_depth_log(time_data_all)
@@ -78,10 +81,30 @@ def whoi_process_all(group="WHOI"):
     #   Calibrate conductivity
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
+    btl_data_all, time_data_all = osnap_oxy.ctd_oxy_converter(
+        btl_data_all, time_data_all
+    )
+
+    btl_data_prefit = (
+        btl_data_all.copy()
+    )  #   Stashing for prefit vs postfit (could reduce)
+    time_data_prefit = time_data_all.copy()
+
+    btl_data_fit, time_data_fit = osnap_oxy.osnap_oxy_main(
+        btl_data_all, time_data_all, ssscc_list
+    )
+
+    print("Data fitting and flagging complete.")
+
+    #####
+    # Step 3: export data
+    #####
+
+    print("Writing out data products...")
+
     try:
         import xarray as xr
 
-        
         depth_df = pd.read_csv(
             cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
         ).dropna()
@@ -90,13 +113,14 @@ def whoi_process_all(group="WHOI"):
         )
         full_depth_df = pd.concat([depth_df, manual_depth_df])
         full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
-        btl_data_all["DEPTH"] = -999
+        btl_data_fit["DEPTH"] = -999
         for index, row in full_depth_df.iterrows():
-            btl_data_all.loc[btl_data_all["SSSCC"] == row["SSSCC"], "DEPTH"] = int(
+            btl_data_fit.loc[btl_data_fit["SSSCC"] == row["SSSCC"], "DEPTH"] = int(
                 row["DEPTH"]
             )
         outfile = cfg.dirs["pressure"] + "bottle_data"
         save_cols = [
+            "SSSCC",
             "GPSLAT",
             "GPSLON",
             "btl_fire_num",
@@ -108,29 +132,32 @@ def whoi_process_all(group="WHOI"):
             "CTDCOND2",
             "CTDSAL",
             "CTDSAL_FLAG_W",
-            "CTDOXY1",
+            "CTDOXY",
+            "CTDOXY_FLAG_W",
             "ALT",
             "CTDFLUOR",
             "TURBIDITY",
             "CTDXMISS",
             "FLUOR_CDOM",
         ]
-        cond_btl_data = btl_data_all[save_cols].to_xarray()
-        cond_btl_data.to_netcdf(path=outfile + ".nc")
-        btl_data_all[save_cols].to_csv(outfile + ".csv")
-        print("Exporting continuous .csv files...")
+        save_btl = btl_data_fit[save_cols].to_xarray()
+        save_btl.to_netcdf(path=outfile + ".nc")
+        btl_data_fit[save_cols].to_csv(outfile + ".csv", index=False)
+        # print("Exporting continuous .csv files...")
         # process_ctd.export_ct1(time_data_all, ssscc_list)
         time_cols = [
+            "SSSCC",
             "GPSLAT",
             "GPSLON",
             "CTDPRS",
-            "CTDTMP",
+            "CTDTMP1",
             "CTDTMP_FLAG_W",
             "CTDCOND1",
             "CTDCOND2",
             "CTDSAL",
             "CTDSAL_FLAG_W",
             "CTDOXY",
+            "CTDOXY_FLAG_W",
             "ALT",
             "CTDFLUOR",
             "TURBIDITY",
@@ -138,32 +165,16 @@ def whoi_process_all(group="WHOI"):
             "FLUOR_CDOM",
         ]
         for ssscc in ssscc_list:
+            print("Writing time file", ssscc)
             time_out = cfg.dirs["pressure"] + ssscc + "_profile.nc"
-            time_ssscc = time_data_all.loc[time_data_all.SSSCC == ssscc]
+            time_ssscc = time_data_fit.loc[time_data_fit.SSSCC == ssscc]
             time_ssscc = time_ssscc[time_cols].to_xarray()
             time_ssscc.to_netcdf(path=time_out)
 
-        ctd_plots.osnap_suite(btl_data_all)
+        print("Exporting OSNAP data suite figures...")
+        ctd_plots.osnap_suite(btl_data_fit)
     except:
-        pass
-
-    # calculate params needs for oxy calibration
-    #   OXY titration data will be rare (2-4 points per cast), so fits may be looser
-    oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
-
-    # calibrate oxygen against reference
-    oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
-
-    #####
-    # Step 3: export data
-    #####
-
-    # export files for making cruise report figs
-    process_bottle.export_report_data(btl_data_all)  #   Does this need to happen?
-
-    #   Generate generic .csv/.netcdf of the data for others to use
-    #       (bottle and continuous)
-    #   Generate plots similar to what Leah has produced
+        print("Could not export final data.")
 
 
 if __name__ == "__main__":
