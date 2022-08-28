@@ -19,7 +19,7 @@ cfg = get_ctdcal_config()
 
 
 def ctd_oxy_converter(btl_df, time_df):
-
+    """Convert SBE43's output into umol/kg"""
     #   Extract the import bits of load_all_btl_files
 
     btl_df["SA"] = gsw.SA_from_SP(
@@ -81,18 +81,25 @@ def osnap_oxy_main(
     ssscc_list,
     filepath=cfg.dirs["oxygen"] + "Winkler.xlsx",
 ):
+    """
+    Objective of skipping "prepare_oxy". Meg's titrations are imported in load_all_btl_files
+    Get oxygen values converted, apply some preliminary flags, and apply the fit.
+    * Modified versions of ctd_oxy_converter, calibrate_oxy
+    * Return the dataframes to the workspace
+    """
     # oxy_data = pd.read_excel(filepath, sheet_name="Aaron")
     # oxy_data["SSSCC"] = (
     #     oxy_data["Station/Cast"].astype(int).astype(str).str.zfill(3)
     # )  #   Drop floats and then to string
 
-    btl_data_all, time_data_all = ctd_oxy_converter(btl_data_all, time_data_all)
+    # btl_data_all, time_data_all = ctd_oxy_converter(btl_data_all, time_data_all)
 
-    btl_data_all["OXYGEN"] = btl_data_all["OxygenValue"]
+    btl_data_all["OXYGEN"] = btl_data_all["OxygenValue"]  #   Meg's reference titrations
     btl_data_all["OXYGEN_FLAG_W"] = flagging.nan_values(
         btl_data_all[cfg.column["refO"]]
     )
 
+    #   Due to troubleshooting difficulties, calibrate_oxy was modified rather than getting a new function in here.
     btl_data_fit, time_data_fit = oxy_fitting.calibrate_oxy(
         btl_data_all, time_data_all, ssscc_list
     )

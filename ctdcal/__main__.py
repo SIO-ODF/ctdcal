@@ -171,6 +171,7 @@ def process(group):
     elif group == "WHOI":
         from .scripts.whoi_process_all import whoi_process_all
 
+        #   ctdcal process -g WHOI
         whoi_process_all()
 
     elapsed = time.time() - t

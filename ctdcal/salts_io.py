@@ -129,10 +129,11 @@ def sdl_std(saltDF, cut_std, salt_dir=cfg.dirs["salt"], infile="standards.csv"):
     if cut_std.empty:
         #   If no standards were run in the last iteration, the CRavg = CRraw and needs a flat adjustment
         #   If a standard is run, then the CRavg already has a flat standardization adjustment
-        print(
-            saltDF.STNNBR.iloc[0],
-            "is missing a standard. Pulling from the appropriate standard run...",
-        )
+
+        # print(
+        #     saltDF.STNNBR.iloc[0],
+        #     "is missing a standard. Pulling from the appropriate standard run...",
+        # )
 
         try:
             times = pd.to_datetime(std_list.DateTime)
@@ -140,7 +141,7 @@ def sdl_std(saltDF, cut_std, salt_dir=cfg.dirs["salt"], infile="standards.csv"):
             corr = std_list.Correction.loc[
                 times == min(times, key=lambda d: abs(d - samp_time))
             ].item()
-            print("Pulled correction value:", corr)
+            # print("Pulled correction value:", corr)
         except:
             #   Read last value in as Correction
             corr = std_list.Correction.iloc[-1]
