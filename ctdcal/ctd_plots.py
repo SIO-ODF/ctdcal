@@ -333,7 +333,7 @@ def residual_3(x1, x2, xr, stn, f_out=None):
     return _save_fig(ax, f_out)
 
 
-def section_bottle_plot(df, varname="CTDSAL", f_out=None, cmap="viridis"):
+def section_bottle_plot(df, varname="CTDSAL", f_out=None, interp=True, cmap="viridis"):
     """
     Scatter plot of a desired variable against section distance for a bottle file.
 
@@ -348,6 +348,7 @@ def section_bottle_plot(df, varname="CTDSAL", f_out=None, cmap="viridis"):
     from math import ceil
 
     depth_max = ceil(df.DEPTH.max() / 500) * 500
+    dot_width = 2
 
     #   Create section distance column
     x = df.LATITUDE.diff()
@@ -373,16 +374,38 @@ def section_bottle_plot(df, varname="CTDSAL", f_out=None, cmap="viridis"):
         ]  #       Define new value to add for the beginning of the next iteration
     df["dist"].fillna(method="ffill", inplace=True)  #   Forward fill the nans
 
-    plt.set_cmap(cmap)
-    plt.figure(figsize=(7, 6))
-    fig, ax1 = plt.subplots()
-    plt.fill_between(df["dist"], df["DEPTH"], depth_max, interpolate=True, color="gray")
-    ax1.tricontour(
-        df.dist, df.CTDPRS, df[varname]
-    )  #   Creates the irregularly-spaced bounds for the contour
-    cntr2 = ax1.tricontourf(df.dist, df.CTDPRS, df[varname])  #   Fills in the contour
-    ax1.scatter(df.dist, df.CTDPRS, s=5, color="k", zorder=3)
-    cbar = fig.colorbar(cntr2, ax=ax1)
+    if interp:
+        plt.set_cmap(cmap)
+        plt.figure(figsize=(7, 6))
+        fig, ax = plt.subplots()
+        ax.tricontour(
+            df.dist, df.CTDPRS, df[varname], 20
+        )  #   Creates the irregularly-spaced bounds for the contour
+        plt.fill_between(
+            df["dist"],
+            df["DEPTH"],
+            depth_max,
+            interpolate=True,
+            color="gray",
+            zorder=2,
+        )
+        cntr2 = ax.tricontourf(
+            df.dist, df.CTDPRS, df[varname], 20
+        )  #   Fills in the contour
+        ax.scatter(df.dist, df.CTDPRS, s=dot_width, color="k", zorder=3)
+        cbar = fig.colorbar(cntr2, ax=ax)
+    else:
+        plt.figure(figsize=(7, 6))
+        ax = plt.axes()
+        a = ax.scatter(df["dist"], df["CTDPRS"], c=df[varname])
+        plt.colorbar(a, ax=ax)
+        plt.fill_between(
+            df["dist"],
+            df["DEPTH"],
+            depth_max,
+            interpolate=True,
+            color="gray",
+        )
 
     plt.ylim(0, depth_max)
     plt.ylabel("CTDPRS (dbar)")
@@ -390,7 +413,7 @@ def section_bottle_plot(df, varname="CTDSAL", f_out=None, cmap="viridis"):
     plt.tight_layout()
     plt.gca().invert_yaxis()
 
-    return _save_fig(ax1, f_out)
+    return _save_fig(ax, f_out)
 
 
 def osnap_suite(df):
@@ -418,6 +441,16 @@ def osnap_suite(df):
         "019",
         "020",
         "021",
+        "022",
+        "023",
+        "024",
+        "025",
+        "026",
+        "027",
+        "028",
+        "029",
+        "030",
+        "031",
     ]
     plt_btl = df.loc[df.SSSCC.isin(line1)]
     section_bottle_plot(
