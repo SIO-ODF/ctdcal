@@ -87,7 +87,7 @@ def whoi_process_all(group="WHOI"):
 
     btl_data_prefit = (
         btl_data_all.copy()
-    )  #   Stashing for prefit vs postfit (could reduce)
+    )  #   Stashing for prefit vs postfit (could reduce size)
     time_data_prefit = time_data_all.copy()
 
     btl_data_fit, time_data_fit = osnap_oxy.osnap_oxy_main(
@@ -172,7 +172,9 @@ def whoi_process_all(group="WHOI"):
             time_ssscc.to_netcdf(path=time_out)
 
         print("Exporting OSNAP data suite figures...")
-        ctd_plots.osnap_suite(btl_data_fit)
+        ctd_plots.osnap_suite(
+            btl_data_prefit, btl_data_fit, time_data_prefit, time_data_fit
+        )
     except:
         print("Could not export final data.")
 

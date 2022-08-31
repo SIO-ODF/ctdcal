@@ -416,9 +416,10 @@ def section_bottle_plot(df, varname="CTDSAL", f_out=None, interp=True, cmap="vir
     return _save_fig(ax, f_out)
 
 
-def osnap_suite(df):
+def osnap_suite(btl_prefit, btl_fit, time_prefit, time_fit):
 
     #   Section plots with key params for each hydrographic line
+    #   Could write as 2D array and plot iteratively...
     line1 = [
         "002",
         "003",
@@ -452,17 +453,108 @@ def osnap_suite(df):
         "030",
         "031",
     ]
-    plt_btl = df.loc[df.SSSCC.isin(line1)]
+    plt_btl1 = btl_fit.loc[btl_fit.SSSCC.isin(line1)]
     section_bottle_plot(
-        plt_btl, varname="CTDTMP1", f_out=cfg.dirs["logs"] + "CTDTEMP1.png", cmap="RdPu"
+        plt_btl1,
+        varname="CTDTMP1",
+        f_out=cfg.dirs["logs"] + "CTDTEMP1_to31.pdf",
+        cmap="RdPu",
     )
     section_bottle_plot(
-        plt_btl, varname="CTDSAL", f_out=cfg.dirs["logs"] + "CTDSAL.png"
+        plt_btl1, varname="CTDSAL", f_out=cfg.dirs["logs"] + "CTDSAL_to31.pdf"
     )
     section_bottle_plot(
-        plt_btl, varname="CTDOXY1", f_out=cfg.dirs["logs"] + "CTDOXY.png"
+        plt_btl1, varname="CTDOXY1", f_out=cfg.dirs["logs"] + "CTDOXY_to31.pdf"
     )
-    osnap_plot_TS(plt_btl, f_out=cfg.dirs["logs"] + "TS.png")
+    osnap_plot_TS(plt_btl1, f_out=cfg.dirs["logs"] + "TS_to31.pdf")
+    #   Second section
+    line2 = [
+        "052",
+        "053",
+        "054",
+        "055",
+        "056",
+        "057",
+        "058",
+        "059",
+        "060",
+        "061",
+        "062",
+        "063",
+        "064",
+        "065",
+    ]
+    plt_btl2 = btl_fit.loc[btl_fit.SSSCC.isin(line2)]
+    section_bottle_plot(
+        plt_btl2,
+        varname="CTDTMP1",
+        f_out=cfg.dirs["logs"] + "CTDTEMP1_northbox.pdf",
+        cmap="RdPu",
+    )
+    section_bottle_plot(
+        plt_btl2, varname="CTDSAL", f_out=cfg.dirs["logs"] + "CTDSAL_northbox.pdf"
+    )
+    section_bottle_plot(
+        plt_btl2, varname="CTDOXY1", f_out=cfg.dirs["logs"] + "CTDOXY_northbox.pdf"
+    )
+    osnap_plot_TS(plt_btl1, f_out=cfg.dirs["logs"] + "TS_northbox.pdf")
+    osnap_plot_TS(btl_fit, f_out=cfg.dirs["logs"] + "TS.pdf")
+    report_residuals(btl_fit)
+
+    for ssscc in btl_fit.SSSCC.unique():
+        pre = time_prefit[["CTDPRS", "CTDOXY"]].loc[time_prefit.SSSCC == ssscc]
+        post = time_fit[["CTDPRS", "CTDOXY"]].loc[time_fit.SSSCC == ssscc]
+        ref = btl_fit[["CTDPRS", "OXYGEN"]].loc[btl_fit.SSSCC == ssscc]
+        fit_comparison(pre, post, ref, ssscc)
+
+
+def report_residuals(btl_df, outdir="data/report_figs/", ext=".pdf"):
+
+    #   Temperature residuals
+    param = "t1"
+    residual_vs_pressure(
+        btl_df[cfg.column[param]],
+        btl_df[cfg.column["t2"]],
+        btl_df["CTDPRS"],
+        stn=btl_df["SSSCC"],
+        xlabel=f"{cfg.column[param]} Residual (mS/cm)",
+        f_out=f"{outdir}t2-{param}_vs_p{ext}",
+    )
+    residual_vs_station(
+        btl_df[cfg.column[param]],
+        btl_df[cfg.column["t2"]],
+        btl_df["CTDPRS"],
+        btl_df["SSSCC"],
+        ylabel=f"{cfg.column[param]} Residual (mS/cm)",
+        f_out=f"{outdir}t2-{param}_vs_stn{ext}",
+    )
+    #   Conductivity residuals
+    for param, ref in zip(["c1", "c2", "c2"], ["refC", "refC", "c1"]):
+        residual_vs_pressure(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            stn=btl_df["SSSCC"],
+            xlabel=f"{cfg.column[param]} Residual (mS/cm)",
+            f_out=f"{outdir}{ref}-{param}_vs_p{ext}",
+        )
+        residual_vs_station(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            btl_df["SSSCC"],
+            ylabel=f"{cfg.column[param]} Residual (mS/cm)",
+            f_out=f"{outdir}{ref}-{param}_vs_stn{ext}",
+        )
+        residual_vs_station(
+            btl_df[cfg.column[param]],
+            btl_df[cfg.column[ref]],
+            btl_df["CTDPRS"],
+            btl_df["SSSCC"],
+            ylabel=f"{cfg.column[param]} Residual (mS/cm)",
+            deep=True,
+            f_out=f"{outdir}{ref}-{param}_vs_stn_deep{ext}",
+        )
 
 
 def osnap_plot_sensor_comparison():
@@ -471,6 +563,23 @@ def osnap_plot_sensor_comparison():
     Inputting either the raw (.pkl) or calibrated (.extension_tbd) continuous downcast data.
     """
     pass
+
+
+def fit_comparison(pre, post, ref, ssscc, varlabel="CTDOXY"):
+    """Take in a variable pre and post time data, as well as reference, and plot scatter"""
+    plt.figure(figsize=(7, 6))
+    ax = plt.axes()
+    a = plt.scatter(pre.CTDOXY, pre.CTDPRS)
+    b = plt.scatter(post.CTDOXY, post.CTDPRS)
+    c = plt.scatter(ref.OXYGEN, ref.CTDPRS, s=500, marker="*")
+    plt.title(str(varlabel + " " + ssscc))
+    plt.tight_layout()
+    plt.gca().invert_yaxis()
+    plt.ylabel("CTDPRES")
+    plt.legend()
+    logs = "logs"
+    f_out = f"{cfg.dirs[logs]}postfit/{varlabel}_{ssscc}.png"
+    _save_fig(ax, f_out)
 
 
 def osnap_plot_sensor_comparison_3p():
