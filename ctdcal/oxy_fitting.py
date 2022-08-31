@@ -841,7 +841,14 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             # all non-NaN oxygen data with flags
             all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
         else:
-            print("Oxygen for", ssscc, "is empty. Fitting and plotting skipped.")
+            #   OSNAP: Force some sort of fit
+            # print("Oxygen for", ssscc, "is empty. Fitting and plotting skipped.")
+            print(
+                "Oxygen for",
+                ssscc,
+                "contains no bottle references. Assigning global coefs.",
+            )
+            sbe43_dict[ssscc] = sbe_coef0
 
     # TODO: save outlier data from fits?
     # TODO: secondary oxygen flagging step (instead of just taking outliers from fit routine)

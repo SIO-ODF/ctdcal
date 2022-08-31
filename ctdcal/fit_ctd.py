@@ -531,6 +531,8 @@ def calibrate_cond(btl_df, time_df):
                 f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_prefit.pdf",
             )
 
+            #   Warning: Make sure that the ssscc contains at least one point within the yaml zRange
+
             # 2) prepare data for fitting
             # NOTE: df_bad will be overwritten during post-fit data flagging
             # but is left here for future debugging (if necessary)
