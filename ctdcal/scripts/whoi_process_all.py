@@ -37,6 +37,7 @@ def whoi_process_all(group="WHOI"):
     # load station/cast list from file
     try:
         ssscc_list = process_ctd.get_ssscc_list()
+        microcat_list = process_ctd.get_ssscc_list(fname="data/ssscc_microcat.csv")
     except FileNotFoundError:
         log.info("No ssscc.csv file found, generating from .hex file list")
         ssscc_list = process_ctd.make_ssscc_list()
@@ -45,10 +46,10 @@ def whoi_process_all(group="WHOI"):
         ]  #   OSNAP default is just cast number CCC
 
     # convert raw .hex files
-    convert.hex_to_ctd(ssscc_list)
+    convert.hex_to_ctd(ssscc_list, group)
 
     # process time files
-    convert.make_time_files(ssscc_list, group)
+    convert.make_time_files(ssscc_list, group, microcat_list)
 
     # process bottle file
     convert.make_btl_mean(ssscc_list)
@@ -60,6 +61,8 @@ def whoi_process_all(group="WHOI"):
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
     btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
     print("Files loaded in to station", ssscc_list[-1])
+
+    # time_microcat = process_ctd.load_all_ctd_files(microcat_list) #   Deal with microcats seperately
 
     #####
     # Step 2: calibrate conductivity and oxygen
@@ -121,6 +124,7 @@ def whoi_process_all(group="WHOI"):
         outfile = cfg.dirs["pressure"] + "bottle_data"
         save_cols = [
             "SSSCC",
+            "DateTime",
             "GPSLAT",
             "GPSLON",
             "btl_fire_num",
@@ -147,6 +151,7 @@ def whoi_process_all(group="WHOI"):
         # process_ctd.export_ct1(time_data_all, ssscc_list)
         time_cols = [
             "SSSCC",
+            "DateTime",
             "GPSLAT",
             "GPSLON",
             "CTDPRS",

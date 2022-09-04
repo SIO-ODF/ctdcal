@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", "Mean of empty slice.")
 
 
-def cast_details(df, ssscc, log_file=None):
+def cast_details(df, ssscc, group="ODF",log_file=None):
     """
     We determine the cast details using pandas magic.
     First find alternating periods of pumps on and pumps off, then select the
@@ -77,8 +77,10 @@ def cast_details(df, ssscc, log_file=None):
 
     # remove upcast
     df_downcast = df_cast[:p_max_ind].copy()
+    if group == "WHOI":
+        df_upcast = df_cast[p_max_ind:].copy()
 
-    return df_downcast
+    return df_downcast, df_upcast
 
 
 def _trim_soak_period(df=None):

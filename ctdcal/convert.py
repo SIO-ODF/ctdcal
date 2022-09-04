@@ -2,6 +2,7 @@ from pathlib import Path
 
 import gsw
 import logging
+import datetime
 import numpy as np
 import pandas as pd
 
@@ -119,7 +120,7 @@ short_lookup = {
 }
 
 
-def hex_to_ctd(ssscc_list):
+def hex_to_ctd(ssscc_list, group="ODF"):
     # TODO: add (some) error handling from odf_convert_sbe.py
     """
     Convert raw CTD data and export to .pkl files.
@@ -136,16 +137,38 @@ def hex_to_ctd(ssscc_list):
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
+            print(f"{ssscc} Creating pickle from hex...")
             hexFile = cfg.dirs["raw"] + "ar69-03_" + ssscc + ".hex"
             xmlconFile = cfg.dirs["raw"] + "ar69-03_" + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader)
+            #   OSNAP request
+            if group == "WHOI":
+                #   Convert NMEA serials to DateTimes as str to prevent indexing/averaging issues
+                converted_df["DateTime"] = converted_df.nmea_datetime.apply(
+                    lambda x: datetime.datetime.fromtimestamp(x)
+                ).astype(str)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
 
 
-def make_time_files(ssscc_list, group="ODF"):
+def make_time_files(ssscc_list, group="ODF", microcat_list=None):
+    """
+    Create continuous time files of just the downcast data.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to convert
+    group : str
+        Who is running the processing, defining subprocesses to take
+    microcat_list : list of str
+        List of stations where microcats are, and upcast data is requested
+
+    Returns
+    -------
+    """
     log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
@@ -156,6 +179,9 @@ def make_time_files(ssscc_list, group="ODF"):
             if bad_rows.any():
                 log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
             converted_df.loc[bad_rows, :] = np.nan
+            # if group == "WHOI":
+            #     converted_df["DateTime"] = converted_df["DateTime"].astype(str)
+            #   df.interpolate has issues with datetimes
             converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
             # Trim to times when rosette is in water
@@ -184,21 +210,29 @@ def make_time_files(ssscc_list, group="ODF"):
 
             # TODO: add despike/wild edit filter (optional?)
 
-            # Filter data
-            filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df,
-                window="triangle",
-                parameters=cfg.filter_cols,
-            )
-
+            if group == "WHOI":
+                #   OSNAP wants as little filtering as possible
+                filter_data = trimmed_df
+            else:
+                # Filter data
+                filter_data = process_ctd.raw_ctd_filter(
+                    trimmed_df,
+                    window="triangle",
+                    parameters=cfg.filter_cols,
+                )
             # Trim to downcast
-            cast_data = process_ctd.cast_details(
+            cast_data, upcast_data = process_ctd.cast_details(
                 filter_data,
                 ssscc,
+                group,
                 log_file=cfg.dirs["logs"] + "cast_details.csv",
             )
 
             cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
+            if group == "WHOI":
+                #   OSNAP needs conductivity fixed and would like upcasts from specific microcat stations
+                if ssscc in microcat_list:
+                    upcast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time_upcast.pkl")
 
 
 def make_btl_mean(ssscc_list):
