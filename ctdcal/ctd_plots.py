@@ -499,8 +499,9 @@ def osnap_suite(btl_prefit, btl_fit, time_prefit, time_fit):
     )
     osnap_plot_TS(plt_btl1, f_out=cfg.dirs["logs"] + "TS_northbox.pdf")
     osnap_plot_TS(btl_fit, f_out=cfg.dirs["logs"] + "TS.pdf")
-    report_residuals(btl_fit)
+    all_residuals(btl_fit)
 
+    print("Starting the prefit-postfit comparisons...")
     for ssscc in btl_fit.SSSCC.unique():
         pre = time_prefit[["CTDPRS", "CTDOXY"]].loc[time_prefit.SSSCC == ssscc]
         post = time_fit[["CTDPRS", "CTDOXY"]].loc[time_fit.SSSCC == ssscc]
@@ -508,7 +509,7 @@ def osnap_suite(btl_prefit, btl_fit, time_prefit, time_fit):
         fit_comparison(pre, post, ref, ssscc)
 
 
-def report_residuals(btl_df, outdir="data/report_figs/", ext=".pdf"):
+def all_residuals(btl_df, outdir="data/logs/postfit/", ext=".pdf"):
 
     #   Temperature residuals
     param = "t1"
