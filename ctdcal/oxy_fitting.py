@@ -591,6 +591,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
 
     bad_df = pd.DataFrame()  # initialize DF for questionable values
 
+    #   This step breaks if there are stations without oxygen titrations (index=0 becomes all NaN)
     if sbe_coef0 is None:
         sbe_coef0 = _get_sbe_coef()  # load initial coefficient guess
 
@@ -603,18 +604,21 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
         x0=sbe_coef0,
         args=(weights, fit_data, merged_df["REFOXY"]),
         bounds=[(None, None), (None, None), (0, None), (None, None), (None, None)],
-    )
+    )  #   scipy.optimize.optimize.OptimizeResult
 
-    cfw_coefs = res.x
-    merged_df["CTDOXY"] = _PMEL_oxy_eq(cfw_coefs, fit_data)
+    cfw_coefs = res.x  #   New coeffs to log
+    merged_df["CTDOXY"] = _PMEL_oxy_eq(cfw_coefs, fit_data)  #   New data
     merged_df["residual"] = merged_df["REFOXY"] - merged_df["CTDOXY"]
-    cutoff = 2.8 * np.std(merged_df["residual"])
+    #   OSNAP resolve error of throwing all values when stdev and residual are very small for few titrations
+    if any(merged_df.residual > 0.0001):
+        cutoff = 2.8 * np.std(merged_df["residual"])
+    else:
+        cutoff = 0.0001
     thrown_values = merged_df[np.abs(merged_df["residual"]) > cutoff]
     bad_df = pd.concat([bad_df, thrown_values])
     merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
 
     #   Problems arise if there was only one oxygen titration and that value gets thrown
-
     while not thrown_values.empty:  # runs as long as there are thrown_values
 
         p0 = tuple(cfw_coefs)  # initialize coefficients with previous results
@@ -775,7 +779,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         btl_df["SSSCC"],
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
-        xlim=(-10, 10),
+        xlim=(-10, 20),
     )
     # Prep vars, dfs, etc.
     all_sbe43_merged = pd.DataFrame()
@@ -886,6 +890,27 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             ),
         )
         log.info(ssscc + " time data fitting done")
+        #   Check for asymptotic fitting from underconstrained curves at the surface
+        check_region = time_df.loc[time_rows]
+        if (np.std(check_region.CTDOXY.iloc[0:19]) > 10) & (
+            (check_region.CTDOXY.iloc[0] - check_region.CTDOXY.iloc[1]) < 0
+        ):
+            #   Generally thrusts up, then downwards when the signal is actually climbing up linearly following final bottle
+            # print(ssscc, "has plummeting surface values following fitting...")
+            #   Define the area that needs to be refit. This should be where the derivative in the first ~30 points climbs up before going back down
+            idx = (
+                np.diff(np.diff(check_region.CTDOXY.iloc[0:29])).argmax() + 2
+            )  #   2nd derivative is maxed when first derivative goes from decreasing to increasing
+            fill_region = check_region.iloc[0:idx]
+            #   Pulled average pre-corrected slope from first 20 points of stations 1 and 33
+            coefs = [1.18855453, fill_region.iloc[-1]["CTDOXY"]]
+            fn = np.poly1d(
+                coefs
+            )  #   Define a linear correction equation as a function of pressure
+            check_region.CTDOXY.iloc[0 : len(fill_region)] = np.flip(
+                fn(fill_region.CTDPRS)
+            )
+            time_df.loc[time_rows, "CTDOXY"] = check_region.CTDOXY
 
     # flag CTDOXY with more than 1% difference
     time_df["CTDOXY_FLAG_W"] = 2  # TODO: actual flagging of some kind?
