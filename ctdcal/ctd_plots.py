@@ -566,21 +566,33 @@ def osnap_plot_sensor_comparison():
     pass
 
 
-def fit_comparison(pre, post, ref, ssscc, varlabel="CTDOXY"):
+def fit_comparison(pre, post, ref, ssscc, varlabel="CTDOXY", grid=False):
     """Take in a variable pre and post time data, as well as reference, and plot scatter"""
-    plt.figure(figsize=(7, 6))
+    plt.figure(figsize=(8, 5))
     ax = plt.axes()
-    a = plt.scatter(pre.CTDOXY, pre.CTDPRS)
-    b = plt.scatter(post.CTDOXY, post.CTDPRS)
-    c = plt.scatter(ref.OXYGEN, ref.CTDPRS, s=500, marker="*")
-    plt.title(str(varlabel + " " + ssscc))
-    plt.tight_layout()
+    plt.scatter(pre.CTDOXY, pre.CTDPRS, label="Prefit")
+    plt.scatter(post.CTDOXY, post.CTDPRS, label="Postfit")
+    plt.scatter(ref.OXYGEN, ref.CTDPRS, s=300, marker="*", label="Bottle Reference")
     plt.gca().invert_yaxis()
-    plt.ylabel("CTDPRES")
-    plt.legend()
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
+    ax.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.10),
+        fancybox=True,
+        shadow=True,
+        ncol=3,
+    )
+    title_label = str(varlabel + " " + ssscc)
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    _apply_default_fmt(xlim, ylim, varlabel, "CTDPRES", title_label, grid)
+    plt.xlabel(varlabel, horizontalalignment="right", x=1.0)
     logs = "logs"
     f_out = f"{cfg.dirs[logs]}postfit/{varlabel}_{ssscc}.png"
-    _save_fig(ax, f_out)
+    # _save_fig(ax, f_out)
+    plt.savefig(f_out, bbox_inches="tight")
 
 
 def osnap_plot_sensor_comparison_3p():
