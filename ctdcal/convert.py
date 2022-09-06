@@ -210,16 +210,13 @@ def make_time_files(ssscc_list, group="ODF", microcat_list=None):
 
             # TODO: add despike/wild edit filter (optional?)
 
-            if group == "WHOI":
-                #   OSNAP wants as little filtering as possible
-                filter_data = trimmed_df
-            else:
-                # Filter data
-                filter_data = process_ctd.raw_ctd_filter(
-                    trimmed_df,
-                    window="triangle",
-                    parameters=cfg.filter_cols,
-                )
+            # Filter data
+            filter_data = process_ctd.raw_ctd_filter(
+                trimmed_df,
+                window="triangle",
+                parameters=cfg.filter_cols,
+            )
+
             # Trim to downcast
             cast_data, upcast_data = process_ctd.cast_details(
                 filter_data,
