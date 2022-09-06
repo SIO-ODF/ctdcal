@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", "Mean of empty slice.")
 
 
-def cast_details(df, ssscc, group="ODF",log_file=None):
+def cast_details(df, ssscc, group="ODF", log_file=None):
     """
     We determine the cast details using pandas magic.
     First find alternating periods of pumps on and pumps off, then select the
@@ -210,6 +210,10 @@ def ctd_align(inMat=None, col=None, time=0.0):
 
     Originally written by Courtney Schatzman, docstring by Joseph Gum.
     Need to generate alignment plots in order to properly use ctd_align.
+    
+    Notes:
+    * Returns float array. Convert output using np.float64(inMat)
+    * Transpose matrix prior to calling function
 
     Args:
         param1 (ndarray): inMat, numpy ndarray with dtype array

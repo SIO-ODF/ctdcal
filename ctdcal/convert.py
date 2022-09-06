@@ -6,7 +6,7 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from ctdcal import get_ctdcal_config
+from ctdcal import get_ctdcal_config, fit_ctd
 from ctdcal import equations_sbe as sbe_eq
 from ctdcal import process_bottle as btl
 from ctdcal import process_ctd as process_ctd
@@ -144,10 +144,29 @@ def hex_to_ctd(ssscc_list, group="ODF"):
             converted_df = convertFromSBEReader(sbeReader)
             #   OSNAP request
             if group == "WHOI":
+                #   V1 box offsets primary line by 0.073 sec, but not the secondary line. This is 1.7 scans, rounded down to 1
+                print(f"{ssscc} offsetting C1 by 0.073 seconds...")
+                inMat = np.transpose(converted_df.to_numpy())
+                inMat = np.transpose(
+                    process_ctd.ctd_align(inMat=inMat, col=4, time=0.073)
+                )
+                converted_df["CTDCOND2"] = np.float64(inMat[:, 4])  #   ctd_align is old
+
+                #   Conductivity thermal mass correction à la SBE CellTM
+                print(f"{ssscc} applying C1, C2 thermal mass correction...")
+                converted_df["CTDCOND1"] = fit_ctd.cell_therm_mass_corr(
+                    converted_df["CTDTMP1"], converted_df["CTDCOND1"]
+                )
+                converted_df["CTDCOND2"] = fit_ctd.cell_therm_mass_corr(
+                    converted_df["CTDTMP2"], converted_df["CTDCOND2"]
+                )
+
                 #   Convert NMEA serials to DateTimes as str to prevent indexing/averaging issues
-                converted_df["DateTime"] = converted_df.nmea_datetime.apply(
-                    lambda x: datetime.datetime.fromtimestamp(x)
-                ).astype(str)
+                # print(f"{ssscc} making datetimes...")
+                # converted_df["DateTime"] = converted_df.nmea_datetime.apply(
+                #     lambda x: datetime.datetime.fromtimestamp(x)
+                # ).astype(str)
+
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True

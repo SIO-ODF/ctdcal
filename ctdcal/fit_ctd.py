@@ -48,9 +48,9 @@ def cell_therm_mass_corr(temp, cond, sample_int=1 / 24, alpha=0.03, beta=1 / 7):
     sample_int : float, optional
         CTD sample interval [seconds]
     alpha : float, optional
-        Thermal anomaly amplitude
+        Thermal anomaly amplitude (default for SBE4 = 0.03)
     beta : float, optional
-        Thermal anomaly time constant
+        Thermal anomaly time constant (default for 1/beta = 7)
 
     Returns
     -------
