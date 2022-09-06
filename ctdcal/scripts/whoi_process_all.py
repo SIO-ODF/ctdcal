@@ -36,6 +36,7 @@ def whoi_process_all(group="WHOI"):
     print("Beginning processing. Checking files for conversion...")
     # load station/cast list from file
     try:
+        #   Station 086 = 086B, do not use 086 hex/xmlcon
         ssscc_list = process_ctd.get_ssscc_list()
         microcat_list = process_ctd.get_ssscc_list(fname="data/ssscc_microcat.csv")
     except FileNotFoundError:
@@ -107,6 +108,7 @@ def whoi_process_all(group="WHOI"):
 
     try:
         import xarray as xr
+        import datetime
 
         depth_df = pd.read_csv(
             cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
@@ -121,6 +123,9 @@ def whoi_process_all(group="WHOI"):
             btl_data_fit.loc[btl_data_fit["SSSCC"] == row["SSSCC"], "DEPTH"] = int(
                 row["DEPTH"]
             )
+        btl_data_fit["DateTime"] = btl_data_fit.nmea_datetime.apply(
+            lambda x: datetime.datetime.fromtimestamp(x)
+        ).astype(str)
         outfile = cfg.dirs["pressure"] + "bottle_data"
         save_cols = [
             "SSSCC",
