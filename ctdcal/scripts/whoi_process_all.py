@@ -125,7 +125,10 @@ def whoi_process_all(group="WHOI"):
             )
         btl_data_fit["DateTime"] = btl_data_fit.nmea_datetime.apply(
             lambda x: datetime.datetime.fromtimestamp(x)
-        ).astype(str)
+        )
+        time_data_fit["DateTime"] = time_data_fit.nmea_datetime.apply(
+            lambda x: datetime.datetime.fromtimestamp(x)
+        )
         outfile = cfg.dirs["pressure"] + "bottle_data"
         save_cols = [
             "SSSCC",
