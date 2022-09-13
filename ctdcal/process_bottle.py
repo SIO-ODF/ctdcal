@@ -69,7 +69,9 @@ def bottle_mean(btl_df):
         output = pd.concat(
             (
                 output,
-                btl_df[btl_df[BOTTLE_FIRE_NUM_COL] == i]
+                btl_df[
+                    btl_df[BOTTLE_FIRE_NUM_COL] == i
+                ]  #   Depreciation FutureWarming when DateTime string is in converted pickle
                 .mean()
                 .to_frame(name=i)
                 .transpose(),

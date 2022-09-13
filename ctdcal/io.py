@@ -14,6 +14,8 @@ log = logging.getLogger(__name__)
 def load_cnv(cnv_file: Union[str, Path]) -> pd.DataFrame:
     """
     Load Sea-Bird converted (.cnv) cast file into DataFrame
+    Check the encoding on the file (file -I filepath), could be iso-8859-1
+        f = open(cnv_file, 'r', encoding="iso-8859-1")
     """
     with open(cnv_file) as f:
         file = f.readlines()

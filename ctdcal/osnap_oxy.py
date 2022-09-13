@@ -100,6 +100,7 @@ def osnap_oxy_main(
     )
 
     #   Due to troubleshooting difficulties, calibrate_oxy was modified rather than getting a new function in here.
+    #   TODO: Actually break the fitting routines up into subfunctions for greater flexibility
     btl_data_fit, time_data_fit = oxy_fitting.calibrate_oxy(
         btl_data_all, time_data_all, ssscc_list
     )
