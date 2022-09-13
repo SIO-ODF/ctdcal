@@ -464,7 +464,7 @@ def osnap_suite(btl_prefit, btl_fit, time_prefit, time_fit):
         plt_btl1, varname="CTDSAL", f_out=cfg.dirs["logs"] + "CTDSAL_to31.pdf"
     )
     section_bottle_plot(
-        plt_btl1, varname="CTDOXY1", f_out=cfg.dirs["logs"] + "CTDOXY_to31.pdf"
+        plt_btl1, varname="CTDOXY", f_out=cfg.dirs["logs"] + "CTDOXY_to31.pdf"
     )
     osnap_plot_TS(plt_btl1, f_out=cfg.dirs["logs"] + "TS_to31.pdf")
     #   Second section
@@ -495,18 +495,24 @@ def osnap_suite(btl_prefit, btl_fit, time_prefit, time_fit):
         plt_btl2, varname="CTDSAL", f_out=cfg.dirs["logs"] + "CTDSAL_northbox.pdf"
     )
     section_bottle_plot(
-        plt_btl2, varname="CTDOXY1", f_out=cfg.dirs["logs"] + "CTDOXY_northbox.pdf"
+        plt_btl2, varname="CTDOXY", f_out=cfg.dirs["logs"] + "CTDOXY_northbox.pdf"
     )
     osnap_plot_TS(plt_btl1, f_out=cfg.dirs["logs"] + "TS_northbox.pdf")
     osnap_plot_TS(btl_fit, f_out=cfg.dirs["logs"] + "TS.pdf")
     all_residuals(btl_fit)
+    osnap_coherence(btl_fit)
+    osnap_coherence(
+        btl_fit.loc[btl_fit.CTDPRS > 500],
+        outdir=cfg.dirs["logs"] + "postfit/500_",
+    )  #   Do one just for the data within the fitting range
 
     print("Starting the prefit-postfit comparisons...")
     for ssscc in btl_fit.SSSCC.unique():
         pre = time_prefit[["CTDPRS", "CTDOXY"]].loc[time_prefit.SSSCC == ssscc]
         post = time_fit[["CTDPRS", "CTDOXY"]].loc[time_fit.SSSCC == ssscc]
-        ref = btl_fit[["CTDPRS", "OXYGEN"]].loc[btl_fit.SSSCC == ssscc]
-        fit_comparison(pre, post, ref, ssscc)
+        ref = btl_fit[["CTDPRS", "BTL_OXY"]].loc[btl_fit.SSSCC == ssscc]
+        fit_comparison(pre, post, ref, ssscc, grid=True)
+        plt.close()
 
 
 def all_residuals(btl_df, outdir="data/logs/postfit/", ext=".pdf"):
@@ -518,6 +524,7 @@ def all_residuals(btl_df, outdir="data/logs/postfit/", ext=".pdf"):
         btl_df[cfg.column["t2"]],
         btl_df["CTDPRS"],
         stn=btl_df["SSSCC"],
+        ylim=(4000, 0),
         xlabel=f"{cfg.column[param]} Residual (mS/cm)",
         f_out=f"{outdir}t2-{param}_vs_p{ext}",
     )
@@ -536,6 +543,7 @@ def all_residuals(btl_df, outdir="data/logs/postfit/", ext=".pdf"):
             btl_df[cfg.column[ref]],
             btl_df["CTDPRS"],
             stn=btl_df["SSSCC"],
+            ylim=(4000, 0),
             xlabel=f"{cfg.column[param]} Residual (mS/cm)",
             f_out=f"{outdir}{ref}-{param}_vs_p{ext}",
         )
@@ -547,7 +555,7 @@ def all_residuals(btl_df, outdir="data/logs/postfit/", ext=".pdf"):
             ylabel=f"{cfg.column[param]} Residual (mS/cm)",
             f_out=f"{outdir}{ref}-{param}_vs_stn{ext}",
         )
-        residual_vs_station(
+        residual_vs_station(  #   The deep stations only
             btl_df[cfg.column[param]],
             btl_df[cfg.column[ref]],
             btl_df["CTDPRS"],
@@ -556,14 +564,49 @@ def all_residuals(btl_df, outdir="data/logs/postfit/", ext=".pdf"):
             deep=True,
             f_out=f"{outdir}{ref}-{param}_vs_stn_deep{ext}",
         )
+    residual_vs_pressure(
+        btl_df["CTDOXY"],
+        btl_df["BTL_OXY"],
+        btl_df["CTDPRS"],
+        stn=btl_df["SSSCC"],
+        ylim=(4000, 0),
+        xlim=[-10, 10],
+        xlabel=f"SBE43 Residual (umol/kg)",
+        f_out=f"{outdir}refoxy-ctdoxy_vs_p{ext}",
+    )
+    residual_vs_station(
+        btl_df["CTDOXY"],
+        btl_df["BTL_OXY"],
+        btl_df["CTDPRS"],
+        btl_df["SSSCC"],
+        ylim=[-10, 10],
+        ylabel=f"SBE43 Residual (umol/kg)",
+        f_out=f"{outdir}refoxy-ctdoxy_vs_stn{ext}",
+    )
 
 
-def osnap_plot_sensor_comparison():
+def osnap_coherence(btl_df, outdir=cfg.dirs["logs"] + "postfit/", ext=".pdf"):
     """
-    Line plot of primary-secondary sensor difference at a given station or series of stations.
-    Inputting either the raw (.pkl) or calibrated (.extension_tbd) continuous downcast data.
+    Scatter of temperature and
     """
-    pass
+    plt.figure(figsize=(7, 6))
+    plt.scatter(
+        btl_df["CTDTMP1"] - btl_df["CTDTMP2"],
+        btl_df["CTDCOND1"] - btl_df["CTDCOND2"],
+        c=btl_df["CTDPRS"],
+        marker="+",
+    )
+    plt.xticks(rotation=45)
+    cbar = plt.colorbar(pad=0.1)
+    cbar.set_label("Pressure (dbar)")
+    plt.xlim((-0.05, 0.05))
+    plt.ylim((-0.05, 0.05))
+    plt.xlabel("CTDTMP1-CTDTMP2 Residual (T90 C)", fontsize=12)
+    plt.ylabel("CTDCOND1-CTDCOND2 Residual (mS/cm)", fontsize=12)
+    plt.title("Primary vs Secondary CTD Plumbing Coherence", fontsize=12)
+    plt.tight_layout()
+    plt.savefig(f"{outdir}c_t_coherence{ext}")
+    plt.close()
 
 
 def fit_comparison(pre, post, ref, ssscc, varlabel="CTDOXY", grid=False):
@@ -572,7 +615,7 @@ def fit_comparison(pre, post, ref, ssscc, varlabel="CTDOXY", grid=False):
     ax = plt.axes()
     plt.scatter(pre.CTDOXY, pre.CTDPRS, label="Prefit")
     plt.scatter(post.CTDOXY, post.CTDPRS, label="Postfit")
-    plt.scatter(ref.OXYGEN, ref.CTDPRS, s=300, marker="*", label="Bottle Reference")
+    plt.scatter(ref.BTL_OXY, ref.CTDPRS, s=300, marker="*", label="Bottle Reference")
     plt.gca().invert_yaxis()
 
     box = ax.get_position()
@@ -587,7 +630,7 @@ def fit_comparison(pre, post, ref, ssscc, varlabel="CTDOXY", grid=False):
     title_label = str(varlabel + " " + ssscc)
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    _apply_default_fmt(xlim, ylim, varlabel, "CTDPRES", title_label, grid)
+    _apply_default_fmt(xlim, ylim, varlabel, "CTDPRES (dbar)", title_label, grid)
     plt.xlabel(varlabel, horizontalalignment="right", x=1.0)
     logs = "logs"
     f_out = f"{cfg.dirs[logs]}postfit/{varlabel}_{ssscc}.png"
