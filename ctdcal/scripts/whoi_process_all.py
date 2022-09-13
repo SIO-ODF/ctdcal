@@ -123,38 +123,48 @@ def whoi_process_all(group="WHOI"):
             btl_data_fit.loc[btl_data_fit["SSSCC"] == row["SSSCC"], "DEPTH"] = int(
                 row["DEPTH"]
             )
-        btl_data_fit["DateTime"] = btl_data_fit.nmea_datetime.apply(
-            lambda x: datetime.datetime.fromtimestamp(x)
-        )
-        time_data_fit["DateTime"] = time_data_fit.nmea_datetime.apply(
-            lambda x: datetime.datetime.fromtimestamp(x)
+
+        btl_data_fit["DateTime"] = btl_data_fit.nmea_datetime  #   For MatLAB < 2020
+        time_data_fit["DateTime"] = time_data_fit.nmea_datetime
+        btl_data_fit = process_bottle.add_btlnbr_cols(
+            btl_data_fit, btl_num_col="btl_fire_num"
+        )  #   BTLNBR int
+        btl_data_fit = btl_data_fit.rename(
+            columns={"SALNTY": "BTL_SAL", "OXYGEN": "BTL_OXY"}
         )
         outfile = cfg.dirs["pressure"] + "bottle_data"
-        save_cols = [
-            "SSSCC",
-            "DateTime",
-            "GPSLAT",
-            "GPSLON",
-            "btl_fire_num",
-            "CTDPRS",
-            "CTDTMP1",
-            "CTDTMP2",
-            "CTDTMP_FLAG_W",
-            "CTDCOND1",
-            "CTDCOND2",
-            "CTDSAL",
-            "CTDSAL_FLAG_W",
-            "CTDOXY",
-            "CTDOXY_FLAG_W",
-            "ALT",
-            "CTDFLUOR",
-            "TURBIDITY",
-            "CTDXMISS",
-            "FLUOR_CDOM",
-        ]
-        save_btl = btl_data_fit[save_cols].to_xarray()
+        btl_cols = {
+            "SSSCC": "Station",
+            "DateTime": "",
+            "GPSLAT": "Dec Degrees",
+            "GPSLON": "Dec Degrees",
+            "BTLNBR": "",
+            "CTDPRS": "DBAR",
+            "CTDTMP1": "ITS-90",
+            "CTDTMP2": "ITS-90",
+            "CTDTMP_FLAG_W": "",
+            "CTDCOND1": "mS/cm",
+            "CTDCOND2": "mS/cm",
+            "CTDSAL": "PSS-78",
+            "CTDSAL_FLAG_W": "",
+            "BTL_SAL": "PSS-78",
+            "CTDOXY": "UMOL/KG",
+            "CTDOXY_FLAG_W": "",
+            "BTL_OXY": "UMOL/KG",
+            "CTDOXY1": "ML/L",
+            "CTDOXYVOLTS": "0-5VDC",
+            "ALT": "M",
+            "CTDFLUOR": "mg/m^3",
+            "TURBIDITY": "0-5VDC",
+            "CTDXMISS": "0-5VDC",
+            "FLUOR_CDOM": "0-5VDC",
+        }
+        with open(outfile + ".csv", mode="w+") as f:
+            f.write(",".join(btl_cols.keys()) + "\n")
+            f.write(",".join(btl_cols.values()) + "\n")
+            btl_data_fit[btl_cols.keys()].to_csv(f, header=False, index=False)
+        save_btl = btl_data_fit[btl_cols.keys()].to_xarray()
         save_btl.to_netcdf(path=outfile + ".nc")
-        btl_data_fit[save_cols].to_csv(outfile + ".csv", index=False)
         # print("Exporting continuous .csv files...")
         # process_ctd.export_ct1(time_data_all, ssscc_list)
         time_cols = [
@@ -171,6 +181,8 @@ def whoi_process_all(group="WHOI"):
             "CTDSAL_FLAG_W",
             "CTDOXY",
             "CTDOXY_FLAG_W",
+            "CTDOXY1",
+            "CTDOXYVOLTS",
             "ALT",
             "CTDFLUOR",
             "TURBIDITY",
