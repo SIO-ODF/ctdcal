@@ -2,7 +2,6 @@ from pathlib import Path
 
 import gsw
 import logging
-import datetime
 import numpy as np
 import pandas as pd
 
@@ -146,11 +145,21 @@ def hex_to_ctd(ssscc_list, group="ODF"):
             if group == "WHOI":
                 #   V1 box offsets primary line by 0.073 sec, but not the secondary line. This is 1.7 scans, rounded down to 1
                 print(f"{ssscc} offsetting C1 by 0.073 seconds...")
-                inMat = np.transpose(converted_df.to_numpy())
-                inMat = np.transpose(
-                    process_ctd.ctd_align(inMat=inMat, col=4, time=0.073)
+                inMat = np.transpose(converted_df.to_numpy())  #   Initial transposition
+                inMat = process_ctd.ctd_align(
+                    inMat=inMat, col=4, time=0.073
+                )  # CTDCOND1
+                print(
+                    f"{ssscc} offsetting CTDOXY1 and oxygen voltage by 3.5 seconds each..."
                 )
+                inMat = process_ctd.ctd_align(inMat=inMat, col=6, time=3.5)  #   CTDOXY1
+                inMat = np.transpose(
+                    process_ctd.ctd_align(inMat=inMat, col=7, time=3.5)
+                )  #   OXY volts
+
                 converted_df["CTDCOND2"] = np.float64(inMat[:, 4])  #   ctd_align is old
+                converted_df["CTDOXY1"] = np.float64(inMat[:, 6])
+                converted_df["CTDOXYVOLTS"] = np.float64(inMat[:, 7])
 
                 #   Conductivity thermal mass correction à la SBE CellTM
                 print(f"{ssscc} applying C1, C2 thermal mass correction...")
