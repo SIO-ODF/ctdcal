@@ -587,6 +587,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
         xlim=(-10, 10),
+        ylim=(4000, 0),
     )
 
     bad_df = pd.DataFrame()  # initialize DF for questionable values
@@ -653,6 +654,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
                 xlabel="CTDOXY Residual (umol/kg)",
                 f_out=f_out,
                 xlim=(-10, 10),
+                ylim=(4000, 0),
             )
     else:
         print("Can't generate", f_suffix, "plotting figure as 'merged_df' is empty.")
@@ -780,6 +782,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
         xlim=(-10, 20),
+        ylim=(4000, 0),
     )
     # Prep vars, dfs, etc.
     all_sbe43_merged = pd.DataFrame()
@@ -927,6 +930,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
         xlim=(-10, 10),
+        ylim=(4000, 0),
     )
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit_flag2.pdf"
     flag2 = btl_df["CTDOXY_FLAG_W"] == 2
@@ -937,6 +941,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
         xlim=(-10, 10),
+        ylim=(4000, 0),
     )
 
     # export fitting coefs

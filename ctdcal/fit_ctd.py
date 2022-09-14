@@ -144,6 +144,7 @@ def _flag_btl_data(
             show_thresh=True,
             xlabel=xlabel,
             f_out=f_out,
+            ylim=(4000, 0),
         )
         f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
         ctd_plots._intermediate_residual_plot(
@@ -153,6 +154,7 @@ def _flag_btl_data(
             show_thresh=True,
             xlabel=xlabel,
             f_out=f_out,
+            ylim=(4000, 0),
         )
 
     return df_ques, df_bad
@@ -529,6 +531,7 @@ def calibrate_cond(btl_df, time_df):
                 btl_df.loc[btl_rows, "SSSCC"],
                 xlabel=f"{cN.upper()} Residual (mS/cm)",
                 f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_prefit.pdf",
+                ylim=(4000, 0),
             )
 
             #   Warning: Make sure that the ssscc contains at least one point within the yaml zRange
@@ -548,6 +551,7 @@ def calibrate_cond(btl_df, time_df):
                 df_good["SSSCC"],
                 xlabel=f"{cN.upper()} Residual (mS/cm)",
                 f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_fit_data.pdf",
+                ylim=(4000, 0),
             )
 
             # 3) calculate fit coefs
@@ -609,6 +613,7 @@ def calibrate_cond(btl_df, time_df):
             xlabel=f"{cN.upper()} Residual (mS/cm)",
             show_thresh=True,
             f_out=f"{cfg.fig_dirs[cN]}residual_all_postfit.pdf",
+            ylim=(4000, 0),
         )
 
         # export cond quality flags

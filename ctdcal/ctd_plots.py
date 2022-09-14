@@ -196,6 +196,7 @@ def _intermediate_residual_plot(
     prs,
     stn,
     xlim=(-0.02, 0.02),
+    ylim=(6000, 0),
     xlabel="Residual",
     show_thresh=False,
     f_out=None,
@@ -204,7 +205,15 @@ def _intermediate_residual_plot(
     Internal function to make figures at intermediate processing stages for debugging.
     """
     ax = residual_vs_pressure(
-        0, diff, prs, stn=stn, xlim=xlim, xlabel=xlabel, auto_title=False, grid=True
+        0,
+        diff,
+        prs,
+        stn=stn,
+        xlim=xlim,
+        ylim=ylim,
+        xlabel=xlabel,
+        auto_title=False,
+        grid=True,
     )
 
     if show_thresh:
