@@ -696,7 +696,7 @@ def osnap_plot_TS(df, f_out=None):
     plt.clabel(cs, fontsize=12, inline=1, fmt="%0.1f")
     #   Scatter of sample values
     sc = ax.scatter(salt, temp, c=df.SSSCC.astype(int), marker="+")
-    sc.set_clim(vmin=1, vmax=df.SSSCC.astype(int).max())
+    sc.set_clim(vmin=df.SSSCC.astype(int).min(), vmax=df.SSSCC.astype(int).max())
     ax.set_xlabel("Salinity")
     ax.set_ylabel("Temperature (ºC)")
     cbar = plt.colorbar(sc, format=tick.FormatStrFormatter("%.0f"))
