@@ -50,7 +50,9 @@ def whoi_process_all(group="WHOI"):
     convert.hex_to_ctd(ssscc_list, group)
 
     # process time files
-    convert.make_time_files(ssscc_list, group, microcat_list)
+    convert.make_time_files(
+        ssscc_list, group, ssscc_list
+    )  #   0914 want *all* upcasts fit
 
     # process bottle file
     convert.make_btl_mean(ssscc_list)
@@ -174,6 +176,7 @@ def whoi_process_all(group="WHOI"):
             "GPSLON",
             "CTDPRS",
             "CTDTMP1",
+            "CTDTMP2",
             "CTDTMP_FLAG_W",
             "CTDCOND1",
             "CTDCOND2",
