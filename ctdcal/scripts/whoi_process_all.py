@@ -77,15 +77,29 @@ def whoi_process_all(group="WHOI"):
     process_ctd.make_depth_log(time_data_all)
 
     #   Flag the temp data relative to itself, don't fit it w/o reference. Using ODF threshold defaults.
-    time_data_all["CTDTMP_FLAG_W"] = flagging.by_residual(
-        time_data_all.CTDTMP1, time_data_all.CTDTMP2, time_data_all.CTDPRS
-    )
-    btl_data_all["CTDTMP_FLAG_W"] = flagging.by_residual(
-        btl_data_all.CTDTMP1, btl_data_all.CTDTMP2, btl_data_all.CTDPRS
-    )  #   These columns should go in the output file.
+    # time_data_all["CTDTMP_FLAG_W"] = flagging.by_residual(
+    #     time_data_all.CTDTMP1, time_data_all.CTDTMP2, time_data_all.CTDPRS
+    # )
+    # btl_data_all["CTDTMP_FLAG_W"] = flagging.by_residual(
+    #     btl_data_all.CTDTMP1, btl_data_all.CTDTMP2, btl_data_all.CTDPRS
+    # )  #   These columns should go in the output file.
+    time_data_all["CTDTMP_FLAG_W"] = 1  #   ANo reference. By WOCE def.
+    btl_data_all["CTDTMP_FLAG_W"] = 1
 
     #   Calibrate conductivity
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
+    skip_list = [
+        "168",
+        "169",
+        "189",
+        "191",
+        "192",
+        "194",
+        "195",
+        "200",
+    ]  #   A list of stations where salts were not taken whatsoever. No ref, so use 1.
+    btl_data_all.loc[btl_data_all.SSSCC.isin(skip_list), "CTDSAL_FLAG_W"] = 1
+    time_data_all.loc[time_data_all.SSSCC.isin(skip_list), "CTDSAL_FLAG_W"] = 1
 
     btl_data_all, time_data_all = osnap_oxy.ctd_oxy_converter(
         btl_data_all, time_data_all
