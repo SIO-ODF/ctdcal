@@ -793,12 +793,14 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # Density match time/btl oxy dataframes
     print("Matching sigmas...")
     for ssscc in ssscc_list:
+        if ssscc == "100":
+            print("SSSCC #100...")
         time_data = time_df[time_df["SSSCC"] == ssscc].copy()
         btl_data = btl_df[btl_df["SSSCC"] == ssscc].copy()
         # can't calibrate without bottle oxygen ("OXYGEN")
         if (btl_data["OXYGEN_FLAG_W"] == 9).all():
             sbe43_dict[ssscc] = np.full(5, np.nan)
-            log.warning(ssscc + " skipped, all oxy data is NaN")
+            # log.warning(ssscc + " skipped, all oxy data is NaN")
             #   Can't calibrate, but let's try to apply the default coeffs
             # continue  #   This continue statement would keep all_sbe43_merged from being of equal size to btl_df
         sbe43_merged = match_sigmas(
@@ -820,6 +822,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         sbe43_merged["SSSCC"] = ssscc
         all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
         log.info(ssscc + " density matching done")
+    print("Density matching done for all samples.")
 
     # Only fit using OXYGEN flagged good (2)
     try:
@@ -833,29 +836,31 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
     sbe43_dict["ox0"] = sbe_coef0
 
+    #   OSNAP wants to use global coeffs for fitting. Assume membrane compresses identically
+    #   For each cast.
     # Fit each cast individually
-    for ssscc in ssscc_list:
-        if not all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].empty:
+    # for ssscc in ssscc_list:
+    #     if not all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].empty:
 
-            sbe_coef, sbe_df = sbe43_oxy_fit(
-                all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
-                sbe_coef0=sbe_coef0,
-                f_suffix=f"_{ssscc}",
-            )
-            # build coef dictionary
-            if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
-                sbe43_dict[ssscc] = sbe_coef
-            # all non-NaN oxygen data with flags
-            all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
-        else:
-            #   OSNAP: Force some sort of fit
-            # print("Oxygen for", ssscc, "is empty. Fitting and plotting skipped.")
-            print(
-                "Oxygen for",
-                ssscc,
-                "contains no bottle references. Assigning global coefs.",
-            )
-            sbe43_dict[ssscc] = sbe_coef0
+    #         sbe_coef, sbe_df = sbe43_oxy_fit(
+    #             all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
+    #             sbe_coef0=sbe_coef0,
+    #             f_suffix=f"_{ssscc}",
+    #         )
+    #         # build coef dictionary
+    #         if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
+    #             sbe43_dict[ssscc] = sbe_coef
+    #         # all non-NaN oxygen data with flags
+    #         all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
+    #     else:
+    #         #   OSNAP: Force some sort of fit
+    #         # print("Oxygen for", ssscc, "is empty. Fitting and plotting skipped.")
+    #         print(
+    #             "Oxygen for",
+    #             ssscc,
+    #             "contains no bottle references. Assigning global coefs.",
+    #         )
+    #         sbe43_dict[ssscc] = sbe_coef0
 
     # TODO: save outlier data from fits?
     # TODO: secondary oxygen flagging step (instead of just taking outliers from fit routine)
@@ -863,16 +868,10 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # apply coefs
     time_df["CTDOXY"] = np.nan
     for ssscc in ssscc_list:
-        if np.isnan(sbe43_dict[ssscc]).all():
-            log.warning(
-                f"{ssscc} missing oxy data, leaving nan values and flagging as 9"
-            )
-            time_df.loc[time_df["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
-            continue
         btl_rows = (btl_df["SSSCC"] == ssscc).values
         time_rows = (time_df["SSSCC"] == ssscc).values
         btl_df.loc[btl_rows, "CTDOXY"] = _PMEL_oxy_eq(
-            sbe43_dict[ssscc],
+            sbe43_dict["ox0"],
             (
                 btl_df.loc[btl_rows, cfg.column["oxyvolts"]],
                 btl_df.loc[btl_rows, cfg.column["p"]],
@@ -881,9 +880,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 btl_df.loc[btl_rows, "OS"],
             ),
         )
-        log.info(ssscc + " btl data fitting done")
+        print(ssscc + " btl data fitting done")
         time_df.loc[time_rows, "CTDOXY"] = _PMEL_oxy_eq(
-            sbe43_dict[ssscc],
+            sbe43_dict["ox0"],
             (
                 time_df.loc[time_rows, cfg.column["oxyvolts"]],
                 time_df.loc[time_rows, cfg.column["p"]],
@@ -892,28 +891,71 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 time_df.loc[time_rows, "OS"],
             ),
         )
-        log.info(ssscc + " time data fitting done")
-        #   Check for asymptotic fitting from underconstrained curves at the surface
+        #   Correct asymptotic behavior at the surface
         check_region = time_df.loc[time_rows]
         if (np.std(check_region.CTDOXY.iloc[0:19]) > 10) & (
             (check_region.CTDOXY.iloc[0] - check_region.CTDOXY.iloc[1]) < 0
         ):
-            #   Generally thrusts up, then downwards when the signal is actually climbing up linearly following final bottle
-            # print(ssscc, "has plummeting surface values following fitting...")
-            #   Define the area that needs to be refit. This should be where the derivative in the first ~30 points climbs up before going back down
-            idx = (
-                np.diff(np.diff(check_region.CTDOXY.iloc[0:29])).argmax() + 2
-            )  #   2nd derivative is maxed when first derivative goes from decreasing to increasing
+            idx = np.diff(np.diff(check_region.CTDOXY.iloc[0:29])).argmax() + 2
             fill_region = check_region.iloc[0:idx]
-            #   Pulled average pre-corrected slope from first 20 points of stations 1 and 33
             coefs = [1.18855453, fill_region.iloc[-1]["CTDOXY"]]
-            fn = np.poly1d(
-                coefs
-            )  #   Define a linear correction equation as a function of pressure
+            fn = np.poly1d(coefs)
             check_region.CTDOXY.iloc[0 : len(fill_region)] = np.flip(
                 fn(fill_region.CTDPRS)
             )
             time_df.loc[time_rows, "CTDOXY"] = check_region.CTDOXY
+    # for ssscc in ssscc_list:
+    #     if np.isnan(sbe43_dict[ssscc]).all():
+    #         log.warning(
+    #             f"{ssscc} missing oxy data, leaving nan values and flagging as 9"
+    #         )
+    #         time_df.loc[time_df["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
+    #         continue
+    #     btl_rows = (btl_df["SSSCC"] == ssscc).values
+    #     time_rows = (time_df["SSSCC"] == ssscc).values
+    #     btl_df.loc[btl_rows, "CTDOXY"] = _PMEL_oxy_eq(
+    #         sbe43_dict[ssscc],
+    #         (
+    #             btl_df.loc[btl_rows, cfg.column["oxyvolts"]],
+    #             btl_df.loc[btl_rows, cfg.column["p"]],
+    #             btl_df.loc[btl_rows, cfg.column["t1"]],
+    #             btl_df.loc[btl_rows, "dv_dt"],
+    #             btl_df.loc[btl_rows, "OS"],
+    #         ),
+    #     )
+    #     log.info(ssscc + " btl data fitting done")
+    #     time_df.loc[time_rows, "CTDOXY"] = _PMEL_oxy_eq(
+    #         sbe43_dict[ssscc],
+    #         (
+    #             time_df.loc[time_rows, cfg.column["oxyvolts"]],
+    #             time_df.loc[time_rows, cfg.column["p"]],
+    #             time_df.loc[time_rows, cfg.column["t1"]],
+    #             time_df.loc[time_rows, "dv_dt"],
+    #             time_df.loc[time_rows, "OS"],
+    #         ),
+    #     )
+    #     log.info(ssscc + " time data fitting done")
+    #     #   Check for asymptotic fitting from underconstrained curves at the surface
+    #     check_region = time_df.loc[time_rows]
+    #     if (np.std(check_region.CTDOXY.iloc[0:19]) > 10) & (
+    #         (check_region.CTDOXY.iloc[0] - check_region.CTDOXY.iloc[1]) < 0
+    #     ):
+    #         #   Generally thrusts up, then downwards when the signal is actually climbing up linearly following final bottle
+    #         # print(ssscc, "has plummeting surface values following fitting...")
+    #         #   Define the area that needs to be refit. This should be where the derivative in the first ~30 points climbs up before going back down
+    #         idx = (
+    #             np.diff(np.diff(check_region.CTDOXY.iloc[0:29])).argmax() + 2
+    #         )  #   2nd derivative is maxed when first derivative goes from decreasing to increasing
+    #         fill_region = check_region.iloc[0:idx]
+    #         #   Pulled average pre-corrected slope from first 20 points of stations 1 and 33
+    #         coefs = [1.18855453, fill_region.iloc[-1]["CTDOXY"]]
+    #         fn = np.poly1d(
+    #             coefs
+    #         )  #   Define a linear correction equation as a function of pressure
+    #         check_region.CTDOXY.iloc[0 : len(fill_region)] = np.flip(
+    #             fn(fill_region.CTDPRS)
+    #         )
+    #         time_df.loc[time_rows, "CTDOXY"] = check_region.CTDOXY
 
     # flag CTDOXY with more than 1% difference
     time_df["CTDOXY_FLAG_W"] = 2  # TODO: actual flagging of some kind?
