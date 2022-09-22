@@ -606,3 +606,30 @@ def CR_to_cond(cr, bath_t, ref_t, btl_p):
         cond[cond <= 1] = np.nan
 
     return cond
+
+
+def deg_to_dms(deg, pretty_print=None, ndp=4):
+    """
+    Convert from decimal degrees to degrees, minutes, seconds.
+    https://scipython.com/book/chapter-2-the-core-python-language-i/additional-problems/converting-decimal-degrees-to-deg-min-sec/
+    Defaults to N hemisphere if no sign is given on latitude (pretty_print)
+    Defaults to E hemisphere if no sign is given on longitude (pretty_print)
+    """
+
+    m, s = divmod(abs(deg) * 3600, 60)
+    d, m = divmod(m, 60)
+    if deg < 0:
+        d = -d
+    d, m = int(d), int(m)
+
+    if pretty_print:
+        if pretty_print == "latitude":
+            hemi = "N" if d >= 0 else "S"
+        elif pretty_print == "longitude":
+            hemi = "E" if d >= 0 else "W"
+        else:
+            hemi = "?"
+        return "{d:d}° {m:d}′ {s:.{ndp:d}f}″ {hemi:1s}".format(
+            d=abs(d), m=m, s=s, hemi=hemi, ndp=ndp
+        )
+    return d, m, s
