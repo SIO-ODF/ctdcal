@@ -519,16 +519,16 @@ def osnap_suite(btl_prefit, btl_fit, time_prefit, time_fit):
         outdir=cfg.dirs["logs"] + "postfit/500_",
     )  #   Do one just for the data within the fitting range
 
-    print("Starting the prefit-postfit comparisons...")
-    #   Takes a hot sec
-    for ssscc in btl_fit.SSSCC.unique():
-        if ssscc == "100":
-            print("SSSCC #100...")
-        pre = time_prefit[["CTDPRS", "CTDOXY"]].loc[time_prefit.SSSCC == ssscc]
-        post = time_fit[["CTDPRS", "CTDOXY"]].loc[time_fit.SSSCC == ssscc]
-        ref = btl_fit[["CTDPRS", "BTL_OXY"]].loc[btl_fit.SSSCC == ssscc]
-        fit_comparison(pre, post, ref, ssscc, grid=True)
-        plt.close()
+    # print("Starting the prefit-postfit comparisons...")
+    # #   Takes a hot sec
+    # for ssscc in btl_fit.SSSCC.unique():
+    #     if ssscc == "100":
+    #         print("SSSCC #100...")
+    #     pre = time_prefit[["CTDPRS", "CTDOXY"]].loc[time_prefit.SSSCC == ssscc]
+    #     post = time_fit[["CTDPRS", "CTDOXY"]].loc[time_fit.SSSCC == ssscc]
+    #     ref = btl_fit[["CTDPRS", "BTL_OXY"]].loc[btl_fit.SSSCC == ssscc]
+    #     fit_comparison(pre, post, ref, ssscc, grid=True)
+    #     plt.close()
 
 
 def all_residuals(btl_df, outdir="data/logs/postfit/", ext=".pdf"):
