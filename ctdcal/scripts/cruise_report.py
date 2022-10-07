@@ -8,7 +8,7 @@ from .. import ctd_plots, get_ctdcal_config
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
-btl_file = "data/scratch_folder/report_data.csv"
+btl_file = "data/logs/report_data.csv"
 btl_df = pd.read_csv(btl_file)
 
 # TODO: these were in old plots module; worth adding?
@@ -225,7 +225,7 @@ def calculate_residuals():
     low_grad_rows = (btl_df["CTDTMP1"] - btl_df["CTDTMP2"]).abs() < 0.002
     deep_rows = btl_df["CTDPRS"] > 2000
 
-    T_flag2 = (btl_df["CTDTMP1_FLAG_W"] == 2) | (btl_df["CTDTMP2_FLAG_W"] == 2)
+    # T_flag2 = (btl_df["CTDTMP1_FLAG_W"] == 2) | (btl_df["CTDTMP2_FLAG_W"] == 2)
     C_flag2 = (btl_df["CTDCOND1_FLAG_W"] == 2) | (btl_df["CTDCOND2_FLAG_W"] == 2)
     S_flag2 = (btl_df["CTDSAL_FLAG_W"] == 2) | (btl_df["CTDSAL_FLAG_W"] == 2)
     O_flag2 = btl_df["CTDOXY_FLAG_W"] == 2
@@ -235,15 +235,15 @@ def calculate_residuals():
         return np.format_float_positional(x, precision=5)
 
     # Temperature
-    low_grad = btl_df[low_grad_rows & T_flag2]
-    deep = btl_df[deep_rows & T_flag2]
-    print(f"REFT-T1 = {fmt((low_grad['REFTMP'] - low_grad['CTDTMP1']).std() * 2)}")
-    print(f"REFT-T2 = {fmt((low_grad['REFTMP'] - low_grad['CTDTMP2']).std() * 2)}")
-    print(f"T1-T2 = {fmt((low_grad['CTDTMP1'] - low_grad['CTDTMP2']).std() * 2)}")
-    print(f"REFT-T1 (deep) = {fmt((deep['REFTMP'] - deep['CTDTMP1']).std() * 2)}")
-    print(f"REFT-T2 (deep) = {fmt((deep['REFTMP'] - deep['CTDTMP2']).std() * 2)}")
-    print(f"T1-T2 (deep) = {fmt((deep['CTDTMP1'] - deep['CTDTMP2']).std() * 2)}")
-    print("")
+    # low_grad = btl_df[low_grad_rows & T_flag2]
+    # deep = btl_df[deep_rows & T_flag2]
+    # print(f"REFT-T1 = {fmt((low_grad['REFTMP'] - low_grad['CTDTMP1']).std() * 2)}")
+    # print(f"REFT-T2 = {fmt((low_grad['REFTMP'] - low_grad['CTDTMP2']).std() * 2)}")
+    # print(f"T1-T2 = {fmt((low_grad['CTDTMP1'] - low_grad['CTDTMP2']).std() * 2)}")
+    # print(f"REFT-T1 (deep) = {fmt((deep['REFTMP'] - deep['CTDTMP1']).std() * 2)}")
+    # print(f"REFT-T2 (deep) = {fmt((deep['REFTMP'] - deep['CTDTMP2']).std() * 2)}")
+    # print(f"T1-T2 (deep) = {fmt((deep['CTDTMP1'] - deep['CTDTMP2']).std() * 2)}")
+    # print("")
 
     # Conductivity
     low_grad = btl_df[low_grad_rows & C_flag2]
@@ -273,19 +273,19 @@ def calculate_residuals():
 
     # RINKO
     # low_grad = btl_df[low_grad_rows & R_flag2]
-    flag2 = btl_df[R_flag2]
-    deep = btl_df[deep_rows & R_flag2]
-    print(f"OXY-RINKO = {fmt((flag2['OXYGEN'] - flag2['CTDRINKO']).std() * 2)}")
-    print(f"OXY-RINKO (deep) = {fmt((deep['OXYGEN'] - deep['CTDRINKO']).std() * 2)}")
-    print("")
+    # flag2 = btl_df[R_flag2]
+    # deep = btl_df[deep_rows & R_flag2]
+    # print(f"OXY-RINKO = {fmt((flag2['OXYGEN'] - flag2['CTDRINKO']).std() * 2)}")
+    # print(f"OXY-RINKO (deep) = {fmt((deep['OXYGEN'] - deep['CTDRINKO']).std() * 2)}")
+    # print("")
 
 
 def cruise_report_residuals():
     """Do all the things for cruise report"""
-    plot_residuals()
-    pressure_offset()
-    fit_coefficients()
-    calculate_residuals()
+    # plot_residuals()
+    # pressure_offset()
+    # fit_coefficients()
+    # calculate_residuals()
 
 
 # if __name__ == "__main__":

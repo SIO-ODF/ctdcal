@@ -373,18 +373,16 @@ def export_report_data(df):
         "SALNTY",
         "CTDOXY",
         "CTDOXY_FLAG_W",
-        "CTDRINKO",
-        "CTDRINKO_FLAG_W",
+        # "CTDRINKO",
+        # "CTDRINKO_FLAG_W",
         "OXYGEN",
     ]
 
     # add in missing flags
     df["CTDTMP1_FLAG_W"] = flagging.by_residual(
-        df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
+        df["CTDTMP1"], df["CTDTMP2"], df["CTDPRS"]
     )
-    df["CTDTMP2_FLAG_W"] = flagging.by_residual(
-        df["CTDTMP1"], df["REFTMP"], df["CTDPRS"]
-    )
+    df["CTDTMP2_FLAG_W"] = df["CTDTMP1_FLAG_W"]
     df["CTDCOND1_FLAG_W"] = flagging.by_residual(
         df["CTDCOND1"], df["BTLCOND"], df["CTDPRS"]
     )
@@ -392,9 +390,9 @@ def export_report_data(df):
         df["CTDCOND2"], df["BTLCOND"], df["CTDPRS"]
     )
     df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
-    df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
+    # df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
-    df[cruise_report_cols].to_csv("data/scratch_folder/report_data.csv", index=False)
+    df[cruise_report_cols].to_csv("data/logs/report_data.csv", index=False)
 
     return
 

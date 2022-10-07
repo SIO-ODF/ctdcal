@@ -147,6 +147,7 @@ def whoi_process_all(group="WHOI"):
         btl_data_fit = process_bottle.add_btlnbr_cols(
             btl_data_fit, btl_num_col="btl_fire_num"
         )  #   BTLNBR int
+        process_bottle.export_report_data(btl_data_fit)
         btl_data_fit = btl_data_fit.rename(
             columns={"SALNTY": "BTL_SAL", "OXYGEN": "BTL_OXY"}
         )
