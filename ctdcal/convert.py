@@ -104,6 +104,12 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    "13": {
+        "short_name": "CTDFLUOR",
+        "long_name": "FluoroSeatechWetlabsFLF_Sensor",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
 }
 
 
