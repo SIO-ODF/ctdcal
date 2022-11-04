@@ -9,8 +9,6 @@ Nov 7, 2016
 
 import csv
 import logging
-import statistics
-import sys
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
@@ -187,6 +185,8 @@ def load_all_btl_files(ssscc_list, cols=None):
         reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
         try:
             reft_data = _load_reft_data(reft_file)
+            if len(reft_data) > 36:
+                log.error(f"len(reft_data) > 36 for {ssscc}, check reftmp file")
         except FileNotFoundError:
             log.warning(
                 "Missing (or misnamed) REFT Data Station: "
@@ -201,6 +201,8 @@ def load_all_btl_files(ssscc_list, cols=None):
         refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
         try:
             refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
+            if len(refc_data) > 36:
+                log.error(f"len(refc_data) > 36 for {ssscc}, check autosal file")
         except FileNotFoundError:
             log.warning(
                 "Missing (or misnamed) REFC Data Station: "
@@ -218,6 +220,8 @@ def load_all_btl_files(ssscc_list, cols=None):
         oxy_file = cfg.dirs["oxygen"] + ssscc
         try:
             oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
+            if len(oxy_data) > 36:
+                log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
         except FileNotFoundError:
             log.warning(
                 "Missing (or misnamed) REFO Data Station: "
@@ -259,9 +263,7 @@ def load_all_btl_files(ssscc_list, cols=None):
         )
 
         if len(btl_data) > 36:
-            log.error(
-                f"""Length of bottle data for {ssscc} is > 36, check for errors in reference parameter files"""
-            )
+            log.error(f"len(btl_data) for {ssscc} > 36, check bottle file")
 
         # Add bottom of cast information (date,time,lat,lon,etc.)
         btl_data = _add_btl_bottom_data(btl_data, ssscc)
