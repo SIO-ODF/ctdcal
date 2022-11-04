@@ -114,6 +114,151 @@ def remove_autosal_drift(saltDF, refDF):
     return saltDF.drop(labels="IndexTime", axis="columns")
 
 
+def sdl_loader(filename):
+    """
+    For loading sdl.dat (Salinity data logger) files and rewriting as ODF formatted DataFrames.
+    """
+    sdl = pd.read_csv(filename, sep="\t")  #   Read tab deliminated file
+    sdl = sdl.loc[sdl.ReadingNumber.isnull()]  #   Remove non-averaged readings
+    try:
+        cut_std = sdl[
+            sdl["BottleLabel"].str.contains("P")
+        ]  #   Remove rows associated with standard (P coming from IAPSO batch)
+        sdl = sdl[sdl["BottleLabel"].str.contains("P") == False]
+    except AttributeError:
+        #   If standard was run previously
+        cut_std = pd.DataFrame()
+
+    if not sdl.empty:
+
+        #   Create SSSCC columns. For OSNAP, CC = 01
+        sdl[["ID2", "Num"]] = sdl.SampleID.str.split("#", expand=True)
+        sdl["SSS"] = sdl.ID2.str[0:3]
+        sdl["CC"] = sdl.ID2.str[-2:]
+
+        #   Extract microcat samples and write Autosal lines for microcat group
+        #   (Pass the microcat.csv file into sdl_std for salinity)
+        commented = sdl[sdl.Comments.isnull() == False]
+        if not commented.empty:
+            micro = commented[commented.Comments.str.contains("cat")]
+            if not micro.empty:
+                #   Cut out the columns they don't want
+                micro = pd.DataFrame.from_dict(
+                    {
+                        "STNNBR": micro.SSS,
+                        "BOTTLE": micro.BottleLabel.astype(int),
+                        "CRavg": 2
+                        * micro.AdjustedRatio,  #   SDL writes ratio out as half of what ODF routine does
+                        "CR_unadjusted": 2 * micro.UncorrectedRatio,
+                        "EndTime": micro.DateTime,
+                        "Comment": micro.Comments,
+                    }
+                )
+                if cut_std.empty:
+                    #   Need to pass through sdl_std
+                    micro.to_csv(
+                        Path(cfg.dirs["salt"])
+                        / f"microcat_salt_to_correct_{micro.STNNBR.iloc[0]}.csv",
+                        index=False,
+                    )
+                else:
+                    micro["SALNTY"] = gsw.SP_salinometer((micro["CRavg"] / 2), 24)
+                    micro.to_csv(
+                        Path(cfg.dirs["salt"])
+                        / f"microcat_salt_{micro.STNNBR.iloc[0]}.csv",
+                        index=False,
+                    )
+
+        sdl = sdl[
+            sdl["Comments"].isnull() == True
+        ]  #   Cut out everything  that has a comment (Aaron indicating as needing a rerun or microcat, which are not fit)
+
+        #   Make saltDF in same format as odf_io
+        to_write = {
+            "STNNBR": sdl.SSS,
+            "CASTNO": sdl.CC,
+            "SAMPNO": sdl.BottleLabel.astype(int),
+            "BathTEMP": 24,  #   There is no option to export bath temp with decimals and is occasionally very wrong
+            "CRavg": 2
+            * sdl.AdjustedRatio,  #   SDL writes ratio out as half of what ODF routine does
+            "CRraw": 2 * sdl.UncorrectedRatio,
+            "autosalSAMPNO": sdl.SampleNumber,
+            "Unknown": np.nan,  # Standardize dial
+            "StartTime": np.nan,
+            "EndTime": sdl.DateTime,
+            "Attempts": np.nan,
+        }
+        saltDF = pd.DataFrame.from_dict(to_write)
+        saltDF.reset_index(inplace=True)  #   Ignore the index given to it before
+    else:
+        print(
+            "Warning: No entries discovered in saltDF and results in empty dataframe:",
+            filename,
+        )
+
+    return saltDF, cut_std
+
+
+def sdl_std(saltDF, cut_std, salt_dir=cfg.dirs["salt"], infile="standards.csv"):
+    """For applying standard correction to saltDF/updating standards list in Salinity data logger"""
+    outfile = Path(salt_dir) / infile
+    if not outfile.exists():
+        #   If the standards file does not exist, create it
+        print("Salt standards file does not exist. Creating...")
+        header = [
+            "SampleID",
+            "BottleLabel",
+            "DateTime",
+            "BathTemperature",
+            "UncorrectedRatio",
+            "UncorrectedRatioStandDev",
+            "Correction",
+            "AdjustedRatio",
+        ]
+        cut_std.to_csv(Path(outfile), columns=header, index=False)
+
+    std_list = pd.read_csv(outfile)
+    if cut_std.empty:
+        #   If no standards were run in the last iteration, the CRavg = CRraw and needs a flat adjustment
+        #   If a standard is run, then the CRavg already has a flat standardization adjustment
+
+        # print(
+        #     saltDF.STNNBR.iloc[0],
+        #     "is missing a standard. Pulling from the appropriate standard run...",
+        # )
+
+        try:
+            times = pd.to_datetime(std_list.DateTime)
+            samp_time = pd.to_datetime(saltDF.EndTime.iloc[0])
+            corr = std_list.Correction.loc[
+                times == min(times, key=lambda d: abs(d - samp_time))
+            ].item()
+            # print("Pulled correction value:", corr)
+        except:
+            #   Read last value in as Correction
+            corr = std_list.Correction.iloc[-1]
+            print(
+                "Latest standard run was:",
+                std_list["DateTime"].iloc[-1],
+                "Correction =",
+                corr,
+            )
+
+        #   apply offset from last standard (CRavg = CRavg + Correction)
+        saltDF["CRavg"] = saltDF["CRavg"] + corr * 2
+        # print("New CRavg:\n", saltDF["CRavg"])
+
+    else:  #   Append the standard lines to the standards file. Use current adjusted CR.
+        print("Appending new standards to list.")
+        std_list = pd.concat([std_list, cut_std], ignore_index=True)
+        std_list = std_list.drop_duplicates(
+            subset="DateTime", keep="first"
+        )  #   In case of overlap
+        std_list.to_csv(Path(outfile), index=False)
+
+    return saltDF
+
+
 def _salt_exporter(
     saltDF, outdir=cfg.dirs["salt"], stn_col="STNNBR", cast_col="CASTNO"
 ):
