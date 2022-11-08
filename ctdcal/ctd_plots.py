@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+import gsw
 
 log = logging.getLogger(__name__)
 
@@ -219,6 +220,185 @@ def _intermediate_residual_plot(
 
     # save to path or return axis (primarily for testing)
     return _save_fig(ax, f_out)
+
+
+def haversine(lat1, lon1, lat2, lon2, units="km"):
+    """
+    Calculate the great circle distance in kilometers between two points
+    on the earth using the haversine formula.
+    For use on small distances (<4 degrees)
+
+    Parameters
+    ----------
+    lat1, lon1, lat2, lon2 : Float
+        Latitude and longitude of coordinate points 1 and 2, respectively
+        in decimal degrees
+    units : String
+        Abbreviation of desired distance units (km, mi, or nmi)
+
+    Returns
+    -------
+    dout : Float
+        Calculated distance between points with units specified by 'units'
+    """
+    from math import radians, cos, sin, asin, sqrt
+
+    # convert decimal degrees to radians
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    # haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+    #   Discern output
+    if units == "mi":
+        print("Desired output units of miles in haversine formula.")
+        r = 3956
+    elif units == "nmi":
+        print("Desired output units of nautical miles in haversine formula.")
+        r = 3440.1
+    else:
+        if units != "km":
+            print(
+                "Provided units:",
+                units,
+                "not recognized. Assuming kilomters output in haversine formula.",
+            )
+        r = 6371  #   Assume kilometers
+    dout = c * r
+    return dout
+
+
+def section_bottle_plot(df, varname="CTDSAL", f_out=None, interp=True, cmap="viridis"):
+    """
+    Scatter plot of a desired variable against section distance for a bottle file.
+
+    Parameters
+    ----------
+    df : Pandas DataFrame
+        Bottle DataFrame with latitude, longitude, CTD pressure, and other variables
+    varname : String
+        String of variable intended to be plotted. Defaults to CTDSAL.
+
+    """
+    from math import ceil
+
+    depth_max = ceil(df.DEPTH.max() / 500) * 500
+    dot_width = 2
+
+    #   Create section distance column
+    x = df.LATITUDE.diff()
+    x.reset_index(inplace=True, drop=True)
+    idx = x[x != 0.0].index.tolist()
+    df["dist"] = np.nan
+    for i in idx:
+        if i == 0:
+            df["dist"].iloc[i] = 0.0
+            val_add = 0.0
+        else:
+            #   Uses last assignment
+            df["dist"].iloc[i] = (
+                haversine(
+                    df.LATITUDE.iloc[i - 1],
+                    df.LONGITUDE.iloc[i - 1],
+                    df.LATITUDE.iloc[i],
+                    df.LONGITUDE.iloc[i],
+                )
+                + val_add
+            )
+        #   Define new value to add for the beginning of the next iteration
+        val_add = df["dist"].iloc[i]
+    df["dist"].fillna(method="ffill", inplace=True)  #   Forward fill the nans
+
+    if interp:
+        plt.set_cmap(cmap)
+        plt.figure(figsize=(7, 6))
+        fig, ax = plt.subplots()
+        #   Creates the irregularly-spaced bounds for the contour
+        ax.tricontour(df.dist, df.CTDPRS, df[varname], 20)
+        plt.fill_between(
+            df["dist"],
+            df["DEPTH"],
+            depth_max,
+            interpolate=True,
+            color="gray",
+            zorder=2,
+        )
+        #   Fills in the contour
+        cntr2 = ax.tricontourf(df.dist, df.CTDPRS, df[varname], 20)
+        ax.scatter(df.dist, df.CTDPRS, s=dot_width, color="k", zorder=3)
+        cbar = fig.colorbar(cntr2, ax=ax)
+    else:
+        plt.figure(figsize=(7, 6))
+        ax = plt.axes()
+        a = ax.scatter(df["dist"], df["CTDPRS"], c=df[varname])
+        plt.colorbar(a, ax=ax)
+        plt.fill_between(
+            df["dist"],
+            df["DEPTH"],
+            depth_max,
+            interpolate=True,
+            color="gray",
+        )
+
+    plt.ylim(0, depth_max)
+    plt.ylabel("CTDPRS (dbar)")
+    plt.xlabel("Section Distance (km)")
+    plt.tight_layout()
+    plt.gca().invert_yaxis()
+
+    return _save_fig(ax, f_out)
+
+
+def bottle_TS_plot(df, f_out=None):
+    """
+    Line plot of temperature and salinity for a single cast or series of casts.
+    Modified from: https://oceanpython.org/2013/02/17/t-s-diagram/
+
+    Reads in bottle dataframe and creates a TS plot, colored by station number.
+
+    Parameters
+    ----------
+    df : Pandas DataFrame
+        Bottle DataFrame with latitude, longitude, CTD pressure, and other variables
+    f_out : String, optional
+        Path and filename to save TS plot
+    """
+
+    #   Demarcate temperature, salinty, and limits for density
+    temp = df.CTDTMP1
+    salt = df.CTDSAL
+    smin = salt.min() - (0.01 * salt.min())
+    smax = salt.max() + (0.01 * salt.max())
+    tmin = temp.min() - (0.1 * temp.max())
+    tmax = temp.max() + (0.1 * temp.max())
+    #   Gridding for a contour
+    xdim = round((smax - smin) / 0.1 + 1.0)
+    ydim = round((tmax - tmin) + 1.0)
+    #   Creating density vectors to fill the grid with densities
+    dens = np.zeros((ydim, xdim))
+    si = np.linspace(1, xdim - 1, xdim) * 0.1 + smin
+    ti = np.linspace(1, ydim - 1, ydim) + tmin
+    for j in range(0, int(ydim)):
+        for i in range(0, int(xdim)):
+            dens[j, i] = gsw.rho(si[i], ti[j], 0)
+    dens = dens - 1000  #   Convert to sigma-theta
+
+    fig = plt.figure(figsize=(7, 6))
+    ax = fig.add_subplot()
+    #   Density contours
+    cs = plt.contour(si, ti, dens, linestyles="dashed", colors="k")
+    plt.clabel(cs, fontsize=12, inline=1, fmt="%0.1f")
+    #   Scatter of sample values
+    sc = ax.scatter(salt, temp, c=df.SSSCC.astype(int), marker="+")
+    sc.set_clim(vmin=df.SSSCC.astype(int).min(), vmax=df.SSSCC.astype(int).max())
+    ax.set_xlabel("Salinity")
+    ax.set_ylabel("Temperature (ºC)")
+    cbar = plt.colorbar(sc, format=ticker.FormatStrFormatter("%.0f"))
+    cbar.set_label("Cast Number")
+
+    _save_fig(ax, f_out)
 
 
 # TODO: more plots! what does ODV have?
