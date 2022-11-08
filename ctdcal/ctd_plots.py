@@ -186,6 +186,12 @@ def residual_vs_station(
         log.info('Set afterward using \'ax.set_title("title")`')
     _apply_default_fmt(None, ylim, xlabel, ylabel, title, grid)
 
+    #   Reduce the number of ticks (divide by 10) for easier viewing
+    if (len(stn) > 100) & (not deep):
+        plt.xticks(
+            np.arange(min(stn.astype(int)), max(stn.astype(int)), 10), rotation=45
+        )
+
     # save to path or return axis
     return _save_fig(ax, f_out)
 
