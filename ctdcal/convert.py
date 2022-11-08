@@ -104,6 +104,18 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    "67": {
+        "short_name": "TURBIDITY",
+        "long_name": "Turbidity Meter",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
+    "19": {
+        "short_name": "FLUOR_CDOM",
+        "long_name": "FluoroWetlabCDOM_Sensor",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
 }
 
 
