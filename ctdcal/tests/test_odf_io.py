@@ -227,3 +227,175 @@ def test_process_salts(tmp_path, caplog):
     with caplog.at_level(logging.INFO):
         odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
         assert "90909_salts.csv already exists" in caplog.messages[1]
+
+
+def make_sdl(to_file=None):
+    salts = pd.DataFrame(
+        [
+            [
+                "1",
+                "Calibration#1",
+                "P165",
+                "0",
+                "",
+                "20-Aug-2022 05:32:34",
+                "24C",
+                "0.999759",
+                "0.000006",
+                "0.000101",
+                "0.999860",
+                "0.000000",
+                "0.0000",
+                "",
+            ],
+            [
+                "1",
+                "Calibration#1",
+                "",
+                "0",
+                "1",
+                "20-Aug-2022 05:32:35",
+                "24C",
+                "0.999759",
+                "0.000006",
+                "0.000101",
+                "0.999860",
+                "0.000000",
+                "0.0000",
+                "",
+            ],
+            [
+                "1",
+                "001#1",
+                "1",
+                "1",
+                "",
+                "20-Aug-2022 05:36:42",
+                "24C",
+                "0.999135",
+                "0.000006",
+                "0.000101",
+                "0.999236",
+                "34.969930",
+                "0.0002",
+                "",
+            ],
+            [
+                "1",
+                "001#1",
+                "",
+                "1",
+                "1",
+                "20-Aug-2022 05:36:47",
+                "24C",
+                "0.999132",
+                "0.000007",
+                "0.000101",
+                "0.999233",
+                "34.969800",
+                "0.0003",
+                "",
+            ],
+            [
+                "1",
+                "001#1",
+                "",
+                "1",
+                "2",
+                "20-Aug-2022 05:38:07",
+                "24C",
+                "0.999138",
+                "0.000005",
+                "0.000101",
+                "0.999239",
+                "34.970070",
+                "0.0002",
+                "",
+            ],
+            [
+                "2",
+                "001#2",
+                "2",
+                "1",
+                "",
+                "20-Aug-2022 05:45:12",
+                "24C",
+                "0.999141",
+                "0.000007",
+                "0.000101",
+                "0.999242",
+                "34.970170",
+                "0.0003",
+                "",
+            ],
+            [
+                "2",
+                "001#2",
+                "",
+                "1",
+                "1",
+                "20-Aug-2022 05:45:17",
+                "24C",
+                "0.999078",
+                "0.000006",
+                "0.000101",
+                "0.999178",
+                "34.967670",
+                "0.0002",
+                "",
+            ],
+            [
+                "2",
+                "001#2",
+                "",
+                "1",
+                "2",
+                "20-Aug-2022 05:46:41",
+                "24C",
+                "0.999205",
+                "0.000008",
+                "0.000101",
+                "0.999306",
+                "34.972660",
+                "0.0003",
+                "",
+            ],
+        ],
+        columns=[
+            "SampleNumber",
+            "SampleID",
+            "BottleLabel",
+            "SampleType",
+            "ReadingNumber",
+            "DateTime",
+            "BathTemperature",
+            "UncorrectedRatio",
+            "UncorrectedRatioStandDev",
+            "Correction",
+            "AdjustedRatio",
+            "CalculatedSalinity",
+            "CalculatedSalinityStandDev",
+            "Comments",
+        ],
+    )
+
+    if to_file is not None:
+        salts.to_csv(to_file, sep="\t", index=False)
+
+
+def test_sdl_loader(tmp_path):
+
+    f_path = tmp_path / "001.dat"
+    assert not Path(tmp_path / "001.dat").exists()
+    make_sdl(to_file=f_path)
+
+    #   Check that bottle dataframe is populated with real vals
+    [SaltDF, cut_std] = odf_io.sdl_loader(f_path)
+    assert len(SaltDF) == 2
+    assert not "SampleType" in SaltDF.columns
+    assert "autosalSAMPNO" in SaltDF.columns
+    assert type(SaltDF["CRavg"].iloc[0]) == np.float64
+    #   Check that cut standards are indeed, standards
+    assert len(cut_std) == 1
+    assert "SampleType" in cut_std.columns
+    assert "Correction" in cut_std.columns
