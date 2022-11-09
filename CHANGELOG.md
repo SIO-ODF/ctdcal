@@ -4,12 +4,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## v0.1.4b (unreleased)
 
 ### Added
+* Logging messages of all levels are now logged to `ctdcal.log` file
+* `ctdcal` CLI now has a `--debug` flag to display all logging levels (instead of WARNING and above)
 * `ctdcal.io` has two new functions for reading Exchange data files from local filesystem or URL, `load_exchange_btl` and `load_exchange_ctd` (see [CCHDO File Formats](https://cchdo.ucsd.edu/formats))
 * Tutorial notebooks on how to use `ctdcal` can be found in the [docs](https://ctdcal.readthedocs.io/en/latest/)
-* `ctdcal` CLI now has a `--debug` flag to display all logging levels (instead of WARNING and above)
 * `ctdcal quick-convert` CLI command to create Exchange ct1 files from Sea-Bird .cnv files, without performing any calibration
 * `ctdcal qc` CLI command to launch interactive data flagging tool
 * Data flagging tool now has an exit button to halt the local server process
+* Added Wetlabs Fluorometer to `convert.py`
+* Start testing `process_bottle` and `oxy_fitting` modules
+
+### Changed
+* By default, only logging levels WARNING and above will be displayed in terminal (see `--debug` addition above)
+* Fixed bug when loading single station `ssscc.csv` files into `fit_ctd`
 
 ## v0.1.3b (2021-10-21)
 
