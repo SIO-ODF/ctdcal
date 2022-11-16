@@ -17,7 +17,6 @@ from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -154,12 +153,19 @@ def gather_oxy_params(oxy_file):
     df : DataFrame
         Oxygen measurement parameters
     """
-    with open(oxy_file, newline="") as f:
-        header = f.readline()
+    titr_columns = ["V_std", "V_blank", "N_KIO3", "V_KIO3", "T_KIO3", "T_thio"]
+    try:
+        with open(oxy_file, newline="") as f:
+            header = f.readline()
 
-    param_list = header.split()[:6]
-    params = pd.DataFrame(param_list, dtype=float).transpose()
-    params.columns = ["V_std", "V_blank", "N_KIO3", "V_KIO3", "T_KIO3", "T_thio"]
+        param_list = header.split()[:6]
+        params = pd.DataFrame(param_list, dtype=float).transpose()
+        params.columns = titr_columns
+
+    except FileNotFoundError:
+        # fitting data before titration file has been received from oxygen analyst
+        log.info(f"Failed to load {oxy_file} titration file, filling with NaNs")
+        params = pd.DataFrame(np.nan, index=[0], columns=titr_columns)
 
     return params
 
