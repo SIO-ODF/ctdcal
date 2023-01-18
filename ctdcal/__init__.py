@@ -17,7 +17,7 @@ except PackageNotFoundError:
     pass
 
 
-def get_ctdcal_config():
+def get_ctdcal_config(cfg_file="config.py"):
     """
     Find and load config file from ctdcal module folder (ctdcal/ctdcal/).
 
@@ -25,7 +25,7 @@ def get_ctdcal_config():
     """
     # compile config.py and save variables to dict
     config = {}
-    with resources.path("ctdcal", "config.py") as filepath:
+    with resources.path("ctdcal", cfg_file) as filepath:
         try:
             with open(filepath, mode="rb") as f:
                 exec(compile(f.read(), filepath, "exec"), config)

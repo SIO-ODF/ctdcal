@@ -91,7 +91,7 @@ def import_data():
 @click.option(
     "-g",
     "--group",
-    type=click.Choice(["ODF", "PMEL"], case_sensitive=False),
+    type=click.Choice(["ODF", "GTC", "PMEL"], case_sensitive=False),
     default="ODF",
 )
 # @click.option(
@@ -108,6 +108,13 @@ def process(group):
 
         log.info("Starting ODF processing run")
         odf_process_all()
+
+    elif group == "GTC":
+        from .scripts.gp17_process_all import gp17_process_all
+
+        log.info("Starting GP17 processing run")
+        gp17_process_all()
+
     elif group == "PMEL":
         # pmel_process()
         raise NotImplementedError
@@ -137,24 +144,96 @@ def qc():  # pragma: no cover
 @click.option(
     "-f",
     "--file",
-    type=click.Choice(["hy1", "ct1", "all"], case_sensitive=False),
+    type=click.Choice(
+        ["hy1", "ct1", "reft", "salt", "oxy", "all"], case_sensitive=False
+    ),
     default="all",
 )
 @cli.command()
-def quick_convert(file):
+def quick_convert(filetype):
     """Convert Sea-Bird .cnv files to Exchange CTD (ct1) and bottle (hy1) files."""
     from .scripts.quick_convert import cnv_to_ct1
 
-    if file == "ct1":
+    if filetype == "ct1":
         cnv_to_ct1()
-    elif file == "hy1":
+    elif filetype == "hy1":
         # cnv_to_hy1()
         raise NotImplementedError
-    elif file == "all":
+    # elif filetype == "oxy":
+    #     from oxy_fitting import calculate_bottle_oxygen, load_winkler_oxy
+    #     # loop over list of 5-digit files with no extension (e.g., 01301)
+    #     for f in sorted(Path(cfg.dirs["oxygen"]).glob("?????")):
+    #         df, params = load_winkler_oxy(f)
+
+    elif filetype == "all":
         cnv_to_ct1()
         # cnv_to_hy1()
 
     # should we have non-Exchange output options?
+
+
+@click.argument("filename", type=click.Path(exists=True))
+# @click.argument("startidx", type=int, nargs=1)
+@cli.command()
+def quick_plot(filename):
+    # ctdcal quick-plot /Volumes/cruise/RR2214/data/ctd/data/processed/ssscc.cnv
+    import gsw
+    import matplotlib.pyplot as plt
+    from ctdcal.io import load_cnv
+
+    startidx = 5000
+    T_xlim = (5, 9)
+    S_xlim = (33.75, 34.5)
+    O_xlim = (260, 300)
+    D_xlim = (26, 27)
+
+    cnv = load_cnv(filename)
+    cnv = cnv.iloc[startidx:cnv["prDM"].idxmax()]
+    cnv["sigma0"] = gsw.sigma0(cnv["sal00"], cnv["t090C"])
+    fig, ax1 = plt.subplots(figsize=(6, 8), dpi=100)
+
+    # Temperature block
+    color = "tab:red"
+    ax1.set_xlabel("Temperature (ºC)", color=color)
+    ax1.set_ylabel("Depth (m)")
+    ax1.plot(cnv["t090C"], cnv["depSM"], color=color)
+    ax1.set_xlim(T_xlim)
+    ax1.set_ylim([250, 0])
+    ax1.grid()
+    ax1.tick_params(axis="x", labelcolor=color)
+
+    # Salinity block
+    ax2 = ax1.twiny()  # instantiate a second axes that shares the same x-axis
+    color = "xkcd:gold"
+    ax2.set_xlabel("Salinity (PSU)", color=color)  # we already handled the x-label with ax1
+    ax2.plot(cnv["sal00"], cnv["depSM"], color=color)
+    ax2.set_xlim(S_xlim)
+    ax2.set_ylim([250, 0])
+    ax2.tick_params(axis="x", labelcolor=color)
+
+    # Oxygen block
+    ax3 = ax1.twiny()  # instantiate a second axes that shares the same x-axis
+    ax3.spines.top.set_position(("axes", 1.1))
+    color = "xkcd:cyan"
+    ax3.set_xlabel("Oxygen (umol/kg)", color=color)  # we already handled the x-label with ax1
+    ax3.plot(cnv["sbox0Mm/Kg"], cnv["depSM"], color=color)
+    ax3.set_xlim(O_xlim)
+    ax3.set_ylim([250, 0])
+    ax3.tick_params(axis="x", labelcolor=color)
+
+    # Density block
+    ax4 = ax1.twiny()  # instantiate a second axes that shares the same x-axis
+    ax4.spines.top.set_position(("axes", 1.2))
+    color = "blue"
+    ax4.set_xlabel("Density (sigma-theta)", color=color)  # we already handled the x-label with ax1
+    ax4.plot(cnv["sigma0"], cnv["depSM"], color=color)
+    ax4.set_xlim(D_xlim)
+    ax4.set_ylim([250, 0])
+    ax4.tick_params(axis="x", labelcolor=color)
+
+    fig.suptitle(filename[-9:])
+    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+    plt.show()
 
 
 if __name__ == "__main__":

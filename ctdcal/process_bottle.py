@@ -58,6 +58,14 @@ def retrieveBottleData(converted_df):
     return pd.DataFrame()  # empty dataframe
 
 
+def read_bl(fname):
+    """Read SBE .bl file."""
+
+    df = pd.read_csv(fname, skiprows=2, header=None)
+    df.columns = ["index", "btl_fire_num", "time", "start_idx", "end_idx"]
+
+    return df
+
 def bottle_mean(btl_df):
     """Compute the mean for each bottle from a dataframe."""
     btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
@@ -127,7 +135,7 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
     Loads salt_file to dataframe and reindexes to match bottle data dataframe
     """
     salt_data = pd.read_csv(
-        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"]
+        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg", "autosalSAMPNO"]
     )
     salt_data.set_index(index_name)
     salt_data["SSSCC_SALT"] = Path(salt_file).stem.split("_")[0]
@@ -156,7 +164,7 @@ def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", deci
     return df
 
 
-def load_all_btl_files(ssscc_list, cols=None):
+def load_all_btl_files(ssscc_list, cols=None, cfg=cfg):
     """
     Load bottle and secondary (e.g. reference temperature, bottle salts, bottle oxygen)
     files for station/cast list and merge into a dataframe.
@@ -175,6 +183,12 @@ def load_all_btl_files(ssscc_list, cols=None):
 
     """
     df_data_all = pd.DataFrame()
+
+    if cfg.platform == "GTC":
+        log.info("Using GTC config file")
+    elif cfg.platform == "ODF":
+        log.info("Loading ODF salt bottles to niskin mapping...")
+        salt_map = pd.read_csv("data/salt/ODF_salt_mappings.csv", dtype={"SSSCC": str})
 
     for ssscc in ssscc_list:
         log.info("Loading BTL data for station: " + ssscc + "...")
@@ -201,6 +215,11 @@ def load_all_btl_files(ssscc_list, cols=None):
         refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
         try:
             refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
+            if cfg.platform == "ODF":
+                log.info("Mapping salt bottle to ODF Niskin number")
+                refc_data = refc_data.merge(salt_map[salt_map["SSSCC"] == ssscc])
+                refc_data["SAMPNO_SALT"] = refc_data["SAMPNO"]
+                refc_data = refc_data.drop(columns=["SSSCC", "SAMPNO", "comment"])
             if len(refc_data) > 36:
                 log.error(f"len(refc_data) > 36 for {ssscc}, check autosal file")
         except FileNotFoundError:
@@ -211,15 +230,15 @@ def load_all_btl_files(ssscc_list, cols=None):
             )
             refc_data = pd.DataFrame(
                 index=btl_data.index,
-                columns=["CRavg", "BathTEMP", "BTLCOND"],
+                columns=["CRavg", "BathTEMP", "SALNTY"],
                 dtype=float,
             )
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
-        oxy_file = cfg.dirs["oxygen"] + ssscc
+        oxy_file = cfg.dirs["oxygen"] + ssscc + "_oxy.csv"
         try:
-            oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
+            oxy_data = pd.read_csv(oxy_file)
             if len(oxy_data) > 36:
                 log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
         except FileNotFoundError:
@@ -231,17 +250,13 @@ def load_all_btl_files(ssscc_list, cols=None):
             oxy_data = pd.DataFrame(
                 index=btl_data.index,
                 columns=[
+                    "BOTTLENO_OXY",
                     "FLASKNO",
-                    "TITR_VOL",
-                    "TITR_TEMP",
-                    "DRAW_TEMP",
-                    "TITR_TIME",
-                    "END_VOLTS",
+                    "FLASK_VOL",
+                    "OXYGEN",
                 ],
                 dtype=float,
             )
-            oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
-            oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
             oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
 
         ### clean up dataframe
@@ -359,7 +374,7 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
                 log.warning(
                     "refT file for cast " + ssscc + " does not exist... skipping"
                 )
-                return
+                continue
 
 
 def add_btlnbr_cols(df, btl_num_col):
@@ -423,8 +438,13 @@ def export_report_data(df):
     return
 
 
-def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
+def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF", cfg=cfg):
     log.info("Exporting bottle file")
+
+    if cfg.platform == "GTC":
+        log.info("Using GTC config file")
+        cfg.expocode = cfg.expocode + "_GTC"
+
     btl_data = df.copy()
     now = datetime.now()
     file_datetime = now.strftime("%Y%m%d")
@@ -455,18 +475,23 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         # "CTDRINKO_FLAG_W": "",
         "CTDOXY": "UMOL/KG",
         "CTDOXY_FLAG_W": "",
-        "OXYGEN": "UMOL/KG",
-        "OXYGEN_FLAG_W": "",
-        "REFTMP": "ITS-90",
-        "REFTMP_FLAG_W": "",
     }
+    if cfg.platform == "ODF":
+        btl_columns.update(
+            {
+                "OXYGEN": "UMOL/KG",
+                "OXYGEN_FLAG_W": "",
+                "REFTMP": "ITS-90",
+                "REFTMP_FLAG_W": "",
+            }
+        )
 
     # rename outputs as defined in user_settings.yaml
     for param, attrs in cfg.ctd_outputs.items():
         if param not in btl_data.columns:
             btl_data.rename(columns={attrs["sensor"]: param}, inplace=True)
 
-    btl_data["EXPOCODE"] = cfg.expocode
+    btl_data["EXPOCODE"] = cfg.expocode.strip("_GTC")
     btl_data["SECT_ID"] = cfg.section_id
     btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
     btl_data["CASTNO"] = [int(x[3:]) for x in btl_data["SSSCC"]]
@@ -479,8 +504,9 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     )
 
     # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+    if cfg.platform == "ODF":
+        btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+        btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
@@ -489,25 +515,33 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     #     btl_data[col] = btl_data[col].round(1)
 
     # add depth
-    depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
-    ).dropna()
-    manual_depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
-    )
-    full_depth_df = pd.concat([depth_df, manual_depth_df])
-    full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
+    # depth_df = pd.read_csv(
+    #     cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+    # ).dropna()
+    # manual_depth_df = pd.read_csv(
+    #     cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+    # )
+    # full_depth_df = pd.concat([depth_df, manual_depth_df])
+    # full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
     btl_data["DEPTH"] = -999
-    for index, row in full_depth_df.iterrows():
-        btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
+    # for index, row in full_depth_df.iterrows():
+    #     btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
+    manual_depth_df = pd.read_csv(
+        cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"STNNBR": str}
+    )
+    for index, row in manual_depth_df.iterrows():
+        btl_data.loc[btl_data["STNNBR"] == int(row["STNNBR"]), "DEPTH"] = int(row["DEPTH"])
 
     # deal with nans
     # TODO: missing REFTMP not obvious til loading data - where to put this?
     # _reft_loader() is not the right place
     # maybe during loading step flag missing OXYGEN, REFTMP, BTLCOND?
-    btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
-        btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
-    )
+    if cfg.platform == "ODF":
+        btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
+            btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
+        )
+
+    # fill NaNs
     btl_data = btl_data.where(~btl_data.isnull(), -999)
 
     # check columns

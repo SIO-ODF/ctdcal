@@ -424,11 +424,67 @@ def seapoint_fluor(volts, coefs, decimals=6):
     Notes
     -----
     According to .xmlcon, GainSetting "is an array index, not the actual gain setting."
+    Gain options are [30, 10, 3, 1] V/(ug/l), so array index 2 would be a gain of 3.
+
+    See http://www.seapoint.com/pdf/scf_um.pdf for more information.
     """
     _check_coefs(coefs, ["GainSetting", "Offset"])
-    # TODO: actual calibration/conversion/something?
-    # TODO: move this to different module? edge case since it's the only Seapoint sensor
-    volts = np.array(volts)
+    volts = _check_volts(volts)
     fluoro = np.around(volts, decimals)
 
     return fluoro
+
+
+def seapoint_turbidity(volts, coefs, decimals=6):
+    """
+    Convert Seapoint optical backscatter from voltage to FTU (formazin turbidity units).
+
+    Notes
+    -----
+    According to .xmlcon, GainSetting "is an array index, not the actual gain setting."
+    Gain options are [1, 5, 20, 100]x, so array index 2 would be a gain of 20x.
+    SensorID: 33
+
+    Parameters
+    ----------
+    volts : array-like
+        Raw voltage
+    coefs : dict
+        Dictionary of calibration coefficients (GainSetting, ScaleFactor)
+
+    Returns
+    -------
+    turbidity : array-like
+        Optical backscatter in FTU
+
+    Sensitivity/Range:
+    100x gain: 200 mV/FTU    25 FTU
+    20x gain:   40 mV/FTU   125 FTU
+    5x gain:    10 mV/FTU   500 FTU
+    1x gain:     2 mV/FTU  4000 FTU *
+    * response above 1250 FTU becomes non-linear
+
+    See http://www.seapoint.com/stm.htm for more information.
+    """
+    _check_coefs(coefs, ["GainSetting", "ScaleFactor"])
+    sensitivity = [2, 10, 40, 200][int(coefs["GainSetting"])]  # mV/FTU
+    volts = _check_volts(volts)
+    turbidity = np.around(volts * 1000 / sensitivity, decimals)
+
+    return turbidity
+
+
+def NOAA_ORP(volts, coefs, decimals=6):
+    """
+    Convert sensor output (in volts) to scaled millivolts.
+
+    ORP sensor range is -500 to +500 millivolts, with output scaled to 0-5 volts for the
+    auxiliary analog channels on the CTD.
+
+    Coefficients should be A0 = -500 and A1 = 200 to get appropriate scaled range.
+    """
+    _check_coefs(coefs, ["A0", "A1"])
+    volts = _check_volts(volts)
+    scaled_mVolts = np.around(volts * coefs["A1"] + coefs["A0"], decimals)
+
+    return scaled_mVolts

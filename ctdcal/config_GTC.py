@@ -1,19 +1,18 @@
-### configuration file for odf_process_all.py
-#
-# TODO: organize these by editable/fixed variables
-from importlib import resources
-
-import yaml
-
-with resources.open_text("ctdcal", "user_settings.yaml") as f:
-    settings = yaml.safe_load(f)
+### configuration file for gp17_process_all.py
 
 # Unpack user settings (any sanitizing/checks needed? probably)
-platform = "ODF"
-expocode = settings["expocode"]
-section_id = settings["section_id"]
-ctd_serial = settings["ctd_serial"]
-ctd_outputs = settings["ctd_outputs"]
+platform = "GTC"
+expocode = "33RR20221201"
+section_id = "GP17-OCE"
+ctd_serial = 888
+ctd_outputs = {
+    "CTDPRS": {"sensor": "CTDPRS", "units": "DBAR"},
+    "CTDTMP": {"sensor": "CTDTMP1", "units": "ITS-90"},
+    "CTDSAL": {"sensor": "CTDSAL1", "units": "PSS-78"},
+    "CTDOXY": {"sensor": "CTDOXY1", "units": "UMOL/KG"},
+    "CTDXMISS": {"sensor": "CTDXMISS1", "units": "0-5VDC"},
+    "CTDFLUOR": {"sensor": "FLUOR", "units": "0-5VDC"},
+}
 
 # CTD file (.ct1) variable outputs
 # move elsewhere when xarray is implemented
@@ -29,7 +28,7 @@ for (param, attrs) in ctd_outputs.items():
 
 # List of directories for I/O purposes
 dirs = {
-    "ssscc": "data/ssscc/",
+    "ssscc": "data/ssscc_GTC/",
     "raw": "data/raw/",
     "converted": "data/converted/",
     "time": "data/time/",
@@ -42,12 +41,11 @@ dirs = {
     "scratch": "data/scratch_folder",
 }
 fig_dirs = {
-    "t1": "data/logs/fitting_figs/temp_primary/",
-    "t2": "data/logs/fitting_figs/temp_secondary/",
-    "c1": "data/logs/fitting_figs/cond_primary/",
-    "c2": "data/logs/fitting_figs/cond_secondary/",
-    "ox": "data/logs/fitting_figs/oxy_primary/",
-    "rinko": "data/logs/fitting_figs/oxy_rinko/",
+    "t1": "data/logs/fitting_figs_GTC/temp_primary/",
+    "t2": "data/logs/fitting_figs_GTC/temp_secondary/",
+    "c1": "data/logs/fitting_figs_GTC/cond_primary/",
+    "c2": "data/logs/fitting_figs_GTC/cond_secondary/",
+    "ox": "data/logs/fitting_figs_GTC/oxy_primary/",
 }
 
 # remnant of old system, will be pushed into xarray metadata/attrs
@@ -59,9 +57,6 @@ column = {
     "c1": "CTDCOND1",
     "c2": "CTDCOND2",
     "sal": "CTDSAL",
-    # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
-    # "s2": "CTDSAL2",
-    "rinko_oxy": "U_DEF_poly1",  # CHECK THIS!
     "oxyvolts": "CTDOXYVOLTS",
     "refT": "REFTMP",
     "refC": "BTLCOND",
@@ -73,5 +68,5 @@ column = {
 
 # List of columns to filter
 filter_cols = []
-for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]:
+for x in ["p", "t1", "t2", "c1", "c2", "sal", "oxyvolts", "lat", "lon"]:
     filter_cols.append(column[x])

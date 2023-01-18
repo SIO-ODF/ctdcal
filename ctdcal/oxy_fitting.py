@@ -49,8 +49,13 @@ def load_winkler_oxy(oxy_file):
                 row = row[:9]
             oxy_array.append(row)
 
-    # TODO turn params into a dict with useful labels
-    params = oxy_array.pop(0)  # save file header info for later (Winkler values)
+    # turn params into DataFrame
+    titr_values = oxy_array.pop(0)[:6]
+    titr_columns = ["V_std", "V_blank", "N_KIO3", "V_KIO3", "T_KIO3", "T_thio"]
+    params = pd.DataFrame(titr_values, dtype=float).transpose()
+    params.columns = titr_columns
+
+    # turn titr data into DataFrame
     cols = OrderedDict(
         [
             ("STNNO_OXY", int),
@@ -64,11 +69,10 @@ def load_winkler_oxy(oxy_file):
             ("END_VOLTS", float),
         ]
     )
-
     df = pd.DataFrame(oxy_array, columns=cols.keys()).astype(cols)
     df = df[df["BOTTLENO_OXY"] != 99]  # remove "Dummy Data"
     df = df[df["TITR_VOL"] > 0]  # remove "ABORTED DATA"
-    df = df.sort_values("BOTTLENO_OXY").reset_index(drop=True)
+    # df = df.sort_values("BOTTLENO_OXY").reset_index(drop=True)
     df["FLASKNO"] = df["FLASKNO"].astype(str)
 
     return df, params
@@ -168,6 +172,74 @@ def gather_oxy_params(oxy_file):
         params = pd.DataFrame(np.nan, index=[0], columns=titr_columns)
 
     return params
+
+
+def convert_winkler_oxy(ssscc_list):
+    """
+    DUPLICATE FUNCTION FOR GP17, needs to be refactored/merged with
+    oxy_fitting.calculate_bottle_oxygen()
+
+    Wrapper function for collecting parameters and calculating oxygen values from
+    Winkler titrations.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to process
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Titration equation comes from WHP Operations and Methods, Culberson (1991):
+    https://cchdo.github.io/hdo-assets/documentation/manuals/pdf/91_1/culber2.pdf
+
+    """
+    log.info("Converting Winkler oxygen files to .csv")
+    oxy_df = pd.DataFrame()
+    for ssscc in ssscc_list:
+        oxy, params = load_winkler_oxy(cfg.dirs["oxygen"] + ssscc)
+        for col in params.columns:
+            oxy[col] = params[col][0]
+        oxy["SSSCC"] = oxy["STNNO_OXY"].map("{:03d}".format) + oxy["CASTNO_OXY"].map(
+            "{:02d}".format
+        )
+        oxy_df = pd.concat([oxy_df, oxy])
+
+    # get flask volumes and merge with titration parameters
+    flasks = load_flasks()  # TODO: volume correction from thermal expansion?
+    oxy_df["FLASK_VOL"] = pd.merge(oxy_df["FLASKNO"], flasks, how="left")["FLASK_VOL"].values
+
+    # find 20degC equivalents
+    rho_20C = gsw.rho_t_exact(0, 20, 0)
+    rho_T_KIO3 = gsw.rho_t_exact(0, oxy_df["T_KIO3"], 0)
+    N_KIO3_20C = oxy_df["N_KIO3"] * (rho_T_KIO3 / rho_20C)
+
+    # TODO: does KIO3 volume get corrected? what is the recorded value?
+    # V_KIO3_20C = correct_flask_vol(params["V_KIO3"], t=params["T_KIO3"])
+
+    # calculate O2 concentration (in mL/L)
+    E = 5598  # stoichiometric relationship between thio_n and DO
+    DO_reg = 0.0017  # correction for oxygen added by reagents
+    V_reg = 2.0  # volume of reagents (mL)
+
+    oxy_df["OXYGEN"] = (
+        (
+            ((oxy_df["TITR_VOL"] - oxy_df["V_blank"]) * oxy_df["V_KIO3"] * N_KIO3_20C * E)
+            / (oxy_df["V_std"] - oxy_df["V_blank"])
+            - 1000 * DO_reg
+        )
+    ) / (oxy_df["FLASK_VOL"] - V_reg)
+
+    for ssscc in oxy_df["SSSCC"].unique():
+        if (f_out := Path(f"data/oxygen/{ssscc}_oxy.csv")).exists():
+            log.info(f"{f_out} already exists, skipping")
+            continue
+        oxy_ssscc = oxy_df.loc[oxy_df["SSSCC"] == ssscc].copy()
+        cols = ["BOTTLENO_OXY", "FLASKNO", "FLASK_VOL", "OXYGEN"]
+        oxy_ssscc[cols].to_csv(f_out, index=False)
 
 
 def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nums):
@@ -658,7 +730,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     return cfw_coefs, df
 
 
-def prepare_oxy(btl_df, time_df, ssscc_list):
+def prepare_oxy(btl_df, time_df, cfg=cfg):
     """
     Calculate oxygen-related variables needed for calibration:
     sigma, oxygen solubility (OS), and bottle oxygen
@@ -669,8 +741,6 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         CTD data at bottle stops
     time_df : DataFrame
         Continuous CTD data
-    ssscc_list : list of str
-        List of stations to process
 
     Returns
     -------
@@ -719,30 +789,27 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         time_df[cfg.column["lon"]],
         time_df[cfg.column["lat"]],
     )
-    # Convert CTDOXY units
+    # Convert CTDOXY/OXYGEN units
     btl_df["CTDOXY"] = oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
-    # Calculate bottle oxygen
-    btl_df[cfg.column["refO"]] = calculate_bottle_oxygen(
-        ssscc_list,
-        btl_df["SSSCC"],
-        btl_df["TITR_VOL"],
-        btl_df["TITR_TEMP"],
-        btl_df["FLASKNO"],
-    )
-    btl_df[cfg.column["refO"]] = oxy_ml_to_umolkg(
-        btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
-    )
-    btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["refO"]])
-    # Load manual OXYGEN flags
-    if Path("data/oxygen/manual_oxy_flags.csv").exists():
-        manual_flags = pd.read_csv(
-            "data/oxygen/manual_oxy_flags.csv", dtype={"SSSCC": str}
+    if cfg.platform == "GTC":
+        time_df["CTDOXY"] = oxy_ml_to_umolkg(time_df["CTDOXY1"], time_df["sigma_btl"])
+        time_df["CTDOXY_FLAG_W"] = 2
+        btl_df["CTDOXY_FLAG_W"] = 2
+    else:
+        btl_df[cfg.column["refO"]] = oxy_ml_to_umolkg(
+            btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
         )
-        for _, flags in manual_flags.iterrows():
-            df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
-                btl_df["btl_fire_num"] == flags["SAMPNO"]
+        btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["refO"]])
+        # Load manual OXYGEN flags
+        if Path("data/oxygen/manual_oxy_flags.csv").exists():
+            manual_flags = pd.read_csv(
+                "data/oxygen/manual_oxy_flags.csv", dtype={"SSSCC": str}
             )
-            btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
+            for _, flags in manual_flags.iterrows():
+                df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
+                    btl_df["btl_fire_num"] == flags["SAMPNO"]
+                )
+                btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
 
     return True
 
@@ -788,27 +855,32 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         # can't calibrate without bottle oxygen ("OXYGEN")
         if (btl_data["OXYGEN_FLAG_W"] == 9).all():
             sbe43_dict[ssscc] = np.full(5, np.nan)
+            sbe43_merged = btl_data[
+                ["CTDPRS", "CTDOXYVOLTS", "dv_dt", "OS", "CTDOXY"]
+            ].copy()
+            sbe43_merged["CTDTMP"] = btl_data["CTDTMP1"]
+            sbe43_merged["REFOXY"] = np.nan
             log.warning(ssscc + " skipped, all oxy data is NaN")
-            continue
-        sbe43_merged = match_sigmas(
-            btl_data[cfg.column["p"]],
-            btl_data[cfg.column["refO"]],
-            btl_data["CTDTMP1"],
-            btl_data["SA"],
-            time_data["OS"],
-            time_data[cfg.column["p"]],
-            time_data[cfg.column["t1"]],
-            time_data["SA"],
-            time_data[cfg.column["oxyvolts"]],
-            time_data["scan_datetime"],
-        )
-        sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
-        btl_df.loc[
-            btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]
-        ] = sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
+        else:
+            sbe43_merged = match_sigmas(
+                btl_data[cfg.column["p"]],
+                btl_data[cfg.column["refO"]],
+                btl_data["CTDTMP1"],
+                btl_data["SA"],
+                time_data["OS"],
+                time_data[cfg.column["p"]],
+                time_data[cfg.column["t1"]],
+                time_data["SA"],
+                time_data[cfg.column["oxyvolts"]],
+                time_data["scan_datetime"],
+            )
+            sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
+            btl_df.loc[
+                btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]
+            ] = sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
+            log.info(ssscc + " density matching done")
         sbe43_merged["SSSCC"] = ssscc
         all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
-        log.info(ssscc + " density matching done")
 
     # Only fit using OXYGEN flagged good (2)
     all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()

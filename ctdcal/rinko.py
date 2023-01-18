@@ -215,16 +215,24 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         # deal with time dependent coefs by further fitting individual casts
         # NOTE (4/9/21): tried adding time drift term unsuccessfully
         # Uchida (2010) says fitting individual stations is the same (even preferred?)
-        for ssscc in ssscc_sublist:
-            (rinko_coefs_ssscc, _) = rinko_oxy_fit(
-                good_data.loc[good_data["SSSCC"] == ssscc].copy(),
+
+        # GT2022: fit all cast at a given station together
+        # use set comprehension to eliminate duplicates:
+        stn_list = sorted({ssscc[:3] for ssscc in ssscc_sublist})
+        good_data["STNNBR"] = good_data["SSSCC"].str[:3]
+        btl_df["STNNBR"] = btl_df["SSSCC"].str[:3]
+        time_df["STNNBR"] = time_df["SSSCC"].str[:3]
+
+        for stn in stn_list:
+            (rinko_coefs_stn, _) = rinko_oxy_fit(
+                good_data.loc[good_data["STNNBR"] == stn].copy(),
                 rinko_coef0=rinko_coefs_group,
-                f_suffix=f"_{ssscc}",
+                f_suffix=f"_{stn}",
             )
 
             # check mean/stdev to see if new fit is better or worse
-            btl_rows = btl_df["SSSCC"] == ssscc
-            time_rows = time_df["SSSCC"] == ssscc
+            btl_rows = btl_df["STNNBR"] == stn
+            time_rows = time_df["STNNBR"] == stn
             group_resid = (
                 _Uchida_DO_eq(
                     rinko_coefs_group,
@@ -238,9 +246,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 )
                 - btl_df.loc[btl_rows, "OXYGEN"]
             )
-            ssscc_resid = (
+            stn_resid = (
                 _Uchida_DO_eq(
-                    rinko_coefs_ssscc,
+                    rinko_coefs_stn,
                     (
                         btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
                         btl_df.loc[btl_rows, cfg.column["p"]],
@@ -251,17 +259,17 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 )
                 - btl_df.loc[btl_rows, "OXYGEN"]
             )
-            worse_mean = np.abs(ssscc_resid.mean()) > np.abs(group_resid.mean())
-            worse_stdev = ssscc_resid.std() > group_resid.std()
+            worse_mean = np.abs(stn_resid.mean()) > np.abs(group_resid.mean())
+            worse_stdev = stn_resid.std() > group_resid.std()
             if worse_mean and worse_stdev:
                 log.info(
-                    f"{ssscc} fit parameters worse than {f_stem} group – reverting back"
+                    f"{stn} fit parameters worse than {f_stem} group – reverting back"
                 )
-                rinko_coefs_ssscc = rinko_coefs_group
+                rinko_coefs_stn = rinko_coefs_group
 
             # apply coefficients
             btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
-                rinko_coefs_ssscc,
+                rinko_coefs_stn,
                 (
                     btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
                     btl_df.loc[btl_rows, cfg.column["p"]],
@@ -271,7 +279,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                 ),
             )
             time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
-                rinko_coefs_ssscc,
+                rinko_coefs_stn,
                 (
                     time_df.loc[time_rows, cfg.column["rinko_oxy"]],
                     time_df.loc[time_rows, cfg.column["p"]],
@@ -282,7 +290,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             )
 
             # save coefficients to dataframe
-            coefs_df.loc[ssscc] = rinko_coefs_ssscc
+            coefs_df.loc[stn] = rinko_coefs_stn
 
     # flag CTDRINKO with more than 1% difference
     time_df["CTDRINKO_FLAG_W"] = 2  # TODO: actual flagging of some kind?
@@ -315,6 +323,11 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     coefs_df.applymap(
         lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
     ).to_csv(cfg.dirs["logs"] + "rinko_coefs.csv")
+
+    # drop STNNBR columns
+    good_data.drop(columns=["STNNBR"], inplace=True)
+    btl_df.drop(columns=["STNNBR"], inplace=True)
+    time_df.drop(columns=["STNNBR"], inplace=True)
 
     return True
 

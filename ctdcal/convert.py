@@ -110,6 +110,12 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    "33": {
+        "short_name": "CTDTURB",
+        "long_name": "SeapointTurbiditySensor",
+        "units": "FTU",
+        "type": "float64",
+    }
 }
 
 
@@ -129,18 +135,21 @@ def hex_to_ctd(ssscc_list):
     """
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
-        if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
+        if not Path(cfg.dirs["converted"] + ssscc.strip("GTC_") + ".pkl").exists():
             hexFile = cfg.dirs["raw"] + ssscc + ".hex"
             xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader, ssscc)
+            ssscc = ssscc.strip("GTC_")  # save files w/o GTC_ prepended
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
 
 
-def make_time_files(ssscc_list):
+def make_time_files(ssscc_list, cfg=cfg):
     log.info("Generating time.pkl files")
+    if cfg.platform == "GTC":
+        log.info("Using GTC config file")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
             converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
@@ -194,7 +203,7 @@ def make_time_files(ssscc_list):
             cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
 
 
-def make_btl_mean(ssscc_list):
+def make_btl_mean(ssscc_list, cfg=cfg):
     # TODO: add (some) error handling from odf_process_bottle.py
     """
     Create "bottle mean" files from continuous CTD data averaged at the bottle stops.
@@ -210,11 +219,52 @@ def make_btl_mean(ssscc_list):
         bottle averaging of mean has finished successfully
     """
     log.info("Generating btl_mean.pkl files")
+    if cfg.platform == "GTC":
+        log.info("Using GTC config file")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
             imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
+
+            btl_map = pd.read_csv(
+                f"data/bottle/gt_numbers/{ssscc}.csv",
+                comment="#",
+                usecols=["SAMPNO", "PYLON", "GEOTRC_SAMPNO"],
+            )
+            if cfg.platform == "GTC":
+                mean_df["SAMPNO"] = mean_df.loc[:, "btl_fire_num"].copy()
+                mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
+                mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").ffill()
+                if mean_df.isna().any().any():
+                    log.info(f"NaN data in {ssscc} after ffill, applying bfill as well.")
+                    mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").bfill()
+                mean_df["btl_fire_num"] = mean_df["SAMPNO"]
+
+                # deal with bottles fired out of order
+                bl_data = btl.read_bl(Path(cfg.dirs["raw"]) / f"GTC_{ssscc}.bl")
+                bl_data = bl_data.drop(columns=["time", "start_idx", "end_idx"])
+
+                if ssscc == "01302":
+                    # bottle 13 mistakenly fired twice
+                    bl_data = bl_data.drop_duplicates(subset="btl_fire_num", keep="last")
+                    bl_data.loc[:, "index"] = np.arange(1, 25)
+                    bl_data = bl_data.reset_index(drop=True)
+
+                if all(bl_data["index"].values == mean_df["SAMPNO"].values):
+                    log.info(f"Using {ssscc}.bl file for btl_fire_num")
+                    mean_df["btl_fire_num"] = bl_data["btl_fire_num"]
+                else:
+                    log.info(f"Mismatch between {ssscc}.bl index and mean_df SAMPNO")
+                    breakpoint()
+
+            elif cfg.platform == "ODF":
+                if len(btl_map) > 36:
+                    log.info("More than 36 bottle mappings, suspected monocore cast")
+                    log.info(f"Dropping extra row from {ssscc}")
+                    btl_map = btl_map.iloc[:36]
+                mean_df["SAMPNO"] = mean_df.loc[:, "btl_fire_num"].copy()
+                mean_df = mean_df.merge(btl_map, how="right")
 
             # export bottom bottle time/lat/lon info
             fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
@@ -423,7 +473,7 @@ def convertFromSBEReader(sbeReader, ssscc):
         ### Fluorometer Seapoint block
         elif meta["sensor_id"] == "11":
             log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
-            converted_df[col] = sbe_eq.seapoint_fluoro(raw_df[meta["column"]], coefs)
+            converted_df[col] = sbe_eq.seapoint_fluor(raw_df[meta["column"]], coefs)
 
         ### Salinity block
         elif meta["sensor_id"] == "1000":
@@ -435,8 +485,9 @@ def convertFromSBEReader(sbeReader, ssscc):
             log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
             converted_df[col] = sbe_eq.sbe_altimeter(raw_df[meta["column"]], coefs)
 
-        ### Rinko block
+        ### User polynomial block
         elif meta["sensor_id"] == "61":
+            # Rinko
             if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO"):
                 log.info("Processing Rinko O2")
                 # hysteresis correct then pass through voltage (see Uchida, 2010)
@@ -446,6 +497,14 @@ def convertFromSBEReader(sbeReader, ssscc):
                     p_array,
                     coefs,
                 )
+            elif "ORP" in meta["sensor_info"]["SensorName"]:
+                log.info("Processing ORP sensor")
+                converted_df[col] = sbe_eq.NOAA_ORP(raw_df[meta["column"]], coefs)
+
+        ### Turbidity block
+        elif meta["sensor_id"] == "33":
+            log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
+            converted_df[col] = sbe_eq.seapoint_turbidity(raw_df[meta["column"]], coefs)
 
         ### Aux block
         else:

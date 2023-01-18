@@ -454,7 +454,7 @@ def calibrate_temp(btl_df, time_df):
     return True
 
 
-def calibrate_cond(btl_df, time_df):
+def calibrate_cond(btl_df, time_df, cfg=cfg):
     # TODO: make this an ODF script in ctdcal/scripts?
     # TODO: break off parts of this to useful functions for all vars (C/T/O)
     # TODO: salt subset lists aren't loading in increasing order:
@@ -474,6 +474,7 @@ def calibrate_cond(btl_df, time_df):
 
     """
     log.info("Calibrating conductivity")
+
     # calculate BTLCOND values from autosal data
     btl_df[cfg.column["refC"]] = convert.CR_to_cond(
         btl_df["CRavg"],
@@ -485,7 +486,10 @@ def calibrate_cond(btl_df, time_df):
     # merge in handcoded salt flags
     # TODO: make salt flagger move .csv somewhere else? or just always have it
     # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
-    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
+    salt_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded.csv"  # abstract to config.py
+    if cfg.platform == "GTC":
+        log.info("Using GTC config file")
+        salt_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded_GTC.csv"
     if Path(salt_file).exists():
         handcoded_salts = pd.read_csv(
             salt_file, dtype={"SSSCC": str, "salinity_flag": int}
@@ -510,7 +514,10 @@ def calibrate_cond(btl_df, time_df):
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_c1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
 
-    fit_yaml = load_fit_yaml()  # load fit polynomial order
+    if cfg.platform == "GTC":
+        fit_yaml = load_fit_yaml(fname="data/logs/fit_coefs_GTC.yaml")
+    else:
+        fit_yaml = load_fit_yaml()  # load fit polynomial order
     for cN, tN in zip(["c1", "c2"], ["t1", "t2"]):
         C_flag, C_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:

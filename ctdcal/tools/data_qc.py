@@ -19,7 +19,7 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
-from ctdcal import get_ctdcal_config, io
+from ctdcal import get_ctdcal_config, io, process_ctd
 
 cfg = get_ctdcal_config()
 
@@ -27,8 +27,20 @@ cfg = get_ctdcal_config()
 # TODO: following above, make parts reusable?
 
 # load continuous CTD data and make into a dict (only ~20MB)
-file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
-ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
+# file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
+# ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
+
+# ODF
+ssscc_list = process_ctd.get_ssscc_list()
+fname = Path(cfg.dirs["pressure"]) / f"{cfg.expocode}_hy1.csv"
+handcoded_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded.csv"
+
+# GTC
+# ssscc_list = process_ctd.get_ssscc_list("data/ssscc_GTC.csv")
+# fname = Path(cfg.dirs["pressure"]) / f"{cfg.expocode}_GTC_hy1.csv"
+# handcoded_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded_GTC.csv"
+
+file_list = [Path(cfg.dirs["pressure"]) / f"{ssscc}_ct1.csv" for ssscc in ssscc_list]
 ctd_data = []
 for f in file_list:
     print(f"Loading {f}")
@@ -38,7 +50,7 @@ for f in file_list:
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
 # load bottle file
-fname = list(Path(cfg.dirs["pressure"]).glob("*hy1.csv"))[0]
+# fname = list(Path(cfg.dirs["pressure"]).glob("*hy1.csv"))[0]
 btl_data = io.load_exchange_btl(fname).replace(-999, np.nan)
 btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"
@@ -49,7 +61,7 @@ btl_data["Comments"] = ""
 btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
 
 # update with old handcoded flags if file exists
-if (handcoded_file := Path(cfg.dirs["salt"]) / "salt_flags_handcoded.csv").exists():
+if handcoded_file.exists():
     handcodes = pd.read_csv(handcoded_file, dtype={"SSSCC": str}, keep_default_na=False)
     handcodes = handcodes.rename(columns={"salinity_flag": "New Flag"}).drop(
         columns="diff"
@@ -155,8 +167,8 @@ src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
 fig = figure(
-    plot_height=800,
-    plot_width=400,
+    height=800,
+    width=400,
     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
     y_axis_label="Pressure (dbar)",
@@ -260,7 +272,6 @@ def update_selectors():
 def edit_flag():
 
     print("exec edit_flag()")
-
     btl_data.loc[
         btl_data["SSSCC"] == src_table.data["SSSCC"].values[0],
         "New Flag",

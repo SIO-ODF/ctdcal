@@ -13,7 +13,9 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
+def _salt_loader(
+    filename, flag_file=Path(cfg.dirs["salt"]) / "salt_flags_handcoded.csv"
+):
     """
     Load raw file into salt and reference DataFrames.
     """
@@ -60,9 +62,9 @@ def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
     # TODO: handling for re-samples?
 
     # check for commented out lines
-    commented = saltDF["STNNBR"].str.startswith(("#", "x"))
+    commented = saltDF["STNNBR"].str.startswith(("#", "x", "*"))
     if commented.any():
-        log.debug(f"Found comment character (#, x) in {ssscc} salt file, ignoring line")
+        log.debug(f"Found comment character (#, x, *) in {ssscc} salt file, ignoring line")
         saltDF = saltDF[~commented]
 
     # check end time for * and code questionable

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-from . import get_ctdcal_config, io, oxy_fitting
+from . import get_ctdcal_config, io, oxy_fitting, flagging
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -155,8 +155,9 @@ def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
         )
 
     # If pumps have not turned on until in water, return DataFrame
-    if df_cast.iloc[0]["CTDPRS"] > P_surface:
-        return df_cast
+    # TODO: why did I code this?
+    # if df_cast.iloc[0]["CTDPRS"] > P_surface:
+    #     return df_cast
 
     # Bin the data by time, and compute the average rate of descent
     df_cast["index"] = df_cast.index  # needed at end to identify start_idx
@@ -186,7 +187,8 @@ def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
             if df["CTDPRS"].max() < P_downcast:
                 # make sure it's soak, not a stop to switch to autocast (i.e. A20 2021)
                 # TODO: try instead finding max depth then working backwards?
-                if df.max()["movement"] == "stop" and len(df) > 1:
+                # if df.max()["movement"] == "stop" and len(df) > 1:
+                if df.max()["movement"] == "stop":
                     last_idx = idx
             else:
                 return last_idx
@@ -268,7 +270,7 @@ def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
     return filter_df
 
 
-def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
+def remove_on_deck(df, ssscc, cond_startup=20.0, log_file=None):
     """
     Find and remove times when rosette is on deck.
     Optionally log average pressure at start and end of cast.
@@ -277,7 +279,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     ----------
     df : DataFrame
         Raw CTD data
-    stacast : str
+    ssscc : str
         Station/cast name
     cond_startup : float, optional
         Minimum conductivity (units?) threshold indicating rosette is in water
@@ -321,7 +323,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     else:
         start_seconds = start_samples / fl
         log.warning(
-            f"{stacast}: Only {start_seconds:0.1f} seconds of start pressure averaged."
+            f"{ssscc}: Only {start_seconds:0.1f} seconds of start pressure averaged."
         )
         start_p = np.average(start_df.iloc[fl2:start_samples])
 
@@ -331,39 +333,29 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     else:
         end_seconds = end_samples / fl
         log.warning(
-            f"{stacast}: Only {end_seconds:0.1f} seconds of end pressure averaged."
+            f"{ssscc}: Only {end_seconds:0.1f} seconds of end pressure averaged."
         )
         end_p = np.average(end_df)  # just average whatever there is
 
     # Remove ondeck start and end pressures
     if len(start_df) == 0:
-        log.warning("Failed to find starting deck pressure.")
-        for n in [1, 2]:
-            try:
-                (downcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
-            except KeyError:
-                log.warning(
-                    f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
-                )
-        breakpoint()
+        log.warning("Failed to find starting deck pressure using conductivity.")
+        log.info(f"Setting {ssscc} start pressure to NaN")
+        start_p = np.nan
+        start_df[0] = np.nan  # for trimming df
+        # NOTE: pump off not usually reliable according to previous cruises.
+        # not sure of the actual best way to deal with this
     if len(end_df) == 0:
-        log.warning("Failed to find ending deck pressure.")
-        for n in [1, 2]:
-            try:
-                (upcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
-            except KeyError:
-                log.warning(
-                    f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
-                )
-        breakpoint()
-    # MK (3/23/20, 11am):
-    # auto end calculation failed bc cond2 is still >30
-    # may have to do manually or just use cond1 for station 00901
+        log.warning("Failed to find ending deck pressure using conductivity.")
+        log.info(f"Setting {ssscc} start pressure to NaN")
+        # TODO: NO ENDING PRESSURE FOR GTC 00602
+        end_p = np.nan
+        end_df[df.index.max()] = np.nan  # for trimming df
     trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
 
     # Log ondeck pressures
     if log_file is not None:
-        io.write_pressure_details(stacast, log_file, start_p, end_p)
+        io.write_pressure_details(ssscc, log_file, start_p, end_p)
 
     return trimmed_df
 
@@ -531,7 +523,7 @@ def _get_pressure_offset(start_vals, end_vals):
     return p_off
 
 
-def apply_pressure_offset(df, p_col="CTDPRS"):
+def apply_pressure_offset(df, ssscc_list=[], p_col="CTDPRS"):
     # TODO: import p_col from config file
     """
     Calculate pressure offset using deck pressure log and apply it to the data.
@@ -555,7 +547,10 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
         dtype={"SSSCC": str},
         na_values="Started in Water",
     )
+    if ssscc_list:
+        p_log = p_log.loc[p_log["SSSCC"].isin(ssscc_list)]
     p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p)
+    log.info(f"Applying {p_offset} dbar offset")
     df[p_col] += p_offset
     df[p_col + "_FLAG_W"] = 2
 
@@ -599,7 +594,7 @@ def make_depth_log(time_df, threshold=80):
         .round()
         .astype(int)
     )
-    bottom_df[["SSSCC", "DEPTH"]].to_csv(
+    bottom_df[["SSSCC", "DEPTH"]].sort_values("SSSCC").to_csv(
         cfg.dirs["logs"] + "depth_log.csv", index=False
     )
 
@@ -628,7 +623,7 @@ def get_ssscc_list(fname="data/ssscc.csv"):
     return ssscc_list
 
 
-def load_all_ctd_files(ssscc_list):
+def load_all_ctd_files(ssscc_list, cfg=cfg):
     """
     Load CTD files for station/cast list and merge into a dataframe.
 
@@ -644,6 +639,10 @@ def load_all_ctd_files(ssscc_list):
 
     """
     df_list = []
+
+    if cfg.platform == "GTC":
+        log.info("Using GTC config file")
+
     for ssscc in ssscc_list:
         log.info("Loading TIME data for station: " + ssscc + "...")
         time_file = cfg.dirs["time"] + ssscc + "_time.pkl"
@@ -702,7 +701,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list):
+def export_ct1(df, ssscc_list, cfg=cfg):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -724,11 +723,18 @@ def export_ct1(df, ssscc_list):
     """
     log.info("Exporting CTD files")
 
+    if cfg.platform == "GTC":
+        log.info("Using GTC config file")
+
     # initial flagging (some of this should be moved)
     # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
     # TODO: may not always have these channels so don't hardcode them in!
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
+
+    if cfg.platform == "ODF":
+        df["CTDORP_FLAG_W"] = flagging.nan_values(df["U_DEF_poly3"], flag_good=1)
+        df["CTDTURB_FLAG_W"] = flagging.nan_values(df["CTDTURB"], flag_good=1)
     # df["CTDBACKSCATTER_FLAG_W"] = 1
 
     # rename outputs as defined in user_settings.yaml
@@ -757,32 +763,42 @@ def export_ct1(df, ssscc_list):
         cfg.dirs["logs"] + "bottom_bottle_details.csv",
         dtype={"SSSCC": str},
     )
-    depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
-    ).dropna()
-    try:
-        manual_depth_df = pd.read_csv(
-            cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
-        )
-    except FileNotFoundError:
-        # TODO: add logging; look into inheriting/extending a class to add features
-        log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
-        manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
-        manual_depth_df.to_csv(cfg.dirs["logs"] + "manual_depth_log.csv", index=False)
-    full_depth_df = pd.concat([depth_df, manual_depth_df])
-    full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
+    # depth_df = pd.read_csv(
+    #     cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+    # ).dropna()
+    # try:
+    #     manual_depth_df = pd.read_csv(
+    #         cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+    #     )
+    # except FileNotFoundError:
+    #     # TODO: add logging; look into inheriting/extending a class to add features
+    #     log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
+    #     manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
+    #     manual_depth_df.to_csv(cfg.dirs["logs"] + "manual_depth_log.csv", index=False)
+    # full_depth_df = pd.concat([depth_df, manual_depth_df])
+    # full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
+
+    manual_depth_df = pd.read_csv(
+        cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"STNNBR": str}
+    )
 
     for ssscc in ssscc_list:
 
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
-        # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
-        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        if cfg.platform == "ODF":
+            log.info(f"Using Rinko as CTDOXY for {ssscc}")
+            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
+
+        if cfg.platform == "ODF":
+            if (time_data["CTDORP"] == -500).all():
+                time_data["CTDORP"] = np.nan
+                time_data["CTDORP_FLAG_W"] = 9
+
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
         # force flags back to int (TODO: make flags categorical)
@@ -791,7 +807,8 @@ def export_ct1(df, ssscc_list):
                 time_data[col] = time_data[col].astype(int)
 
         try:
-            depth = full_depth_df.loc[full_depth_df["SSSCC"] == ssscc, "DEPTH"].iloc[0]
+            # depth = full_depth_df.loc[full_depth_df["SSSCC"] == ssscc, "DEPTH"].iloc[0]
+            depth = int(manual_depth_df.loc[manual_depth_df["STNNBR"] == ssscc[:3], "DEPTH"])
         except IndexError:
             log.warning(f"No depth logged for {ssscc}, setting to -999")
             depth = -999
