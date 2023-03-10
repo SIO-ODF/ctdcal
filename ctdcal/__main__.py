@@ -5,6 +5,7 @@ Objectives of this branch:
 * Explore metrics for flagging quality
 * Iron out QA/QC
 * Continue with testing for Codecov coverage
+* Consolidate settings.py, config.py, and user_settings.yaml
 
 Timeframe
 DMB, Mar - Aug 2023
