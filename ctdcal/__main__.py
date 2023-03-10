@@ -1,3 +1,20 @@
+"""
+Objectives of this branch:
+* Test fitting methods for temperature, salinity, and oxygen
+* Implement xarray conversion steps to .nc from .PKL, .ct1/.hy1, and/or .CNV
+* Explore metrics for flagging quality
+* Iron out QA/QC
+* Continue with testing for Codecov coverage
+
+Timeframe
+DMB, Mar - Aug 2023
+
+Eventual intention of verison update to 0.1.5
+* Key changes from OSNAP (#54): SDL routine, additional sensors in short_lookup, TS and section plots
+* This cruise, including any procedural enhancements, changes, or fixes
+* Post-cruise QA/QC functional changes and assessments
+"""
+
 import logging
 from importlib import resources
 from pathlib import Path
