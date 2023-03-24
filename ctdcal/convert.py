@@ -161,6 +161,19 @@ def make_time_files(ssscc_list, cfg=cfg):
             converted_df.loc[bad_rows, :] = np.nan
             converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
+            # remove misc spikes
+            # ODF cast, primary TC spike around scan 128000
+            if ssscc == "00313":
+                breakpoint()
+                converted_df.loc[128065, ["CTDTMP1", "CTDCOND1", "CTDOXYVOLTS"]] = np.nan
+                converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
+            # ODF cast, primary TC spike around scan 105800
+            if ssscc == "02208":
+                breakpoint()
+                converted_df.loc[105924:105930, ["CTDTMP1", "CTDCOND1", "CTDOXYVOLTS"]] = np.nan
+                converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
@@ -199,6 +212,27 @@ def make_time_files(ssscc_list, cfg=cfg):
                 ssscc,
                 log_file=cfg.dirs["logs"] + "cast_details.csv",
             )
+            breakpoint()
+
+            # ODF cast bad surf samples, trim off more
+            if ssscc == "02203":
+                breakpoint()
+                cast_data = cast_data.iloc[250:].reset_index(drop=True)
+
+            # ODF "bonus" cast manually pick cast range, auto detect does bad job
+            if ssscc == "03804":
+                breakpoint()
+                idx_pmax = filter_data["CTDPRS"].idxmax()
+                cast_data = filter_data.iloc[10643:idx_pmax].reset_index(drop=True)
+
+            # GTC casts sucked something into pump, use upcast
+            if ssscc in ["01803", "02502"]:
+                breakpoint()
+                log.info(f"Using upcast for {ssscc}")
+                idx_pmax = filter_data["CTDPRS"].idxmax()
+                cast_data = filter_data.iloc[idx_pmax:]
+                # reverse order so it "looks like" a downcast
+                cast_data = cast_data.iloc[::-1].reset_index(drop=True)
 
             cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
 
@@ -231,8 +265,15 @@ def make_btl_mean(ssscc_list, cfg=cfg):
                 f"data/bottle/gt_numbers/{ssscc}.csv",
                 comment="#",
                 usecols=["SAMPNO", "PYLON", "GEOTRC_SAMPNO"],
+                na_values=["  ", "     "],  # for station 03801 with many unfired btls
             )
             if cfg.platform == "GTC":
+
+                if ssscc == "01302":
+                    # bottle 13 mistakenly fired twice
+                    mean_df = mean_df.drop(index=14)
+                    mean_df["btl_fire_num"] = np.arange(1, 25)
+
                 mean_df["SAMPNO"] = mean_df.loc[:, "btl_fire_num"].copy()
                 mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
                 mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").ffill()
@@ -259,6 +300,12 @@ def make_btl_mean(ssscc_list, cfg=cfg):
                     breakpoint()
 
             elif cfg.platform == "ODF":
+                if ssscc == "03204":
+                    # cast w/ multiple misfires by console operator
+                    mean_df = mean_df.drop(5)  # btl 4 fired 2x, resulting in 36 fired
+                    mean_df.index = np.arange(1, 37)
+                    mean_df["btl_fire_num"] = mean_df.index
+
                 if len(btl_map) > 36:
                     log.info("More than 36 bottle mappings, suspected monocore cast")
                     log.info(f"Dropping extra row from {ssscc}")
@@ -276,6 +323,8 @@ def make_btl_mean(ssscc_list, cfg=cfg):
                 datetime_col = "scan_datetime"
 
             bot_df = mean_df[[datetime_col, "GPSLAT", "GPSLON"]].head(1)
+            if ssscc == "03801":  # unfired bottles workaround
+                bot_df = mean_df[[datetime_col, "GPSLAT", "GPSLON"]].dropna().head(1)
             bot_df.columns = ["bottom_time", "latitude", "longitude"]
             bot_df.insert(0, "SSSCC", ssscc)
             add_header = not Path(fname).exists()  # add header iff file doesn't exist
