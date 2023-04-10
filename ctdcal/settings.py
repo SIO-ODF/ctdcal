@@ -3,20 +3,20 @@ import os
 import pathlib
 
 cruise = dict(
-    cruise_title="GO-SHIP NBP1802",
-    cruise_name="nbp1802",
-    cruisedb="nbp1802",
-    vessel="R/V Palmer",
-    ship_code="3206",
-    expocode="320620180309",
-    chief_sci="Alison Macdonald",
-    sectionid="S04P",
-    start_date="2018-03-09 14:00:00",
-    start_port="Hobart, Tasmania, Australia",
-    start_latlon="42.8821 S 147.3272 W",
-    end_date="2018-05-14 10:00:00",
-    end_port="Punta Arenas, Chile",
-    end_latlon="53.1638 S 70.9171 W",
+    cruise_title="Deep Madagascar Basin RR2303",
+    cruise_name="DMB 2023",
+    cruisedb="RR2303",
+    vessel="R/V Roger Revelle",
+    ship_code="33RR",
+    expocode="33RR20230409",
+    chief_sci="Viviane Menezes",
+    sectionid="DMB",
+    start_date="2023-04-09 11:30:00",
+    start_port="Cape Town, Western Cape, South Africa",
+    start_latlon="33.9188 S 18.4233 E",
+    end_date="2023-05-13 10:00:00",
+    end_port="Port Louis, Mauritius",
+    end_latlon="20.1619 S 57.4988 E",
 )
 
 ctd_processing_dir = dict(
