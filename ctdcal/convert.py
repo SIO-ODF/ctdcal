@@ -232,6 +232,10 @@ def make_btl_mean(ssscc_list):
             with open(fname, "a") as f:
                 bot_df.to_csv(f, mode="a", header=add_header, index=False)
 
+            #   Bottles 11, 12 are not mounted, increment up bottles after bottle 10
+            if len(mean_df) > 10:
+                mean_df.btl_fire_num.iloc[10:] = mean_df.btl_fire_num.iloc[10:] + 2
+
             mean_df.to_pickle(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
