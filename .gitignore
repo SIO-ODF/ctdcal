@@ -71,3 +71,4 @@ htmlcov/*
 
 __pycache__/
 ctdcal/_version.py
+ctdcal.log
