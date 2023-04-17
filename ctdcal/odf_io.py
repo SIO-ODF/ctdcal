@@ -7,7 +7,7 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import get_ctdcal_config
+from ctdcal import get_ctdcal_config
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)

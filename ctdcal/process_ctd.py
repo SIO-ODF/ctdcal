@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-from . import get_ctdcal_config, io, oxy_fitting
+from ctdcal import get_ctdcal_config, io, oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)

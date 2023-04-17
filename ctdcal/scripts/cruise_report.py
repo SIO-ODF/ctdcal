@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from .. import ctd_plots, get_ctdcal_config
+from ctdcal import ctd_plots, get_ctdcal_config
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)

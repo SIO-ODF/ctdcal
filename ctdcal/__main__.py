@@ -26,7 +26,7 @@ from bokeh.application.handlers.script import ScriptHandler
 from bokeh.server.server import Server
 from tornado.ioloop import IOLoop
 
-from . import get_ctdcal_config
+from ctdcal import get_ctdcal_config
 
 # Rich handling
 # from rich.logging import RichHandler
