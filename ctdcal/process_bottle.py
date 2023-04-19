@@ -478,9 +478,9 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
     )
 
-    # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+    # # switch oxygen primary sensor to rinko
+    # btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+    # btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
