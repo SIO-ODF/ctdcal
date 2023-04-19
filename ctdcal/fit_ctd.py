@@ -511,8 +511,20 @@ def calibrate_cond(btl_df, time_df):
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
 
     fit_yaml = load_fit_yaml()  # load fit polynomial order
+
     for cN, tN in zip(["c1", "c2"], ["t1", "t2"]):
         C_flag, C_fit_coefs = pd.DataFrame(), pd.DataFrame()
+
+        #   Get an idea of what the prefit looks like
+        ctd_plots._intermediate_residual_plot(
+            btl_df.loc[:, cfg.column["refC"]] - btl_df.loc[:, cfg.column[cN]],
+            btl_df.loc[:, cfg.column["p"]],
+            btl_df.loc[:, "SSSCC"],
+            xlabel=f"{cN.upper()} Residual (mS/cm)",
+            show_thresh=True,
+            f_out=f"{cfg.fig_dirs[cN]}residual_all_prefit.pdf",
+        )
+
         for f in ssscc_subsets:
             # 0) grab ssscc chunk to fit
             ssscc_sublist = (
