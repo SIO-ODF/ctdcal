@@ -152,6 +152,13 @@ def make_time_files(ssscc_list):
             converted_df.loc[bad_rows, :] = np.nan
             converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
+            #   Removing cast-specific spikes in data
+            #   00601: Sucked up something and noise was in oxy, but nothing else on primary line
+            if ssscc == "00601":
+                # breakpoint()
+                converted_df.loc[125625:128351, "CTDOXYVOLTS"] = np.nan
+                converted_df.interpolate(limit=2726, limit_area="inside", inplace=True)
+
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
