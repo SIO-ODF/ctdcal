@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-from ctdcal import get_ctdcal_config, io, oxy_fitting
+from ctdcal import get_ctdcal_config, io, oxy_fitting, odf_io
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -772,13 +772,17 @@ def export_ct1(df, ssscc_list):
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
+    i = 0
+    odf_io.printProgressBar(
+        i, len(ssscc_list), prefix="Progress:", suffix="Writing ct1 files", length=50
+    )
     for ssscc in ssscc_list:
 
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
         # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
+        # print(f"Using Rinko as CTDOXY for {ssscc}")
         time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
         time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[cfg.ctd_col_names]
@@ -836,3 +840,12 @@ def export_ct1(df, ssscc_list):
             f.write("\n")
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")
+
+        i += 1
+        odf_io.printProgressBar(
+            i,
+            len(ssscc_list),
+            prefix="Progress:",
+            suffix="Writing ct1 files",
+            length=50,
+        )

@@ -17,6 +17,7 @@ from ctdcal import ctd_plots as ctd_plots
 from ctdcal import flagging as flagging
 from ctdcal import get_ctdcal_config
 from ctdcal import process_ctd as process_ctd
+from ctdcal import odf_io
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -782,6 +783,11 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
+
+    i = 0
+    odf_io.printProgressBar(
+        i, len(ssscc_list), prefix="Progress:", suffix="Density Matching", length=50
+    )
     for ssscc in ssscc_list:
         time_data = time_df[time_df["SSSCC"] == ssscc].copy()
         btl_data = btl_df[btl_df["SSSCC"] == ssscc].copy()
@@ -809,6 +815,10 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         sbe43_merged["SSSCC"] = ssscc
         all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
         log.info(ssscc + " density matching done")
+        i += 1
+        odf_io.printProgressBar(
+            i, len(ssscc_list), prefix="Progress:", suffix="Density Matching", length=50
+        )
 
     # Only fit using OXYGEN flagged good (2)
     all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
@@ -818,6 +828,10 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_dict["ox0"] = sbe_coef0
 
     # Fit each cast individually
+    i = 0
+    odf_io.printProgressBar(
+        i, len(ssscc_list), prefix="Progress:", suffix="SBE43 Fitting", length=50
+    )
     for ssscc in ssscc_list:
         sbe_coef, sbe_df = sbe43_oxy_fit(
             all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
@@ -829,6 +843,10 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             sbe43_dict[ssscc] = sbe_coef
         # all non-NaN oxygen data with flags
         all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
+        i += 1
+        odf_io.printProgressBar(
+            i, len(ssscc_list), prefix="Progress:", suffix="SBE43 Fitting", length=50
+        )
 
     # TODO: save outlier data from fits?
     # TODO: secondary oxygen flagging step (instead of just taking outliers from fit routine)

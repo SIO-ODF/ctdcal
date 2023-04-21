@@ -12,6 +12,7 @@ from ctdcal import (
     flagging,
     process_ctd,
     oxy_fitting,
+    odf_io,
 )
 
 cfg = get_ctdcal_config()
@@ -202,6 +203,11 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         ssscc_list = process_ctd.get_ssscc_list()
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
+
+    i = 0
+    odf_io.printProgressBar(
+        i, len(ssscc_list), prefix="Progress:", suffix="RINKO fitting", length=50
+    )
     for f in ssscc_subsets:
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         f_stem = f.stem
@@ -279,6 +285,14 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                     time_df.loc[time_rows, cfg.column["sal"]],
                     time_df.loc[time_rows, "OS"],
                 ),
+            )
+            i += 1
+            odf_io.printProgressBar(
+                i,
+                len(ssscc_list),
+                prefix="Progress:",
+                suffix="RINKO fitting",
+                length=50,
             )
 
             # save coefficients to dataframe
