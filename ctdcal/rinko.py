@@ -360,6 +360,13 @@ def rinko_oxy_fit(
 
     bad_df = pd.DataFrame()
     weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
+    #   Fitting will resume if all RINKO values are zero.
+    if all(btl_df[cfg.column["rinko_oxy"]] == 0):
+        # raise ValueError('All RINKO values are detected as 0. Check config.py')
+        log.warning(
+            "All RINKO values are detected as 0. Fitting may have anomalous results."
+        )
+
     fit_data = (
         btl_df[cfg.column["rinko_oxy"]],
         btl_df[cfg.column["p"]],
