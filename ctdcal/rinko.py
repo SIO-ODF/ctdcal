@@ -730,169 +730,169 @@ def match_sigmas(
     return merged_df
 
 
-def rinko_oxygen_fit(merged_df, rinko_coef0=None, f_out=None):
+# def rinko_oxygen_fit(merged_df, rinko_coef0=None, f_out=None):
 
-    # Create DF for good and questionable values
+#     # Create DF for good and questionable values
 
-    bad_df = pd.DataFrame()
-    good_df = pd.DataFrame()
+#     bad_df = pd.DataFrame()
+#     good_df = pd.DataFrame()
 
-    if rinko_coef0 is None:
-        # Load initial coefficient guess
-        rinko_coef0 = rinko_o2_cal_parameters()
+#     if rinko_coef0 is None:
+#         # Load initial coefficient guess
+#         rinko_coef0 = rinko_o2_cal_parameters()
 
-    p0 = [x for x in rinko_coef0]
+#     p0 = [x for x in rinko_coef0]
 
-    # Curve fit (weighted)
-    weights = oxy_fitting.calculate_weights(merged_df["CTDPRS_rinko_ctd"])
-    cfw_coefs = scipy.optimize.fmin(
-        rinko_weighted_residual,
-        x0=p0,
-        args=(
-            weights,
-            (
-                merged_df["CTDPRS_rinko_ctd"],
-                merged_df["CTDTMP_rinko"],
-                merged_df["CTDRINKOVOLTS"],
-                merged_df["OS_rinko_ctd"],
-            ),
-            merged_df["REFOXY_rinko"],
-        ),
-        maxfun=10000,
-    )
-    merged_df["CTDRINKO"] = rinko_oxy_eq(
-        merged_df["CTDPRS_rinko_ctd"],
-        merged_df["CTDTMP_rinko"],
-        merged_df["CTDRINKOVOLTS"],
-        merged_df["OS_rinko_ctd"],
-        cfw_coefs,
-    )
+#     # Curve fit (weighted)
+#     weights = oxy_fitting.calculate_weights(merged_df["CTDPRS_rinko_ctd"])
+#     cfw_coefs = scipy.optimize.fmin(
+#         rinko_weighted_residual,
+#         x0=p0,
+#         args=(
+#             weights,
+#             (
+#                 merged_df["CTDPRS_rinko_ctd"],
+#                 merged_df["CTDTMP_rinko"],
+#                 merged_df["CTDRINKOVOLTS"],
+#                 merged_df["OS_rinko_ctd"],
+#             ),
+#             merged_df["REFOXY_rinko"],
+#         ),
+#         maxfun=10000,
+#     )
+#     merged_df["CTDRINKO"] = rinko_oxy_eq(
+#         merged_df["CTDPRS_rinko_ctd"],
+#         merged_df["CTDTMP_rinko"],
+#         merged_df["CTDRINKOVOLTS"],
+#         merged_df["OS_rinko_ctd"],
+#         cfw_coefs,
+#     )
 
-    merged_df["res_rinko"] = merged_df["REFOXY_rinko"] - merged_df["CTDRINKO"]
-    stdres = np.std(merged_df["res_rinko"])
-    cutoff = stdres * 2.8
+#     merged_df["res_rinko"] = merged_df["REFOXY_rinko"] - merged_df["CTDRINKO"]
+#     stdres = np.std(merged_df["res_rinko"])
+#     cutoff = stdres * 2.8
 
-    thrown_values = merged_df[np.abs(merged_df["res_rinko"]) > cutoff]
-    bad_df = pd.concat([bad_df, thrown_values])
-    merged_df = merged_df[np.abs(merged_df["res_rinko"]) <= cutoff]
+#     thrown_values = merged_df[np.abs(merged_df["res_rinko"]) > cutoff]
+#     bad_df = pd.concat([bad_df, thrown_values])
+#     merged_df = merged_df[np.abs(merged_df["res_rinko"]) <= cutoff]
 
-    while not thrown_values.empty:  # runs as long as there are thrown_values
+#     while not thrown_values.empty:  # runs as long as there are thrown_values
 
-        p0 = cfw_coefs
-        weights = oxy_fitting.calculate_weights(merged_df["CTDPRS_rinko_ctd"])
-        cfw_coefs = scipy.optimize.fmin(
-            rinko_weighted_residual,
-            x0=p0,
-            args=(
-                weights,
-                (
-                    merged_df["CTDPRS_rinko_ctd"],
-                    merged_df["CTDTMP_rinko"],
-                    merged_df["CTDRINKOVOLTS"],
-                    merged_df["OS_rinko_ctd"],
-                ),
-                merged_df["REFOXY_rinko"],
-            ),
-            maxfun=10000,
-        )
-        merged_df["CTDRINKO"] = rinko_oxy_eq(
-            merged_df["CTDPRS_rinko_ctd"],
-            merged_df["CTDTMP_rinko"],
-            merged_df["CTDRINKOVOLTS"],
-            merged_df["OS_rinko_ctd"],
-            cfw_coefs,
-        )
+#         p0 = cfw_coefs
+#         weights = oxy_fitting.calculate_weights(merged_df["CTDPRS_rinko_ctd"])
+#         cfw_coefs = scipy.optimize.fmin(
+#             rinko_weighted_residual,
+#             x0=p0,
+#             args=(
+#                 weights,
+#                 (
+#                     merged_df["CTDPRS_rinko_ctd"],
+#                     merged_df["CTDTMP_rinko"],
+#                     merged_df["CTDRINKOVOLTS"],
+#                     merged_df["OS_rinko_ctd"],
+#                 ),
+#                 merged_df["REFOXY_rinko"],
+#             ),
+#             maxfun=10000,
+#         )
+#         merged_df["CTDRINKO"] = rinko_oxy_eq(
+#             merged_df["CTDPRS_rinko_ctd"],
+#             merged_df["CTDTMP_rinko"],
+#             merged_df["CTDRINKOVOLTS"],
+#             merged_df["OS_rinko_ctd"],
+#             cfw_coefs,
+#         )
 
-        merged_df["res_rinko"] = merged_df["REFOXY_rinko"] - merged_df["CTDRINKO"]
-        stdres = np.std(merged_df["res_rinko"])
-        cutoff = stdres * 2.8
-        thrown_values = merged_df[np.abs(merged_df["res_rinko"]) > cutoff]
-        print(len(thrown_values))
-        print(p0)
-        bad_df = pd.concat([bad_df, thrown_values])
-        merged_df = merged_df[np.abs(merged_df["res_rinko"]) <= cutoff]
+#         merged_df["res_rinko"] = merged_df["REFOXY_rinko"] - merged_df["CTDRINKO"]
+#         stdres = np.std(merged_df["res_rinko"])
+#         cutoff = stdres * 2.8
+#         thrown_values = merged_df[np.abs(merged_df["res_rinko"]) > cutoff]
+#         print(len(thrown_values))
+#         print(p0)
+#         bad_df = pd.concat([bad_df, thrown_values])
+#         merged_df = merged_df[np.abs(merged_df["res_rinko"]) <= cutoff]
 
-    # try:
-    #     cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq,
-    #                                               (merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd']),
-    #                                               merged_df['REFOXY_rinko'], coef0, sigma=weights, absolute_sigma=False, maxfev=50000)
+#     try:
+#         cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq,
+#                                                   (merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd']),
+#                                                   merged_df['REFOXY_rinko'], coef0, sigma=weights, absolute_sigma=False, maxfev=50000)
 
-    #     merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coef)
-    #     merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
-    #     stdres = np.std(merged_df['res_rinko'])
-    #     cutoff = stdres * 2.8
+#         merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coef)
+#         merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
+#         stdres = np.std(merged_df['res_rinko'])
+#         cutoff = stdres * 2.8
 
-    #     thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #     bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #     bad_df = pd.concat([bad_df, bad_values])
-    #     merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
+#         thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#         bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#         bad_df = pd.concat([bad_df, bad_values])
+#         merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
 
-    #     while not thrown_values.empty:
+#         while not thrown_values.empty:
 
-    #         p0 = cfw_coef
-    #         # weights = 1/(np.power(merged_df['CTDPRS_rinko_ctd'],1/2))
-    #         weights = 1/(oxy_fitting.calculate_weights(merged_df['CTDPRS_rinko_ctd']))
-    #         cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq, (merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd']), merged_df['REFOXY_rinko'], p0, sigma=weights, absolute_sigma=False, maxfev=50000)
-    #         merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coef)
-    #         merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
-    #         stdres = np.std(merged_df['res_rinko'])
-    #         cutoff = stdres * 2.8
-    #         thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #         bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #         bad_df = pd.concat([bad_df, bad_values])
-    #         merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
+#             p0 = cfw_coef
+#             # weights = 1/(np.power(merged_df['CTDPRS_rinko_ctd'],1/2))
+#             weights = 1/(oxy_fitting.calculate_weights(merged_df['CTDPRS_rinko_ctd']))
+#             cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq, (merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd']), merged_df['REFOXY_rinko'], p0, sigma=weights, absolute_sigma=False, maxfev=50000)
+#             merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coef)
+#             merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
+#             stdres = np.std(merged_df['res_rinko'])
+#             cutoff = stdres * 2.8
+#             thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#             bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#             bad_df = pd.concat([bad_df, bad_values])
+#             merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
 
-    # except RuntimeError:
+#     except RuntimeError:
 
-    #         try:#Nested try/except could be better
-    #             print('Weighted curve fitting failed for RINKO...using Unweighted Fitting')
-    #             cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq, (merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd']), merged_df['REFOXY_rinko'], coef0)
-    #             merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coef)
+#             try:#Nested try/except could be better
+#                 print('Weighted curve fitting failed for RINKO...using Unweighted Fitting')
+#                 cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq, (merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd']), merged_df['REFOXY_rinko'], coef0)
+#                 merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coef)
 
-    #             merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
-    #             stdres = np.std(merged_df['res_rinko'])
-    #             cutoff = stdres * 2.8
+#                 merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
+#                 stdres = np.std(merged_df['res_rinko'])
+#                 cutoff = stdres * 2.8
 
-    #             thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #             bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #             bad_df = pd.concat([bad_df, bad_values])
-    #             merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
+#                 thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#                 bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#                 bad_df = pd.concat([bad_df, bad_values])
+#                 merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
 
-    #             while not thrown_values.empty:
+#                 while not thrown_values.empty:
 
-    #                 p0 = cfw_coef
-    #                 cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq, (merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd']), merged_df['REFOXY_rinko'], coef0)
-    #                 merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coef)
+#                     p0 = cfw_coef
+#                     cfw_coef , cov = scipy.optimize.curve_fit(rinko_curve_fit_eq, (merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd']), merged_df['REFOXY_rinko'], coef0)
+#                     merged_df['CTDRINKO'] = rinko_oxy_eq(merged_df['CTDPRS_rinko_ctd'],merged_df['CTDTMP_rinko'],merged_df['CTDRINKOVOLTS'],merged_df['OS_rinko_ctd'],cfw_coef)
 
-    #                 merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
-    #                 stdres = np.std(merged_df['res_rinko'])
-    #                 cutoff = stdres * 2.8
+#                     merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
+#                     stdres = np.std(merged_df['res_rinko'])
+#                     cutoff = stdres * 2.8
 
-    #                 thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #                 bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #                 bad_df = pd.concat([bad_df, bad_values])
-    #                 merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
+#                     thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#                     bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#                     bad_df = pd.concat([bad_df, bad_values])
+#                     merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
 
-    #         except:
-    #             print('Logging RINKO coef...')
-    #             cfw_coef = coef0
-    #             merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
-    #             stdres = np.std(merged_df['res_rinko'])
-    #             cutoff = stdres * 2.8
-    #             thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #             bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
-    #             merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
+#             except:
+#                 print('Logging RINKO coef...')
+#                 cfw_coef = coef0
+#                 merged_df['res_rinko'] = merged_df['REFOXY_rinko'] - merged_df['CTDRINKO']
+#                 stdres = np.std(merged_df['res_rinko'])
+#                 cutoff = stdres * 2.8
+#                 thrown_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#                 bad_values = merged_df[np.abs(merged_df['res_rinko']) > cutoff]
+#                 merged_df = merged_df[np.abs(merged_df['res_rinko']) <= cutoff]
 
-    # coef_dict[station] = cfw_coef
-    good_df = pd.concat([good_df, merged_df])
-    good_df["CTDRINKO_FLAG_W"] = 2
-    bad_df = pd.concat([bad_df, bad_values])
-    bad_df["CTDRINKO_FLAG_W"] = 3
-    df = pd.concat([good_df, bad_df])
-    df.sort_values(by="CTDPRS_rinko_btl", ascending=False, inplace=True)
-    oxy_df = df.copy()
+#     coef_dict[station] = cfw_coef
+#     good_df = pd.concat([good_df, merged_df])
+#     good_df["CTDRINKO_FLAG_W"] = 2
+#     bad_df = pd.concat([bad_df, bad_values])
+#     bad_df["CTDRINKO_FLAG_W"] = 3
+#     df = pd.concat([good_df, bad_df])
+#     df.sort_values(by="CTDPRS_rinko_btl", ascending=False, inplace=True)
+#     oxy_df = df.copy()
 
-    return cfw_coef, df
+#     return cfw_coef, df
 
 
 if __name__ == "__main__":
