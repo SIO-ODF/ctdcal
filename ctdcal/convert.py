@@ -10,6 +10,7 @@ from ctdcal import get_ctdcal_config
 from ctdcal import process_bottle as btl
 from ctdcal import process_ctd as process_ctd
 from ctdcal import sbe_reader as sbe_rd
+from ctdcal import odf_io
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -128,6 +129,11 @@ def hex_to_ctd(ssscc_list):
 
     """
     log.info("Converting .hex files")
+
+    i = 0
+    odf_io.printProgressBar(
+        i, len(ssscc_list), prefix="Progress:", suffix="Translating new HEX", length=50
+    )
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
             hexFile = cfg.dirs["raw"] + ssscc + ".hex"
@@ -135,7 +141,14 @@ def hex_to_ctd(ssscc_list):
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader, ssscc)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
-
+        i += 1
+        odf_io.printProgressBar(
+            i,
+            len(ssscc_list),
+            prefix="Progress:",
+            suffix="Translating new HEX",
+            length=50,
+        )
     return True
 
 
