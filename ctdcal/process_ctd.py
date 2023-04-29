@@ -801,7 +801,24 @@ def export_ct1(df, ssscc_list):
             depth = -999
 
         # get cast_details for current SSSCC
-        cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("records")[0]
+        try:
+            cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("records")[
+                0
+            ]
+        except:
+            #   DMB2023 for casts where bottles were not fired
+            log.warning(
+                f"Cast details unavailable for {ssscc}. Getting details from continuous data..."
+            )
+            cast_details2 = pd.read_csv(
+                cfg.dirs["logs"] + "cast_details.csv",
+                dtype={"SSSCC": str}
+                # cfg.dirs["logs"] + "bottom_bottle_details.csv",
+                # dtype={"SSSCC": str},
+            )
+            cast_dict = cast_details2[cast_details2["SSSCC"] == ssscc].to_dict(
+                "records"
+            )[0]
         b_datetime = (
             datetime.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc)
             .strftime("%Y%m%d %H%M")

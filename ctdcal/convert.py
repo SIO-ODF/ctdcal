@@ -234,29 +234,34 @@ def make_btl_mean(ssscc_list):
         if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
             imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df)
-            mean_df = btl.bottle_mean(bottle_df)
+            if not all(bottle_df.isnull()):
+                mean_df = btl.bottle_mean(bottle_df)
 
-            # export bottom bottle time/lat/lon info
-            fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
-            datetime_col = "nmea_datetime"
-            if datetime_col not in mean_df.columns:
-                log.debug(
-                    f"'{datetime_col}' not found in DataFrame - using 'scan_datetime'"
-                )
-                datetime_col = "scan_datetime"
+                # export bottom bottle time/lat/lon info
+                fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
+                datetime_col = "nmea_datetime"
+                if datetime_col not in mean_df.columns:
+                    log.debug(
+                        f"'{datetime_col}' not found in DataFrame - using 'scan_datetime'"
+                    )
+                    datetime_col = "scan_datetime"
 
-            bot_df = mean_df[[datetime_col, "GPSLAT", "GPSLON"]].head(1)
-            bot_df.columns = ["bottom_time", "latitude", "longitude"]
-            bot_df.insert(0, "SSSCC", ssscc)
-            add_header = not Path(fname).exists()  # add header iff file doesn't exist
-            with open(fname, "a") as f:
-                bot_df.to_csv(f, mode="a", header=add_header, index=False)
+                bot_df = mean_df[[datetime_col, "GPSLAT", "GPSLON"]].head(1)
+                bot_df.columns = ["bottom_time", "latitude", "longitude"]
+                bot_df.insert(0, "SSSCC", ssscc)
+                add_header = not Path(
+                    fname
+                ).exists()  # add header iff file doesn't exist
+                with open(fname, "a") as f:
+                    bot_df.to_csv(f, mode="a", header=add_header, index=False)
 
-            #   Bottles 11, 12 are not mounted, increment up bottles after bottle 10
-            if len(mean_df) > 10:
-                mean_df.btl_fire_num.iloc[10:] = mean_df.btl_fire_num.iloc[10:] + 2
+                #   Bottles 11, 12 are not mounted, increment up bottles after bottle 10
+                if len(mean_df) > 10:
+                    mean_df.btl_fire_num.iloc[10:] = mean_df.btl_fire_num.iloc[10:] + 2
 
-            mean_df.to_pickle(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl")
+                mean_df.to_pickle(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl")
+            else:
+                log.warning(f"No bottles detected in {ssscc}. Resuming processing...")
 
     return True
 

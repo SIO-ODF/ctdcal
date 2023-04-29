@@ -132,6 +132,15 @@ def process(group):
 
 
 @cli.command()
+def reuse():
+    """Process a subset of samples, reusing premade coefficients"""
+    from .scripts.odf_process_reuse import odf_process_reuse
+
+    log.info("Beginning processing for stations without discrete data")
+    odf_process_reuse()
+
+
+@cli.command()
 def cruise_report():
     """Generate bottle residual figures for cruise report"""
 

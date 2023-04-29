@@ -180,8 +180,11 @@ def load_all_btl_files(ssscc_list, cols=None):
     for ssscc in ssscc_list:
         log.info("Loading BTL data for station: " + ssscc + "...")
         btl_file = cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl"
-        btl_data = _load_btl_data(btl_file, cols)
-
+        try:
+            btl_data = _load_btl_data(btl_file, cols)
+        except FileNotFoundError:
+            log.warning(f"Bottle means not found for {ssscc}. Skipping read in...")
+            continue
         ### load REFT data
         reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
         try:
