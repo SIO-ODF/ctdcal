@@ -533,15 +533,6 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org
 
-    #   Insert the eDNA
-    print("Inserting eDNA station 00202...")
-    eDNA_file = Path("data/pressure/33RR20230409_eDNA_hy1.csv")
-    eDNA_df = io.load_exchange_btl(eDNA_file)
-    #   00201 ends on index 44
-    btl_data = pd.concat([btl_data.iloc[:44], eDNA_df, btl_data.iloc[44:]]).reset_index(
-        drop=True
-    )
-
     with open(out_dir + cfg.expocode + "_hy1.csv", mode="w+") as f:
         f.write("BOTTLE, %s\n" % (time_stamp))
         f.write(",".join(btl_columns.keys()) + "\n")
