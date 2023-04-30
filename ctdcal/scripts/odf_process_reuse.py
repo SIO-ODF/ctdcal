@@ -21,7 +21,7 @@ from ctdcal import (
     convert,
     fit_ctd,
     get_ctdcal_config,
-    odf_io,
+    io,
     oxy_fitting,
     process_bottle,
     process_ctd,
@@ -48,6 +48,7 @@ def odf_process_reuse():
     convert.make_btl_mean(ssscc_list_matches["raw"])
 
     #   If bottles *were* fired, run process_bottle.process_reft(ssscc_list_matches["raw"])
+    process_bottle.process_reft(ssscc_list_matches["raw"])
 
     #   Skip temperature, salt, oxygen files
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list_matches["raw"])
@@ -425,7 +426,35 @@ def export_hy1_reuse(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         btl_data.to_csv(f, header=False, index=False)
         f.write("\n" + "END_DATA")
 
+    main_df = merge_hy1()
+
+    with open(out_dir + cfg.expocode + "_combo_hy1.csv", mode="w+") as f:
+        f.write("BOTTLE, %s\n" % (time_stamp))
+        f.write(",".join(btl_columns.keys()) + "\n")
+        f.write(",".join(btl_columns.values()) + "\n")
+        main_df.to_csv(f, header=False, index=False)
+        f.write("\n" + "END_DATA")
+
     return
+
+
+def merge_hy1(
+    main_file=Path("data/pressure/33RR20230409_hy1.csv"),
+    reuse_file=Path("data/pressure/33RR20230409_reuse_hy1.csv"),
+):
+    """Merges two hy1 files, returning the combined dataframe"""
+
+    main_df = io.load_exchange_btl(main_file)
+    reuse_df = io.load_exchange_btl(reuse_file)
+
+    main_df = main_df.append(reuse_df)
+    main_df = main_df.sort_values(
+        by=["STNNBR", "CASTNO", "SAMPNO"],
+        ascending=[True, True, False],
+        ignore_index=True,
+    )
+
+    return main_df
 
 
 if __name__ == "__main__":
