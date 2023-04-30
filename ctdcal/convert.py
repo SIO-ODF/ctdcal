@@ -234,7 +234,7 @@ def make_btl_mean(ssscc_list):
         if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
             imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df)
-            if not all(bottle_df.isnull()):
+            if not bottle_df.empty:
                 mean_df = btl.bottle_mean(bottle_df)
 
                 # export bottom bottle time/lat/lon info
