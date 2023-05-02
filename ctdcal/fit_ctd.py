@@ -482,24 +482,39 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["p"]],
     )
 
-    # merge in handcoded salt flags
+    #   Initial autosal flagging
+    btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
+
+    #   Merge in manual salt flags
+    if Path("data/salt/manual_salt_flags.csv").exists():
+        manual_flags = pd.read_csv(
+            "data/salt/manual_salt_flags.csv", dtype={"SSSCC": str}
+        )
+        print(manual_flags.tail())
+        for _, flags in manual_flags.iterrows():
+            df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
+                btl_df["btl_fire_num"] == flags["SAMPNO"]
+            )
+            btl_df.loc[df_row, "SALNTY_FLAG_W"] = flags["Flag"]
+
+    # merge in handcoded salt flags (from QA)
     # TODO: make salt flagger move .csv somewhere else? or just always have it
     # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
-    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
-    if Path(salt_file).exists():
-        handcoded_salts = pd.read_csv(
-            salt_file, dtype={"SSSCC": str, "salinity_flag": int}
-        )
-        handcoded_salts = handcoded_salts.rename(
-            columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
-        ).drop(columns=["diff", "Comments"])
-        btl_df = btl_df.merge(handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left")
-        # TODO: may be easier to try using flagging._merge_flags()?
-        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
-            btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
-        )
-    else:
-        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
+    # salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
+    # if Path(salt_file).exists():
+    #     handcoded_salts = pd.read_csv(
+    #         salt_file, dtype={"SSSCC": str, "salinity_flag": int}
+    #     )
+    #     handcoded_salts = handcoded_salts.rename(
+    #         columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
+    #     ).drop(columns=["diff", "Comments"])
+    #     btl_df = btl_df.merge(handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left")
+    #     # TODO: may be easier to try using flagging._merge_flags()?
+    #     btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
+    #         btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
+    #     )
+    # else:
+    #     btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
 
     ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
@@ -622,6 +637,9 @@ def calibrate_cond(btl_df, time_df):
             show_thresh=True,
             f_out=f"{cfg.fig_dirs[cN]}residual_all_postfit.pdf",
         )
+
+        #   Add autosal flags back in
+        btl_df.loc[df_row, "SALNTY_FLAG_W"] = flags["Flag"]
 
         # export cond quality flags
         # TODO: make these flags useful/less cluttered
