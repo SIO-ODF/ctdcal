@@ -639,7 +639,8 @@ def calibrate_cond(btl_df, time_df):
         )
 
         #   Add autosal flags back in
-        btl_df.loc[df_row, "SALNTY_FLAG_W"] = flags["Flag"]
+        if Path("data/salt/manual_salt_flags.csv").exists():
+            btl_df.loc[df_row, "SALNTY_FLAG_W"] = flags["Flag"]
 
         # export cond quality flags
         # TODO: make these flags useful/less cluttered
