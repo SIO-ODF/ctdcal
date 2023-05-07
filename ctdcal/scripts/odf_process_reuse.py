@@ -89,6 +89,37 @@ def odf_process_reuse():
         t2 = ssscc_coef_t2.loc[ssscc_coef_t2["SSSCC"] == ssscc].astype(float)
         c1 = ssscc_coef_c1.loc[ssscc_coef_c1["SSSCC"] == ssscc].astype(float)
         c2 = ssscc_coef_c2.loc[ssscc_coef_c2["SSSCC"] == ssscc].astype(float)
+
+        if ssscc == "05001":
+            print("Fish sucked up on 05101 - using secondary line")
+            #   Why does this give NaN? Overwrite line 1 I guess...
+            # time_df.loc[
+            #     time_df["SSSCC"] == "05101",
+            #     ["CTDTMP1", "CTDTMP2", "CTDCOND1", "CTDCOND2"],
+            # ] = time_df.loc[
+            #     time_df["SSSCC"] == "05101",
+            #     ["CTDTMP2", "CTDTMP1", "CTDCOND2", "CTDCOND1"],
+            # ]
+            # btl_df.loc[
+            #     btl_df["SSSCC"] == "05101",
+            #     ["CTDTMP1", "CTDTMP2", "CTDCOND1", "CTDCOND2"],
+            # ] = btl_df.loc[
+            #     btl_df["SSSCC"] == "05101",
+            #     ["CTDTMP2", "CTDTMP1", "CTDCOND2", "CTDCOND1"],
+            # ]
+            time_df.loc[time_df.SSSCC == "05101", "CTDTMP1"] = time_df.loc[
+                time_df.SSSCC == "05101", "CTDTMP2"
+            ]
+            time_df.loc[time_df.SSSCC == "05101", "CTDCOND1"] = time_df.loc[
+                time_df.SSSCC == "05101", "CTDCOND2"
+            ]
+            btl_df.loc[btl_df.SSSCC == "05101", "CTDTMP1"] = btl_df.loc[
+                btl_df.SSSCC == "05101", "CTDTMP2"
+            ]
+            btl_df.loc[btl_df.SSSCC == "05101", "CTDCOND1"] = btl_df.loc[
+                btl_df.SSSCC == "05101", "CTDCOND2"
+            ]
+
         #   Temperature, order is ct1, ct2, then c0, cp1, cp2
         for tN in ["t1", "t2"]:
             #   Extract coefficients to tuple for polyfit
@@ -134,6 +165,17 @@ def odf_process_reuse():
                 (time_df[cfg.column["p"]], ps),
                 (time_df[cfg.column[tN]], ts),
             )
+    time_df[cfg.column["sal"]] = gsw.SP_from_C(
+        time_df[cfg.column["c1"]],
+        time_df[cfg.column["t1"]],
+        time_df[cfg.column["p"]],
+    )
+    btl_df[cfg.column["sal"]] = gsw.SP_from_C(
+        btl_df[cfg.column["c1"]],
+        btl_df[cfg.column["t1"]],
+        btl_df[cfg.column["p"]],
+    )
+
     #   Now use the fit data to get oxygen prepared
     btl_df["SA"] = gsw.SA_from_SP(
         btl_df[cfg.column["sal"]],
