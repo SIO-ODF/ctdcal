@@ -141,6 +141,15 @@ def reuse():
 
 
 @cli.command()
+def vis():
+    """Plot all the pre/postfit data in the current SSSCC"""
+    from .scripts.odf_quickplot import odf_quickplot
+
+    log.info("Plotting current SSSCC")
+    odf_quickplot()
+
+
+@cli.command()
 def cruise_report():
     """Generate bottle residual figures for cruise report"""
 

@@ -221,6 +221,42 @@ def _intermediate_residual_plot(
     return _save_fig(ax, f_out)
 
 
+def two_element(x1, x2, y, ssscc=None, caption=None, f_out=None):
+
+    plt.style.use("ggplot")
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, sharey="all")
+
+    ax1.plot(x1, y)
+    ax1.plot(x2, y)
+    ax1.invert_yaxis()
+    plt.tight_layout()
+    ax1.tick_params(labelrotation=45)
+    plt.grid()
+
+    ax2.plot(x2 - x1, y)
+    plt.tight_layout()
+    ax2.tick_params(labelrotation=45)
+    plt.grid()
+
+    plt.gcf().subplots_adjust(bottom=0.2, left=0.1)
+
+    if type(x1) == pd.core.series.Series:
+        ax1.legend([x1.name, x2.name])
+        ax1.set_ylabel(y.name)
+        ax1.set_xlabel(x1.name + ", " + x2.name)
+        ax2.set_xlabel("Residual " + x2.name + "-" + x1.name)
+
+    if ssscc is not None:
+        fig.suptitle(ssscc, x=0.53, y=1)
+
+    if caption is not None:
+        plt.figtext(
+            0.5, 0.01, caption, wrap=True, horizontalalignment="center", fontsize=12
+        )
+    return _save_fig(fig, f_out)
+
+
 # TODO: more plots! what does ODV have?
 # section plots (w/ PyDiva)
 # parameter-parameter plots
