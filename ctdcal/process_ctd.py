@@ -189,7 +189,14 @@ def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
                 if df.max()["movement"] == "stop" and len(df) > 1:
                     last_idx = idx
             else:
-                return last_idx
+                try:
+                    return last_idx
+                except UnboundLocalError:
+                    #   If the threshold isn't triggered due to short soak DMB2023 TODO: Test this
+                    log.warning(
+                        f"Problem exceeding pressure threshold to identify downcast from soak."
+                    )
+                    return idx
         return last_idx
 
     # Trim off everything before last soak
