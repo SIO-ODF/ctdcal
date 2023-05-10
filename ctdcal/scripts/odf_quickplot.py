@@ -31,9 +31,14 @@ log = logging.getLogger(__name__)
 cfg = get_ctdcal_config()
 
 
-def odf_quickplot():
+def odf_quickplot(type):
     #   Import the SSSCC list
-    ssscc_list = ssscc_list = process_ctd.get_ssscc_list()
+    if type == "ssscc":
+        ssscc_list = ssscc_list = process_ctd.get_ssscc_list()
+    else:
+        raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
+        ssscc_list = sorted([f.stem for f in raw_files])
+
     #   Import fitting coefs for the figure captions
 
     i = 0
