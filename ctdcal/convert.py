@@ -166,6 +166,10 @@ def make_time_files(ssscc_list):
             converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
             #   Removing cast-specific spikes in data
+            #   90001: Single-point spike on the primary line
+            if ssscc == "90001":
+                converted_df.loc[31363, ["CTDTMP1", "CTDSAL"]] = np.nan
+
             #   00601: Sucked up something and noise was in oxy, but nothing else on primary line
             if ssscc == "00601":
                 # breakpoint()
