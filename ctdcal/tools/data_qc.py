@@ -23,18 +23,14 @@ from ctdcal import get_ctdcal_config, io, process_ctd
 
 cfg = get_ctdcal_config()
 
-# TODO: abstract parts of this to a separate file
-# TODO: following above, make parts reusable?
-
-# load continuous CTD data and make into a dict (only ~20MB)
-# file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
-# ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
-
-# ODF
-ssscc_list = process_ctd.get_ssscc_list()
-fname = Path(cfg.dirs["pressure"]) / f"{cfg.expocode}_hy1.csv"
+#   ODF method for loading SSSCC files
+# ssscc_list = process_ctd.get_ssscc_list() #   For when you have 100% full casts
+raw_files = Path(cfg.dirs["raw"]).glob("*.hex") #   For when you have bio/yo-yo casts
+ssscc_list = sorted([f.stem for f in raw_files])
+fname = Path(cfg.dirs["pressure"]) / f"{cfg.expocode}_combo_hy1.csv"
 handcoded_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded.csv"
 
+#   Continuous files
 file_list = [Path(cfg.dirs["pressure"]) / f"{ssscc}_ct1.csv" for ssscc in ssscc_list]
 ctd_data = []
 for f in file_list:
@@ -50,6 +46,7 @@ btl_data = io.load_exchange_btl(fname).replace(-999, np.nan)
 btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"
 ].apply(lambda x: f"{x:02d}")
+#   Create salinity residuals
 btl_data["Residual"] = btl_data["SALNTY"] - btl_data["CTDSAL"]
 btl_data[["CTDPRS", "Residual"]] = btl_data[["CTDPRS", "Residual"]].round(4)
 btl_data["Comments"] = ""
@@ -132,6 +129,7 @@ comment_button = Button(label="Apply to selected", button_type="warning")
 save_button = Button(label="Save flagged data", button_type="success")
 exit_button = Button(label="Exit flagging tool", button_type="danger")
 
+#   Residual table
 vspace = Div(text=""" """, width=200, height=50)
 residual_guide_text = Div(
     text="""<br><br>
@@ -143,6 +141,7 @@ residual_guide_text = Div(
     width=150,
     height=135,
 )
+#   Note about bulk bottle flagging
 bulk_flag_text = Div(
     text="""<br><br>
     <b>Bulk Bottle Flagging:</b><br>
@@ -152,13 +151,14 @@ bulk_flag_text = Div(
     height=135,
 )
 
-# set up datasources
+#   Set up datasources (for use in the plotting)
 src_table = ColumnDataSource(data=dict())
 src_table_changes = ColumnDataSource(data=dict())
 src_plot_trace = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_downcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_upcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
+src_plot_btl_del = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
 fig = figure(
@@ -210,9 +210,35 @@ btl_sal.nonselection_glyph.line_alpha = 0.2
 ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 
+fig2 = figure(
+    height=800,
+    width=400,
+    title="Salinity residual vs CTDPRS [Station {}]".format(parameter.value, station.value),
+    tools="pan,box_zoom,wheel_zoom,box_select,reset",
+    y_axis_label="Pressure (dbar)",
+)
+thresh = np.array([0.002, 0.005, 0.010, 0.020])
+p_range = np.array([6000, 2000, 1000, 500])
+thresh = np.append(thresh, thresh[-1])
+p_range = np.append(p_range, 0)
+btl_sal2 = fig2.asterisk(
+    "x",
+    "y",
+    size=12,
+    line_width=1.5,
+    color="#0033CC",
+    source=src_plot_btl_del,
+    legend_label="Salinity residual",
+)
+fig2.step(thresh, p_range)
+fig2.step(-thresh, p_range)
+fig2.select(BoxSelectTool).select_every_mousemove = False
+fig2.y_range.flipped = True  # invert y-axis
+fig2.legend.location = "bottom_right"
+fig2.legend.border_line_width = 3
+fig2.legend.border_line_alpha = 1
+
 # define callback functions
-
-
 def update_selectors():
 
     print("exec update_selectors()")
@@ -252,6 +278,10 @@ def update_selectors():
     }
     src_plot_btl.data = {
         "x": btl_data.loc[btl_rows, ref_param.value],
+        "y": btl_data.loc[btl_rows, "CTDPRS"],
+    }
+    src_plot_btl_del.data = {
+        "x": btl_data.loc[btl_rows, "Residual"],
         "y": btl_data.loc[btl_rows, "CTDPRS"],
     }
 
@@ -475,7 +505,7 @@ tables = column(
     data_table_title, data_table, data_table_changed_title, data_table_changed
 )
 
-curdoc().add_root(row(controls, tables, fig))
+curdoc().add_root(row(controls, tables, fig, fig2))
 curdoc().title = "CTDO Data Flagging Tool"
 
 update_selectors()
