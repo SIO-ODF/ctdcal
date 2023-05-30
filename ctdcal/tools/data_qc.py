@@ -210,12 +210,14 @@ btl_sal.nonselection_glyph.line_alpha = 0.2
 ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 
+
 fig2 = figure(
     height=800,
     width=400,
     title="Salinity residual vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
     y_axis_label="Pressure (dbar)",
+    y_range=fig.y_range
 )
 thresh = np.array([0.002, 0.005, 0.010, 0.020])
 p_range = np.array([6000, 2000, 1000, 500])
@@ -228,10 +230,11 @@ btl_sal2 = fig2.asterisk(
     line_width=1.5,
     color="#0033CC",
     source=src_plot_btl_del,
-    legend_label="Salinity residual",
+    legend_label="Salinity residual (SALNTY-CTDSAL)",
 )
 fig2.step(thresh, p_range)
 fig2.step(-thresh, p_range)
+# fig2.ray(x=[0], y=[6000], length=0, angle=np.pi/2, line_width=1, color="black", line_dash="dashdot")  #   Option for vertical line on 0
 fig2.select(BoxSelectTool).select_every_mousemove = False
 fig2.y_range.flipped = True  # invert y-axis
 fig2.legend.location = "bottom_right"
