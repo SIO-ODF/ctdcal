@@ -678,5 +678,15 @@ def calibrate_cond(btl_df, time_df):
     btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.nan_values(
         btl_df[cfg.column["sal"]], old_flags=btl_df[cfg.column["sal"] + "_FLAG_W"]
     )
+    #   Post-cruise QC
+    if Path("data/salt/salt_flags_handcoded.csv").exists():
+        manual_flags = pd.read_csv(
+            "data/salt/salt_flags_handcoded.csv", dtype={"SSSCC": str}
+        )
+        for _, flags in manual_flags.iterrows():
+            df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
+                btl_df["btl_fire_num"] == flags["SAMPNO"]
+            )
+            btl_df.loc[df_row, "SALNTY_FLAG_W"] = flags["salinity_flag"]
 
     return btl_df, time_df
