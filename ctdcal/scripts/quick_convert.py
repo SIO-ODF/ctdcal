@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from ctdcal import flagging, get_ctdcal_config, io
+from ctdcal import flagging, get_ctdcal_config, proj_io
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def cnv_to_ct1():
         "CStarTr0": "CTDXMISS",
     }
     for f in cnv_files:
-        df = io.load_cnv(f).rename(mapper=sbe_to_woce, axis=1)
+        df = proj_io.load_cnv(f).rename(mapper=sbe_to_woce, axis=1)
         df = df[sbe_to_woce.values()]
 
         # give everything WOCE-named uncalibrated flags

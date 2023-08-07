@@ -19,7 +19,7 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
-from ctdcal import get_ctdcal_config, io
+from ctdcal import get_ctdcal_config, proj_io
 
 cfg = get_ctdcal_config()
 
@@ -32,14 +32,14 @@ ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
 ctd_data = []
 for f in file_list:
     print(f"Loading {f}")
-    header, df = io.load_exchange_ctd(f)
+    header, df = proj_io.load_exchange_ctd(f)
     df["SSSCC"] = header["STNNBR"].zfill(3) + header["CASTNO"].zfill(2)
     ctd_data.append(df)
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
 # load bottle file
 fname = list(Path(cfg.dirs["pressure"]).glob("*hy1.csv"))[0]
-btl_data = io.load_exchange_btl(fname).replace(-999, np.nan)
+btl_data = proj_io.load_exchange_btl(fname).replace(-999, np.nan)
 btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"
 ].apply(lambda x: f"{x:02d}")
