@@ -485,7 +485,7 @@ def calibrate_cond(btl_df, time_df):
     # merge in handcoded salt flags
     # TODO: make salt flagger move .csv somewhere else? or just always have it
     # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
-    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
+    salt_file = "data/salt/salt_flags_handcoded.csv"  # abstract to config.py
     if Path(salt_file).exists():
         handcoded_salts = pd.read_csv(
             salt_file, dtype={"SSSCC": str, "salinity_flag": int}
@@ -521,6 +521,11 @@ def calibrate_cond(btl_df, time_df):
             btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
             good_rows = btl_rows & (btl_df["SALNTY_FLAG_W"] == 2)
             time_rows = time_df["SSSCC"].isin(ssscc_sublist).values
+
+            # Exclude specific casts from fitting...
+            # AS 9 Aug 2023
+            exc_list = ['02401', '02501', '02601', '02701']
+            good_rows = good_rows & (~btl_df["SSSCC"].isin(exc_list).values)
 
             # 1) plot pre-fit residual
             f_stem = f.stem  # get "ssscc_c*" from path

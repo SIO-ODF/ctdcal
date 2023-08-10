@@ -622,8 +622,14 @@ def get_ssscc_list(fname="data/ssscc.csv"):
     Load in list of stations/casts to process.
     """
     ssscc_list = []
-    with open(fname, "r") as filename:
-        ssscc_list = [line.strip() for line in filename]
+    with open(fname, "r") as lines:
+        # ssscc_list = [line.strip() for line in filename]
+        #
+        # adding ability to comment out lines in sssscc file
+        # AS 7 Aug 2023
+        for line in lines:
+            if not line.startswith("#"):
+                ssscc_list.append(line.strip())
 
     return ssscc_list
 
