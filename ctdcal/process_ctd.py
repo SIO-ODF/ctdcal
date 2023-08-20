@@ -49,7 +49,8 @@ def cast_details(df, ssscc, log_file=None):
     b_lon : Longitude at bottom of cast
     b_alt : Altimeter reading at bottom of cast
     """
-    df_cast = _trim_soak_period(df)
+    # df_cast = _trim_soak_period(df)
+    df_cast = _trim_soak_period(ssscc, df)
 
     # TODO: call parameters from config file instead
     p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))
@@ -81,7 +82,7 @@ def cast_details(df, ssscc, log_file=None):
     return df_downcast
 
 
-def _trim_soak_period(df=None):
+def _trim_soak_period(ssscc, df=None):
     """
     1) Find pump on/off patterns
     2) Select pump_on=True group with largest pressure recording
@@ -95,14 +96,14 @@ def _trim_soak_period(df=None):
     df_cast = df_pump_on_list[np.argmax([df["CTDPRS"].max() for df in df_pump_on_list])]
     df_cast = df_cast.reset_index(drop=True)
     # next fn deals w/ edge cases, leave as is for now
-    df_cast = _find_last_soak_period(df_cast)
+    df_cast = _find_last_soak_period(df_cast, ssscc)
     start_ind = df_cast.loc[: len(df) // 4, "CTDPRS"].argmin()
     df_trimmed = df_cast[start_ind:].reset_index(drop=True).copy()
 
     return df_trimmed
 
 
-def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
+def _find_last_soak_period(df_cast, ssscc, time_bin=8, P_surface=2, P_downcast=50):
     """
     Find the soak period before the downcast starts.
 
@@ -182,6 +183,7 @@ def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
 
     # Find last soak period before starting descent to target depth
     def find_last(df_list, P_downcast):
+        last_idx = None
         for idx, df in enumerate(df_list):
             if df["CTDPRS"].max() < P_downcast:
                 # make sure it's soak, not a stop to switch to autocast (i.e. A20 2021)
@@ -189,7 +191,11 @@ def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
                 if df.max()["movement"] == "stop" and len(df) > 1:
                     last_idx = idx
             else:
-                return last_idx
+                if not last_idx:
+                    print("Whoa! Trouble finding the soak on cast %s! idx:%s" % (ssscc, idx))
+                    return idx - 1
+                else:
+                    return last_idx
         return last_idx
 
     # Trim off everything before last soak
@@ -478,7 +484,7 @@ def binning_df(df, p_column="CTDPRS", bin_size=2):
     )
     df_out.loc[:, p_column] = df_out["bins"].astype(float)
 
-    return df_out.groupby("bins").mean()
+    return df_out.groupby("bins").mean(numeric_only=False)
 
 
 def _fill_surface_data(df, bin_size=2):
@@ -708,7 +714,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list):
+def export_ct1(df, params):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -778,7 +784,7 @@ def export_ct1(df, ssscc_list):
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
-    for ssscc in ssscc_list:
+    for ssscc in params.ssscc:
 
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
