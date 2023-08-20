@@ -475,7 +475,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     # sort by decreasing sample number (increasing pressure) and reindex
     btl_data = btl_data.sort_values(
-        by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
+        by=["STNNBR", "CASTNO", "SAMPNO"], ascending=[True, True, False], ignore_index=True
     )
 
     # switch oxygen primary sensor to rinko

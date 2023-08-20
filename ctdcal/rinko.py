@@ -159,7 +159,7 @@ def oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
     return residuals
 
 
-def calibrate_oxy(btl_df, time_df, ssscc_list):
+def calibrate_oxy(btl_df, time_df, params):
     """
     Non-linear least squares fit oxygen optode against bottle oxygen.
 
@@ -199,9 +199,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         )
         if not Path(cfg.dirs["ssscc"]).exists():
             Path(cfg.dirs["ssscc"]).mkdir()
-        ssscc_list = process_ctd.get_ssscc_list()
+        # ssscc_list = process_ctd.get_ssscc_list()
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
-        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
+        pd.Series(params.ssscc).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
         f_stem = f.stem
@@ -283,6 +283,24 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
             # save coefficients to dataframe
             coefs_df.loc[ssscc] = rinko_coefs_ssscc
+
+    # Calibrate casts without bottle data (biocasts, etc) using r0...
+    # AS 2023-08-18
+    #
+    ssscc_oxy = set(params.ssscc_oxy)
+    for ssscc in [n for n in params.ssscc if n not in ssscc_oxy]:
+        time_rows = time_df["SSSCC"] == ssscc
+        print("Processing CTDRINKO for %s using r0..." % ssscc)
+        time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
+            rinko_coefs0,
+            (
+                time_df.loc[time_rows, cfg.column["rinko_oxy"]],
+                time_df.loc[time_rows, cfg.column["p"]],
+                time_df.loc[time_rows, cfg.column["t1"]],
+                time_df.loc[time_rows, cfg.column["sal"]],
+                time_df.loc[time_rows, "OS"],
+            ),
+        )
 
     # flag CTDRINKO with more than 1% difference
     time_df["CTDRINKO_FLAG_W"] = 2  # TODO: actual flagging of some kind?
@@ -461,6 +479,14 @@ def rinko_o2_cal_parameters(**kwargs):
     F = kwargs.get("F",  6.250000e-5)
     G = kwargs.get("G",  0.000000e0)
     H = kwargs.get("H",  1.000000e0)
+    # A = kwargs.get("A", -4.367428e1)    # coeffs for sn0297 2022-08-24
+    # B = kwargs.get("B",  1.376636e2)
+    # C = kwargs.get("C", -3.647983e-1)
+    # D = kwargs.get("D",  1.044300e-2)
+    # E = kwargs.get("E",  4.300000e-3)
+    # F = kwargs.get("F",  6.810000e-5)
+    # G = kwargs.get("G",  0.000000e0)
+    # H = kwargs.get("H",  1.000000e0)
     return RinkoO2Cal(A,B,C,D,E,F,G,H)
 
 def rinko_temperature_cal_parameters(**kwargs):
@@ -468,6 +494,10 @@ def rinko_temperature_cal_parameters(**kwargs):
     B = kwargs.get("B",  1.666857e1)
     C = kwargs.get("C", -2.142681e0)
     D = kwargs.get("D",  4.582805e-1)
+    # A = kwargs.get("A", -5.282776e0)    # coeffs for sn0297 2022-08-24
+    # B = kwargs.get("B",  1.671875e1)
+    # C = kwargs.get("C", -2.186949e0)
+    # D = kwargs.get("D",  4.688863e-1)
     return RinkoTMPCal(A,B,C,D)
 
 def rinko_temperature(v, tmp_cal:RinkoTMPCal):

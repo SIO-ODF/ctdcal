@@ -747,7 +747,7 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     return True
 
 
-def calibrate_oxy(btl_df, time_df, ssscc_list):
+def calibrate_oxy(btl_df, time_df, params):
     """
     Non-linear least squares fit chemical sensor oxygen against bottle oxygen.
 
@@ -757,8 +757,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         CTD data at bottle stops
     time_df : DataFrame
         Continuous CTD data
-    ssscc_list : list of str
-        List of stations to process
+    # ssscc_list : list of str
+    #     List of stations to process
+    params: data parameters
 
     Returns
     -------
@@ -782,7 +783,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
-    for ssscc in ssscc_list:
+    for ssscc in params.ssscc:
         time_data = time_df[time_df["SSSCC"] == ssscc].copy()
         btl_data = btl_df[btl_df["SSSCC"] == ssscc].copy()
         # can't calibrate without bottle oxygen ("OXYGEN")
@@ -818,7 +819,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_dict["ox0"] = sbe_coef0
 
     # Fit each cast individually
-    for ssscc in ssscc_list:
+    for ssscc in params.ssscc_oxy:
         sbe_coef, sbe_df = sbe43_oxy_fit(
             all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
             sbe_coef0=sbe_coef0,
@@ -834,8 +835,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # TODO: secondary oxygen flagging step (instead of just taking outliers from fit routine)
 
     # apply coefs
-    time_df["CTDOXY"] = np.nan
-    for ssscc in ssscc_list:
+    time_df.loc[time_df['SSSCC'].isin(params.ssscc_oxy), 'CTDOXY'] = np.nan
+    for ssscc in params.ssscc:
         if np.isnan(sbe43_dict[ssscc]).all():
             log.warning(
                 f"{ssscc} missing oxy data, leaving nan values and flagging as 9"
@@ -873,22 +874,25 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         btl_df["CTDOXY"], btl_df["OXYGEN"], percent_thresh=1
     )
 
+    # Don't plot the biocasts
+    btl_df_plotnobioonly = btl_df[btl_df['SSSCC'].isin(params.ssscc_oxy)]
+
     # Plot all post fit data
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit.pdf"
     ctd_plots._intermediate_residual_plot(
-        btl_df["OXYGEN"] - btl_df["CTDOXY"],
-        btl_df["CTDPRS"],
-        btl_df["SSSCC"],
+        btl_df_plotnobioonly["OXYGEN"] - btl_df_plotnobioonly["CTDOXY"],
+        btl_df_plotnobioonly["CTDPRS"],
+        btl_df_plotnobioonly["SSSCC"],
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
         xlim=(-10, 10),
     )
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit_flag2.pdf"
-    flag2 = btl_df["CTDOXY_FLAG_W"] == 2
+    flag2 = btl_df_plotnobioonly["CTDOXY_FLAG_W"] == 2
     ctd_plots._intermediate_residual_plot(
-        btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDOXY"],
-        btl_df.loc[flag2, "CTDPRS"],
-        btl_df.loc[flag2, "SSSCC"],
+        btl_df_plotnobioonly.loc[flag2, "OXYGEN"] - btl_df_plotnobioonly.loc[flag2, "CTDOXY"],
+        btl_df_plotnobioonly.loc[flag2, "CTDPRS"],
+        btl_df_plotnobioonly.loc[flag2, "SSSCC"],
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f_out,
         xlim=(-10, 10),
