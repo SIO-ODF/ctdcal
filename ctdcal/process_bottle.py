@@ -127,7 +127,8 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
     Loads salt_file to dataframe and reindexes to match bottle data dataframe
     """
     salt_data = pd.read_csv(
-        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"]
+        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"],
+        comment='#'
     )
     salt_data.set_index(index_name)
     salt_data["SSSCC_SALT"] = Path(salt_file).stem.split("_")[0]
