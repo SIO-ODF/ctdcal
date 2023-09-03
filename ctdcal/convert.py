@@ -446,6 +446,9 @@ def convertFromSBEReader(sbeReader, ssscc):
                     p_array,
                     coefs,
                 )
+            elif meta["sensor_info"]["SensorName"] in ("RINKOT"):
+                log.info("Processing Rinko T")
+                converted_df[col] = raw_df[meta["column"]]
 
         ### Aux block
         else:

@@ -185,10 +185,11 @@ def calibrate_oxy(btl_df, time_df, params):
     coefs_df = pd.DataFrame(columns=["c0", "c1", "c2", "d0", "d1", "d2", "cp"])
 
     # Only fit using OXYGEN flagged good (2)
-    good_data = btl_df[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    # good_data = btl_df[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    good_data = btl_df[btl_df["OXYGEN_FLAG_W"] != 9].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
-    (rinko_coefs0, _) = rinko_oxy_fit(good_data, f_suffix="_r0")
+    (rinko_coefs0, _) = rinko_oxy_fit(good_data.loc[good_data['CTDPRS'] > 1000], f_suffix="_r0")
     coefs_df.loc["r0"] = rinko_coefs0  # log for comparison
 
     # fit station groups, like T/C fitting (ssscc_r1, _r2, etc.)
@@ -203,7 +204,7 @@ def calibrate_oxy(btl_df, time_df, params):
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
         pd.Series(params.ssscc).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
-        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True, comment='#').to_list()
         f_stem = f.stem
         (rinko_coefs_group, _) = rinko_oxy_fit(
             good_data.loc[good_data["SSSCC"].isin(ssscc_sublist)].copy(),
@@ -290,15 +291,28 @@ def calibrate_oxy(btl_df, time_df, params):
     ssscc_oxy = set(params.ssscc_oxy)
     for ssscc in [n for n in params.ssscc if n not in ssscc_oxy]:
         time_rows = time_df["SSSCC"] == ssscc
-        print("Processing CTDRINKO for %s using r0..." % ssscc)
+        btl_rows = btl_df["SSSCC"] == ssscc
+        # find a neighbor and steal its coeffs...
+        substitute_ssscc = params.ssscc[params.ssscc.index(ssscc) + 1]
+        print("Processing CTDRINKO for %s using r%s..." % (ssscc, substitute_ssscc))
         time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
-            rinko_coefs0,
+            coefs_df.loc[substitute_ssscc],
             (
                 time_df.loc[time_rows, cfg.column["rinko_oxy"]],
                 time_df.loc[time_rows, cfg.column["p"]],
                 time_df.loc[time_rows, cfg.column["t1"]],
                 time_df.loc[time_rows, cfg.column["sal"]],
                 time_df.loc[time_rows, "OS"],
+            ),
+        )
+        btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
+            coefs_df.loc[substitute_ssscc],
+            (
+                btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
+                btl_df.loc[btl_rows, cfg.column["p"]],
+                btl_df.loc[btl_rows, cfg.column["t1"]],
+                btl_df.loc[btl_rows, cfg.column["sal"]],
+                btl_df.loc[btl_rows, "OS"],
             ),
         )
 
