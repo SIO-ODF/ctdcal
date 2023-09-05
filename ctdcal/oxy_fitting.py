@@ -781,6 +781,9 @@ def calibrate_oxy(btl_df, time_df, params):
     sbe43_dict = {}
     all_sbe43_fit = pd.DataFrame()
 
+    # Track casts with oxy samples... AS 9/4/2023
+    ssscc_to_fit = []
+
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
     for ssscc in params.ssscc:
@@ -791,6 +794,7 @@ def calibrate_oxy(btl_df, time_df, params):
             sbe43_dict[ssscc] = np.full(5, np.nan)
             log.warning(ssscc + " skipped, all oxy data is NaN")
             continue
+        ssscc_to_fit.append(ssscc)
         sbe43_merged = match_sigmas(
             btl_data[cfg.column["p"]],
             btl_data[cfg.column["refO"]],
@@ -819,7 +823,7 @@ def calibrate_oxy(btl_df, time_df, params):
     sbe43_dict["ox0"] = sbe_coef0
 
     # Fit each cast individually
-    for ssscc in params.ssscc_oxy:
+    for ssscc in ssscc_to_fit:
         sbe_coef, sbe_df = sbe43_oxy_fit(
             all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
             sbe_coef0=sbe_coef0,

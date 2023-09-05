@@ -189,7 +189,8 @@ def calibrate_oxy(btl_df, time_df, params):
     good_data = btl_df[btl_df["OXYGEN_FLAG_W"] != 9].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
-    (rinko_coefs0, _) = rinko_oxy_fit(good_data.loc[good_data['CTDPRS'] > 1000], f_suffix="_r0")
+    # (rinko_coefs0, _) = rinko_oxy_fit(good_data, f_suffix="_r0")
+    (rinko_coefs0, _) = rinko_oxy_fit(good_data.loc[good_data['CTDPRS'] > 100], f_suffix="_r0")
     coefs_df.loc["r0"] = rinko_coefs0  # log for comparison
 
     # fit station groups, like T/C fitting (ssscc_r1, _r2, etc.)
@@ -285,18 +286,18 @@ def calibrate_oxy(btl_df, time_df, params):
             # save coefficients to dataframe
             coefs_df.loc[ssscc] = rinko_coefs_ssscc
 
-    # Calibrate casts without bottle data (biocasts, etc) using r0...
+    # Calibrate casts without bottle data (biocasts, etc) using the next available...
     # AS 2023-08-18
     #
     ssscc_oxy = set(params.ssscc_oxy)
     for ssscc in [n for n in params.ssscc if n not in ssscc_oxy]:
         time_rows = time_df["SSSCC"] == ssscc
         btl_rows = btl_df["SSSCC"] == ssscc
-        # find a neighbor and steal its coeffs...
-        substitute_ssscc = params.ssscc[params.ssscc.index(ssscc) + 1]
-        print("Processing CTDRINKO for %s using r%s..." % (ssscc, substitute_ssscc))
+        # find the next neighbor and steal its coeffs...
+        substitute_coeffs = min(coefs_df[coefs_df.index > ssscc].index.tolist())
+        print("Processing CTDRINKO for %s using r%s..." % (ssscc, substitute_coeffs))
         time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
-            coefs_df.loc[substitute_ssscc],
+            coefs_df.loc[substitute_coeffs],
             (
                 time_df.loc[time_rows, cfg.column["rinko_oxy"]],
                 time_df.loc[time_rows, cfg.column["p"]],
@@ -306,7 +307,7 @@ def calibrate_oxy(btl_df, time_df, params):
             ),
         )
         btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
-            coefs_df.loc[substitute_ssscc],
+            coefs_df.loc[substitute_coeffs],
             (
                 btl_df.loc[btl_rows, cfg.column["rinko_oxy"]],
                 btl_df.loc[btl_rows, cfg.column["p"]],
