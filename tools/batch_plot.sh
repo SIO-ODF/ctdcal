@@ -11,6 +11,12 @@ if [ $# -ne 3 ]; then
     exit 1
 fi
 
+# Set the tools directory path...
+TOOLS="/Users/als026/code/ctdcal/tools/"
+
+# Lets build the args string...
+ARGS="${TOOLS}"
+
 case ${1} in
   oxygen)
     SCRIPT="plot_rinko.py"
@@ -24,13 +30,16 @@ case ${1} in
     ;;
 esac
 
-CALFILE=${2}
-CSVFILE=${3}
+if [ ${2} == "none" ]; then
+  echo "No calfile needed."
+  ARGS="${ARGS}${SCRIPT}"
+else
+  ARGS="${ARGS}${SCRIPT} ${2}"
+fi
 
-# Set the tools directory path...
-TOOLS="/Users/als026/code/ctdcal/tools/"
+CSVFILE=${3}
 
 # Call the plotting script for each line in the CSV file...
 while read ssscc; do
-  python "${TOOLS}${SCRIPT}" "${CALFILE}" "${ssscc}"
+  python "${ARGS}" "${ssscc}"
 done <"${CSVFILE}"

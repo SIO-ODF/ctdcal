@@ -2,46 +2,55 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import matplotlib.pyplot as plt
 import pandas as pd
+import matplotlib.pyplot as plt
+
+from common import Cast
 
 
-class Cast(object):
+class Reft(Cast):
     """
     Simple class to store cast details.
     """
     def __init__(self, cast_no):
         self.cast_no = cast_no
-        self.t_raw = pd.read_csv('../data/reft/%s_reft.csv' % self.cast_no)
-        self.btl = pd.read_pickle('../data/bottle/%s_btl_mean.pkl' % self.cast_no)
-        cols = ['CTDPRS', 'CTDTMP1', 'CTDTMP2', 'btl_fire_num', 'T90']
-        data = pd.merge(self.btl, self.t_raw, how='left', on='btl_fire_num')
-        self.data = data[cols]
+        self.reft = pd.read_csv('../data/reft/%s_reft.csv' % cast_no)
+        super().__init__()
 
-    def flag_temp(self):
+    def parse_data(self):
+        self.data['pressure'] = self.btl['CTDPRS']
+        self.data['temperature 1'] = self.btl['CTDTMP1']
+        self.data['temperature 2'] = self.btl['CTDTMP2']
+        data = pd.merge(self.btl, self.reft, how='left', on='btl_fire_num').set_index(pd.Index([n for n in range(1, 37)]))
+        self.data['bottle number'] = data['btl_fire_num'].astype(int)
+        self.data['T ref'] = data['T90']
+
+    def _flag_temp(self):
         # quick and dirty pre-fit flagging...
-        self.data['DIFF1'] = self.data['T90'] - self.data['CTDTMP1']
-        self.data['DIFF2'] = self.data['T90'] - self.data['CTDTMP2']
-        self.data['flag_1'] = False
-        self.data.loc[(self.data['CTDPRS'] <= 500) & (abs(self.data['DIFF1'] >= 0.02)), 'flag_1'] = True
-        self.data.loc[(self.data['CTDPRS'] <= 1000) & (self.data['CTDPRS'] > 500) & (abs(self.data['DIFF1'] >= 0.01)), 'flag_1'] = True
-        self.data.loc[(self.data['CTDPRS'] <= 2000) & (self.data['CTDPRS'] > 1000) & (abs(self.data['DIFF1'] >= 0.005)), 'flag_1'] = True
-        self.data.loc[(self.data['CTDPRS'] > 2000) & (abs(self.data['DIFF1'] >= 0.0025)), 'flag_1'] = True
+        self.data['DIFF1'] = self.data['T ref'] - self.data['temperature 1']
+        self.data['DIFF2'] = self.data['T ref'] - self.data['temperature 2']
+        self.data['Flag'] = False
+        self.data.loc[(self.data['pressure'] <= 500) & (abs(self.data['DIFF1'] >= 0.02)), 'Flag'] = True
+        self.data.loc[(self.data['pressure'] <= 1000) & (self.data['pressure'] > 500) & (abs(self.data['DIFF1'] >= 0.01)), 'Flag'] = True
+        self.data.loc[(self.data['pressure'] <= 2000) & (self.data['pressure'] > 1000) & (abs(self.data['DIFF1'] >= 0.005)), 'Flag'] = True
+        self.data.loc[(self.data['pressure'] > 2000) & (abs(self.data['pressure'] >= 0.0025)), 'Flag'] = True
 
     def qc_plot_temp(self):
         """
         Plot primary, secondary and reference temperatures. Label bottle stops and indicate
         any identified by flagging.
         """
+        self._flag_temp()
+        # data = self.data.loc[self.data['T ref'].
         fig, ax = plt.subplots(figsize=(6, 8))
-        ax.plot(self.data['T90'], self.data['CTDPRS'], 'go', label='RefT')
-        for x, y, l, f in zip(self.data['T90'], self.data['CTDPRS'], self.data['btl_fire_num'], self.data['flag_1']):
+        ax.plot(self.data['T ref'], self.data['pressure'], 'go', label='T Ref')
+        for x, y, l, f in zip(self.data['T ref'], self.data['pressure'], self.data['bottle number'], self.data['Flag']):
             if f:
-                ax.annotate(int(l), (x, y), xytext=(5, -10), textcoords='offset points', color='red')
+                ax.annotate(l, (x, y), xytext=(5, -10), textcoords='offset points', color='red')
             else:
-                ax.annotate(int(l), (x, y), xytext=(5, -10), textcoords='offset points')
-        ax.plot(self.data['CTDTMP1'], self.data['CTDPRS'], 'k-', label='CTD1')
-        ax.plot(self.data['CTDTMP2'], self.data['CTDPRS'], 'r:', label='CTD2')
+                ax.annotate(l, (x, y), xytext=(5, -10), textcoords='offset points')
+        ax.plot(self.data['temperature 1'], self.data['pressure'], 'k-', label='CTD 1')
+        ax.plot(self.data['temperature 2'], self.data['pressure'], 'r:', label='CTD 2')
         ax.set_title('Cast %s' % self.cast_no)
         ax.set_xlabel('Temperature (T90)')
         ax.set_ylabel('Pressure (dbar)')
@@ -61,8 +70,8 @@ def main():
     casts = [arg for arg in args.casts]
 
     for cast_no in casts:
-        cast = Cast(cast_no)
-        cast.flag_temp()
+        cast = Reft(cast_no)
+        cast.parse_data()
         cast.qc_plot_temp()
 
 
