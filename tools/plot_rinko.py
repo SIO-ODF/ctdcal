@@ -7,18 +7,10 @@ import matplotlib.pyplot as plt
 
 from common import Cast, Coefficients
 
-_parameter_names_rinko = [
-        'salinity',
-        'analog_oxygen',
-        'analog_temperature',
-        'oxygen temperature',
-        'oxygen saturation'
-    ]
-
 
 class Rinko(Cast):
     """
-    Simple class to store cast details.
+    Extension of Cast class with methods specific to Rinko processing.
     """
     def __init__(self, cast_no):
         self.cast_no = cast_no

@@ -102,7 +102,7 @@ def odf_process_all():
     #####
 
     # export files for making cruise report figs
-    # process_bottle.export_report_data(btl_data_all)
+    process_bottle.export_report_data(btl_data_all)
 
     # export to Exchange format
     # TODO: clean this up more
