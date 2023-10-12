@@ -152,6 +152,7 @@ def make_time_files(ssscc_list):
             converted_df.loc[bad_rows, :] = np.nan
             converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
+            #   Data spike indices 10274-10277 related to CTD voltages
             if ssscc == "00701":
                 converted_df.CTDCOND1.iloc[10274:10277] = np.nan
                 converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
