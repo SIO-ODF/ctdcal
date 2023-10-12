@@ -53,6 +53,9 @@ def odf_quickplot(type):
         post = io.load_exchange_ctd(cfg.dirs["pressure"] + ssscc + "_ct1.csv")[1]
 
         #   Make a directory, where figures can be written out to (a folder called 00101)
+        if not Path(cfg.dirs["figs"]).exists(): #   If the parent folder does not exist
+            Path(cfg.dirs["figs"]).mkdir()
+
         if not Path(cfg.dirs["figs"] + ssscc).exists():
             Path(cfg.dirs["figs"] + ssscc).mkdir()
 
