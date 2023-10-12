@@ -152,6 +152,10 @@ def make_time_files(ssscc_list):
             converted_df.loc[bad_rows, :] = np.nan
             converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
+            if ssscc == "00701":
+                converted_df.CTDCOND1.iloc[10274:10277] = np.nan
+                converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
