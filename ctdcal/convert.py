@@ -157,6 +157,21 @@ def make_time_files(ssscc_list):
                 converted_df.CTDCOND1.iloc[10274:10277] = np.nan
                 converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
 
+            #   Remove data spike (2 pts) in primary conductivity
+            elif ssscc == "10501":
+                converted_df.CTDCOND1.iloc[89822:89825] = np.nan
+                converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+
+            #   Remove data spike (2 pts) in primary conductivity
+            elif ssscc == "14101":
+                converted_df.CTDCOND1.iloc[125989:125991] = np.nan
+                converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+
+            #   Remove 225 ºC temperature spike in primary temperature
+            elif ssscc == "14401":
+                converted_df.CTDTMP1.iloc[18638:18639] = np.nan
+                converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
