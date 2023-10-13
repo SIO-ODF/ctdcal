@@ -158,6 +158,10 @@ def make_time_files(ssscc_list):
                 converted_df.CTDOXYVOLTS.iloc[np.r_[8944:8951,9823:9829]]
                 converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
 
+            elif ssscc in ["02401", "02501", "02601", "02701"]:
+                print("Swapping primary and secondary conductivity sensors for ", ssscc)
+                converted_df = converted_df.rename(columns={"CTDCOND1": "CTDCOND2", "CTDCOND2": "CTDCOND1"})
+
             #   Remove data spike (2 pts) in primary conductivity
             elif ssscc == "10501":
                 converted_df.CTDCOND1.iloc[89822:89825] = np.nan
