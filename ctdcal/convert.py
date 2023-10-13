@@ -5,11 +5,11 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import equations_sbe as sbe_eq
-from . import get_ctdcal_config
-from . import process_bottle as btl
-from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
+from ctdcal import equations_sbe as sbe_eq
+from ctdcal import get_ctdcal_config
+from ctdcal import process_bottle as btl
+from ctdcal import process_ctd as process_ctd
+from ctdcal import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -136,46 +136,64 @@ def hex_to_ctd(ssscc_list):
             converted_df = convertFromSBEReader(sbeReader, ssscc)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
+            cleanup_pkl(converted_df, ssscc)
+
     return True
 
+def cleanup_pkl(converted_df, ssscc=None):
+    """
+    Removes spikes and applies station-specific fixes to continuous CTD
+    dataframes.
+
+    Parameters
+    ----------
+    converted_df : Pandas dataframe 
+        Continuous CTD data for a single cast
+    ssscc : Str
+        Station number for instruction
+
+    """
+    # Remove any pressure spikes
+    bad_rows = converted_df["CTDPRS"].abs() > 6500
+    if bad_rows.any():
+        log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
+    converted_df.loc[bad_rows, :] = np.nan
+    converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
+    #   Data spikes related to CTD voltages
+    if ssscc == "00701":
+        converted_df.CTDCOND1.iloc[10274:10277] = np.nan
+        converted_df.CTDOXYVOLTS.iloc[np.r_[8944:8951,9823:9829]]
+        converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+
+    elif ssscc in ["02401", "02501", "02601", "02701"]:
+        print("Swapping primary and secondary conductivity sensors for ", ssscc)
+        converted_df = converted_df.rename(columns={"CTDCOND1": "CTDCOND2", "CTDCOND2": "CTDCOND1"})
+
+    #   Remove data spike (2 pts) in primary conductivity
+    elif ssscc == "10501":
+        converted_df.CTDCOND1.iloc[89822:89825] = np.nan
+        converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+
+    #   Remove data spike (2 pts) in primary conductivity
+    elif ssscc == "14101":
+        converted_df.CTDCOND1.iloc[125989:125991] = np.nan
+        converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+
+    #   Remove 225 ºC temperature spike in primary temperature
+    elif ssscc == "14401":
+        converted_df.CTDTMP1.iloc[18638:18639] = np.nan
+        converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+
+    converted_df.to_pickle(cfg.dirs["converted"] + ssscc + "_cleaned.pkl")
+
+    return True
 
 def make_time_files(ssscc_list):
     log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
-            converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
-
-            # Remove any pressure spikes
-            bad_rows = converted_df["CTDPRS"].abs() > 6500
-            if bad_rows.any():
-                log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
-            converted_df.loc[bad_rows, :] = np.nan
-            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
-
-            #   Data spikes related to CTD voltages
-            if ssscc == "00701":
-                converted_df.CTDCOND1.iloc[10274:10277] = np.nan
-                converted_df.CTDOXYVOLTS.iloc[np.r_[8944:8951,9823:9829]]
-                converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
-
-            elif ssscc in ["02401", "02501", "02601", "02701"]:
-                print("Swapping primary and secondary conductivity sensors for ", ssscc)
-                converted_df = converted_df.rename(columns={"CTDCOND1": "CTDCOND2", "CTDCOND2": "CTDCOND1"})
-
-            #   Remove data spike (2 pts) in primary conductivity
-            elif ssscc == "10501":
-                converted_df.CTDCOND1.iloc[89822:89825] = np.nan
-                converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
-
-            #   Remove data spike (2 pts) in primary conductivity
-            elif ssscc == "14101":
-                converted_df.CTDCOND1.iloc[125989:125991] = np.nan
-                converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
-
-            #   Remove 225 ºC temperature spike in primary temperature
-            elif ssscc == "14401":
-                converted_df.CTDTMP1.iloc[18638:18639] = np.nan
-                converted_df.interpolate(limit = 24, limit_area="inside", inplace=True)
+            converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + "_cleaned.pkl")
 
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
@@ -183,24 +201,6 @@ def make_time_files(ssscc_list):
                 ssscc,
                 log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
             )
-
-            # # TODO: switch to loop instead, e.g.:
-            # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
-
-            # if not c1_col in raw_data.dtype.names:
-            #     print('c1_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
-            # if not c2_col in raw_data.dtype.names:
-            #     print('c2_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
-            # if not dopl_col in raw_data.dtype.names:
-            #     print('do_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
-
-            # TODO: add despike/wild edit filter (optional?)
 
             # Filter data
             filter_data = process_ctd.raw_ctd_filter(
@@ -237,7 +237,7 @@ def make_btl_mean(ssscc_list):
     log.info("Generating btl_mean.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
-            imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+            imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + "_cleaned.pkl")
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
 
