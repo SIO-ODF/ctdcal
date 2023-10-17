@@ -45,6 +45,8 @@ def load_winkler_oxy(oxy_file):
         )
         oxy_array = []
         for row in oxyF:
+            if row[0].startswith('#'):
+                continue
             if len(row) > 9:
                 row = row[:9]
             oxy_array.append(row)
@@ -740,9 +742,11 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         )
         for _, flags in manual_flags.iterrows():
             df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
-                btl_df["btl_fire_num"] == flags["SAMPNO"]
+                # using flags index 1 for SAMPNO col
+                btl_df["btl_fire_num"] == flags[1]
             )
-            btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
+            # using flags index 2 for Flags col
+            btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags[2]
 
     return True
 

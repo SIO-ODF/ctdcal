@@ -186,7 +186,7 @@ def calibrate_oxy(btl_df, time_df, params):
 
     # Only fit using OXYGEN flagged good (2)
     # good_data = btl_df[btl_df["OXYGEN_FLAG_W"] == 2].copy()
-    good_data = btl_df[btl_df["OXYGEN_FLAG_W"] != 9].copy()
+    good_data = btl_df[~btl_df["OXYGEN_FLAG_W"].isin([4, 9])].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     # (rinko_coefs0, _) = rinko_oxy_fit(good_data, f_suffix="_r0")
