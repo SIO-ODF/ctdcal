@@ -802,6 +802,10 @@ def export_ct1(df, params):
             if col.endswith("FLAG_W"):
                 time_data[col] = time_data[col].astype(int)
 
+        ## flag this oxy spike on 00701 at 4m...
+        if ssscc == '00701':
+            time_data.loc[2, 'CTDOXY_FLAG_W'] = 4
+
         try:
             depth = full_depth_df.loc[full_depth_df["SSSCC"] == ssscc, "DEPTH"].iloc[0]
         except IndexError:
