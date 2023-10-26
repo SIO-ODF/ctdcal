@@ -820,16 +820,16 @@ def export_ct1(df, params):
             time_data.loc[1, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
         if ssscc == '04601':
             time_data.loc[1, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
-        # if ssscc == '05001':
-        #     time_data.loc[2, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
+        if ssscc == '05001':
+            time_data.loc[2, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
         if ssscc == '09301':
             time_data.loc[1, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
         if ssscc == '01401':
             time_data.loc[1, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
         if ssscc == '09801':
             time_data.loc[1, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
-        # if ssscc == '11002':
-        #     time_data.loc[1, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
+        if ssscc == '11002':
+            time_data.loc[1, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
         if ssscc == '11201':
             time_data.loc[1, ['CTDTMP_FLAG_W', 'CTDSAL_FLAG_W', 'CTDOXY_FLAG_W', 'CTDXMISS_FLAG_W', 'CTDFLUOR_FLAG_W']] = 6
         if ssscc == '12001':
