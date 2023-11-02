@@ -16,9 +16,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import oxy_fitting as oxy_fitting
+from ctdcal import flagging as flagging
+from ctdcal import get_ctdcal_config
+from ctdcal import oxy_fitting as oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -208,7 +208,11 @@ def load_all_btl_files(ssscc_list, cols=None, cfg=cfg):
                 + "...filling with NaNs"
             )
             reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
-            reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
+            if ssscc != "03801":
+                reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
+            else:
+                #   This cast was done very shallow near the coast and bottles were fired in an unorthodox manner
+                reft_data["btl_fire_num"] = btl_data["btl_fire_num"].dropna().astype(int)
             reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
         ### load REFC data
@@ -257,25 +261,46 @@ def load_all_btl_files(ssscc_list, cols=None, cfg=cfg):
                 ],
                 dtype=float,
             )
-            oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
+            if ssscc != "03801":
+                oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
+            else:
+                oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].dropna().astype(int)
 
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
-        btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
-        btl_data = pd.merge(
-            btl_data,
-            refc_data,
-            left_on="btl_fire_num",
-            right_on="SAMPNO_SALT",
-            how="outer",
-        )
-        btl_data = pd.merge(
-            btl_data,
-            oxy_data,
-            left_on="btl_fire_num",
-            right_on="BOTTLENO_OXY",
-            how="outer",
-        )
+        if ssscc == "03801":
+            #   Bottle numbers were odd in refT, refC had all bottles sampled by ODF, oxy was missing
+            btl_data = pd.merge(btl_data.dropna(), reft_data.dropna(), on="btl_fire_num", how="outer")
+            btl_data = pd.merge(
+                btl_data,
+                refc_data,
+                left_on="btl_fire_num",
+                right_on="SAMPNO_SALT",
+                how="outer",
+            )
+            btl_data = pd.merge(
+                btl_data,
+                oxy_data.dropna(),
+                left_on="btl_fire_num",
+                right_on="BOTTLENO_OXY",
+                how="outer",
+            )
+        else:
+            btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
+            btl_data = pd.merge(
+                btl_data,
+                refc_data,
+                left_on="btl_fire_num",
+                right_on="SAMPNO_SALT",
+                how="outer",
+            )
+            btl_data = pd.merge(
+                btl_data,
+                oxy_data,
+                left_on="btl_fire_num",
+                right_on="BOTTLENO_OXY",
+                how="outer",
+            )
 
         if len(btl_data) > 36:
             log.error(f"len(btl_data) for {ssscc} > 36, check bottle file")
