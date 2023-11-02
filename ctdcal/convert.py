@@ -5,11 +5,11 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import equations_sbe as sbe_eq
-from . import get_ctdcal_config
-from . import process_bottle as btl
-from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
+from ctdcal import equations_sbe as sbe_eq
+from ctdcal import get_ctdcal_config
+from ctdcal import process_bottle as btl
+from ctdcal import process_ctd as process_ctd
+from ctdcal import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -164,13 +164,13 @@ def make_time_files(ssscc_list, cfg=cfg):
             # remove misc spikes
             # ODF cast, primary TC spike around scan 128000
             if ssscc == "00313":
-                breakpoint()
+                # breakpoint()
                 converted_df.loc[128065, ["CTDTMP1", "CTDCOND1", "CTDOXYVOLTS"]] = np.nan
                 converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
             # ODF cast, primary TC spike around scan 105800
             if ssscc == "02208":
-                breakpoint()
+                # breakpoint()
                 converted_df.loc[105924:105930, ["CTDTMP1", "CTDCOND1", "CTDOXYVOLTS"]] = np.nan
                 converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
@@ -212,22 +212,22 @@ def make_time_files(ssscc_list, cfg=cfg):
                 ssscc,
                 log_file=cfg.dirs["logs"] + "cast_details.csv",
             )
-            breakpoint()
+            # breakpoint()
 
             # ODF cast bad surf samples, trim off more
             if ssscc == "02203":
-                breakpoint()
+                # breakpoint()
                 cast_data = cast_data.iloc[250:].reset_index(drop=True)
 
             # ODF "bonus" cast manually pick cast range, auto detect does bad job
             if ssscc == "03804":
-                breakpoint()
+                # breakpoint()
                 idx_pmax = filter_data["CTDPRS"].idxmax()
                 cast_data = filter_data.iloc[10643:idx_pmax].reset_index(drop=True)
 
             # GTC casts sucked something into pump, use upcast
             if ssscc in ["01803", "02502"]:
-                breakpoint()
+                # breakpoint()
                 log.info(f"Using upcast for {ssscc}")
                 idx_pmax = filter_data["CTDPRS"].idxmax()
                 cast_data = filter_data.iloc[idx_pmax:]
@@ -257,6 +257,7 @@ def make_btl_mean(ssscc_list, cfg=cfg):
         log.info("Using GTC config file")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
+            print(f"Extracting bottle means for {ssscc}")
             imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
@@ -274,17 +275,17 @@ def make_btl_mean(ssscc_list, cfg=cfg):
                     mean_df = mean_df.drop(index=14)
                     mean_df["btl_fire_num"] = np.arange(1, 25)
 
-                mean_df["SAMPNO"] = mean_df.loc[:, "btl_fire_num"].copy()
-                mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
-                mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").ffill()
-                if mean_df.isna().any().any():
-                    log.info(f"NaN data in {ssscc} after ffill, applying bfill as well.")
-                    mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").bfill()
-                mean_df["btl_fire_num"] = mean_df["SAMPNO"]
+                    mean_df["SAMPNO"] = mean_df.loc[:, "btl_fire_num"].copy()
+                    mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
+                    mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").ffill()
+                    if mean_df.isna().any().any():
+                        log.info(f"NaN data in {ssscc} after ffill, applying bfill as well.")
+                        mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").bfill()
+                    mean_df["btl_fire_num"] = mean_df["SAMPNO"]
 
-                # deal with bottles fired out of order
-                bl_data = btl.read_bl(Path(cfg.dirs["raw"]) / f"GTC_{ssscc}.bl")
-                bl_data = bl_data.drop(columns=["time", "start_idx", "end_idx"])
+                    # deal with bottles fired out of order
+                    bl_data = btl.read_bl(Path(cfg.dirs["raw"]) / f"GTC_{ssscc}.bl")
+                    bl_data = bl_data.drop(columns=["time", "start_idx", "end_idx"])
 
                 if ssscc == "01302":
                     # bottle 13 mistakenly fired twice
