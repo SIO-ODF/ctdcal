@@ -3,7 +3,7 @@ Process all CTD and bottle data from ODF/GTC/etc. platforms.
 """
 
 # import needed ctdcal modules
-from .. import (
+from ctdcal import (
     get_ctdcal_config,
     convert,
     fit_ctd,
@@ -79,28 +79,42 @@ def gp17_process_all():
     import pandas as pd
     process_ctd.make_depth_log(pd.concat([time_data_all, time_data_GTC]))
 
+    print("Fitting temperature...")
     # calibrate temperature against reference
     fit_ctd.calibrate_temp(btl_data_all, time_data_all)
     time_data_GTC["CTDTMP_FLAG_W"] = 2
 
-    # calibrate temperature against reference
+    print("Fitting conductivity...")
+    # calibrate salinity against reference
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
     btl_data_GTC, time_data_GTC = fit_ctd.calibrate_cond(
         btl_data_GTC, time_data_GTC, cfg=cfg_GTC
     )
 
+    print("Running oxygen preparations...")
     # calculate params needs for oxy/rinko calibration
     # TODO: move density matching to prepare_oxy
     oxy_fitting.prepare_oxy(btl_data_all, time_data_all)
     oxy_fitting.prepare_oxy(btl_data_GTC, time_data_GTC, cfg=cfg_GTC)
 
+    print("Fitting oxygen...")
+
     # calibrate oxygen against reference
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
     rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
+    #   Now match sigmas for the GTC rosette with the ODF discrete data...
+    oxy_fitting.calibrate_mixed_sigmas(btl_data_all, time_data_GTC, GTC_ssscc_list)
+
+    # breakpoint()
+    #   Attempted to fit using ODF coefs - unsuccessful (sensor calibs return very diff. voltages)
+    # oxy_fitting.calibrate_gtc_oxy(btl_data_GTC, time_data_GTC, GTC_ssscc_list, cfg=cfg_GTC)
+
     #####
     # Step 3: export data
     #####
+
+    print("Exporting data...")
 
     # export files for making cruise report figs
     process_bottle.export_report_data(btl_data_all)
@@ -109,7 +123,8 @@ def gp17_process_all():
     # TODO: clean this up more
     process_ctd.export_ct1(time_data_all, ssscc_list)
     process_bottle.export_hy1(btl_data_all)
-    process_ctd.export_ct1(time_data_GTC, GTC_ssscc_list, cfg=cfg_GTC)
+    #   Adjust flags inside ct1/hy1 exports (need to move flagging outside of this step)
+    process_ctd.export_ct1(time_data_GTC, GTC_ssscc_list, df2=time_data_all, cfg=cfg_GTC)
     process_bottle.export_hy1(btl_data_GTC, cfg=cfg_GTC)
 
     # run: ctd_to_bottle.py

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-from . import get_ctdcal_config, io, oxy_fitting, flagging
+from ctdcal import get_ctdcal_config, io, oxy_fitting, flagging
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -701,7 +701,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list, cfg=cfg):
+def export_ct1(df, ssscc_list, df2 = None, cfg=cfg):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -721,6 +721,7 @@ def export_ct1(df, ssscc_list, cfg=cfg):
     Needs depth_log.csv and manual_depth_log.csv to run successfully
 
     """
+    #   2023 adjustment - passing in ODF df for GTC flagging
     log.info("Exporting CTD files")
 
     if cfg.platform == "GTC":
@@ -782,10 +783,68 @@ def export_ct1(df, ssscc_list, cfg=cfg):
         cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"STNNBR": str}
     )
 
+    #   A list of stations for flagging GTC vs ODF
+    #   GTC to match: Deepest ODF cast
+    reflist = {
+        "00102":"00110",
+        "00107":"00110",
+        "00202":"00204",
+        "00302":"00313",
+        "00307":"00313",
+        "00310":"00313",
+        "00312":"00313",
+        "00402":"00403",
+        "00602":"00610",
+        "00607":"00610",
+        "00701":"00703",
+        "00802":"00810",
+        "00807":"00810",
+        "00902":"00904",
+        "01002":"01009",
+        "01007":"01009",
+        "01102":"01104",
+        "01202":"01210",
+        "01207":"01210",
+        "01302":"01304",
+        "01408":"01412",
+        "01410":"01412",
+        "01413":"01412",#   A rare instance of a GTC cast following ODF
+        "01502":"01504",
+        "01602":"01608",
+        "01607":"01608",
+        "01803":"01802",
+        "01809":"01802",
+        "02002":"02014",
+        "02008":"02014",
+        "02012":"02014",
+        "02207":"02208",
+        "02209":"02208",
+        "02302":"02303",
+        "02402":"02404",
+        "02502":"02510",
+        "02506":"02510",
+        "02602":"02604",
+        "02702":"02712",
+        "02706":"02712",
+        "02710":"02712",
+        "02902":"02908",
+        "02907":"02908",
+        "03002":"03004",
+        "03201":"03205",
+        "03203":"03205",
+        "03402":"03205",
+        "03502":"03510",
+        "03508":"03510",
+        "03602":"03605",
+        "03702":"03703",
+        "03707":"03703",
+        "03709":"03703",
+        "03801":"03802",    #   03804 had issues
+    }
     for ssscc in ssscc_list:
 
         time_data = df[df["SSSCC"] == ssscc].copy()
-        time_data = pressure_sequence(time_data)
+        time_data = pressure_sequence(time_data)    #   2 dbar average step
         # switch oxygen primary sensor to rinko
         if cfg.platform == "ODF":
             log.info(f"Using Rinko as CTDOXY for {ssscc}")
@@ -798,6 +857,29 @@ def export_ct1(df, ssscc_list, cfg=cfg):
             if (time_data["CTDORP"] == -500).all():
                 time_data["CTDORP"] = np.nan
                 time_data["CTDORP_FLAG_W"] = 9
+
+        #   ####
+        #   Step 2.5: Manual flagging of GTC rosette
+        #   GTC oxygen data unable to be fit using existing coefficients, so indices were found of "good" data for all GTC casts
+        #   CTDOXY_FLAG_W = 2 if |GTC(station)-ODF(station)|< ~1%
+        #   ####
+        if cfg.platform == "GTC":
+            time_data["CTDOXY_FLAG_W"] = 3 #   Default flag to 3, rather than 2
+            #   A list of stations to be fit against
+            flag_from = pressure_sequence(df2[df2["SSSCC"]==reflist[ssscc]])
+            #   Homogenize dataframe sizes, now that they're pressure sequences
+            if len(flag_from)>len(time_data):
+                flag_from = flag_from.head(len(time_data))
+            elif len(flag_from)<len(time_data):
+                #   If ODF didn't go far enough, append NaNs that won't change flags
+                flag_from = flag_from.reindex(range(0, len(time_data)))
+            #   Now that they're the same size, modify the CTDOXY_FLAG_W in time_data using flag_from as the reference oxygen
+            #   Default is 1%
+            time_data["CTDOXY_FLAG_W"] = flagging.by_percent_diff(time_data["CTDOXY"], flag_from["CTDOXY"])
+            print(f"Flagged for GTC {ssscc} using reference {reflist[ssscc]}")
+            # print("New flags:")
+            # print(time_data.CTDOXY_FLAG_W.value_counts())
+
 
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 

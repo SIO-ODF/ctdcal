@@ -13,10 +13,10 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import ctd_plots as ctd_plots
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import process_ctd as process_ctd
+from ctdcal import ctd_plots as ctd_plots
+from ctdcal import flagging as flagging
+from ctdcal import get_ctdcal_config
+from ctdcal import process_ctd as process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -792,6 +792,7 @@ def prepare_oxy(btl_df, time_df, cfg=cfg):
     # Convert CTDOXY/OXYGEN units
     btl_df["CTDOXY"] = oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
     if cfg.platform == "GTC":
+        #   For the GTC rosette, this was straight up converted without using fitting coefs
         time_df["CTDOXY"] = oxy_ml_to_umolkg(time_df["CTDOXY1"], time_df["sigma_btl"])
         time_df["CTDOXY_FLAG_W"] = 2
         btl_df["CTDOXY_FLAG_W"] = 2
@@ -814,7 +815,7 @@ def prepare_oxy(btl_df, time_df, cfg=cfg):
     return True
 
 
-def calibrate_oxy(btl_df, time_df, ssscc_list):
+def calibrate_oxy(btl_df, time_df, ssscc_list, cfg=cfg):
     """
     Non-linear least squares fit chemical sensor oxygen against bottle oxygen.
 
@@ -973,3 +974,378 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_coefs.to_csv(cfg.dirs["logs"] + "sbe43_coefs.csv")
 
     return True
+
+def calibrate_mixed_sigmas(btl_df, time_df, ssscc_list):
+    """
+    Attempt at fitting the GP17-OCE GTC rosette, which had an SBE43
+    but no Winkler data available as a reference.
+
+    This method attempts to use "match_sigmas" for density matching 
+    between ODF bottle data on another cast, then applying those to
+    the GTC rosette bottle data and continuous downcast.
+
+    Developed to reuse as much of "calibrate_oxy" as possible.
+    """
+    print("Attempting match sigmas of GTC-ODF bottle data...")
+
+    #   GTC to match: Deepest ODF cast
+    # reflist = {
+    #         "00102":"00110",
+    #         "00107":"00110",
+    #         "00202":"00204",
+    #         "00302":"00313",
+    #         "00307":"00313",
+    #         "00310":"00313",
+    #         "00312":"00313",
+    #         "00402":"00403",
+    #         "00602":"00610",
+    #         "00607":"00610",
+    #         "00701":"00703",
+    #         "00802":"00810",
+    #         "00807":"00810",
+    #         "00902":"00904",
+    #         "01002":"01009",
+    #         "01007":"01009",
+    #         "01102":"01104",
+    #         "01202":"01210",
+    #         "01207":"01210",
+    #         "01302":"01304",
+    #         "01408":"01412",
+    #         "01410":"01412",
+    #         "01413":"01412",#   A rare instance of a GTC cast following ODF
+    #         "01502":"01504",
+    #         "01602":"01608",
+    #         "01607":"01608",
+    #         "01803":"01802",
+    #         "01809":"01802",
+    #         "02002":"02014",
+    #         "02008":"02014",
+    #         "02012":"02014",
+    #         "02207":"02208",
+    #         "02209":"02208",
+    #         "02302":"02303",
+    #         "02402":"02404",
+    #         "02502":"02510",
+    #         "02506":"02510",
+    #         "02602":"02604",
+    #         "02702":"02712",
+    #         "02706":"02712",
+    #         "02710":"02712",
+    #         "02902":"02908",
+    #         "02907":"02908",
+    #         "03002":"03004",
+    #         "03201":"03205",
+    #         "03203":"03205",
+    #         "03402":"03205",
+    #         "03502":"03510",
+    #         "03508":"03510",
+    #         "03602":"03605",
+    #         "03702":"03703",
+    #         "03707":"03703",
+    #         "03709":"03703",
+    #         "03801":"03802",    #   03804 had issues
+    #     }
+    reflist = {
+            "00102":["00103", "00106", "00110"],
+            "00107":["00103", "00106", "00110"],
+            "00202":["00204"],
+            "00302":["00303","00306","00308","00313"],
+            "00307":["00303","00306","00308","00313"],
+            "00310":["00303","00306","00308","00313"],
+            "00312":["00303","00306","00308","00313"],
+            "00402":["00403"],
+            "00602":["00604","00606","00610"],
+            "00607":["00604","00606","00610"],
+            "00701":["00703"],
+            "00802":["00803","00806","00810"],
+            "00807":["00803","00806","00810"],
+            "00902":["00904"],
+            "01002":["01003","01006","01009"],
+            "01007":["01003","01006","01009"],
+            "01102":["01104"],
+            "01202":["01203","01205","01210"],
+            "01207":["01203","01205","01210"],
+            "01302":["01304"],
+            "01408":["01401","01405","01407","01412"],
+            "01410":["01401","01405","01407","01412"],
+            "01413":["01412"],  #   Maps best to only 01412
+            "01502":["01504"],
+            "01602":["01603","01605","01608"],
+            "01607":["01603","01605","01608"],
+            "01803":["01802","01806","01810"],
+            "01809":["01810"],  #   Maps best to only 01810
+            "02002":["02003","02006","02011","02014"],
+            "02008":["02003","02006","02011","02014"],
+            "02012":["02003","02006","02011","02014"],
+            "02207":["02210"],  #   Maps best only to 02210
+            "02209":["02203","02208","02210"],
+            "02302":["02303"],
+            "02402":["02404"],
+            "02502":["02510"],  #   Maps best only to 02510
+            "02506":["02504","02507","02510"],
+            "02602":["02604"],
+            "02702":["02703","02707","02709","02712"],
+            "02706":["02703","02707","02709","02712"],
+            "02710":["02703","02707","02709","02712"],
+            "02902":["02903","02906","02908"],
+            "02907":["02903","02906","02908"],
+            "03002":["03004"],
+            "03201":["03206"],  #   Maps best only to 03206
+            "03203":["03202","03204","03205","03206"],
+            "03402":["03205"],
+            "03502":["03503","03507","03510"],
+            "03508":["03503","03507","03510"],
+            "03602":["03605"],
+            "03702":["03703","03707","03710","03711"],
+            "03707":["03703","03707","03710","03711"],
+            "03709":["03711"],  #   Maps best only to 03711
+            "03801":["03802"],  #   03804 had issues
+        }
+
+    #   These are all the SSSCCs where the "unfit" are better than the "fit" attempts
+    ig_ssscc = {"00302", "00312", "00802", "00807", "01602", "02002", "02702", "02902", "03402", "03502", "03707"}
+
+    # Prep vars, dfs, etc.
+    all_sbe43_merged = pd.DataFrame()
+    sbe43_dict = {}
+    all_sbe43_fit = pd.DataFrame()
+    btl_df2 = btl_df.copy() #   This is just for use here, make sure the original (ODF) does not get modified
+
+    # btl_df["dv_dt"] = np.nan  # initialize column
+    for ssscc in ssscc_list:
+        use_ssscc = reflist[ssscc]
+        time_data = time_df[time_df["SSSCC"] == ssscc].copy()   #   Current SSSCC to fit
+        btl_data = btl_df[btl_df["SSSCC"].isin(use_ssscc)].copy()  #   All bottle SSSCCs with reference data
+        # can't calibrate without bottle oxygen ("OXYGEN")
+        if (btl_data["OXYGEN_FLAG_W"] == 9).all():
+            sbe43_dict[ssscc] = np.full(5, np.nan)
+            sbe43_merged = btl_data[
+                ["CTDPRS", "CTDOXYVOLTS", "dv_dt", "OS", "CTDOXY"]
+            ].copy()
+            sbe43_merged["CTDTMP"] = btl_data["CTDTMP1"]
+            sbe43_merged["REFOXY"] = np.nan
+            log.warning(ssscc + " skipped, all oxy data is NaN")
+        else:
+            print(f"Matching sigmas: {ssscc} to {use_ssscc}...")
+            sbe43_merged = match_sigmas(
+                btl_data[cfg.column["p"]],
+                btl_data[cfg.column["refO"]],
+                btl_data["CTDTMP1"],
+                btl_data["SA"],
+                time_data["OS"],
+                time_data[cfg.column["p"]],
+                time_data[cfg.column["t1"]],
+                time_data["SA"],
+                time_data[cfg.column["oxyvolts"]],
+                time_data["scan_datetime"],
+            )
+            sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
+            btl_df2.loc[
+                btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]
+            ] = sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
+            log.info(ssscc + " density matching done")
+        sbe43_merged["SSSCC"] = ssscc
+        all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
+
+    # Only fit using OXYGEN flagged good (2)
+    all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+
+    # Fit ALL oxygen stations together to get initial coefficient guess
+    # (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
+    #   Coefs from xmlcon file for initial guess
+    sbe_coef0 = (4.9142e-1,-0.5186,0.9800,-4.0284e-3,3.6000e-2)
+    sbe43_dict["ox0"] = sbe_coef0
+
+    print("Fitting GTC oxygen individually to acquire new coefs...")
+    # Fit each cast individually
+    for ssscc in ssscc_list:
+        print(ssscc)
+        try:
+            sbe_coef, sbe_df = sbe43_oxy_fit(
+                all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
+                sbe_coef0=sbe_coef0,
+                f_suffix=f"_{ssscc}",
+            )
+        except ValueError:
+            if ssscc == "01803":
+                #   Has a negative pressure value
+                sbe_coef, sbe_df = sbe43_oxy_fit(
+                    all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].iloc[0:-1].copy(),
+                    sbe_coef0=sbe_coef0,
+                    f_suffix=f"_{ssscc}",
+                )
+        # build coef dictionary
+        if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
+            sbe43_dict[ssscc] = sbe_coef
+        # all non-NaN oxygen data with flags
+        all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
+
+    # apply coefs
+    print("Applying new coefs to time data...")
+    time_df["CTDOXY"] = np.nan
+    for ssscc in ssscc_list:
+        if np.isnan(sbe43_dict[ssscc]).all():
+            log.warning(
+                f"{ssscc} missing oxy data, leaving nan values and flagging as 9"
+            )
+            time_df.loc[time_df["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
+            continue
+        time_rows = (time_df["SSSCC"] == ssscc).values
+        if ssscc not in ig_ssscc:
+            time_df.loc[time_rows, "CTDOXY"] = _PMEL_oxy_eq(
+                sbe43_dict[ssscc],
+                (
+                    time_df.loc[time_rows, cfg.column["oxyvolts"]],
+                    time_df.loc[time_rows, cfg.column["p"]],
+                    time_df.loc[time_rows, cfg.column["t1"]],
+                    time_df.loc[time_rows, "dv_dt"],
+                    time_df.loc[time_rows, "OS"],
+                ),
+            )
+        else:
+            #   If the station should not be fit, i.e. only weights are low in value
+            time_df.loc[time_rows, "CTDOXY"] = oxy_ml_to_umolkg(time_df.loc[time_rows, "CTDOXY1"], time_df.loc[time_rows, "sigma_btl"])
+
+    # flag CTDOXY with more than 1% difference
+    time_df["CTDOXY_FLAG_W"] = 2  # TODO: actual flagging of some kind?
+
+    sbe43_coefs = pd.DataFrame.from_dict(
+        sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
+    ).applymap(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
+    sbe43_coefs.to_csv(cfg.dirs["logs"] + "GTC_sbe43_coefs.csv")
+
+def calibrate_gtc_oxy(btl_data, time_data, ssscc_list, cfg=cfg):
+    """
+    Attempt at fitting the GP17-OCE GTC rosette, which had an SBE43
+    but no Winkler data available as a reference.
+
+    Reuses the fit coefficients based on groupings of SSSCCs -> Cast
+    01102 should use 01104, for example
+    """
+
+    coeffile = cfg.dirs["logs"] + "sbe43_coefs.csv"
+    refcoefs = pd.read_csv(coeffile, index_col=0)   #   Use SSSCC as the index
+    ssscc_pull = refcoefs.index.to_list()
+    ssscc_pull[1]="99999"   #   This is ox0
+    ssscc_pull = list(map(int, ssscc_pull))
+
+    
+    time_data["CTDOXY"] = np.nan
+    btl_data["dv_dt"] = np.nan 
+    time_data["dv_dt"] = calculate_dV_dt(time_data["CTDOXYVOLTS"], time_data["scan_datetime"])
+
+    for ssscc in ssscc_list:
+        
+        #   Reduce data to subset
+        # time_df = time_data[time_data["SSSCC"] == ssscc].copy()
+        # btl_df = btl_data[btl_data["SSSCC"] == ssscc].copy()
+        
+        #   Find the nearest SSSCC and pull the coefs
+        # try:
+        #     #   Round up to the last ODF cast (which were deepest last)
+        #     #   Deepest casts have likely got the "best" coeffs
+        #     use_ssscc = "00110"
+        # except:
+        #     #   Use the nearest cast ()
+        #     use_ssscc = min(ssscc_pull, key=lambda x: abs(x - int(ssscc)))
+        #     # if ssscc in ["00102", "00107"]:
+        #     #     use_coefs = refcoefs.loc["0110"]    #   Other casts too shallow
+        # use_coefs = refcoefs.loc[str(use_ssscc).zfill(5)]
+        
+        #   GTC to match: Deepest ODF cast
+        reflist = {
+            "00102":"00110",
+            "00107":"00110",
+            "00202":"00204",
+            "00302":"00313",
+            "00307":"00313",
+            "00310":"00313",
+            "00312":"00313",
+            "00402":"00403",
+            "00602":"00610",
+            "00607":"00610",
+            "00701":"00703",
+            "00802":"00810",
+            "00807":"00810",
+            "00902":"00904",
+            "01002":"01009",
+            "01007":"01009",
+            "01102":"01104",
+            "01202":"01210",
+            "01207":"01210",
+            "01302":"01304",
+            "01408":"01412",
+            "01410":"01412",
+            "01413":"01412",#   A rare instance of a GTC cast following ODF
+            "01502":"01504",
+            "01602":"01608",
+            "01607":"01608",
+            "01803":"01802",
+            "01809":"01802",
+            "02002":"02014",
+            "02008":"02014",
+            "02012":"02014",
+            "02207":"02208",
+            "02209":"02208",
+            "02302":"02303",
+            "02402":"02404",
+            "02502":"02510",
+            "02506":"02510",
+            "02602":"02604",
+            "02702":"02712",
+            "02706":"02712",
+            "02710":"02712",
+            "02902":"02908",
+            "02907":"02908",
+            "03002":"03004",
+            "03201":"03205",
+            "03203":"03205",
+            "03402":"03205",
+            "03502":"03510",
+            "03508":"03510",
+            "03602":"03605",
+            "03702":"03703",
+            "03707":"03703",
+            "03709":"03703",
+            "03801":"03802",    #   03804 had issues
+        }
+        use_ssscc = reflist[ssscc]
+        use_coefs = refcoefs.loc[use_ssscc]
+
+        print(f"Reusing coeffs for GTC rosette... {ssscc} from {str(use_ssscc).zfill(5)}")
+
+        #   Same procedure as above, skipping the sbe43_dict
+        if np.isnan(use_coefs).all():
+            log.warning(
+                f"{ssscc} missing oxy data, leaving nan values and flagging as 9"
+            )
+            time_data.loc[time_data["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
+            continue
+        btl_rows = (btl_data["SSSCC"] == ssscc).values
+        time_rows = (time_data["SSSCC"] == ssscc).values
+        btl_data.loc[btl_rows, "CTDOXY"] = _PMEL_oxy_eq(
+            use_coefs,
+            (
+                btl_data.loc[btl_rows, cfg.column["oxyvolts"]],
+                btl_data.loc[btl_rows, cfg.column["p"]],
+                btl_data.loc[btl_rows, cfg.column["t1"]],
+                btl_data.loc[btl_rows, "dv_dt"],
+                btl_data.loc[btl_rows, "OS"],
+            ),
+        )
+        log.info(ssscc + " btl data fitting done")
+        time_data.loc[time_rows, "CTDOXY"] = _PMEL_oxy_eq(
+            use_coefs,
+            (
+                time_data.loc[time_rows, cfg.column["oxyvolts"]],
+                time_data.loc[time_rows, cfg.column["p"]],
+                time_data.loc[time_rows, cfg.column["t1"]],
+                time_data.loc[time_rows, "dv_dt"],
+                time_data.loc[time_rows, "OS"],
+            ),
+        )
+
+        #   Flag as 2 temporarily to overwrite in main routine
+        time_data["CTDOXY_FLAG_W"] = 2
+        btl_data["CTDOXY_FLAG_W"] = 2
+
