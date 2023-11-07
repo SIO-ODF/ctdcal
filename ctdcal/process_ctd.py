@@ -701,7 +701,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list, df2 = None, cfg=cfg):
+def export_ct1(df, ssscc_list, df2 = None, df3 = None, cfg=cfg):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -712,6 +712,10 @@ def export_ct1(df, ssscc_list, df2 = None, cfg=cfg):
         Continuous CTD data
     ssscc_list : list of str
         List of stations to export
+    df2: (GTC only) DataFrame
+        ODF CTD data
+    df3: (GTC only) DataFrame
+        Bottle data to be reflagged
 
     Returns
     -------
@@ -841,6 +845,11 @@ def export_ct1(df, ssscc_list, df2 = None, cfg=cfg):
         "03709":"03703",
         "03801":"03802",    #   03804 had issues
     }
+
+    def round_to_multiple(number, multiple):
+        #   Used when rounding GTC bottle data to 2 db
+        return multiple * round(number / multiple)
+
     for ssscc in ssscc_list:
 
         time_data = df[df["SSSCC"] == ssscc].copy()
@@ -880,6 +889,54 @@ def export_ct1(df, ssscc_list, df2 = None, cfg=cfg):
             # print("New flags:")
             # print(time_data.CTDOXY_FLAG_W.value_counts())
 
+            """
+            When oxy fitting is done on GTC bottle file, the
+            ODF bottle data is used as the reference data and the GTC
+            extracted values are ignored when fit coefficients are done
+            (GTC often clustered around the surface and are not ideal for
+            fitting).
+
+            This re-extracts the oxygen data for each bottle entry,
+            using the fit *continuous* data, closest to the pressure point
+            when the bottle was fired.
+
+            Since flagging of the CT1 files is not possible prior to
+            pressure sequencing the data (during the export step),
+            the pressure-averaged data must be re-imported.
+
+            1) Extract corrected oxygen data from time_df based on SSSCC and
+            CTDPRS
+            2) Extract the flag associated with the 2 db bin of data
+            """
+
+            # print("Overwriting pre-fit bottle extraction data for hy1 and assigning flags.")
+
+            btl_rows = df3.loc[df3.SSSCC == ssscc, ["CTDPRS", "CTDOXY", "CTDOXY_FLAG_W"]]
+
+            #   Find the bin that each btl_row falls into and overwrite the btl_df.CTDOXY_FLAG_W flag
+            # btl_rows["CTDOXY_FLAG_W"] = time_data.CTDOXY_FLAG_W.loc[time_data.CTDPRS.isin(round_to_multiple(btl_rows.CTDPRS, 2))]
+            #   Can't get the above to duplicate the bottles fired at identical depths... resorting to for loop
+            for row in range(0, len(btl_rows)):
+                if np.isnan(btl_rows.CTDPRS.iloc[row]):
+                    print(f"NaN pressure found in bottle {row+1} of ssscc {ssscc}")
+                elif btl_rows.CTDOXY.iloc[row] == -999: #   Because no flags are missing/nan, this isn't working in process_btl
+                    btl_rows["CTDOXY_FLAG_W"].iloc[row] = 9
+                elif np.isnan(btl_rows.CTDOXY.iloc[row]):
+                    btl_rows["CTDOXY_FLAG_W"].iloc[row] == 9
+                else:
+                    if round_to_multiple(btl_rows.CTDPRS.iloc[row], 2) > time_data.CTDPRS.max():
+                        print(f"Pressure of bottle {row} on {ssscc} exceeds that of the continous data file. Assigning flag of maximum value.")
+                        btl_rows["CTDOXY_FLAG_W"].iloc[row] = time_data.CTDOXY_FLAG_W.iloc[-1]
+                    else:
+                        btl_rows["CTDOXY_FLAG_W"].iloc[row] = time_data.CTDOXY_FLAG_W.loc[time_data.CTDPRS == round_to_multiple(btl_rows.CTDPRS.iloc[row], 2)]
+            
+
+            df3.loc[df3.SSSCC == ssscc, "CTDOXY_FLAG_W"] = btl_rows.CTDOXY_FLAG_W   #   Merge flags back in
+
+        #   CTDFLUOR is getting set to scientific
+        # time_data.CTDFLUOR = time_data.CTDFLUOR.apply(pd.to_numeric, errors='coerce') #   Doesn't change writeout
+        # time_data.CTDFLUOR = time_data.CTDFLUOR.round(decimals=5)   #   Also doesn't fix writeout
+        time_data.CTDFLUOR[time_data.CTDFLUOR < 0.0001] = 0.0
 
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
