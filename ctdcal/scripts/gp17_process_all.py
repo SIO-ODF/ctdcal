@@ -104,7 +104,7 @@ def gp17_process_all():
     rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #   Now match sigmas for the GTC rosette with the ODF discrete data...
-    oxy_fitting.calibrate_mixed_sigmas(btl_data_all, time_data_GTC, GTC_ssscc_list)
+    oxy_fitting.calibrate_mixed_sigmas(btl_data_all, time_data_GTC, btl_data_GTC, GTC_ssscc_list)
 
     # breakpoint()
     #   Attempted to fit using ODF coefs - unsuccessful (sensor calibs return very diff. voltages)
@@ -123,8 +123,8 @@ def gp17_process_all():
     # TODO: clean this up more
     process_ctd.export_ct1(time_data_all, ssscc_list)
     process_bottle.export_hy1(btl_data_all)
-    #   Adjust flags inside ct1/hy1 exports (need to move flagging outside of this step)
-    process_ctd.export_ct1(time_data_GTC, GTC_ssscc_list, df2=time_data_all, cfg=cfg_GTC)
+    #   Adjust flags inside ct1/hy1 exports (need to move flagging outside of this step in the future)
+    process_ctd.export_ct1(time_data_GTC, GTC_ssscc_list, df2=time_data_all, df3=btl_data_GTC, cfg=cfg_GTC)
     process_bottle.export_hy1(btl_data_GTC, cfg=cfg_GTC)
 
     # run: ctd_to_bottle.py

@@ -464,7 +464,7 @@ def export_report_data(df):
 
 
 def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF", cfg=cfg):
-    log.info("Exporting bottle file")
+    print(f"Exporting bottle file: {cfg.platform}")
 
     if cfg.platform == "GTC":
         log.info("Using GTC config file")
@@ -568,6 +568,9 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF", cfg=cfg):
 
     # fill NaNs
     btl_data = btl_data.where(~btl_data.isnull(), -999)
+    if any(btl_data.CTDOXY == -999):
+        btl_data.loc[btl_data.CTDOXY == -999, "CTDOXY_FLAG_W"] = 9   #   This wasn't being done before?
+
 
     # check columns
     try:

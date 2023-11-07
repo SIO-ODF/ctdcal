@@ -975,7 +975,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list, cfg=cfg):
 
     return True
 
-def calibrate_mixed_sigmas(btl_df, time_df, ssscc_list):
+def calibrate_mixed_sigmas(btl_df, time_df, GTC_btl_df, ssscc_list):
     """
     Attempt at fitting the GP17-OCE GTC rosette, which had an SBE43
     but no Winkler data available as a reference.
@@ -1109,7 +1109,7 @@ def calibrate_mixed_sigmas(btl_df, time_df, ssscc_list):
     all_sbe43_merged = pd.DataFrame()
     sbe43_dict = {}
     all_sbe43_fit = pd.DataFrame()
-    btl_df2 = btl_df.copy() #   This is just for use here, make sure the original (ODF) does not get modified
+    # btl_df2 = btl_df.copy() #   This is just for use here, make sure the original (ODF) does not get modified
 
     # btl_df["dv_dt"] = np.nan  # initialize column
     for ssscc in ssscc_list:
@@ -1140,8 +1140,8 @@ def calibrate_mixed_sigmas(btl_df, time_df, ssscc_list):
                 time_data["scan_datetime"],
             )
             sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
-            btl_df2.loc[
-                btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]
+            GTC_btl_df.loc[
+                GTC_btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]
             ] = sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
             log.info(ssscc + " density matching done")
         sbe43_merged["SSSCC"] = ssscc
@@ -1181,7 +1181,8 @@ def calibrate_mixed_sigmas(btl_df, time_df, ssscc_list):
         all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
 
     # apply coefs
-    print("Applying new coefs to time data...")
+    print("Applying new coefs to bottle and time data...")
+    # GTC_btl_df["CTDOXY"] = np.nan #   Undo this, such that "nonfit" data still exist and get fit.
     time_df["CTDOXY"] = np.nan
     for ssscc in ssscc_list:
         if np.isnan(sbe43_dict[ssscc]).all():
@@ -1189,8 +1190,10 @@ def calibrate_mixed_sigmas(btl_df, time_df, ssscc_list):
                 f"{ssscc} missing oxy data, leaving nan values and flagging as 9"
             )
             time_df.loc[time_df["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
+            GTC_btl_df.loc[btl_df["SSSCC"] == ssscc, "CTDOXY_FLAG_W"] = 9
             continue
         time_rows = (time_df["SSSCC"] == ssscc).values
+        btl_rows = (GTC_btl_df["SSSCC"] == ssscc).values
         if ssscc not in ig_ssscc:
             time_df.loc[time_rows, "CTDOXY"] = _PMEL_oxy_eq(
                 sbe43_dict[ssscc],
@@ -1202,9 +1205,21 @@ def calibrate_mixed_sigmas(btl_df, time_df, ssscc_list):
                     time_df.loc[time_rows, "OS"],
                 ),
             )
+            # GTC_btl_df.loc[btl_rows, "CTDOXY"] = _PMEL_oxy_eq(
+            #     sbe43_dict[ssscc],
+            #     (
+            #         GTC_btl_df.loc[btl_rows, cfg.column["oxyvolts"]],
+            #         GTC_btl_df.loc[btl_rows, cfg.column["p"]],
+            #         GTC_btl_df.loc[btl_rows, cfg.column["t1"]],
+            #         GTC_btl_df.loc[btl_rows, "dv_dt"],
+            #         GTC_btl_df.loc[btl_rows, "OS"],
+            #     ),
+            # )
+            #   Can't do this - CTDOXYVOLTS are set to NaN somewhere before this step (PMEL routine returns NaNs)
         else:
             #   If the station should not be fit, i.e. only weights are low in value
             time_df.loc[time_rows, "CTDOXY"] = oxy_ml_to_umolkg(time_df.loc[time_rows, "CTDOXY1"], time_df.loc[time_rows, "sigma_btl"])
+            # GTC_btl_df.loc[btl_rows, "CTDOXY"] = oxy_ml_to_umolkg(GTC_btl_df.loc[btl_rows, "CTDOXY1"], GTC_btl_df.loc[btl_rows, "sigma_btl"])
 
     # flag CTDOXY with more than 1% difference
     time_df["CTDOXY_FLAG_W"] = 2  # TODO: actual flagging of some kind?
