@@ -940,6 +940,14 @@ def export_ct1(df, ssscc_list, df2 = None, df3 = None, cfg=cfg):
 
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
+        if "CTDORP" in time_data.columns:   #   If this is a cast where the ORP and turbidity sensor were mounted
+            if all(time_data.CTDORP == -999):   #   If the ORP/Turbidity were not turned on...
+                # print(f"CTDORP mounted on cast {ssscc}, but were unused. Flagging 9.")
+                time_data.CTDORP_FLAG_W = 9
+            if all(time_data.CTDTURB == -999):
+                time_data.CTDTURB_FLAG_W = 9
+                # print(f"CTDORP mounted on cast {ssscc}, but were unused. Flagging 9.")
+
         # force flags back to int (TODO: make flags categorical)
         for col in time_data.columns:
             if col.endswith("FLAG_W"):
