@@ -3,7 +3,7 @@ Process all CTD and bottle data using ODF routines.
 """
 
 # import needed ctdcal modules
-from .. import (
+from ctdcal import (
     convert,
     fit_ctd,
     get_ctdcal_config,

@@ -5,11 +5,11 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import equations_sbe as sbe_eq
-from . import get_ctdcal_config
-from . import process_bottle as btl
-from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
+from ctdcal import equations_sbe as sbe_eq
+from ctdcal import get_ctdcal_config
+from ctdcal import process_bottle as btl
+from ctdcal import process_ctd as process_ctd
+from ctdcal import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
