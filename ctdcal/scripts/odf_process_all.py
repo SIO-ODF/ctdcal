@@ -30,14 +30,14 @@ def odf_process_all():
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
     #####
-
+    print("Beginning CTDCAL run...")
     # load station/cast list from file
     try:
         ssscc_list = process_ctd.get_ssscc_list()
     except FileNotFoundError:
         log.info("No ssscc.csv file found, generating from .hex file list")
         ssscc_list = process_ctd.make_ssscc_list()
-
+    print("Converting new .hex files...")
     # convert raw .hex files
     convert.hex_to_ctd(ssscc_list)
 
@@ -56,7 +56,7 @@ def odf_process_all():
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
     #####
-
+    print("Loading time and btl data...")
     # load in all bottle and time data into DataFrame
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
     btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
@@ -67,13 +67,14 @@ def odf_process_all():
 
     # create cast depth log file
     process_ctd.make_depth_log(time_data_all)
-
+    print("Calibrating temperature...")
     # calibrate temperature against reference
     fit_ctd.calibrate_temp(btl_data_all, time_data_all)
-
+    print("Calibrating conductivity...")
     # calibrate temperature against reference
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
+    print("Preparing and calibrating oxygen...")
     # calculate params needs for oxy/rinko calibration
     # TODO: move density matching to prepare_oxy
     oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
@@ -85,7 +86,7 @@ def odf_process_all():
     #####
     # Step 3: export data
     #####
-
+    print("Exporting data products...")
     # export files for making cruise report figs
     process_bottle.export_report_data(btl_data_all)
 
