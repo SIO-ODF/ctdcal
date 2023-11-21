@@ -63,7 +63,7 @@ if "SALNTY_FLAG_W" not in salt_data.columns:
 
 # load ctd btl data
 df_ctd_btl = pd.read_csv(
-    "../../data/scratch_folder/ctd_to_bottle.csv",
+    "../../data/ctd_to_bottle.csv",
     skiprows=[1],
     skipfooter=1,
     engine="python",
