@@ -75,6 +75,20 @@ def init():
         Path(sub_dir).mkdir(parents=True)
 
 
+@cli.command()
+@click.option(
+    "-m",
+    "--method",
+    type=click.Choice(["ssscc", "other"], case_sensitive=False),
+    default="ssscc",
+)
+def vis(method):
+    """Plot all the pre/postfit data in the current SSSCC"""
+    from .scripts.odf_quickplot import odf_quickplot
+
+    log.info("Plotting current SSSCC")
+    odf_quickplot(method)
+
 @cli.command("import")  # click workaround to get a command named 'import'
 def import_data():
     """Import data from given folder into ctdcal for processing"""
