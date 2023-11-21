@@ -442,7 +442,7 @@ def calibrate_temp(btl_df, time_df):
         T_flag.sort_index().to_csv(f"{cfg.dirs['logs']}qual_flag_{tN}.csv", index=False)
 
         # export temp fit params (formated to 5 sig figs, scientific notation)
-        T_fit_coefs[coef_names] = T_fit_coefs[coef_names].applymap(
+        T_fit_coefs[coef_names] = T_fit_coefs[coef_names].map(
             lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
         )
         T_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{tN}.csv", index=False)
@@ -482,9 +482,6 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["p"]],
     )
 
-    # merge in handcoded salt flags
-    # TODO: make salt flagger move .csv somewhere else? or just always have it
-    # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
     salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
     if Path(salt_file).exists():
         handcoded_salts = pd.read_csv(
@@ -616,7 +613,7 @@ def calibrate_cond(btl_df, time_df):
         C_flag.sort_index().to_csv(f"{cfg.dirs['logs']}qual_flag_{cN}.csv", index=False)
 
         # export cond fit params
-        C_fit_coefs[coef_names] = C_fit_coefs[coef_names].applymap(
+        C_fit_coefs[coef_names] = C_fit_coefs[coef_names].map(
             lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
         )
         C_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{cN}.csv", index=False)

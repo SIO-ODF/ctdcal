@@ -764,7 +764,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     -------
 
     """
-    log.info("Calibrating oxygen (SBE43)")
+    print("Calibrating oxygen (SBE43)")
     # Plot all pre fit data
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
@@ -897,7 +897,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     # export fitting coefs
     sbe43_coefs = pd.DataFrame.from_dict(
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
-    ).applymap(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
+    ).map(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
     sbe43_coefs.to_csv(cfg.dirs["logs"] + "sbe43_coefs.csv")
 
     return True
