@@ -38,14 +38,15 @@ dirs = {
     "reft": "data/reft/",
     "oxygen": "data/oxygen/",
     "logs": "data/logs/",
+    "figs": "data/figs/",
 }
 fig_dirs = {
-    "t1": "data/logs/fitting_figs/temp_primary/",
-    "t2": "data/logs/fitting_figs/temp_secondary/",
-    "c1": "data/logs/fitting_figs/cond_primary/",
-    "c2": "data/logs/fitting_figs/cond_secondary/",
-    "ox": "data/logs/fitting_figs/oxy_primary/",
-    "rinko": "data/logs/fitting_figs/oxy_rinko/",
+    "t1": dirs["figs"]+"fitting_figs/temp_primary/",
+    "t2": dirs["figs"]+"fitting_figs/temp_secondary/",
+    "c1": dirs["figs"]+"fitting_figs/cond_primary/",
+    "c2": dirs["figs"]+"fitting_figs/cond_secondary/",
+    "ox": dirs["figs"]+"fitting_figs/oxy_primary/",
+    "rinko": dirs["figs"]+"fitting_figs/oxy_rinko/",
 }
 
 # remnant of old system, will be pushed into xarray metadata/attrs
