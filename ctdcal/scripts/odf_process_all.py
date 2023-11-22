@@ -81,6 +81,7 @@ def odf_process_all():
 
     # calibrate oxygen against reference
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+    print("And now the ODF RINKO...")
     rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #####

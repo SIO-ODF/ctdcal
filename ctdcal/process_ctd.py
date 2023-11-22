@@ -449,7 +449,8 @@ def pressure_sequence(df, p_col="CTDPRS", direction="down"):
 
 
 def binning_df(df, p_column="CTDPRS", bin_size=2):
-    """Calculate the bin-mean of each column in input dataframe
+    """
+    Calculate the bin-mean of each column in input dataframe
 
     Parameters
     ----------
@@ -478,7 +479,12 @@ def binning_df(df, p_column="CTDPRS", bin_size=2):
     )
     df_out.loc[:, p_column] = df_out["bins"].astype(float)
 
-    return df_out.groupby("bins", observed=False).mean()
+    try:
+        return df_out.groupby("bins", observed=False).mean()
+    except TypeError:
+        return df_out.groupby("bins", observed=False).mean(numeric_only=True)
+
+
 
 
 def _fill_surface_data(df, bin_size=2):
