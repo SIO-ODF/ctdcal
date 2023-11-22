@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from ctdcal import get_ctdcal_config
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -7,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 log = logging.getLogger(__name__)
-
+cfg = get_ctdcal_config()
 
 def _apply_default_fmt(xlim, ylim, xlabel, ylabel, title, grid, fontsize=12):
     plt.xlim(xlim)
@@ -220,7 +221,110 @@ def _intermediate_residual_plot(
     # save to path or return axis (primarily for testing)
     return _save_fig(ax, f_out)
 
+def two_element(x1, x2, y, ssscc=None, caption=None, f_out=None):
 
+    plt.style.use("ggplot")
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, sharey="all")
+
+    ax1.plot(x1, y)
+    ax1.plot(x2, y)
+    ax1.invert_yaxis()
+    plt.tight_layout()
+    ax1.tick_params(labelrotation=45)
+    plt.grid()
+
+    ax2.plot(x2 - x1, y)
+    plt.tight_layout()
+    ax2.tick_params(labelrotation=45)
+    plt.grid()
+
+    plt.gcf().subplots_adjust(bottom=0.2, left=0.1)
+
+    if type(x1) == pd.core.series.Series:
+        ax1.legend([x1.name, x2.name])
+        ax1.set_ylabel(y.name)
+        ax1.set_xlabel(x1.name + ", " + x2.name)
+        ax2.set_xlabel("Residual " + x2.name + "-" + x1.name)
+
+    if ssscc is not None:
+        fig.suptitle(ssscc, x=0.53, y=1)
+
+    if caption is not None:
+        plt.figtext(
+            0.5, 0.01, caption, wrap=True, horizontalalignment="center", fontsize=12
+        )
+    return _save_fig(fig, f_out)
+
+def fit_comparison(pre, post, ref, ssscc, varlabel="CTDOXY", grid=False):
+    """Take in a variable pre and post time data, as well as reference, and plot scatter"""
+    plt.figure(figsize=(8, 5))
+    ax = plt.axes()
+    plt.scatter(pre.CTDOXY, pre.CTDPRS, label="Prefit")
+    plt.scatter(post.CTDOXY, post.CTDPRS, label="Postfit")
+    plt.scatter(ref.BTL_OXY, ref.CTDPRS, s=300, marker="*", label="Bottle Reference")
+    plt.gca().invert_yaxis()
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
+    ax.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.10),
+        fancybox=True,
+        shadow=True,
+        ncol=3,
+    )
+    title_label = str(varlabel + " " + ssscc)
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    _apply_default_fmt(xlim, ylim, varlabel, "CTDPRES (dbar)", title_label, grid)
+    plt.xlabel(varlabel, horizontalalignment="right", x=1.0)
+    logs = "logs"
+    f_out = f"{cfg.dirs[logs]}postfit/{varlabel}_{ssscc}.png"
+    # _save_fig(ax, f_out)
+    plt.savefig(f_out, bbox_inches="tight")
+
+def plot_TS(df, f_out=None):
+    """
+    Line plot of temperature and salinity for a single cast or series of casts.
+    Modified from: https://oceanpython.org/2013/02/17/t-s-diagram/
+    """
+    import matplotlib.ticker as tick
+    import gsw
+
+    #   Demarcate temperature, salinty, and limits for density
+    temp = df.CTDTMP1
+    salt = df.CTDSAL
+    smin = salt.min() - (0.01 * salt.min())
+    smax = salt.max() + (0.01 * salt.max())
+    tmin = temp.min() - (0.1 * temp.max())
+    tmax = temp.max() + (0.1 * temp.max())
+    #   Gridding for a contour
+    xdim = round((smax - smin) / 0.1 + 1.0)
+    ydim = round((tmax - tmin) + 1.0)
+    #   Creating density vectors to fill the grid with densities
+    dens = np.zeros((ydim, xdim))
+    si = np.linspace(1, xdim - 1, xdim) * 0.1 + smin
+    ti = np.linspace(1, ydim - 1, ydim) + tmin
+    for j in range(0, int(ydim)):
+        for i in range(0, int(xdim)):
+            dens[j, i] = gsw.rho(si[i], ti[j], 0)
+    dens = dens - 1000  #   Convert to sigma-theta
+
+    fig = plt.figure(figsize=(7, 6))
+    ax = fig.add_subplot()
+    #   Density contours
+    cs = plt.contour(si, ti, dens, linestyles="dashed", colors="k")
+    plt.clabel(cs, fontsize=12, inline=1, fmt="%0.1f")
+    #   Scatter of sample values
+    sc = ax.scatter(salt, temp, c=df.SSSCC.astype(int), marker="+")
+    sc.set_clim(vmin=df.SSSCC.astype(int).min(), vmax=df.SSSCC.astype(int).max())
+    ax.set_xlabel("Salinity")
+    ax.set_ylabel("Temperature (ºC)")
+    cbar = plt.colorbar(sc, format=tick.FormatStrFormatter("%.0f"))
+    cbar.set_label("Cast Number")
+
+    _save_fig(ax, f_out)
 # TODO: more plots! what does ODV have?
 # section plots (w/ PyDiva)
 # parameter-parameter plots
