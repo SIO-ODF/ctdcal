@@ -43,6 +43,7 @@ btl_data = io.load_exchange_btl(fname).replace(-999, np.nan)
 btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"
 ].apply(lambda x: f"{x:02d}")
+#   Create salinity residuals
 btl_data["Residual"] = btl_data["SALNTY"] - btl_data["CTDSAL"]
 btl_data[["CTDPRS", "Residual"]] = btl_data[["CTDPRS", "Residual"]].round(4)
 btl_data["Comments"] = ""
@@ -154,9 +155,16 @@ src_plot_upcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
+# fig = figure(
+#     plot_height=800,
+#     plot_width=400,
+#     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
+#     tools="pan,box_zoom,wheel_zoom,box_select,reset",
+#     y_axis_label="Pressure (dbar)",
+# )
 fig = figure(
-    plot_height=800,
-    plot_width=400,
+    height=800,
+    width=400,
     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
     y_axis_label="Pressure (dbar)",
@@ -203,9 +211,39 @@ btl_sal.nonselection_glyph.line_alpha = 0.2
 ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 
+src_plot_btl_del = ColumnDataSource(data=dict(x=[], y=[]))
+
+fig2 = figure(
+    height=800,
+    width=400,
+    title="Salinity residual vs CTDPRS [Station {}]".format(parameter.value, station.value),
+    tools="pan,box_zoom,wheel_zoom,box_select,reset",
+    y_axis_label="Pressure (dbar)",
+    y_range=fig.y_range
+)
+thresh = np.array([0.002, 0.005, 0.010, 0.020])
+p_range = np.array([6000, 2000, 1000, 500])
+thresh = np.append(thresh, thresh[-1])
+p_range = np.append(p_range, 0)
+btl_sal2 = fig2.asterisk(
+    "x",
+    "y",
+    size=12,
+    line_width=1.5,
+    color="#0033CC",
+    source=src_plot_btl_del,
+    legend_label="Salinity residual (SALNTY-CTDSAL)",
+)
+fig2.step(thresh, p_range)
+fig2.step(-thresh, p_range)
+# fig2.ray(x=[0], y=[6000], length=0, angle=np.pi/2, line_width=1, color="black", line_dash="dashdot")  #   Option for vertical line on 0
+fig2.select(BoxSelectTool).select_every_mousemove = False
+fig2.y_range.flipped = True  # invert y-axis
+fig2.legend.location = "bottom_right"
+fig2.legend.border_line_width = 3
+fig2.legend.border_line_alpha = 1
+
 # define callback functions
-
-
 def update_selectors():
 
     print("exec update_selectors()")
@@ -245,6 +283,10 @@ def update_selectors():
     }
     src_plot_btl.data = {
         "x": btl_data.loc[btl_rows, ref_param.value],
+        "y": btl_data.loc[btl_rows, "CTDPRS"],
+    }
+    src_plot_btl_del.data = {
+        "x": btl_data.loc[btl_rows, "Residual"],
         "y": btl_data.loc[btl_rows, "CTDPRS"],
     }
 
@@ -469,7 +511,7 @@ tables = column(
     data_table_title, data_table, data_table_changed_title, data_table_changed
 )
 
-curdoc().add_root(row(controls, tables, fig))
+curdoc().add_root(row(controls, tables, fig, fig2))
 curdoc().title = "CTDO Data Flagging Tool"
 
 update_selectors()
