@@ -10,6 +10,7 @@ from ctdcal import get_ctdcal_config
 from ctdcal import process_bottle as btl
 from ctdcal import process_ctd as process_ctd
 from ctdcal import sbe_reader as sbe_rd
+from ctdcal import io
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -129,10 +130,16 @@ def hex_to_ctd(ssscc_list):
     """
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
-        if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
+        if "00101" in ssscc_list:   #   Then it's the GTC stuff, load those accordingly
+            hexFile = cfg.dirs["raw"] + "gtc_" + ssscc + ".hex"
+            xmlconFile = cfg.dirs["raw"] + "GTC_" +  ssscc + ".XMLCON"
+        else:   #   ODF
             hexFile = cfg.dirs["raw"] + ssscc + ".hex"
             xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
+        if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
+            print(f"Beginning translation of new data: {ssscc}")
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
+            #   convertFromSBEReader is what actually creates the dataframe
             converted_df = convertFromSBEReader(sbeReader, ssscc)
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
@@ -149,40 +156,44 @@ def make_time_files(ssscc_list):
             bad_rows = converted_df["CTDPRS"].abs() > 6500
             if bad_rows.any():
                 log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
-            converted_df.loc[bad_rows, :] = np.nan
-            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+                converted_df.loc[bad_rows, :] = np.nan  #   Move inside the if statement to fix the depreciation warning
+                converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
             # Trim to times when rosette is in water
-            trimmed_df = process_ctd.remove_on_deck(
-                converted_df,
-                ssscc,
-                log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
-            )
-
-            # # TODO: switch to loop instead, e.g.:
-            # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
-
-            # if not c1_col in raw_data.dtype.names:
-            #     print('c1_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
-            # if not c2_col in raw_data.dtype.names:
-            #     print('c2_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
-            # if not dopl_col in raw_data.dtype.names:
-            #     print('do_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
-
-            # TODO: add despike/wild edit filter (optional?)
+            if "00101" in ssscc_list:   #   GTC
+                try:
+                    trimmed_df = process_ctd.remove_on_deck(
+                        converted_df,
+                        ssscc,
+                        log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
+                    )
+                except:
+                    if any(converted_df.CTDPRS < -0.5):
+                        log.warning(f"Pressure less than -0.5 trimmed from {ssscc} during GTC time file generation: {len(converted_df[converted_df.CTDPRS < -0.5])} points cut")
+                        trimmed_df = converted_df[converted_df.CTDPRS > -0.5]
+                    else:
+                        trimmed_df = converted_df
+                    io.write_pressure_details(ssscc, cfg.dirs["logs"] + "ondeck_pressure.csv", trimmed_df.CTDPRS.iloc[0], trimmed_df.CTDPRS.iloc[-1])
+            else:   #   ODF turning on on deck
+                trimmed_df = process_ctd.remove_on_deck(
+                    converted_df,
+                    ssscc,
+                    log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
+                )
 
             # Filter data
-            filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df,
-                window="triangle",
-                parameters=cfg.filter_cols,
-            )
+            if "U_DEF_poly1" in trimmed_df.columns: #   None of these are on the GTC rosette
+                filter_data = process_ctd.raw_ctd_filter(
+                    trimmed_df,
+                    window="triangle",
+                    parameters=cfg.filter_cols,
+                )
+            else:
+                filter_data = process_ctd.raw_ctd_filter(
+                    trimmed_df,
+                    window="triangle",
+                    parameters=cfg.gtc_filter_cols,
+                )
 
             # Trim to downcast
             cast_data = process_ctd.cast_details(
@@ -216,6 +227,9 @@ def make_btl_mean(ssscc_list):
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
 
+            if len(mean_df) > 36:
+                log.warning(f"{ssscc} more than 36 bottles identified in the CTD data.")
+
             # export bottom bottle time/lat/lon info
             fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
             datetime_col = "nmea_datetime"
@@ -248,7 +262,7 @@ def convertFromSBEReader(sbeReader, ssscc):
     raw_df.index.name = "index"
 
     # Metadata needs to be processed seperately and then joined with the converted data
-    log.info(f"Building metadata dataframe for {ssscc}")
+    print(f"Building metadata dataframe for {ssscc}")
     metaArray = [line.split(",") for line in sbeReader._parse_scans_meta().tolist()]
     meta_cols, meta_dtypes = sbeReader._breakdown_header()
     meta_df = pd.DataFrame(metaArray)
@@ -262,7 +276,7 @@ def convertFromSBEReader(sbeReader, ssscc):
             # map from string "pseudo-boolean" to actual boolean values
             meta_df[col] = meta_df[col].map({"True": True, "False": False})
 
-    log.info("Success!")
+    ("Success!")
 
     t_probe = meta_df["pressure_temp_int"].tolist()  # raw int from Digitquartz T probe
 
@@ -423,7 +437,7 @@ def convertFromSBEReader(sbeReader, ssscc):
         ### Fluorometer Seapoint block
         elif meta["sensor_id"] == "11":
             log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
-            converted_df[col] = sbe_eq.seapoint_fluoro(raw_df[meta["column"]], coefs)
+            converted_df[col] = sbe_eq.seapoint_fluor(raw_df[meta["column"]], coefs)
 
         ### Salinity block
         elif meta["sensor_id"] == "1000":
@@ -437,7 +451,7 @@ def convertFromSBEReader(sbeReader, ssscc):
 
         ### Rinko block
         elif meta["sensor_id"] == "61":
-            if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO"):
+            if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO", "RINKOO2"):
                 log.info("Processing Rinko O2")
                 # hysteresis correct then pass through voltage (see Uchida, 2010)
                 coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
@@ -446,18 +460,30 @@ def convertFromSBEReader(sbeReader, ssscc):
                     p_array,
                     coefs,
                 )
+            elif meta["sensor_info"]["SensorName"] == 'UVP6-HF':
+                log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name} (UVP)")
+                converted_df["UVP"] = raw_df[meta["column"]]
 
+        elif meta["sensor_id"] == "71":
+            #   If the serial number matches that of a deep C-star
+            if "DR" in meta["sensor_info"]["SerialNumber"]:
+                log.info(f"Passing along Sensor ID: {meta['sensor_id']}, {sensor_name} as a straight voltage...")
+                converted_df[col] = raw_df[meta["column"]]
+            #   If the serial number matches that of a turbidity sensor
+            elif "TURB" in meta["sensor_info"]["SerialNumber"]:
+                log.info(f"Passing along Sensor ID: {meta['sensor_id']} ({meta['sensor_info']['SerialNumber']}) as a straight voltage...")
+                converted_df["TURB"] = raw_df[meta["column"]]
         ### Aux block
         else:
-            log.info(f"Passing along Sensor ID: {meta['sensor_id']}, {sensor_name}")
+            log.info(f"Passing along Sensor ID: {meta['sensor_id']}, {sensor_name} as a straight voltage...")
             converted_df[col] = raw_df[meta["column"]]
 
     # Set the column name for the index
     converted_df.index.name = "index"
 
-    log.info("Joining metadata dataframe with converted data...")
+    print("Joining metadata dataframe with converted data...")
     converted_df = converted_df.join(meta_df)
-    log.info("Success!")
+    print("Success!")
 
     # return the converted data as a dataframe
     return converted_df
