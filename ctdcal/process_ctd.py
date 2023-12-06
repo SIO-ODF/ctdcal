@@ -49,14 +49,17 @@ def cast_details(df, ssscc, log_file=None):
     b_lon : Longitude at bottom of cast
     b_alt : Altimeter reading at bottom of cast
     """
-    df_cast = _trim_soak_period(df)
+    df_cast = _trim_soak_period(df) #   20231205 - FutureWarning: Use int(ser.iloc[0]) instead of start_idx = int(df_list[find_last(df_list, P_downcast)].head(1)["index"])
 
     # TODO: call parameters from config file instead
-    p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))
+    # p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))    #   20231205 - FutureWarning: Use float(ser.iloc[0]) instead of p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))
+    p_start = float(df_cast["CTDPRS"].iloc[0].round(4))
     p_max_ind = df_cast["CTDPRS"].argmax()
     p_max = float(np.around(df_cast["CTDPRS"].max(), 4))
-    time_start = float(df_cast["scan_datetime"].head(1))
-    time_end = float(df_cast["scan_datetime"].tail(1))
+    # time_start = float(df_cast["scan_datetime"].head(1))    #   20231205 - FutureWarning
+    time_start = float(df_cast["scan_datetime"].iloc[0])
+    # time_end = float(df_cast["scan_datetime"].tail(1))  #   20231205 - FutureWarning
+    time_end = float(df_cast["scan_datetime"].iloc[-1])
     time_bottom = float(df_cast["scan_datetime"][p_max_ind])
     b_lat = float(np.around(df_cast["GPSLAT"][p_max_ind], 4))
     b_lon = float(np.around(df_cast["GPSLON"][p_max_ind], 4))
@@ -88,6 +91,8 @@ def _trim_soak_period(df=None):
     3) Find soak period before start of downcast
     4) Trim cast, return everything after top of cast (i.e. minimum pressure)
     """
+    # TODO: Is this overcomplicated? Will pumps ever turn off during a cast?
+    # Create a list of dataframes based on the pump status either off or on
     df_list = [
         g for i, g in df.groupby(df["pump_on"].ne(df["pump_on"].shift()).cumsum())
     ]
@@ -193,7 +198,8 @@ def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
         return last_idx
 
     # Trim off everything before last soak
-    start_idx = int(df_list[find_last(df_list, P_downcast)].head(1)["index"])
+    # start_idx = int(df_list[find_last(df_list, P_downcast)].head(1)["index"])   # 20231205 FutureWarning
+    start_idx = int(df_list[find_last(df_list, P_downcast)].iloc[0]["index"])
     df_cast_trimmed = df_cast.loc[start_idx:].reset_index()
 
     return df_cast_trimmed
@@ -337,7 +343,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
 
     # Remove ondeck start and end pressures
     if len(start_df) == 0:
-        log.warning("Failed to find starting deck pressure.")
+        log.warning(f"{stacast}: Failed to find starting deck pressure.")
         for n in [1, 2]:
             try:
                 (downcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
@@ -345,9 +351,9 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
                 log.warning(
                     f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
                 )
-        breakpoint()
+        # breakpoint()  #   20231205 Allow GTC rosette to throw error
     if len(end_df) == 0:
-        log.warning("Failed to find ending deck pressure.")
+        log.warning(f"{stacast}: Failed to find ending deck pressure.")
         for n in [1, 2]:
             try:
                 (upcast[cfg.column[f"c{n}"]] < cond_startup).value_counts()[True]
@@ -355,10 +361,8 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
                 log.warning(
                     f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
                 )
-        breakpoint()
-    # MK (3/23/20, 11am):
-    # auto end calculation failed bc cond2 is still >30
-    # may have to do manually or just use cond1 for station 00901
+        # breakpoint()
+
     trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
 
     # Log ondeck pressures

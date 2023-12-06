@@ -60,7 +60,8 @@ def retrieveBottleData(converted_df):
 
 def bottle_mean(btl_df):
     """Compute the mean for each bottle from a dataframe."""
-    btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
+    # btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))    #   20231205 FutureWarning
+    btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].iloc[-1])
     i = 1
     output = pd.DataFrame()
     while i <= btl_max:
