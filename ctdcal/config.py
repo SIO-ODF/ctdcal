@@ -60,7 +60,7 @@ column = {
     "sal": "CTDSAL",
     # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
     # "s2": "CTDSAL2",
-    "rinko_oxy": "FREE1",  # CHECK THIS!
+    "rinko_oxy": "U_DEF_poly1",  # CHECK THIS!
     "oxyvolts": "CTDOXYVOLTS",
     "refT": "REFTMP",
     "refC": "BTLCOND",
@@ -74,3 +74,7 @@ column = {
 filter_cols = []
 for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]:
     filter_cols.append(column[x])
+
+gtc_filter_cols = []
+for x in ["p", "t1", "t2", "c1", "c2", "sal", "oxyvolts", "lat", "lon"]:
+    gtc_filter_cols.append(column[x])
