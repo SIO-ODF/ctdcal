@@ -52,7 +52,7 @@ def odf_process_all():
     salts_io.portasal_salts(ssscc_all)
 
     # generate reftemp .csv files
-    # process_bottle.process_reft(ssscc_list)
+    process_bottle.process_reft(ssscc_all)
 
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
