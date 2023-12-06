@@ -67,7 +67,7 @@ def odf_process_all():
 
     # process pressure offset
     process_ctd.apply_pressure_offset(btl_data_all)
-    process_ctd.apply_pressure_offset(time_data_all)
+    process_ctd.apply_pressure_offset(time_data_all, mode="by_ssscc")
 
     # create cast depth log file
     process_ctd.make_depth_log(time_data_all)

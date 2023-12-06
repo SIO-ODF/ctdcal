@@ -504,7 +504,7 @@ def _fill_surface_data(df, bin_size=2):
     return df.bfill()
 
 
-def _get_pressure_offset(start_vals, end_vals):
+def _get_pressure_offset(start_vals, end_vals, mode="all"):
     """
     Finds unique values and calculate mean for pressure offset
 
@@ -525,8 +525,10 @@ def _get_pressure_offset(start_vals, end_vals):
     p_end = pd.Series(np.unique(end_vals))
     p_start = p_start[p_start.notnull()]
     p_end = p_end[p_end.notnull()]
-    p_off = p_start.mean() - p_end.mean()
-
+    if mode == "all":
+        p_off = p_start.mean() - p_end.mean()
+    elif mode == "by_ssscc":
+        p_off = p_start - p_end
     # JACKSON THINKS THIS METHOD SHOULD BE USED TO KEEP START END PAIRS
     #    p_df = pd.DataFrame()
     #    p_df['p_start'] = p_start
@@ -541,7 +543,7 @@ def _get_pressure_offset(start_vals, end_vals):
     return p_off
 
 
-def apply_pressure_offset(df, p_col="CTDPRS"):
+def apply_pressure_offset(df, p_col="CTDPRS", mode="all"):
     # TODO: import p_col from config file
     """
     Calculate pressure offset using deck pressure log and apply it to the data.
@@ -553,6 +555,9 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
         DataFrame containing column with pressure values
     p_col : str, optional
         Pressure column name in DataFrame (defaults to CTDPRS)
+    mode : str, optional
+        Type of pressure offset to apply, either "all" (all casts, linear offset) or
+        "by_ssscc" (specific to SSSCCs, linear offset)
 
     Returns
     -------
@@ -565,9 +570,21 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
         dtype={"SSSCC": str},
         na_values="Started in Water",
     )
-    p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p)
-    df[p_col] += p_offset
-    df[p_col + "_FLAG_W"] = 2
+    p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p, mode)
+    df[p_col] = np.nan
+    if mode == "all":
+        df[p_col] += p_offset
+        df[p_col + "_FLAG_W"] = 2
+    elif mode == "by_ssscc":
+        ssscc_offsets = pd.DataFrame({'SSSCC': p_log.SSSCC,'p_offset': list(p_offset)})
+        ssscc_gtc = get_ssscc_list(fname="data/ssscc/ssscc_gtc.csv")    #   Rather than pass this back in
+        for ssscc in ssscc_offsets.SSSCC:
+            if ssscc not in ssscc_gtc:  #   Don't do it for GTC
+                #   Either pandas is really ugly or I'm tired (the latter)
+                df.loc[df.SSSCC == ssscc, p_col] += ssscc_offsets.p_offset.loc[ssscc_offsets.SSSCC==ssscc]
+                df.loc[df.SSSCC == ssscc, p_col + "_FLAG_W"] = 2
+            else:
+                df.loc[df.SSSCC == ssscc, p_col + "_FLAG_W"] = 1
 
     return df
 
