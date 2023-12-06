@@ -57,10 +57,14 @@ def odf_process_all():
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
     #####
-    print("Loading time and btl data...")
+    
     # load in all bottle and time data into DataFrame
-    time_data_all = process_ctd.load_all_ctd_files(ssscc_all)
-    # btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
+    print("Loading ODF ct and bottle data...")
+    time_data_odf = process_ctd.load_all_ctd_files(ssscc_odf)
+    btl_data_odf  = process_bottle.load_all_btl_files(ssscc_odf)
+    print("Loading GTC ct and bottle data...")
+    time_data_gtc = process_ctd.load_all_ctd_files(ssscc_gtc)
+    btl_data_gtc  = process_bottle.load_all_btl_files(ssscc_gtc)
 
     import xarray as xr
     time_pre_xr = time_data_all.to_xarray()
