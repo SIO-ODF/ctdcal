@@ -20,9 +20,10 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def sdl_loader(filename):
+def sdl_loader_dat(filename):
     """
-    For loading sdl.dat files and rewriting as ODF formatted DataFrames.
+    For loading sdl.dat files and rewriting as ODF formatted DataFrames, in accordance
+    to routines aboard OSNAP32.
 
     TODO: Flagging?
     """
@@ -106,6 +107,87 @@ def sdl_loader(filename):
 
     return saltDF, cut_std
 
+def sdl_loader_xlsx(filename):
+    """
+    For loading sdl.xlsx files and rewriting as ODF formatted DataFrames, in accorance
+    to routines aboard NBP2401.
+
+    Originally intended as a subset of sdl_loader_dat, though there were sufficient changes
+    in routine xlsx generation that warranted new columns and to_write parameters.
+
+    Requires openpyxl
+    """
+    sdl = pd.read_excel(filename)
+    sdl = sdl.loc[~sdl.DateTime.isnull()]   #   Cut out the redundant "to average" lines
+    sdl = sdl[sdl["Reading #"].isnull()]    #   Exctract the final values from however many readings
+
+    sdl["IndexTime"] = pd.to_datetime(sdl["DateTime"])
+    sdl["IndexTime"] = (sdl["IndexTime"] - sdl["IndexTime"].iloc[0]).dt.seconds
+    sdl["IndexTime"] += (sdl["IndexTime"] < 0) * (3600 * 24)
+
+    #   Start cutting out the standards
+    try:
+        cut_std = sdl[
+            sdl["Bottle Label"].isnull() == False
+        ]  #   Remove rows associated with standard (P coming from IAPSO batch)
+        sdl = sdl[sdl["Bottle Label"].isnull() == True]
+    except AttributeError:
+        #   If standard was run previously
+        cut_std = pd.DataFrame()
+
+    if not sdl.empty:
+        #   Create SSSCC columns. For NBP2401, CC = 01
+        #   SSSCC GTC (dates, times, whatever) #samplenum
+        sdl[["SSSCC", "Num"]] = sdl["Sample ID"].str.split("#", expand=True)
+        sdl["SSS"] = sdl.SSSCC.str[0:3]
+        sdl["CC"] = sdl.SSSCC.str[3:5]
+        sdl["SSSCC"] = sdl["SSS"] + sdl["CC"]
+
+        to_write = {
+            "STNNBR": sdl.SSS,
+            "CASTNO": sdl.CC,
+            "SAMPNO": sdl.Num.astype(int),
+            "BathTEMP": sdl["Bath Temperature"].str.strip("C").astype(int),  #   There is no option to export bath temp with decimals and is occasionally very wrong
+            "CRavg": 2
+            * sdl["Adjusted Ratio"],  #   SDL writes ratio out as half of what ODF routine does
+            "CRraw": 2 * sdl["Uncorrected Ratio"],
+            "autosalSAMPNO": sdl.Num,
+            "Unknown": np.nan,  # Standardize dial
+            "StartTime": np.nan,
+            "EndTime": sdl.DateTime,
+            "Attempts": np.nan,
+            "IndexTime": sdl.IndexTime
+        }
+        saltDF = pd.DataFrame.from_dict(to_write)
+        saltDF.reset_index(inplace=True)
+    else:
+        print(
+            "Warning: No entries discovered in saltDF and results in empty dataframe:",
+            filename,
+        )
+
+    return saltDF, cut_std
+
+def portasal_remove_drift(saltDF, cut_std):
+    """
+    For removing the difference between the first and last samples.
+    Portasal values are automatically adjusted for the first standard.
+
+    This is basically a copy from odf_io, assuming the run was
+    standardized with a bottle at the beginning and the end.
+    """
+    if len(cut_std) > 1:
+        diff = cut_std[["Adjusted Ratio", "IndexTime"]].diff().dropna()
+        time_coef = (diff["Adjusted Ratio"]*2 / diff["IndexTime"]).iloc[0]
+        saltDF = saltDF.copy(deep=True)  # avoid modifying input dataframe
+        saltDF["CRavg"] += saltDF["IndexTime"] * time_coef
+        saltDF["CRavg"] = saltDF["CRavg"].round(5)
+    elif len(cut_std) == 1:
+        log.warning(f"Only 1 standardization found for run {saltDF.SSSCC.iloc[0]}")
+    else:
+        log.warning(f"Standardization of {saltDF.SSSCC.iloc[0]} was an unusual shape.")
+
+    return saltDF.drop(labels="IndexTime", axis="columns")
 
 def sdl_std(saltDF, cut_std, salt_dir=cfg.dirs["salt"], infile="standards.csv"):
     """For applying standard correction to saltDF/updating standards list"""
@@ -182,7 +264,7 @@ def sdl_exporter(saltDF, outdir=cfg.dirs["salt"], stn_col="STNNBR", cast_col="CA
         for cast in casts:
             stn_cast_salts = stn_salts[stn_salts[cast_col] == cast].copy()
             stn_cast_salts.dropna(axis=1, how="all", inplace=True)  # drop empty columns
-            outfile = Path(outdir) / f"{station}_salts.csv"  # SSS
+            outfile = Path(outdir) / f"{station}{cast}_salts.csv"  # SSS
             if outfile.exists():
                 log.info(str(outfile) + " already exists...skipping")
                 continue
@@ -230,7 +312,7 @@ def osnap_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
         else:
             try:
                 ext = ".dat"
-                saltDF, cut_std = sdl_loader(Path(str(Path(salt_dir) / ssscc) + ext))
+                saltDF, cut_std = sdl_loader_dat(Path(str(Path(salt_dir) / ssscc) + ext))
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue
@@ -241,3 +323,42 @@ def osnap_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
             )  # .round(4)
             sdl_exporter(saltDF, salt_dir)
     osnap_microcat()  #   Correct CRavg and add SALNTY for any microcats
+
+def portasal_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
+    """
+    Basically a copy of osnap_salts using modified loader and standardization functions.
+    * Read in file with .xlsx extension
+    * Adjust the conductivity ratio by a linear correction
+        * If no conductivity ratio is in the file, read the last one (many casts per day)
+    * Calculate SALNTY with 2002 software exports
+    * Write the file, dropping any unnessesary columns
+
+    Master salt processing function. Load in salt files for given station/cast list,
+    calculate salinity, and export to .csv files.
+
+    Developed for use on NBP2401: GEOTRACES
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to process
+    salt_dir : str, optional
+        Path to folder containing raw salt files (defaults to data/salt/)
+    """
+    for ssscc in ssscc_list:
+        if (Path(salt_dir) / f"{ssscc}_salts.csv").exists():
+            log.info(f"{ssscc}_salts.csv already exists in {salt_dir}... skipping")
+            continue
+        else:
+            try:
+                ext = ".xlsx"
+                saltDF, cut_std = sdl_loader_xlsx(Path(str(Path(salt_dir) / ssscc) + ext))
+            except FileNotFoundError:
+                log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
+                continue
+            saltDF = portasal_remove_drift(saltDF, cut_std)   # Linear correction
+            #   The ODF autosal writeout doubles the CRavg. Here we don't have to divide by 2.
+            saltDF["SALNTY"] = gsw.SP_salinometer(
+                (saltDF["CRavg"] / 2), saltDF["BathTEMP"]
+            )  # .round(4)
+            sdl_exporter(saltDF, salt_dir)

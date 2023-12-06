@@ -7,7 +7,7 @@ from ctdcal import (
     convert,
     fit_ctd,
     get_ctdcal_config,
-    odf_io,
+    salts_io,
     oxy_fitting,
     process_bottle,
     process_ctd,
@@ -49,6 +49,7 @@ def odf_process_all():
 
     # generate salt .csv files
     # odf_io.process_salts(ssscc_list)
+    salts_io.portasal_salts(ssscc_all)
 
     # generate reftemp .csv files
     # process_bottle.process_reft(ssscc_list)
