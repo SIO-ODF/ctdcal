@@ -68,11 +68,12 @@ column = {
     "refO": "OXYGEN",
     "lat": "GPSLAT",
     "lon": "GPSLON",
+    "turb": "TURB",
 }
 
 # List of columns to filter
 filter_cols = []
-for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]:
+for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon", "turb"]:   #   Joe Resing requested the turbidity sensor also get filtered.
     filter_cols.append(column[x])
 
 gtc_filter_cols = []
