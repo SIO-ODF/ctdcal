@@ -34,7 +34,11 @@ cfg = get_ctdcal_config()
 def odf_quickplot(type):
     #   Import the SSSCC list
     if type == "ssscc":
-        ssscc_list = ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_list = process_ctd.get_ssscc_list()
+    elif type == "odf-only":
+        ssscc_list = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_odf.csv")
+    elif type == "gtc-only":
+        ssscc_list = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_gtc.csv")
     else:
         raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
         ssscc_list = sorted([f.stem for f in raw_files])
@@ -50,7 +54,7 @@ def odf_quickplot(type):
         #   Import the converted time-series .pkl
         pre = pd.read_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
         #   Import the postfit ct1 file
-        post = io.load_exchange_ctd(cfg.dirs["pressure"] + ssscc + "_ct1.csv")[1]
+        # post = io.load_exchange_ctd(cfg.dirs["pressure"] + ssscc + "_ct1.csv")[1]
 
         #   Make a directory, where figures can be written out to (a folder called 00101)
         if not Path(cfg.dirs["figs"]).exists(): #   If the parent folder does not exist
@@ -76,17 +80,18 @@ def odf_quickplot(type):
             ssscc,
             f_out=cfg.dirs["figs"] + ssscc + "/C-before",
         )
-        ctd_plots.two_element(
-            pre.CTDOXYVOLTS,
-            pre.U_DEF_poly1,
-            pre.CTDPRS,
-            ssscc,
-            f_out=cfg.dirs["figs"] + ssscc + "/oxygen-before",
-        )
-        i += 1
-        odf_io.printProgressBar(
-            i, len(ssscc_list), prefix="Progress:", suffix=ssscc, length=50
-        )
+        if type == "gtc-only":
+            print("No RINKO on this cast.")
+        else:
+            ctd_plots.two_element(
+                pre.CTDOXYVOLTS,
+                pre.U_DEF_poly1,
+                pre.CTDPRS,
+                ssscc,
+                f_out=cfg.dirs["figs"] + ssscc + "/oxygen-before",
+            )
+        ctd_plots.TCcoherence_plot(pre,outdir=cfg.dirs["figs"] + ssscc + "/TC-coherence-before",ext=".png")
+        
 
         #   Plot the temperature T1 pre-vs-post w/ residuals (if same length)
 
@@ -94,6 +99,10 @@ def odf_quickplot(type):
 
         #   Do that using the rinko and SBE43 (voltages, then umol/kg)
 
+        i += 1
+        odf_io.printProgressBar(
+            i, len(ssscc_list), prefix="Progress:", suffix=ssscc, length=50
+        )
 
 if __name__ == "__main__":
 

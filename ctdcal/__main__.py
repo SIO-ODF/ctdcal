@@ -79,7 +79,7 @@ def init():
 @click.option(
     "-m",
     "--method",
-    type=click.Choice(["ssscc", "other"], case_sensitive=False),
+    type=click.Choice(["ssscc", "odf-only", "gtc-only", "other"], case_sensitive=False),
     default="ssscc",
 )
 def vis(method):

@@ -328,3 +328,24 @@ def plot_TS(df, f_out=None):
 # TODO: more plots! what does ODV have?
 # section plots (w/ PyDiva)
 # parameter-parameter plots
+
+
+def TCcoherence_plot(btl_df, outdir=cfg.dirs["figs"], ext=".pdf"):
+    plt.figure(figsize=(7, 6))
+    plt.scatter(
+        btl_df["CTDTMP1"] - btl_df["CTDTMP2"],
+        btl_df["CTDCOND1"] - btl_df["CTDCOND2"],
+        c=btl_df["CTDPRS"],
+        marker="+",
+    )
+    plt.xticks(rotation=45)
+    cbar = plt.colorbar(pad=0.1)
+    cbar.set_label("Pressure (dbar)")
+    plt.xlim((-0.05, 0.05))
+    plt.ylim((-0.05, 0.05))
+    plt.xlabel("CTDTMP1-CTDTMP2 Residual (T90 C)", fontsize=12)
+    plt.ylabel("CTDCOND1-CTDCOND2 Residual (mS/cm)", fontsize=12)
+    plt.title("CTDCOND1-CTDCOND2 vs. CTDTMP1-CTDTMP2", fontsize=12)
+    plt.tight_layout()
+    plt.savefig(f"{outdir}c_t_coherence{ext}")
+    plt.close()
