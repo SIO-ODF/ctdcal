@@ -128,9 +128,9 @@ def sdl_loader_xlsx(filename):
     #   Start cutting out the standards
     try:
         cut_std = sdl[
-            sdl["Bottle Label"].isnull() == False
+            sdl["Sample ID"].str.contains("Cal")
         ]  #   Remove rows associated with standard (P coming from IAPSO batch)
-        sdl = sdl[sdl["Bottle Label"].isnull() == True]
+        sdl = sdl.loc[~sdl["Calculated Salinity"].isnull()]
     except AttributeError:
         #   If standard was run previously
         cut_std = pd.DataFrame()
