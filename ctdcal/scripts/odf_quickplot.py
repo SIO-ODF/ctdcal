@@ -24,6 +24,7 @@ from ctdcal import (
     odf_io,
     process_bottle,
     process_ctd,
+    convert,
     ctd_plots,
 )
 
@@ -35,10 +36,13 @@ def odf_quickplot(type):
     #   Import the SSSCC list
     if type == "ssscc":
         ssscc_list = process_ctd.get_ssscc_list()
+        rosette = "Mixed"
     elif type == "odf-only":
         ssscc_list = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_odf.csv")
+        rosette = "ODF"
     elif type == "gtc-only":
         ssscc_list = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_gtc.csv")
+        rosette = "GTC"
     else:
         raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
         ssscc_list = sorted([f.stem for f in raw_files])
@@ -48,11 +52,22 @@ def odf_quickplot(type):
     i = 0
     odf_io.printProgressBar(i, len(ssscc_list), prefix="Progress:", length=50)
 
+    time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
+    btl_data_all  = process_bottle.load_all_btl_files(ssscc_list)
+    btl_data_all[cfg.column["refC"]] = convert.CR_to_cond(
+            btl_data_all["CRavg"],
+            btl_data_all["BathTEMP"],
+            btl_data_all[cfg.column["t1"]],
+            btl_data_all[cfg.column["p"]],
+        )
+
     #   For loop for each SSSCC
     for ssscc in ssscc_list:
-
+        title_lead = f"{ssscc}: {rosette}"
+        pre = time_data_all[time_data_all.SSSCC == ssscc]
+        pre_b = btl_data_all[btl_data_all.SSSCC == ssscc]
         #   Import the converted time-series .pkl
-        pre = pd.read_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
+        # pre = pd.read_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
         #   Import the postfit ct1 file
         # post = io.load_exchange_ctd(cfg.dirs["pressure"] + ssscc + "_ct1.csv")[1]
 
@@ -91,8 +106,8 @@ def odf_quickplot(type):
                 f_out=cfg.dirs["figs"] + ssscc + "/oxygen-before",
             )
         ctd_plots.TCcoherence_plot(pre,outdir=cfg.dirs["figs"] + ssscc + "/TC-coherence-before",ext=".png")
-        
 
+        ctd_plots.conductivity_overlap(ssscc, pre_b, pre, title_lead=title_lead)
         #   Plot the temperature T1 pre-vs-post w/ residuals (if same length)
 
         #   Do the above using the conductivity sensor

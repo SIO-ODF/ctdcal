@@ -349,3 +349,67 @@ def TCcoherence_plot(btl_df, outdir=cfg.dirs["figs"], ext=".pdf"):
     plt.tight_layout()
     plt.savefig(f"{outdir}c_t_coherence{ext}")
     plt.close()
+
+def conductivity_overlap(ssscc, btl_df, time_df, btl_df2=None, time_df2=None, title_lead="", outdir = cfg.dirs["figs"], ext=".pdf"):
+    """
+    Plot the bottle conductivity against the continuous CTD
+    data streams on the primary and secondary lines.
+    Optionally, pass in a second set of dataframes to layer
+    them and demonstrate post-fit adjustments.
+
+    Parameters
+    ----------
+    ssscc : string
+        Current SSSCC
+    btl_df : pd.Series or array-like
+        Bottle dataframe for a specific SSSCC
+    time_df : pd.Series or array-like
+        Continuous ct1 dataframe for a specific SSSCC
+    btl_df2 : pd.Series or array-like, optional
+        Second set of bottle data to overlap over the given
+        SSSCC
+    time_df2 : pd.Series or array-like, optional
+        Second set of continuous time data to overlap
+        over the given SSSCC
+    title_lead : string, optional
+        Title for the plot, definable elsewhere by configuration
+    outdir : string, optional
+        The path to write the figure
+    ext : string, optional
+        Filename extension when saving plot
+    """
+    #   Make BTLCOND before running this
+    
+    legend_entries = ["Salinometer Cond", "Extracted COND1", "Extracted COND2", 
+                      "Post-Fit Extracted COND1", "Post-Fit Extracted COND2", 
+                      "CTD COND1 Trace", "CTD COND2 Trace", "Post-Fit CTD COND1 Trace", 
+                      "Post-Fit CTD COND2 Trace"]
+    plt.figure(figsize=(12,7))
+    
+    if any(~btl_df.BTLCOND.isnull()):
+        plt.scatter(btl_df.BTLCOND,btl_df.CTDPRS,marker="+",label=legend_entries[0])
+
+    plt.scatter(btl_df.CTDCOND1,btl_df.CTDPRS,marker="+",label=legend_entries[1])
+    plt.scatter(btl_df.CTDCOND2,btl_df.CTDPRS,marker="+",label=legend_entries[2])
+
+    if btl_df2 is not None:
+        plt.scatter(btl_df2.CTDCOND1,btl_df2.CTDPRS,marker="+",label=legend_entries[3])
+        plt.scatter(btl_df2.CTDCOND2,btl_df2.CTDPRS,marker="+",label=legend_entries[4])
+    
+    plt.plot(time_df.CTDCOND1,time_df.CTDPRS,label=legend_entries[5])
+    plt.plot(time_df.CTDCOND2,time_df.CTDPRS,label=legend_entries[6])
+
+    if time_df2 is not None:
+        plt.plot(time_df2.CTDCOND1,time_df2.CTDPRS,label=legend_entries[7])
+        plt.plot(time_df2.CTDCOND1,time_df2.CTDPRS,label=legend_entries[8])
+
+    plt.gca().invert_yaxis()
+    plt.ylabel("CTDPRS")
+    plt.xlabel("Salinity (PSS-78)")
+    plt.title(title_lead)
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+
+    plt.savefig(f"{outdir}/{ssscc}/cond_overlay{ext}")
+    plt.close()
