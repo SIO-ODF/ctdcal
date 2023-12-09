@@ -570,18 +570,20 @@ def apply_pressure_offset(df, p_col="CTDPRS", mode="all"):
         dtype={"SSSCC": str},
         na_values="Started in Water",
     )
-    p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p, mode)
-    df[p_col] = np.nan
+    
+    # df[p_col] = np.nan
+    #   How we normally do things, taking a mean of all the pressure offsets and applying it to the pressure column
     if mode == "all":
+        p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p, mode)
         df[p_col] += p_offset
         df[p_col + "_FLAG_W"] = 2
+    #   Don't apply the offset if SSSCC belongs to GTC - flag the digiquartz as 1
     elif mode == "by_ssscc":
-        ssscc_offsets = pd.DataFrame({'SSSCC': p_log.SSSCC,'p_offset': list(p_offset)})
+        p_log["offset"] = p_log.ondeck_start_p - p_log.ondeck_end_p
         ssscc_gtc = get_ssscc_list(fname="data/ssscc/ssscc_gtc.csv")    #   Rather than pass this back in
-        for ssscc in ssscc_offsets.SSSCC:
+        for ssscc in df.SSSCC.unique():
             if ssscc not in ssscc_gtc:  #   Don't do it for GTC
-                #   Either pandas is really ugly or I'm tired (the latter)
-                df.loc[df.SSSCC == ssscc, p_col] += ssscc_offsets.p_offset.loc[ssscc_offsets.SSSCC==ssscc]
+                df.loc[df.SSSCC == ssscc, p_col] += p_log.offset.loc[p_log.SSSCC == ssscc].iloc[0]
                 df.loc[df.SSSCC == ssscc, p_col + "_FLAG_W"] = 2
             else:
                 df.loc[df.SSSCC == ssscc, p_col + "_FLAG_W"] = 1
