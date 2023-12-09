@@ -192,7 +192,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             log.warning(
                 "Missing (or misnamed) REFT Data Station: "
                 + ssscc
-                + "...filling with NaNs"
+                + "...filling bottle entries with NaNs"
             )
             reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
             reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
@@ -208,7 +208,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             log.warning(
                 "Missing (or misnamed) REFC Data Station: "
                 + ssscc
-                + "...filling with NaNs"
+                + "...filling bottle entries with NaNs"
             )
             refc_data = pd.DataFrame(
                 index=btl_data.index,
@@ -218,11 +218,13 @@ def load_all_btl_files(ssscc_list, cols=None):
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
-        oxy_file = cfg.dirs["oxygen"] + ssscc
+        # oxy_file = cfg.dirs["oxygen"] + ssscc #   Deviating from this for NBP2401 where oxygens are split up between rosettes
+        oxy_file = cfg.dirs["oxygen"] + ssscc + ".csv"
         try:
-            oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
+            oxy_data = pd.read_csv(oxy_file)
             if len(oxy_data) > 36:
-                log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
+                raise ValueError(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
+
         except FileNotFoundError:
             log.warning(
                 "Missing (or misnamed) REFO Data Station: "

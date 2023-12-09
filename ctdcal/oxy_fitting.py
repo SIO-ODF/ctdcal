@@ -21,7 +21,6 @@ from ctdcal import process_ctd as process_ctd
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
-
 def load_winkler_oxy(oxy_file):
     """
     Load Winkler oxygen titration data file.
@@ -73,6 +72,33 @@ def load_winkler_oxy(oxy_file):
 
     return df, params
 
+def winkler_to_csv(ssscc_list):
+    """
+    Convert raw Winkler titration data to csv.
+
+    Parameters
+    ----------
+    ssscc_list: list of str
+        List of stations and casts
+    """
+    from os import path
+
+    for ssscc in sorted(ssscc_list):
+        oxy_file = cfg.dirs["oxygen"] + ssscc
+
+        if path.isfile(oxy_file):   #   If the raw data exists
+            if not path.isfile(oxy_file+".csv"): #   If the csv of the SSSCC doesn't exist
+                oxy_data, params = load_winkler_oxy(oxy_file)
+                for stn in oxy_data.STNNO_OXY:
+                    for cst in oxy_data.CASTNO_OXY:
+                        data_to_save = oxy_data.loc[oxy_data.STNNO_OXY == stn] #   Not sure how to combine these together
+                        data_to_save = data_to_save.loc[data_to_save.CASTNO_OXY == cst]
+                        data_to_save["SSSCC_oxy"] = data_to_save["STNNO_OXY"].apply(lambda x: f"{x:03d}") + data_to_save["CASTNO_OXY"].apply(lambda x: f"{x:02d}")
+                        #   Save the data
+                        data_to_save.to_csv(cfg.dirs["oxygen"]+data_to_save["SSSCC_oxy"].iloc[0]+".csv", index=False)
+        #   If the raw file doesn't exist, that's fine. It's possibly inside another raw file.
+        elif not path.isfile(oxy_file+".csv"):
+            log.warning(f"Warning: Oxygen file does not exist for {ssscc}")
 
 def load_flasks(flask_file=cfg.dirs["oxygen"] + "o2flasks.vol", comment="#"):
     """
