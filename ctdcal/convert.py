@@ -141,6 +141,9 @@ def hex_to_ctd(ssscc_list):
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             #   convertFromSBEReader is what actually creates the dataframe
             converted_df = convertFromSBEReader(sbeReader, ssscc)
+            if "00101" in ssscc_list:
+                #   Add GTC turbidity sensor
+                converted_df["TURB"] = converted_df["FREE4"]
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
