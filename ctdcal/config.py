@@ -77,5 +77,5 @@ for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "l
     filter_cols.append(column[x])
 
 gtc_filter_cols = []
-for x in ["p", "t1", "t2", "c1", "c2", "sal", "oxyvolts", "lat", "lon"]:
+for x in ["p", "t1", "t2", "c1", "c2", "sal", "oxyvolts", "lat", "lon", "turb"]:
     gtc_filter_cols.append(column[x])
