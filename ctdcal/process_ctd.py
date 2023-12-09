@@ -591,7 +591,7 @@ def apply_pressure_offset(df, p_col="CTDPRS", mode="all"):
     return df
 
 
-def make_depth_log(time_df, threshold=80):
+def make_depth_log(time_df, threshold=80, fname="Depth_log_odf.csv", manual=False):
     # TODO: get column names from config file
     """
     Create depth log file from maximum depth of each station/cast in time DataFrame.
@@ -606,6 +606,8 @@ def make_depth_log(time_df, threshold=80):
 
     """
     # TODO: make inputs be arraylike rather than dataframe
+    if any(time_df.SSSCC.str.contains("00101")):
+        fname = "Depth_log_gtc.csv"
     df = time_df[["SSSCC", "CTDPRS", "GPSLAT", "ALT"]].copy().reset_index()
     df_group = df.groupby("SSSCC", sort=False)
     idx_p_max = df_group["CTDPRS"].idxmax()
@@ -628,8 +630,16 @@ def make_depth_log(time_df, threshold=80):
         .round()
         .astype(int)
     )
+    if manual:
+        log.info("Adding manual entries to depth log...")
+        manual_depth_df = pd.read_csv(
+            cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+        )
+        manual_depth_df = manual_depth_df[manual_depth_df.SSSCC.isin(time_df.SSSCC.unique())]
+        bottom_df = pd.concat([bottom_df, manual_depth_df])
+        bottom_df.drop_duplicates(subset="SSSCC", keep="last", inplace=True)
     bottom_df[["SSSCC", "DEPTH"]].to_csv(
-        cfg.dirs["logs"] + "depth_log.csv", index=False
+        cfg.dirs["logs"] + fname, index=False
     )
 
     return True

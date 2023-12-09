@@ -80,7 +80,9 @@ def odf_process_all():
     process_ctd.apply_pressure_offset(time_data_gtc, mode="by_ssscc")
 
     # create cast depth log file
-    process_ctd.make_depth_log(time_data_all)
+    process_ctd.make_depth_log(time_data_odf, manual=True)
+    process_ctd.make_depth_log(time_data_gtc, manual=True)
+
     print("Calibrating temperature...")
     # calibrate temperature against reference
     fit_ctd.calibrate_temp(btl_data_all, time_data_all)
