@@ -34,7 +34,7 @@ def odf_process_all():
     # load station/cast list from file
     ssscc_odf = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_odf.csv")    #   For the sake of running different routines
     ssscc_gtc = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_gtc.csv")
-    ssscc_all = ssscc_odf + ssscc_gtc
+    ssscc_all = sorted(ssscc_odf + ssscc_gtc)
 
     print("Converting new .hex files...")
     # convert raw .hex files
@@ -47,17 +47,20 @@ def odf_process_all():
     # process bottle file
     convert.make_btl_mean(ssscc_all)
 
+    # generate reftemp .csv files
+    process_bottle.process_reft(ssscc_all)
+
     # generate salt .csv files
     # odf_io.process_salts(ssscc_list)
     salts_io.portasal_salts(ssscc_all)
 
-    # generate reftemp .csv files
-    process_bottle.process_reft(ssscc_all)
+    # Generate oxygen .csv files (splitting up sources)
+    oxy_fitting.winkler_to_csv(ssscc_all)
 
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
     #####
-    
+
     # load in all bottle and time data into DataFrame
     print("Loading ODF ct and bottle data...")
     time_data_odf = process_ctd.load_all_ctd_files(ssscc_odf)
@@ -71,8 +74,10 @@ def odf_process_all():
     time_pre_xr.to_netcdf(path=cfg.dirs["converted"]+"all_ct1.nc")
 
     # process pressure offset
-    process_ctd.apply_pressure_offset(btl_data_all)
-    process_ctd.apply_pressure_offset(time_data_all, mode="by_ssscc")
+    process_ctd.apply_pressure_offset(btl_data_odf, mode="by_ssscc")
+    process_ctd.apply_pressure_offset(btl_data_gtc, mode="by_ssscc")
+    process_ctd.apply_pressure_offset(time_data_odf, mode="by_ssscc")
+    process_ctd.apply_pressure_offset(time_data_gtc, mode="by_ssscc")
 
     # create cast depth log file
     process_ctd.make_depth_log(time_data_all)
