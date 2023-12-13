@@ -69,13 +69,16 @@ def odf_process_all():
     time_data_gtc = process_ctd.load_all_ctd_files(ssscc_gtc)
     btl_data_gtc  = process_bottle.load_all_btl_files(ssscc_gtc)
 
+    btl_odf_old = btl_data_odf.copy()
+    time_odf_old = time_data_odf.copy()
+
     import xarray as xr
-    time_pre_xr = time_data_all.to_xarray()
-    time_pre_xr.to_netcdf(path=cfg.dirs["converted"]+"all_ct1.nc")
+    # time_pre_xr = time_data_all.to_xarray()
+    # time_pre_xr.to_netcdf(path=cfg.dirs["converted"]+"all_ct1.nc")
 
     # process pressure offset
     process_ctd.apply_pressure_offset(btl_data_odf, mode="by_ssscc")
-    process_ctd.apply_pressure_offset(btl_data_gtc, mode="by_ssscc")
+    process_ctd.apply_pressure_offset(btl_data_gtc, mode="by_ssscc")    #   Not actually doing this, but I want to flag the pressure as 1
     process_ctd.apply_pressure_offset(time_data_odf, mode="by_ssscc")
     process_ctd.apply_pressure_offset(time_data_gtc, mode="by_ssscc")
 
@@ -83,34 +86,41 @@ def odf_process_all():
     process_ctd.make_depth_log(time_data_odf, manual=True)
     process_ctd.make_depth_log(time_data_gtc, manual=True)
 
+    # calibrate temperature against reference
     print("Calibrating temperature...")
-    # calibrate temperature against reference
-    fit_ctd.calibrate_temp(btl_data_all, time_data_all)
+    fit_ctd.calibrate_temp(btl_data_odf, time_data_odf)
+
     print("Calibrating conductivity...")
-    # calibrate temperature against reference
-    btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
+    btl_data_odf, time_data_odf = fit_ctd.calibrate_cond(btl_data_odf, time_data_odf, fname="data/ssscc/ssscc_odf.csv")
+    btl_data_gtc, time_data_gtc = fit_ctd.calibrate_cond(btl_data_gtc, time_data_gtc, fname="data/ssscc/ssscc_gtc.csv")
 
     print("Preparing and calibrating oxygen...")
     # calculate params needs for oxy/rinko calibration
     # TODO: move density matching to prepare_oxy
     # oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
+    oxy_fitting.prepare_oxy(btl_data_odf, time_data_odf, ssscc_odf)
+    oxy_fitting.prepare_oxy(btl_data_gtc, time_data_gtc, ssscc_gtc)
 
     # calibrate oxygen against reference
-    # oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+    oxy_fitting.calibrate_oxy(btl_data_odf, time_data_odf, ssscc_odf)
+    oxy_fitting.calibrate_oxy(btl_data_gtc, time_data_gtc, ssscc_gtc)
+
     print("And now the ODF RINKO...")
-    # rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+    rinko.calibrate_oxy(btl_data_odf, time_data_odf, ssscc_odf)
 
     #####
     # Step 3: export data
     #####
     print("Exporting data products...")
     # export files for making cruise report figs
-    process_bottle.export_report_data(btl_data_all)
+    process_bottle.export_report_data(btl_data_odf)
 
     # export to Exchange format
     # TODO: clean this up more
-    # process_ctd.export_ct1(time_data_all, ssscc_list)
-    process_bottle.export_hy1(btl_data_all)
+    process_ctd.export_ct1(time_data_odf, ssscc_odf, logfile=cfg.dirs["logs"]+"Depth_log_odf.csv")
+    process_ctd.export_ct1(time_data_gtc, ssscc_gtc, logfile=cfg.dirs["logs"]+"Depth_log_gtc.csv")
+    process_bottle.export_hy1(btl_data_odf, logfile=cfg.dirs["logs"]+"Depth_log_odf.csv")
+    process_bottle.export_hy1(btl_data_gtc, logfile=cfg.dirs["logs"]+"Depth_log_gtc.csv")
 
     # run: ctd_to_bottle.py
 

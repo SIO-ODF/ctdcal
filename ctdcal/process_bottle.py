@@ -426,7 +426,7 @@ def export_report_data(df):
     return
 
 
-def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
+def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF", logfile=cfg.dirs["logs"] + "depth_log.csv"):
     log.info("Exporting bottle file")
     btl_data = df.copy()
     now = datetime.now()
@@ -478,12 +478,19 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     # sort by decreasing sample number (increasing pressure) and reindex
     btl_data = btl_data.sort_values(
-        by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
+        by=["STNNBR", "CASTNO", "SAMPNO"], ascending=[True, True, False], ignore_index=True
     )
 
     # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+    if "odf" in logfile:
+        btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+        btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+        btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
+            btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
+        )
+    else:
+        del btl_columns["REFTMP"]
+        del btl_columns["REFTMP_FLAG_W"]
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
@@ -493,7 +500,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     # add depth
     depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        logfile, dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     manual_depth_df = pd.read_csv(
         cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
@@ -508,9 +515,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     # TODO: missing REFTMP not obvious til loading data - where to put this?
     # _reft_loader() is not the right place
     # maybe during loading step flag missing OXYGEN, REFTMP, BTLCOND?
-    btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
-        btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
-    )
+
     btl_data = btl_data.where(~btl_data.isnull(), -999)
 
     # check columns
@@ -530,7 +535,15 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org
-    with open(out_dir + cfg.expocode + "_hy1.csv", mode="w+") as f:
+
+    if "odf" in logfile:
+        append = "_odf"
+    elif "gtc" in logfile:
+        append = "_gtc"
+    else:
+        append = ""
+
+    with open(out_dir + cfg.expocode + f"{append}_hy1.csv", mode="w+") as f:
         f.write("BOTTLE, %s\n" % (time_stamp))
         f.write(",".join(btl_columns.keys()) + "\n")
         f.write(",".join(btl_columns.values()) + "\n")

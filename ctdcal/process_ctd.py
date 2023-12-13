@@ -15,7 +15,6 @@ log = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", "Mean of empty slice.")
 
-
 def cast_details(df, ssscc, log_file=None):
     """
     We determine the cast details using pandas magic.
@@ -606,7 +605,7 @@ def make_depth_log(time_df, threshold=80, fname="Depth_log_odf.csv", manual=Fals
 
     """
     # TODO: make inputs be arraylike rather than dataframe
-    if any(time_df.SSSCC.str.contains("00101")):
+    if any(time_df.SSSCC.str.contains("00301")):
         fname = "Depth_log_gtc.csv"
     df = time_df[["SSSCC", "CTDPRS", "GPSLAT", "ALT"]].copy().reset_index()
     df_group = df.groupby("SSSCC", sort=False)
@@ -741,7 +740,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list):
+def export_ct1(df, ssscc_list, logfile=cfg.dirs["logs"] + "depth_log.csv"):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -768,7 +767,14 @@ def export_ct1(df, ssscc_list):
     # TODO: may not always have these channels so don't hardcode them in!
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
+    df["CTDTURB_FLAG_W"]  = 1
     # df["CTDBACKSCATTER_FLAG_W"] = 1
+    if "gtc" in logfile:
+        df["CTDTMP_FLAG_W"] = 1
+        df.rename(columns={"FLUOR":"CTDFLUOR"}, inplace=True)
+        ctd_sn = 888
+    else:
+        ctd_sn = 569
 
     # rename outputs as defined in user_settings.yaml
     for param, attrs in cfg.ctd_outputs.items():
@@ -778,7 +784,6 @@ def export_ct1(df, ssscc_list):
     # check that all columns are there
     try:
         df[cfg.ctd_col_names]
-        # this is lazy, do better
     except KeyError as err:
         log.info("Column names not configured properly... attempting to correct")
         bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
@@ -797,7 +802,7 @@ def export_ct1(df, ssscc_list):
         dtype={"SSSCC": str},
     )
     depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        logfile, dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     try:
         manual_depth_df = pd.read_csv(
@@ -815,11 +820,12 @@ def export_ct1(df, ssscc_list):
 
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
-        # switch oxygen primary sensor to rinko
-        # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
-        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        if "odf" in logfile:
+            # switch oxygen primary sensor to rinko
+            print(f"Using Rinko as CTDOXY for {ssscc}")
+            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
@@ -865,7 +871,7 @@ def export_ct1(df, ssscc_list):
                 f"TIME = {b_datetime[1]}\n"
                 f"LATITUDE = {btm_lat:.4f}\n"
                 f"LONGITUDE = {btm_lon:.4f}\n"
-                f"INSTRUMENT_ID = {cfg.ctd_serial}\n"
+                f"INSTRUMENT_ID = {ctd_sn}\n"
                 f"DEPTH = {depth:.0f}\n"
             )
             f.write(ctd_header)

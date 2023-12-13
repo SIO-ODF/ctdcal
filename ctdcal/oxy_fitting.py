@@ -7,6 +7,7 @@ import logging
 import xml.etree.cElementTree as ET
 from collections import OrderedDict
 from pathlib import Path
+import warnings
 
 import gsw
 import numpy as np
@@ -226,15 +227,33 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
 
     """
     params = pd.DataFrame()
+    oxy_map_dict = {"00302":"00301","00307":"00305"}    #   Mapping multiple casts, from which Barna's run params are stored
     for ssscc in ssscc_list:
-        df = gather_oxy_params(cfg.dirs["oxygen"] + ssscc)
+        if ssscc in oxy_map_dict.keys():
+            df = gather_oxy_params(cfg.dirs["oxygen"] + oxy_map_dict[ssscc])
+        else:
+            df = gather_oxy_params(cfg.dirs["oxygen"] + ssscc)
         df["SSSCC"] = ssscc
         params = pd.concat([params, df])
+    params = pd.merge(ssscc_col, params, how="left")
 
     # get flask volumes and merge with titration parameters
     flask_df = load_flasks()  # TODO: volume correction from thermal expansion?
-    volumes = pd.merge(flask_nums, flask_df, how="left")["FLASK_VOL"].values
-    params = pd.merge(ssscc_col, params, how="left")
+    # volumes = pd.merge(flask_nums, flask_df, how="left")["FLASK_VOL"].values
+    df = pd.DataFrame(flask_nums)
+    df["master_index"] = range(len(df))
+    df["vol"] = np.nan
+    for i in df.master_index:
+        try:
+            flask = df.FLASKNO.iloc[i].astype(int).astype(str)
+            df.vol.iloc[i] = flask_df["FLASK_VOL"].loc[flask_df.FLASKNO == flask]
+        except:
+            #   if ~df.FLASKNO.iloc[i].isnumeric():
+                #   print("Unexpected flask number detected at row {i} of the bottle file.")
+            #   Weird error. Can't really look it up.
+            log.info("Bottle oxygen calculation: Missing value for {i} in bottle dataframe.")
+    volumes = df.vol.values
+    
 
     # find 20degC equivalents
     rho_20C = gsw.rho_t_exact(0, 20, 0)
@@ -403,7 +422,7 @@ def calculate_dV_dt(oxy_volts, time, nan_replace=True):
     return dV_dt  # filtered_dvdt
 
 
-def _get_sbe_coef(idx=0):
+def _get_sbe_coef(idx=0, sourcefile="data/ssscc.csv"):
     """
     Get SBE oxygen coefficients from raw .xmlcon files.
     Defaults to using first station in ssscc.csv file.
@@ -412,8 +431,11 @@ def _get_sbe_coef(idx=0):
     """
     # TODO: does scipy's minimize function needs a tuple? can this be improved further?
 
-    station = process_ctd.get_ssscc_list()[idx]
-    xmlfile = cfg.dirs["raw"] + station + ".XMLCON"
+    station = process_ctd.get_ssscc_list(sourcefile)[idx]
+    if station == "00301":
+        xmlfile = cfg.dirs["raw"] + "GTC_" + station + ".XMLCON"
+    else:
+        xmlfile = cfg.dirs["raw"] + station + ".XMLCON"
 
     tree = ET.parse(xmlfile)
     root_eq0 = tree.find(".//CalibrationCoefficients[@equation='0']")  # Owens-Millard
@@ -523,6 +545,7 @@ def match_sigmas(
     ctd_SA,
     ctd_oxyvolts,
     ctd_time,
+    system,
 ):
 
     # Construct Dataframe from bottle and ctd values for merging
@@ -590,7 +613,10 @@ def match_sigmas(
             )
 
     # Apply coef and calculate CTDOXY
-    sbe_coef0 = _get_sbe_coef()  # initial coefficient guess
+    if system == "GTC":
+        sbe_coef0 = _get_sbe_coef(sourcefile=cfg.dirs["ssscc"]+"ssscc_gtc.csv")  # initial coefficient guess
+    elif system == "ODF":
+        sbe_coef0 = _get_sbe_coef(sourcefile=cfg.dirs["ssscc"]+"ssscc_odf.csv")
     merged_df["CTDOXY"] = _PMEL_oxy_eq(
         sbe_coef0,
         (
@@ -605,23 +631,31 @@ def match_sigmas(
     return merged_df
 
 
-def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
+def sbe43_oxy_fit(merged_df, system, sbe_coef0=None, f_suffix=None):
 
-    # Plot data to be fit together
-    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit.pdf"
+    if system == "GTC":
+        sbe_coef0 = _get_sbe_coef(sourcefile=cfg.dirs["ssscc"]+"ssscc_gtc.csv")  # initial coefficient guess
+        f_out1 = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit_gtc.pdf"
+        f_out2 = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_gtc.pdf"
+    elif system == "ODF":
+        sbe_coef0 = _get_sbe_coef(sourcefile=cfg.dirs["ssscc"]+"ssscc_odf.csv")
+        f_out1 = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit_odf.pdf"
+        f_out2 = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_odf.pdf"
+
+    # Plot *unfit* data to be fit together
     ctd_plots._intermediate_residual_plot(
         merged_df["REFOXY"] - merged_df["CTDOXY"],
         merged_df["CTDPRS"],
         merged_df["SSSCC"],
         xlabel="CTDOXY Residual (umol/kg)",
-        f_out=f_out,
+        f_out=f_out1,
         xlim=(-10, 10),
     )
 
-    bad_df = pd.DataFrame()  # initialize DF for questionable values
-
     if sbe_coef0 is None:
         sbe_coef0 = _get_sbe_coef()  # load initial coefficient guess
+
+    bad_df = pd.DataFrame()  # initialize DF for questionable values
 
     # Curve fit (weighted)
     weights = calculate_weights(merged_df["CTDPRS"])
@@ -637,7 +671,10 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     cfw_coefs = res.x
     merged_df["CTDOXY"] = _PMEL_oxy_eq(cfw_coefs, fit_data)
     merged_df["residual"] = merged_df["REFOXY"] - merged_df["CTDOXY"]
-    cutoff = 2.8 * np.std(merged_df["residual"])
+    if len(merged_df) > 2:
+        cutoff = 2.8 * np.std(merged_df["residual"])    
+    else:
+        cutoff = 0.1    #   With very small n, stdev can be very small
     thrown_values = merged_df[np.abs(merged_df["residual"]) > cutoff]
     bad_df = pd.concat([bad_df, thrown_values])
     merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
@@ -667,13 +704,12 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     # intermediate plots to diagnose data chunks goodness
     # TODO: implement into bokeh/flask dashboard
     if f_suffix is not None:
-        f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}.pdf"
         ctd_plots._intermediate_residual_plot(
             merged_df["residual"],
             merged_df["CTDPRS"],
             merged_df["SSSCC"],
             xlabel="CTDOXY Residual (umol/kg)",
-            f_out=f_out,
+            f_out=f_out2,
             xlim=(-10, 10),
         )
 
@@ -790,9 +826,17 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     -------
 
     """
-    print("Calibrating oxygen (SBE43)")
+    
+    
+    if "00301" in ssscc_list:
+        rosette = "GTC"
+        f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit_gtc.pdf"
+    else:
+        rosette = "ODF"
+        f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit.pdf"
+    print(f"Calibrating oxygen (SBE43 for {rosette})")
+
     # Plot all pre fit data
-    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit.pdf"
     ctd_plots._intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
@@ -827,6 +871,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             time_data["SA"],
             time_data[cfg.column["oxyvolts"]],
             time_data["scan_datetime"],
+            system=rosette
         )
         sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
         btl_df.loc[
@@ -840,13 +885,14 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
-    (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
+    (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, rosette, f_suffix="_ox0")
     sbe43_dict["ox0"] = sbe_coef0
 
     # Fit each cast individually
     for ssscc in ssscc_list:
         sbe_coef, sbe_df = sbe43_oxy_fit(
             all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
+            rosette,
             sbe_coef0=sbe_coef0,
             f_suffix=f"_{ssscc}",
         )

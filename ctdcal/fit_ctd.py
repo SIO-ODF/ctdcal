@@ -337,7 +337,7 @@ def calibrate_temp(btl_df, time_df):
         )
         if not Path(cfg.dirs["ssscc"]).exists():
             Path(cfg.dirs["ssscc"]).mkdir()
-        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_list = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_odf.csv")
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_t1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
 
@@ -454,7 +454,7 @@ def calibrate_temp(btl_df, time_df):
     return True
 
 
-def calibrate_cond(btl_df, time_df):
+def calibrate_cond(btl_df, time_df, fname="data/ssscc/ssscc_odf.csv"):
     # TODO: make this an ODF script in ctdcal/scripts?
     # TODO: break off parts of this to useful functions for all vars (C/T/O)
     # TODO: salt subset lists aren't loading in increasing order:
@@ -474,6 +474,19 @@ def calibrate_cond(btl_df, time_df):
 
     """
     log.info("Calibrating conductivity")
+
+    #   Define operating perameters for different rosettes
+    if "odf" in fname:
+        fit_yaml = load_fit_yaml()
+        salt_file = cfg.dirs["salt"]+"/salt_flags_handcoded.csv"
+        ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
+        rosette = "odf"
+    else:
+        fit_yaml = load_fit_yaml(fname=cfg.dirs["logs"]+"/fit_coefs_gtc.yaml")
+        salt_file = cfg.dirs["salt"]+"salt_flags_handcoded_gtc.csv"
+        ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]+"gtc_cond/").glob("ssscc_c*.csv"))
+        rosette = "gtc"
+    
     # calculate BTLCOND values from autosal data
     btl_df[cfg.column["refC"]] = convert.CR_to_cond(
         btl_df["CRavg"],
@@ -482,7 +495,6 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["p"]],
     )
 
-    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
     if Path(salt_file).exists():
         handcoded_salts = pd.read_csv(
             salt_file, dtype={"SSSCC": str, "salinity_flag": int}
@@ -498,16 +510,19 @@ def calibrate_cond(btl_df, time_df):
     else:
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
 
-    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
+    
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
         log.debug(
             "No CTDCOND grouping file found... creating ssscc_c1.csv with all casts"
         )
-        ssscc_list = process_ctd.get_ssscc_list()
-        ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_c1.csv")]
-        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
+        ssscc_list = process_ctd.get_ssscc_list(fname=fname)
+        if rosette == "gtc":
+            ssscc_subsets = [Path(cfg.dirs["ssscc"] + "gtc_cond/ssscc_c1.csv")]
+            pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
+        else:
+            ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_c1.csv")]
+            pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
 
-    fit_yaml = load_fit_yaml()  # load fit polynomial order
     for cN, tN in zip(["c1", "c2"], ["t1", "t2"]):
         C_flag, C_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:
@@ -544,7 +559,7 @@ def calibrate_cond(btl_df, time_df):
                 df_good[cfg.column["p"]],
                 df_good["SSSCC"],
                 xlabel=f"{cN.upper()} Residual (mS/cm)",
-                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_fit_data.pdf",
+                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_{rosette}fit_data.pdf",
             )
 
             # 3) calculate fit coefs
@@ -605,7 +620,7 @@ def calibrate_cond(btl_df, time_df):
             btl_df["SSSCC"],
             xlabel=f"{cN.upper()} Residual (mS/cm)",
             show_thresh=True,
-            f_out=f"{cfg.fig_dirs[cN]}residual_all_postfit.pdf",
+            f_out=f"{cfg.fig_dirs[cN]}residual_all_postfit{rosette}.pdf",
         )
 
         # export cond quality flags
@@ -616,7 +631,7 @@ def calibrate_cond(btl_df, time_df):
         C_fit_coefs[coef_names] = C_fit_coefs[coef_names].map(
             lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
         )
-        C_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{cN}.csv", index=False)
+        C_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{cN}_{rosette}.csv", index=False)
 
     # recalculate salinity with calibrated C/T
     # TODO: compute CTDSAL1 and *2? how to decide which to use

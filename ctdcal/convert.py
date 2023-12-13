@@ -130,7 +130,7 @@ def hex_to_ctd(ssscc_list):
     """
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
-        if "00101" in ssscc_list:   #   Then it's the GTC stuff, load those accordingly
+        if "00301" in ssscc_list:   #   Then it's the GTC stuff, load those accordingly
             hexFile = cfg.dirs["raw"] + "gtc_" + ssscc + ".hex"
             xmlconFile = cfg.dirs["raw"] + "GTC_" +  ssscc + ".XMLCON"
         else:   #   ODF
@@ -141,7 +141,7 @@ def hex_to_ctd(ssscc_list):
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             #   convertFromSBEReader is what actually creates the dataframe
             converted_df = convertFromSBEReader(sbeReader, ssscc)
-            if "00101" in ssscc_list:
+            if "00301" in ssscc_list:
                 #   Add GTC turbidity sensor
                 converted_df["TURB"] = converted_df["FREE4"]
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
@@ -163,7 +163,7 @@ def make_time_files(ssscc_list):
                 converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
             # Trim to times when rosette is in water
-            if "00101" in ssscc_list:   #   GTC
+            if "00301" in ssscc_list:   #   GTC
                 try:
                     trimmed_df = process_ctd.remove_on_deck(
                         converted_df,
@@ -470,6 +470,9 @@ def convertFromSBEReader(sbeReader, ssscc):
         elif meta["sensor_id"] == "71":
             #   If the serial number matches that of a deep C-star
             if "DR" in meta["sensor_info"]["SerialNumber"]:
+                log.info(f"Passing along Sensor ID: {meta['sensor_id']}, {sensor_name} as a straight voltage...")
+                converted_df[col] = raw_df[meta["column"]]
+            elif "????" in meta["sensor_info"]["SerialNumber"]: #   GTC wasn't set up by me...
                 log.info(f"Passing along Sensor ID: {meta['sensor_id']}, {sensor_name} as a straight voltage...")
                 converted_df[col] = raw_df[meta["column"]]
             #   If the serial number matches that of a turbidity sensor

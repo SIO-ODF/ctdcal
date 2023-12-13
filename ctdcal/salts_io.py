@@ -356,7 +356,10 @@ def portasal_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue
-            saltDF = portasal_remove_drift(saltDF, cut_std)   # Linear correction
+            if len(cut_std) == 2:
+                saltDF = portasal_remove_drift(saltDF, cut_std)   # Linear correction for drift
+            else:
+                print(f"No. of standards for {ssscc} are not 2. No autosal drift correction applied.")
             #   The ODF autosal writeout doubles the CRavg. Here we don't have to divide by 2.
             saltDF["SALNTY"] = gsw.SP_salinometer(
                 (saltDF["CRavg"] / 2), saltDF["BathTEMP"]

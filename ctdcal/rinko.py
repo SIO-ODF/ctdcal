@@ -199,7 +199,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         )
         if not Path(cfg.dirs["ssscc"]).exists():
             Path(cfg.dirs["ssscc"]).mkdir()
-        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_list = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_odf.csv")
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
