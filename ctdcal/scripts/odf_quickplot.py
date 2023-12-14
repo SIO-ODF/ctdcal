@@ -47,7 +47,11 @@ def odf_quickplot(type):
         raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
         ssscc_list = sorted([f.stem for f in raw_files])
 
-    #   Pre-fit data
+    #   Import fitting coefs for the figure captions
+
+    i = 0
+    odf_io.printProgressBar(i, len(ssscc_list), prefix="Progress:", length=50)
+
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
     btl_data_all  = process_bottle.load_all_btl_files(ssscc_list)
     btl_data_all[cfg.column["refC"]] = convert.CR_to_cond(
@@ -56,20 +60,12 @@ def odf_quickplot(type):
             btl_data_all[cfg.column["t1"]],
             btl_data_all[cfg.column["p"]],
         )
-    #   Post-fit data
-    time_data_post = pd.read_pickle(cfg.dirs["pressure"] + "ct1.pkl")
-    btl_data_post = pd.read_pickle(cfg.dirs["pressure"] + "hy1.pkl")
-
-    i = 0
-    odf_io.printProgressBar(i, len(ssscc_list), prefix="Progress:", length=50)
 
     #   For loop for each SSSCC
     for ssscc in ssscc_list:
         title_lead = f"{ssscc}: {rosette}"
         pre = time_data_all[time_data_all.SSSCC == ssscc]
         pre_b = btl_data_all[btl_data_all.SSSCC == ssscc]
-        pos = time_data_post[time_data_post.SSSCC == ssscc]
-        pos_b = btl_data_post[btl_data_post.SSSCC == ssscc]
         #   Import the converted time-series .pkl
         # pre = pd.read_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
         #   Import the postfit ct1 file
@@ -100,7 +96,7 @@ def odf_quickplot(type):
             f_out=cfg.dirs["figs"] + ssscc + "/C-before",
         )
         if type == "gtc-only":
-            log.info("No RINKO on this cast.")
+            print("No RINKO on this cast.")
         else:
             ctd_plots.two_element(
                 pre.CTDOXYVOLTS,
@@ -112,8 +108,6 @@ def odf_quickplot(type):
         ctd_plots.TCcoherence_plot(pre,outdir=cfg.dirs["figs"] + ssscc + "/TC-coherence-before",ext=".png")
 
         ctd_plots.conductivity_overlap(ssscc, pre_b, pre, title_lead=title_lead)
-
-        ctd_plots.conductivity_overlap(ssscc, pre_b, pos, time_df2=pos, btl_df2=pos_b, title_lead=title_lead+"post")
         #   Plot the temperature T1 pre-vs-post w/ residuals (if same length)
 
         #   Do the above using the conductivity sensor
