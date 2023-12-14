@@ -367,10 +367,10 @@ def conductivity_overlap(ssscc, btl_df, time_df, btl_df2=None, time_df2=None, ti
         Continuous ct1 dataframe for a specific SSSCC
     btl_df2 : pd.Series or array-like, optional
         Second set of bottle data to overlap over the given
-        SSSCC
+        SSSCC (postfit)
     time_df2 : pd.Series or array-like, optional
         Second set of continuous time data to overlap
-        over the given SSSCC
+        over the given SSSCC (postfit)
     title_lead : string, optional
         Title for the plot, definable elsewhere by configuration
     outdir : string, optional
@@ -395,6 +395,7 @@ def conductivity_overlap(ssscc, btl_df, time_df, btl_df2=None, time_df2=None, ti
     if btl_df2 is not None:
         plt.scatter(btl_df2.CTDCOND1,btl_df2.CTDPRS,marker="+",label=legend_entries[3])
         plt.scatter(btl_df2.CTDCOND2,btl_df2.CTDPRS,marker="+",label=legend_entries[4])
+        ext = "_fit"+ext
     
     plt.plot(time_df.CTDCOND1,time_df.CTDPRS,label=legend_entries[5])
     plt.plot(time_df.CTDCOND2,time_df.CTDPRS,label=legend_entries[6])
