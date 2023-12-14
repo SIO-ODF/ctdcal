@@ -115,6 +115,10 @@ def odf_process_all():
     # export files for making cruise report figs
     process_bottle.export_report_data(btl_data_odf)
 
+    # Save the files for quickplot
+    btl_data_odf.to_pickle(cfg.dirs["pressure"] + "hy1.pkl")
+    time_data_odf.to_pickle(cfg.dirs["pressure"] + "ct1.pkl")
+
     # export to Exchange format
     # TODO: clean this up more
     process_ctd.export_ct1(time_data_odf, ssscc_odf, logfile=cfg.dirs["logs"]+"Depth_log_odf.csv")
