@@ -10,7 +10,7 @@ from ctdcal import get_ctdcal_config
 from ctdcal import process_bottle as btl
 from ctdcal import process_ctd as process_ctd
 from ctdcal import sbe_reader as sbe_rd
-from ctdcal import io
+from ctdcal import io, fit_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -144,6 +144,36 @@ def hex_to_ctd(ssscc_list):
             if "00301" in ssscc_list:
                 #   Add GTC turbidity sensor
                 converted_df["TURB"] = converted_df["FREE4"]
+            else:
+                #   ODF deck unit is not telling us if it is advancing primary/secondary lines
+                #   Advance both the primary/secondary conductivity and oxygen sensors accordingly
+                inMat = np.transpose(converted_df.to_numpy())  #   Initial transposition
+                inMat = process_ctd.ctd_align(
+                    inMat=inMat, col=3, time=0.073
+                )   #   CTDCOND1
+                inMat = process_ctd.ctd_align(
+                    inMat=inMat, col=4, time=0.073
+                )   #   CTDCOND2
+                inMat = process_ctd.ctd_align(inMat=inMat, col=6, time=3.5)  #   CTDOXY1
+                inMat = np.transpose(
+                    process_ctd.ctd_align(inMat=inMat, col=7, time=3.5)
+                )  #   OXY volts, transpose it back
+
+                converted_df["CTDCOND1"] = np.float(inMat[:,3])
+                converted_df["CTDCOND2"] = np.float64(inMat[:,4])
+                converted_df["CTDOXY1"] = np.float64(inMat[:,6])
+                converted_df["CTDOXYVOLTS"] = np.float64(inMat[:,7])
+
+                #   Conductivity thermal mass correction à la SBE CellTM
+                print(f"{ssscc} applying C1, C2 thermal mass correction...")
+                converted_df["CTDCOND1"] = fit_ctd.cell_therm_mass_corr(
+                    converted_df["CTDTMP1"], converted_df["CTDCOND1"]
+                )
+                converted_df["CTDCOND2"] = fit_ctd.cell_therm_mass_corr(
+                    converted_df["CTDTMP2"], converted_df["CTDCOND2"]
+                )
+
+
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
