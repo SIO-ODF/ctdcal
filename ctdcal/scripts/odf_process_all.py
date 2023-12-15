@@ -48,7 +48,7 @@ def odf_process_all():
     convert.make_btl_mean(ssscc_all)
 
     # generate reftemp .csv files
-    process_bottle.process_reft(ssscc_all)
+    process_bottle.process_reft(ssscc_odf)  #   Not done for GTC
 
     # generate salt .csv files
     # odf_io.process_salts(ssscc_list)
