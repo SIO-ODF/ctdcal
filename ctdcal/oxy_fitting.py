@@ -227,7 +227,12 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
 
     """
     params = pd.DataFrame()
-    oxy_map_dict = {"00302":"00301","00307":"00305"}    #   Mapping multiple casts, from which Barna's run params are stored
+    oxy_map_dict = {"00302":"00301",
+                    "00307":"00305",
+                    "00404":"00403",
+                    "00407":"00403",
+                    "00410":"00408",
+                    }    #   Mapping multiple casts, from which Barna's run params are stored
     for ssscc in ssscc_list:
         if ssscc in oxy_map_dict.keys():
             df = gather_oxy_params(cfg.dirs["oxygen"] + oxy_map_dict[ssscc])
