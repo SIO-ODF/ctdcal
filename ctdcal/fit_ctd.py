@@ -542,7 +542,7 @@ def calibrate_cond(btl_df, time_df, fname="data/ssscc/ssscc_odf.csv"):
                 btl_df.loc[btl_rows, cfg.column["p"]],
                 btl_df.loc[btl_rows, "SSSCC"],
                 xlabel=f"{cN.upper()} Residual (mS/cm)",
-                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_prefit.pdf",
+                f_out=f"{cfg.fig_dirs[cN]}{rosette}_residual_{f_stem}_prefit.pdf",
             )
 
             # 2) prepare data for fitting
@@ -559,7 +559,7 @@ def calibrate_cond(btl_df, time_df, fname="data/ssscc/ssscc_odf.csv"):
                 df_good[cfg.column["p"]],
                 df_good["SSSCC"],
                 xlabel=f"{cN.upper()} Residual (mS/cm)",
-                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_{rosette}fit_data.pdf",
+                f_out=f"{cfg.fig_dirs[cN]}{rosette}_residual_{f_stem}_fit_data.pdf",
             )
 
             # 3) calculate fit coefs
@@ -597,7 +597,7 @@ def calibrate_cond(btl_df, time_df, fname="data/ssscc/ssscc_odf.csv"):
                 btl_df[btl_rows],
                 param=cfg.column[cN],
                 ref=cfg.column["refC"],
-                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}.pdf",
+                f_out=f"{cfg.fig_dirs[cN]}{rosette}_residual_{f_stem}.pdf",
             )
 
             # 5) handle quality flags
@@ -620,7 +620,7 @@ def calibrate_cond(btl_df, time_df, fname="data/ssscc/ssscc_odf.csv"):
             btl_df["SSSCC"],
             xlabel=f"{cN.upper()} Residual (mS/cm)",
             show_thresh=True,
-            f_out=f"{cfg.fig_dirs[cN]}residual_all_postfit{rosette}.pdf",
+            f_out=f"{cfg.fig_dirs[cN]}{rosette}_residual_all_postfit.pdf",
         )
 
         # export cond quality flags
@@ -631,7 +631,7 @@ def calibrate_cond(btl_df, time_df, fname="data/ssscc/ssscc_odf.csv"):
         C_fit_coefs[coef_names] = C_fit_coefs[coef_names].map(
             lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
         )
-        C_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{cN}_{rosette}.csv", index=False)
+        C_fit_coefs.to_csv(cfg.dirs["logs"] + f"{rosette}_fit_coef_{cN}.csv", index=False)
 
     # recalculate salinity with calibrated C/T
     # TODO: compute CTDSAL1 and *2? how to decide which to use
