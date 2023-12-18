@@ -159,7 +159,7 @@ def hex_to_ctd(ssscc_list):
                     process_ctd.ctd_align(inMat=inMat, col=7, time=3.5)
                 )  #   OXY volts, transpose it back
 
-                converted_df["CTDCOND1"] = np.float(inMat[:,3])
+                converted_df["CTDCOND1"] = np.float64(inMat[:,3])
                 converted_df["CTDCOND2"] = np.float64(inMat[:,4])
                 converted_df["CTDOXY1"] = np.float64(inMat[:,6])
                 converted_df["CTDOXYVOLTS"] = np.float64(inMat[:,7])
