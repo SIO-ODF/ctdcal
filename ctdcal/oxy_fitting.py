@@ -227,11 +227,16 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
 
     """
     params = pd.DataFrame()
+    #   Oxy mapping, for multiple casts inside a single bottle file
     oxy_map_dict = {"00302":"00301",
                     "00307":"00305",
                     "00404":"00403",
                     "00407":"00403",
                     "00410":"00408",
+                    "00503":"00502",
+                    "00603":"00602",
+                    "00606":"00602",
+                    "00703":"00702",
                     }    #   Mapping multiple casts, from which Barna's run params are stored
     for ssscc in ssscc_list:
         if ssscc in oxy_map_dict.keys():
@@ -640,12 +645,12 @@ def sbe43_oxy_fit(merged_df, system, sbe_coef0=None, f_suffix=None):
 
     if system == "GTC":
         sbe_coef0 = _get_sbe_coef(sourcefile=cfg.dirs["ssscc"]+"ssscc_gtc.csv")  # initial coefficient guess
-        f_out1 = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit_gtc.pdf"
-        f_out2 = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_gtc.pdf"
+        f_out1 = f"{cfg.fig_dirs['ox']}GTC_sbe43_residual{f_suffix}_prefit.pdf"
+        f_out2 = f"{cfg.fig_dirs['ox']}GTC_sbe43_residual{f_suffix}.pdf"
     elif system == "ODF":
         sbe_coef0 = _get_sbe_coef(sourcefile=cfg.dirs["ssscc"]+"ssscc_odf.csv")
-        f_out1 = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit_odf.pdf"
-        f_out2 = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_odf.pdf"
+        f_out1 = f"{cfg.fig_dirs['ox']}ODF_sbe43_residual{f_suffix}_prefit.pdf"
+        f_out2 = f"{cfg.fig_dirs['ox']}ODF_sbe43_residual{f_suffix}.pdf"
 
     # Plot *unfit* data to be fit together
     ctd_plots._intermediate_residual_plot(
@@ -835,10 +840,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     
     if "00301" in ssscc_list:
         rosette = "GTC"
-        f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit_gtc.pdf"
     else:
         rosette = "ODF"
-        f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit.pdf"
+    f_out = f"{cfg.fig_dirs['ox']}{rosette}_residual_all_prefit.pdf"
     print(f"Calibrating oxygen (SBE43 for {rosette})")
 
     # Plot all pre fit data
@@ -951,7 +955,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
 
     # Plot all post fit data
-    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit.pdf"
+    f_out = f"{cfg.fig_dirs['ox']}{rosette}_sbe43_residual_all_postfit.pdf"
     ctd_plots._intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
@@ -960,7 +964,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         f_out=f_out,
         xlim=(-10, 10),
     )
-    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit_flag2.pdf"
+    f_out = f"{cfg.fig_dirs['ox']}{rosette}_sbe43_residual_all_postfit_flag2.pdf"
     flag2 = btl_df["CTDOXY_FLAG_W"] == 2
     ctd_plots._intermediate_residual_plot(
         btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDOXY"],
@@ -975,6 +979,6 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_coefs = pd.DataFrame.from_dict(
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
     ).map(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
-    sbe43_coefs.to_csv(cfg.dirs["logs"] + "sbe43_coefs.csv")
+    sbe43_coefs.to_csv(cfg.dirs["logs"] + f"{rosette}_sbe43_coefs.csv")
 
     return True
