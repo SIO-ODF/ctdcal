@@ -260,6 +260,27 @@ def make_btl_mean(ssscc_list):
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
 
+            #   Read in bottle map file, grabbing the sample number, pylon position, and GTC ID
+            #   Even if there is no mapping to do, it's important to merge the GTC IDs in.
+            btl_map = pd.read_csv(
+                f"data/bottle/map/{ssscc}.csv",
+                comment="#",
+                usecols=["SAMPNO", "PYLON", "GEOTRC_SAMPNO"],
+            )
+
+            #   Add SAMPNO from the bottle map
+            mean_df["SAMPNO"] = mean_df.loc[:, "btl_fire_num"].copy()
+            #   Reduce the mean_df down to just the unique pylon positions
+            mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
+            #   Restore all bottles with copies, backfilling them
+            mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").bfill()
+            if mean_df.isna().any().any():
+                log.info(f"NaN data in {ssscc} after bfill, applying ffill as well.")
+                
+                mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").ffill()
+            #   Restore btl_fire_num
+            mean_df["btl_fire_num"] = mean_df["SAMPNO"]
+
             if len(mean_df) > 36:
                 log.warning(f"{ssscc} more than 36 bottles identified in the CTD data.")
 
