@@ -98,6 +98,8 @@ def residual_vs_pressure(
         sc = ax.scatter(diff, prs, c=idx, marker="+")
         cbar = plt.colorbar(sc, ax=ax, pad=0.1)  # set cbar ticks to station names
         tick_inds = cbar.get_ticks().astype(int)
+        if tick_inds[-1] > len(uniques)-1:
+            tick_inds = tick_inds[:-1]
         cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
         cbar.ax.set_yticklabels(uniques[tick_inds])
         cbar.ax.set_title("Station")
@@ -403,10 +405,12 @@ def conductivity_overlap(ssscc, btl_df, time_df, btl_df2=None, time_df2=None, ti
     if time_df2 is not None:
         plt.plot(time_df2.CTDCOND1,time_df2.CTDPRS,label=legend_entries[7])
         plt.plot(time_df2.CTDCOND1,time_df2.CTDPRS,label=legend_entries[8])
+        if not "fit" in ext:
+            ext = "_fit" + ext
 
     plt.gca().invert_yaxis()
     plt.ylabel("CTDPRS")
-    plt.xlabel("Salinity (PSS-78)")
+    plt.xlabel("Conductivity")
     plt.title(title_lead)
     plt.grid()
     plt.legend()
