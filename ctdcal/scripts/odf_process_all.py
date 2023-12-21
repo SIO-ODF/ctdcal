@@ -73,8 +73,8 @@ def odf_process_all():
     time_odf_old = time_data_odf.copy()
 
     import xarray as xr
-    # time_pre_xr = time_data_all.to_xarray()
-    # time_pre_xr.to_netcdf(path=cfg.dirs["converted"]+"all_ct1.nc")
+    time_pre_xr = time_odf_old.to_xarray()
+    time_pre_xr.to_netcdf(path=cfg.dirs["converted"]+"all_ct1.nc")
 
     # process pressure offset
     process_ctd.apply_pressure_offset(btl_data_odf, mode="by_ssscc")

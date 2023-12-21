@@ -60,16 +60,20 @@ def odf_quickplot(type):
             btl_data_all[cfg.column["t1"]],
             btl_data_all[cfg.column["p"]],
         )
+    
+    time_data_fit = pd.read_pickle(cfg.dirs["pressure"] + "ct1.pkl")
 
     #   For loop for each SSSCC
     for ssscc in ssscc_list:
         title_lead = f"{ssscc}: {rosette}"
-        pre = time_data_all[time_data_all.SSSCC == ssscc]
+        # pre = time_data_all[time_data_all.SSSCC == ssscc]
         pre_b = btl_data_all[btl_data_all.SSSCC == ssscc]
         #   Import the converted time-series .pkl
-        # pre = pd.read_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
+        pre = pd.read_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
+        # pre = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
         #   Import the postfit ct1 file
         # post = io.load_exchange_ctd(cfg.dirs["pressure"] + ssscc + "_ct1.csv")[1]
+        post = time_data_fit[time_data_fit.SSSCC == ssscc]
 
         #   Make a directory, where figures can be written out to (a folder called 00101)
         if not Path(cfg.dirs["figs"]).exists(): #   If the parent folder does not exist
@@ -108,6 +112,8 @@ def odf_quickplot(type):
         ctd_plots.TCcoherence_plot(pre,outdir=cfg.dirs["figs"] + ssscc + "/TC-coherence-before",ext=".png")
 
         ctd_plots.conductivity_overlap(ssscc, pre_b, pre, title_lead=title_lead)
+
+        ctd_plots.conductivity_overlap(ssscc, pre_b, pre, time_df2=post, title_lead=title_lead)
         #   Plot the temperature T1 pre-vs-post w/ residuals (if same length)
 
         #   Do the above using the conductivity sensor
