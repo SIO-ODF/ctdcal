@@ -119,6 +119,18 @@ def sdl_loader_xlsx(filename):
     """
     sdl = pd.read_excel(filename)
     sdl = sdl.loc[~sdl.DateTime.isnull()]   #   Cut out the redundant "to average" lines
+
+    if "SampleID" in sdl.columns:
+        #   This is a direct translation from the .dat and the headers are not compressed
+        sdl = sdl.rename(columns={"SampleID":"Sample ID",
+                            "BottleLabel":"Bottle Label",
+                            "SampleType":"Sample Type",
+                            "Reading#":"Reading #",
+                            "BathTemperature":"Bath Temperature",
+                            "UncorrectedRatio":"Uncorrected Ratio",
+                            "AdjustedRatio":"Adjusted Ratio",
+                            "CalculatedSalinity":"Calculated Salinity"})
+
     sdl = sdl[sdl["Reading #"].isnull()]    #   Exctract the final values from however many readings
 
     sdl["IndexTime"] = pd.to_datetime(sdl["DateTime"])
