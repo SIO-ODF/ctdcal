@@ -22,6 +22,22 @@ from ctdcal import process_ctd as process_ctd
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
+oxy_map_dict = {"00302":"00301",
+                "00307":"00305",
+                "00404":"00403",
+                "00407":"00403",
+                "00410":"00408",
+                "00503":"00502",
+                "00603":"00602",
+                "00606":"00602",
+                "00703":"00702",
+                "00707":"00706",
+                "00803":"00802",
+                "00902":"00806",
+                "00903":"00806",
+                "01002":"01003",
+                }    #   Mapping multiple casts, from which Barna's run params are stored
+
 def load_winkler_oxy(oxy_file):
     """
     Load Winkler oxygen titration data file.
@@ -90,15 +106,16 @@ def winkler_to_csv(ssscc_list):
         if path.isfile(oxy_file):   #   If the raw data exists
             if not path.isfile(oxy_file+".csv"): #   If the csv of the SSSCC doesn't exist
                 oxy_data, params = load_winkler_oxy(oxy_file)
-                for stn in oxy_data.STNNO_OXY:
-                    for cst in oxy_data.CASTNO_OXY:
-                        data_to_save = oxy_data.loc[oxy_data.STNNO_OXY == stn] #   Not sure how to combine these together
-                        data_to_save = data_to_save.loc[data_to_save.CASTNO_OXY == cst]
+                for stn in oxy_data.STNNO_OXY.unique():
+                    subset = oxy_data.loc[oxy_data.STNNO_OXY == stn]
+                    for cst in subset.CASTNO_OXY.unique():
+                        data_to_save = subset.loc[subset.CASTNO_OXY == cst]
                         data_to_save["SSSCC_oxy"] = data_to_save["STNNO_OXY"].apply(lambda x: f"{x:03d}") + data_to_save["CASTNO_OXY"].apply(lambda x: f"{x:02d}")
-                        #   Save the data
                         data_to_save.to_csv(cfg.dirs["oxygen"]+data_to_save["SSSCC_oxy"].iloc[0]+".csv", index=False)
+                
         #   If the raw file doesn't exist, that's fine. It's possibly inside another raw file.
         elif not path.isfile(oxy_file+".csv"):
+            #   Check the mapping dictionary?
             log.warning(f"Warning: Oxygen file does not exist for {ssscc}")
 
 def load_flasks(flask_file=cfg.dirs["oxygen"] + "o2flasks.vol", comment="#"):
@@ -227,17 +244,6 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
 
     """
     params = pd.DataFrame()
-    #   Oxy mapping, for multiple casts inside a single bottle file
-    oxy_map_dict = {"00302":"00301",
-                    "00307":"00305",
-                    "00404":"00403",
-                    "00407":"00403",
-                    "00410":"00408",
-                    "00503":"00502",
-                    "00603":"00602",
-                    "00606":"00602",
-                    "00703":"00702",
-                    }    #   Mapping multiple casts, from which Barna's run params are stored
     for ssscc in ssscc_list:
         if ssscc in oxy_map_dict.keys():
             df = gather_oxy_params(cfg.dirs["oxygen"] + oxy_map_dict[ssscc])
