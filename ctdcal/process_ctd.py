@@ -298,7 +298,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     # Frequency
     fl = 24
     fl2 = fl * 2
-    # Half minute
+    # Half minute period of on-deck time
     ms = 30
     time_delay = fl * ms  # time to let CTD pressure reading settle/sit on deck
 
@@ -321,7 +321,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
 
     # Evaluate starting and ending pressures
     start_samples = len(start_df)
-    if start_samples > time_delay:
+    if start_samples > time_delay and (start_samples - time_delay) > fl2:   #   For NBP2401, the time delay means we need at least 768 scans
         start_p = np.average(start_df.iloc[fl2 : (start_samples - time_delay)])
     else:
         start_seconds = start_samples / fl
