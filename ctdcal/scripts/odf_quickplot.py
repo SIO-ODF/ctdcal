@@ -100,7 +100,7 @@ def odf_quickplot(type):
             f_out=cfg.dirs["figs"] + ssscc + "/C-before",
         )
         if type == "gtc-only":
-            print("No RINKO on this cast.")
+            continue
         else:
             ctd_plots.two_element(
                 pre.CTDOXYVOLTS,
