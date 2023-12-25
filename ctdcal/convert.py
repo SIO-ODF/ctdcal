@@ -141,6 +141,12 @@ def hex_to_ctd(ssscc_list):
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             #   convertFromSBEReader is what actually creates the dataframe
             converted_df = convertFromSBEReader(sbeReader, ssscc)
+
+            # ODF 00707, primary TC spike around scan 105800
+            if ssscc == "00707":
+                converted_df.loc[12711:12713, ["CTDCOND1"]] = np.nan
+                converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
             if "00301" in ssscc_list:
                 #   Add GTC turbidity sensor
                 converted_df["TURB"] = converted_df["FREE4"]
@@ -274,9 +280,11 @@ def make_btl_mean(ssscc_list):
             mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
             #   Restore all bottles with copies, backfilling them
             mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").bfill()
+            
+            #   Works for 01102, where they did pylons 1, 4, 6...
+            #   Also works when entire cast was switched to odd numbers
             if mean_df.isna().any().any():
-                log.info(f"NaN data in {ssscc} after bfill, applying ffill as well.")
-                
+                log.info(f"NaN data in {ssscc} after bfill, applying ffill as well.")    
                 mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").ffill()
             #   Restore btl_fire_num
             mean_df["btl_fire_num"] = mean_df["SAMPNO"]
