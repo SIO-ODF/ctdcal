@@ -135,13 +135,17 @@ def cruise_report():
 
     cruise_report_residuals()
 
-
+@click.option("-m","--method",type=click.Choice(["odf", "gtc"],case_sensitive=False),default="odf")
 @cli.command()
-def qc():  # pragma: no cover
+def qc(method):  # pragma: no cover
     """Launch interactive data flagging web app for QA/QC"""
     io_loop = IOLoop.current()
-    with resources.path("ctdcal.tools", "data_qc.py") as fname:
-        bokeh_app = Application(ScriptHandler(filename=fname))
+    if method == "odf":
+        with resources.path("ctdcal.tools", "data_qc copy 2.py") as fname:
+            bokeh_app = Application(ScriptHandler(filename=fname))
+    elif method == "gtc":
+        with resources.path("ctdcal.tools", "data_qc.py") as fname:
+            bokeh_app = Application(ScriptHandler(filename=fname))
     server = Server(bokeh_app, io_loop=io_loop)
     server.start()
     server.show("/")

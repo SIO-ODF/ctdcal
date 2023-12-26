@@ -23,22 +23,19 @@ from ctdcal import get_ctdcal_config, io, process_ctd
 
 cfg = get_ctdcal_config()
 
-# TODO: abstract parts of this to a separate file
-# TODO: following above, make parts reusable?
-
-# load continuous CTD data and make into a dict (only ~20MB)
-# file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
-# ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
+print("********************************")
+print("You're running data_qc copy 2.py")
+print("********************************")
 
 # ODF
-# ssscc_list = process_ctd.get_ssscc_list(cfg.dirs["ssscc"] + "ssscc_odf.csv")
-# fname = Path(cfg.dirs["pressure"]) / f"{cfg.expocode}_odf_hy1.csv"
-# handcoded_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded_odf.csv"
+ssscc_list = process_ctd.get_ssscc_list(cfg.dirs["ssscc"] + "ssscc_odf.csv")
+fname = Path(cfg.dirs["pressure"]) / f"{cfg.expocode}_odf_hy1.csv"
+handcoded_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded_odf.csv"
 
 # GTC
-ssscc_list = process_ctd.get_ssscc_list(cfg.dirs["ssscc"] + "ssscc_gtc.csv")
-fname = Path(cfg.dirs["pressure"]) / f"{cfg.expocode}_gtc_hy1.csv"
-handcoded_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded_gtc.csv"
+# ssscc_list = process_ctd.get_ssscc_list(cfg.dirs["ssscc"] + "ssscc_gtc.csv")
+# fname = Path(cfg.dirs["pressure"]) / f"{cfg.expocode}_gtc_hy1.csv"
+# handcoded_file = Path(cfg.dirs["salt"]) / "salt_flags_handcoded_gtc.csv"
 
 file_list = [Path(cfg.dirs["pressure"]) / f"{ssscc}_ct1.csv" for ssscc in ssscc_list]
 ctd_data = []
@@ -56,19 +53,21 @@ btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"
 ].apply(lambda x: f"{x:02d}")
 
-#   Create temperature residuals, do for ODF only?
-# btl_data["t_res"] = (btl_data["REFTMP"] - btl_data["CTDTMP"]).round(4)
-# btl_data["New T Flag"] = btl_data["REFTMP_FLAG_W"].copy()
-
-#   Aaaand oxygen
-btl_data["o_res"] = (btl_data["OXYGEN"] - btl_data["CTDOXY"]).round(4)
-btl_data["New O Flag"] = btl_data["OXYGEN_FLAG_W"].copy()
-
 #   Create salinity residuals
 btl_data["Residual"] = btl_data["SALNTY"] - btl_data["CTDSAL"]
 btl_data[["CTDPRS", "Residual"]] = btl_data[["CTDPRS", "Residual"]].round(4)
 btl_data["Comments"] = ""
 btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
+
+#   Temperature
+btl_data["t_res"] = (btl_data["REFTMP"] - btl_data["CTDTMP"]).round(4)
+btl_data["New T Flag"] = btl_data["REFTMP_FLAG_W"].copy()
+
+#   Aaaand oxygen
+btl_data["o_res"] = (btl_data["OXYGEN"] - btl_data["CTDOXY"]).round(4)
+btl_data["New O Flag"] = btl_data["OXYGEN_FLAG_W"].copy()
+
+deltas_d = {"CTDSAL": "Residual", "CTDTMP": "t_res", "CTDOXY": "o_res"}
 
 # update with old handcoded flags if file exists
 if handcoded_file.exists():
@@ -113,9 +112,9 @@ ref_param = Select(
     value=ref_dict[parameter.value],
     disabled=True,
 )
+
 station = Select(title="Station", options=ssscc_list, value=ssscc_list[0])
-# explanation of flags:
-# https://cchdo.github.io/hdo-assets/documentation/manuals/pdf/90_1/chap4.pdf
+
 flag_list = MultiSelect(
     title="Plot data flagged as:",
     value=["1", "2", "3", "9"],
@@ -177,7 +176,7 @@ src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
 fig = figure(
-    height=800,
+    height=900,
     width=400,
     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
@@ -216,7 +215,7 @@ upcast_sal = fig.triangle(
     source=src_plot_upcast,
     legend_label="Upcast CTD sample",
 )
-fig.select(BoxSelectTool).select_every_mousemove = False
+fig.select(BoxSelectTool).continuous = False
 fig.y_range.flipped = True  # invert y-axis
 fig.legend.location = "bottom_right"
 fig.legend.border_line_width = 3
@@ -225,17 +224,22 @@ btl_sal.nonselection_glyph.line_alpha = 0.2
 ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 
+threshes = {"CTDSAL":np.array([0.002, 0.005, 0.010, 0.020]),
+            "CTDTMP":np.array([0.002, 0.005, 0.010, 0.020]),
+            "CTDOXY":np.array([0.625, 1.250, 2.500, 5.000])}
+
 #   Residuals plot
 src_plot_btl_del = ColumnDataSource(data=dict(x=[], y=[]))
 fig2 = figure(
-    height=800,
+    height=900,
     width=400,
-    title="Salinity residual vs CTDPRS [Station {}]".format(parameter.value, station.value),
+    title="{} residual vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
-    y_axis_label="Pressure (dbar)",
+    # y_axis_label="Pressure (dbar)",
     y_range=fig.y_range
 )
-thresh = np.array([0.002, 0.005, 0.010, 0.020])
+# thresh = np.array([0.002, 0.005, 0.010, 0.020])
+thresh = threshes[parameter.value]
 p_range = np.array([6000, 2000, 1000, 500])
 thresh = np.append(thresh, thresh[-1])
 p_range = np.append(p_range, 0)
@@ -246,16 +250,15 @@ btl_sal2 = fig2.asterisk(
     line_width=1.5,
     color="#0033CC",
     source=src_plot_btl_del,
-    legend_label="Salinity residual (SALNTY-CTDSAL)",
 )
 fig2.step(thresh, p_range)
 fig2.step(-thresh, p_range)
 # fig2.ray(x=[0], y=[6000], length=0, angle=np.pi/2, line_width=1, color="black", line_dash="dashdot")  #   Option for vertical line on 0
-fig2.select(BoxSelectTool).select_every_mousemove = False
+fig2.select(BoxSelectTool).continuous = False
 fig2.y_range.flipped = True  # invert y-axis
-fig2.legend.location = "bottom_right"
-fig2.legend.border_line_width = 3
-fig2.legend.border_line_alpha = 1
+# fig2.legend.location = "bottom_right"
+# fig2.legend.border_line_width = 3
+# fig2.legend.border_line_alpha = 1
 
 # define callback functions
 def update_selectors():
@@ -275,6 +278,8 @@ def update_selectors():
         "SSSCC": current_table["SSSCC"],
         "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
+        "t_res": current_table["t_res"],
+        "o_res": current_table["o_res"],
         parameter.value: current_table[parameter.value],
         ref_param.value: current_table[ref_param.value],
         "diff": current_table["Residual"],
@@ -300,13 +305,16 @@ def update_selectors():
         "y": btl_data.loc[btl_rows, "CTDPRS"],
     }
     src_plot_btl_del.data = {
-        "x": btl_data.loc[btl_rows, "Residual"],
+        "x": btl_data.loc[btl_rows, deltas_d[parameter.value]],
         "y": btl_data.loc[btl_rows, "CTDPRS"],
     }
 
     # update plot labels/axlims
     fig.title.text = "{} vs CTDPRS [Station {}]".format(parameter.value, station.value)
     fig.xaxis.axis_label = parameter.value
+
+    fig2.title.text = "{} Residual".format(parameter.value)
+    fig2.xaxis.axis_label = parameter.value
 
     # deselect all datapoints
     btl_sal.data_source.selected.indices = []
@@ -351,6 +359,8 @@ def apply_flag():
         "SSSCC": current_table["SSSCC"],
         "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
+        "t_res": current_table["t_res"],
+        "o_res": current_table["o_res"],
         "CTDSAL": current_table["CTDSAL"],
         "SALNTY": current_table["SALNTY"],
         "diff": current_table["Residual"],
@@ -431,18 +441,21 @@ btl_sal.data_source.selected.on_change("indices", selected_from_plot)
 
 # build data tables
 columns = []
-fields = ["SSSCC", "SAMPNO", "CTDPRS", "CTDSAL", "SALNTY", "diff", "flag", "Comments"]
+fields = ["SSSCC", "SAMPNO", "CTDPRS", "t_res", "o_res", "CTDSAL", 
+          "SALNTY", "diff", "flag", "Comments"]
 titles = [
     "SSSCC",
     "Bottle",
     "CTDPRS",
+    "t_res",
+    "o_res",
     "CTDSAL",
     "SALNTY",
     "Residual",
     "Flag",
     "Comments",
 ]
-widths = [50, 40, 65, 65, 65, 65, 15, 200]
+widths = [50, 40, 65, 65, 65, 65, 65, 65, 15, 200]
 for (field, title, width) in zip(fields, titles, widths):
     if field == "flag":
         strfmt_in = {"text_align": "center", "font_style": "bold"}
@@ -485,7 +498,8 @@ data_table = DataTable(
     source=src_table,
     columns=columns,
     index_width=20,
-    width=565 + 50 + 20,  # sum of col widths + fudge factor + idx width
+    #   width is originally 565 + 50 + 20 = 635
+    width=565 + 150 + 20,  # sum of col widths + fudge factor + idx width
     height=600,
     editable=True,
     fit_columns=False,
