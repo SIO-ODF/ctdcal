@@ -253,12 +253,8 @@ btl_sal2 = fig2.asterisk(
 )
 fig2.step(thresh, p_range)
 fig2.step(-thresh, p_range)
-# fig2.ray(x=[0], y=[6000], length=0, angle=np.pi/2, line_width=1, color="black", line_dash="dashdot")  #   Option for vertical line on 0
 fig2.select(BoxSelectTool).continuous = False
 fig2.y_range.flipped = True  # invert y-axis
-# fig2.legend.location = "bottom_right"
-# fig2.legend.border_line_width = 3
-# fig2.legend.border_line_alpha = 1
 
 # define callback functions
 def update_selectors():
@@ -270,18 +266,21 @@ def update_selectors():
         btl_data["SSSCC"] == station.value
     )
 
-    ref_param.value = ref_dict[parameter.value]
-
     # update table data
     current_table = btl_data[table_rows].reset_index()
+
+    # print("Parameter: ", parameter.value, current_table[parameter.value][0])
+    ref_param.value = ref_dict[parameter.value]
+    # print("Reference parameter: ", ref_param.value, current_table[ref_param.value][0])
+
     src_table.data = {  # this causes edit_flag() to execute
         "SSSCC": current_table["SSSCC"],
         "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
         "t_res": current_table["t_res"],
         "o_res": current_table["o_res"],
-        parameter.value: current_table[parameter.value],
-        ref_param.value: current_table[ref_param.value],
+        "CTD Param": current_table[parameter.value].round(4),
+        "Reference": current_table[ref_param.value].round(4),
         "diff": current_table["Residual"],
         "flag": current_table["New Flag"],
         "Comments": current_table["Comments"],
@@ -441,17 +440,18 @@ btl_sal.data_source.selected.on_change("indices", selected_from_plot)
 
 # build data tables
 columns = []
-fields = ["SSSCC", "SAMPNO", "CTDPRS", "t_res", "o_res", "CTDSAL", 
-          "SALNTY", "diff", "flag", "Comments"]
+fields = ["SSSCC", "SAMPNO", "CTDPRS", "CTD Param", 
+          "Reference", "t_res", "diff", "o_res", "flag", "Comments"]
+ref_dict
 titles = [
     "SSSCC",
     "Bottle",
     "CTDPRS",
+    "CTD Param",
+    "Reference",
     "t_res",
+    "s_res",
     "o_res",
-    "CTDSAL",
-    "SALNTY",
-    "Residual",
     "Flag",
     "Comments",
 ]
@@ -516,7 +516,7 @@ data_table_changed = DataTable(
     sortable=False,
 )
 data_table_title = Div(text="""<b>All Station Data:</b>""", width=200, height=15)
-data_table_changed_title = Div(text="""<b>Flagged Data:</b>""", width=200, height=15)
+data_table_changed_title = Div(text="""<b>Flagged Salinity Data:</b>""", width=200, height=15)
 
 controls = column(
     parameter,
