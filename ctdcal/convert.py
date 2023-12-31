@@ -233,6 +233,9 @@ def make_time_files(ssscc_list):
                     window="triangle",
                     parameters=cfg.gtc_filter_cols,
                 )
+            if ssscc == "01805":
+                #   Pump hiccup in cahoots with conductivity, not sure why soak isn't getting trimmed out
+                filter_data = filter_data.iloc[4500:]
 
             # Trim to downcast
             cast_data = process_ctd.cast_details(
