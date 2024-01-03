@@ -52,6 +52,13 @@ oxy_map_dict = {"00302":"00301",
                 "01802":"01801",
                 "01903":"01902",
                 "01906":"01902",
+                "02003":"02002",
+                "02006":"02002",
+                "02105":"02102",
+                "02106":"02102",
+                "02203":"02202",
+                "02206":"02202",
+                "02303":"02302",
                 }    #   Mapping multiple casts from a single file, from which Barna's run params are stored
 
 def load_winkler_oxy(oxy_file):
