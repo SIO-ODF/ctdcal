@@ -63,62 +63,61 @@ def odf_quickplot(type):
     
     time_data_fit = pd.read_pickle(cfg.dirs["pressure"] + "ct1.pkl")
 
+    #   Make a directory, where figures can be written out to (a folder called 00101)
+    if not Path(cfg.dirs["figs"]).exists(): #   If the parent folder does not exist
+        Path(cfg.dirs["figs"]).mkdir()
+
     #   For loop for each SSSCC
     for ssscc in ssscc_list:
-        title_lead = f"{ssscc}: {rosette}"
-        # pre = time_data_all[time_data_all.SSSCC == ssscc]
-        pre_b = btl_data_all[btl_data_all.SSSCC == ssscc]
-        #   Import the converted time-series .pkl
-        pre = pd.read_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
-        # pre = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
-        #   Import the postfit ct1 file
-        # post = io.load_exchange_ctd(cfg.dirs["pressure"] + ssscc + "_ct1.csv")[1]
-        post = time_data_fit[time_data_fit.SSSCC == ssscc]
-
-        #   Make a directory, where figures can be written out to (a folder called 00101)
-        if not Path(cfg.dirs["figs"]).exists(): #   If the parent folder does not exist
-            Path(cfg.dirs["figs"]).mkdir()
-
         if not Path(cfg.dirs["figs"] + ssscc).exists():
             Path(cfg.dirs["figs"] + ssscc).mkdir()
+            title_lead = f"{ssscc}: {rosette}"
+            # pre = time_data_all[time_data_all.SSSCC == ssscc]
+            pre_b = btl_data_all[btl_data_all.SSSCC == ssscc]
+            #   Import the converted time-series .pkl
+            pre = pd.read_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
+            # pre = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+            #   Import the postfit ct1 file
+            # post = io.load_exchange_ctd(cfg.dirs["pressure"] + ssscc + "_ct1.csv")[1]
+            post = time_data_fit[time_data_fit.SSSCC == ssscc]
 
-        #   On all postfit figures, write out text underneath for the fitting equation (if cond, add in the cc term)
+            #   On all postfit figures, write out text underneath for the fitting equation (if cond, add in the cc term)
 
-        #   Plot the temperature prefit w/ residuals
-        ctd_plots.two_element(
-            pre.CTDTMP1,
-            pre.CTDTMP2,
-            pre.CTDPRS,
-            ssscc,
-            f_out=cfg.dirs["figs"] + ssscc + "/T-before",
-        )
-        ctd_plots.two_element(
-            pre.CTDCOND1,
-            pre.CTDCOND2,
-            pre.CTDPRS,
-            ssscc,
-            f_out=cfg.dirs["figs"] + ssscc + "/C-before",
-        )
-        if type == "gtc-only":
-            continue
-        else:
+            #   Plot the temperature prefit w/ residuals
             ctd_plots.two_element(
-                pre.CTDOXYVOLTS,
-                pre.U_DEF_poly1,
+                pre.CTDTMP1,
+                pre.CTDTMP2,
                 pre.CTDPRS,
                 ssscc,
-                f_out=cfg.dirs["figs"] + ssscc + "/oxygen-before",
+                f_out=cfg.dirs["figs"] + ssscc + "/T-before",
             )
-        ctd_plots.TCcoherence_plot(pre,outdir=cfg.dirs["figs"] + ssscc + "/TC-coherence-before",ext=".png")
+            ctd_plots.two_element(
+                pre.CTDCOND1,
+                pre.CTDCOND2,
+                pre.CTDPRS,
+                ssscc,
+                f_out=cfg.dirs["figs"] + ssscc + "/C-before",
+            )
+            if type == "gtc-only":
+                continue
+            else:
+                ctd_plots.two_element(
+                    pre.CTDOXYVOLTS,
+                    pre.U_DEF_poly1,
+                    pre.CTDPRS,
+                    ssscc,
+                    f_out=cfg.dirs["figs"] + ssscc + "/oxygen-before",
+                )
+            ctd_plots.TCcoherence_plot(pre,outdir=cfg.dirs["figs"] + ssscc + "/TC-coherence-before",ext=".png")
 
-        ctd_plots.conductivity_overlap(ssscc, pre_b, pre, title_lead=title_lead)
+            ctd_plots.conductivity_overlap(ssscc, pre_b, pre, title_lead=title_lead)
 
-        ctd_plots.conductivity_overlap(ssscc, pre_b, pre, time_df2=post, title_lead=title_lead)
-        #   Plot the temperature T1 pre-vs-post w/ residuals (if same length)
+            ctd_plots.conductivity_overlap(ssscc, pre_b, pre, time_df2=post, title_lead=title_lead)
+            #   Plot the temperature T1 pre-vs-post w/ residuals (if same length)
 
-        #   Do the above using the conductivity sensor
+            #   Do the above using the conductivity sensor
 
-        #   Do that using the rinko and SBE43 (voltages, then umol/kg)
+            #   Do that using the rinko and SBE43 (voltages, then umol/kg)
 
         i += 1
         odf_io.printProgressBar(
