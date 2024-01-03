@@ -39,7 +39,7 @@ def residual_vs_pressure(
     prs,
     stn=None,
     xlim=(-0.02, 0.02),
-    ylim=(6000, 0),
+    ylim=(5000, 0),
     xlabel="Residual",
     ylabel="Pressure (dbar)",
     auto_title=True,
@@ -210,7 +210,7 @@ def _intermediate_residual_plot(
 
     if show_thresh:
         thresh = np.array([0.002, 0.005, 0.010, 0.020])
-        p_range = np.array([6000, 2000, 1000, 500])
+        p_range = np.array([5000, 2000, 1000, 500])
         thresh = np.append(thresh, thresh[-1])  # this should still work fine even when
         p_range = np.append(p_range, 0)  # thresh/p_range are defined elsewhere
         plt.step(thresh, p_range, ":k")
