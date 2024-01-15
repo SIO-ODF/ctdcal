@@ -59,6 +59,21 @@ oxy_map_dict = {"00302":"00301",
                 "02203":"02202",
                 "02206":"02202",
                 "02303":"02302",
+                "02405":"02402",
+                "02406":"02402",
+                "02502":"02501",
+                "02504":"02507",
+                "02508":"02507",
+                "02411":"02410",
+                "02603":"02602",
+                "02606":"02602",
+                "02703":"02702",
+                "02706":"02702",
+                "02803":"02802",
+                "02806":"02802",
+                "02903":"02902",
+                "02906":"02902",
+                "02907":"02902",
                 }    #   Mapping multiple casts from a single file, from which Barna's run params are stored
 
 def load_winkler_oxy(oxy_file):
@@ -928,12 +943,16 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Fit each cast individually
     for ssscc in ssscc_list:
-        sbe_coef, sbe_df = sbe43_oxy_fit(
-            all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
-            rosette,
-            sbe_coef0=sbe_coef0,
-            f_suffix=f"_{ssscc}",
-        )
+        if ssscc == "00602":
+            sbe_coef = sbe_coef0
+            sbe_df = all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy()
+        else:
+            sbe_coef, sbe_df = sbe43_oxy_fit(
+                all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
+                rosette,
+                sbe_coef0=sbe_coef0,
+                f_suffix=f"_{ssscc}",
+            )
         # build coef dictionary
         if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
             sbe43_dict[ssscc] = sbe_coef
