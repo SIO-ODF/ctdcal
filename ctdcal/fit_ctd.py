@@ -478,7 +478,7 @@ def calibrate_cond(btl_df, time_df, fname="data/ssscc/ssscc_odf.csv"):
     #   Define operating perameters for different rosettes
     if "odf" in fname:
         fit_yaml = load_fit_yaml()
-        salt_file = cfg.dirs["salt"]+"/salt_flags_handcoded.csv"
+        salt_file = cfg.dirs["salt"]+"salt_flags_handcoded_odf.csv"
         ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
         rosette = "odf"
     else:
