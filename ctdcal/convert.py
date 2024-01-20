@@ -142,9 +142,20 @@ def hex_to_ctd(ssscc_list):
             #   convertFromSBEReader is what actually creates the dataframe
             converted_df = convertFromSBEReader(sbeReader, ssscc)
 
-            # ODF 00707, primary TC spike around scan 105800
+            # ODF 00707, primary T?C spike around scan 105800
             if ssscc == "00707":
                 converted_df.loc[12711:12713, ["CTDCOND1"]] = np.nan
+                converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
+            #   Gunk after cold blob can't be fit on RINKO and isn't seen on upcast
+            if ssscc == "02405":
+                converted_df.loc[24465:24728, ["CTDTMP1","CTDCOND1","U_DEF_poly1"]] = np.nan
+                converted_df.loc[24770:25155, ["CTDTMP1","CTDCOND1","U_DEF_poly1"]] = np.nan
+                converted_df.interpolate(limit=500, limit_area="inside", inplace=True)
+
+            #   C2 spike
+            if ssscc == "02703":
+                converted_df.loc[28694:28699,["CTDCOND2"]] = np.nan
                 converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
             if "00301" in ssscc_list:
@@ -283,7 +294,7 @@ def make_btl_mean(ssscc_list):
             mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
             #   Restore all bottles with copies, backfilling them
             mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").bfill()
-            
+
             #   Works for 01102, where they did pylons 1, 4, 6...
             #   Also works when entire cast was switched to odd numbers
             if mean_df.isna().any().any():

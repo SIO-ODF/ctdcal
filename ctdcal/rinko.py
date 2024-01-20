@@ -186,6 +186,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Only fit using OXYGEN flagged good (2)
     good_data = btl_df[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    #   In general, salinity flags align with where oxygen goes wonky
+    # good_data = good_data[good_data["SALNTY_FLAG_W"] == 2].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     (rinko_coefs0, _) = rinko_oxy_fit(good_data, f_suffix="_r0")
@@ -258,7 +260,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                     f"{ssscc} fit parameters worse than {f_stem} group – reverting back"
                 )
                 rinko_coefs_ssscc = rinko_coefs_group
-
+            
             # apply coefficients
             btl_df.loc[btl_rows, "CTDRINKO"] = _Uchida_DO_eq(
                 rinko_coefs_ssscc,
@@ -270,16 +272,29 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
                     btl_df.loc[btl_rows, "OS"],
                 ),
             )
-            time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
-                rinko_coefs_ssscc,
-                (
-                    time_df.loc[time_rows, cfg.column["rinko_oxy"]],
-                    time_df.loc[time_rows, cfg.column["p"]],
-                    time_df.loc[time_rows, cfg.column["t1"]],
-                    time_df.loc[time_rows, cfg.column["sal"]],
-                    time_df.loc[time_rows, "OS"],
-                ),
-            )
+            if ssscc == "02405":
+                print("Using RINKO group fit coefficients -2, for the time data on 02405.")
+                time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
+                    rinko_coefs_group,
+                    (
+                        time_df.loc[time_rows, cfg.column["rinko_oxy"]],
+                        time_df.loc[time_rows, cfg.column["p"]],
+                        time_df.loc[time_rows, cfg.column["t1"]],
+                        time_df.loc[time_rows, cfg.column["sal"]],
+                        time_df.loc[time_rows, "OS"],
+                    ),
+                ) - 2
+            else:
+                time_df.loc[time_rows, "CTDRINKO"] = _Uchida_DO_eq(
+                    rinko_coefs_ssscc,
+                    (
+                        time_df.loc[time_rows, cfg.column["rinko_oxy"]],
+                        time_df.loc[time_rows, cfg.column["p"]],
+                        time_df.loc[time_rows, cfg.column["t1"]],
+                        time_df.loc[time_rows, cfg.column["sal"]],
+                        time_df.loc[time_rows, "OS"],
+                    ),
+                )
 
             # save coefficients to dataframe
             coefs_df.loc[ssscc] = rinko_coefs_ssscc
