@@ -154,9 +154,16 @@ src_plot_upcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
+# fig = figure(
+#     plot_height=800,
+#     plot_width=400,
+#     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
+#     tools="pan,box_zoom,wheel_zoom,box_select,reset",
+#     y_axis_label="Pressure (dbar)",
+# )
 fig = figure(
-    plot_height=800,
-    plot_width=400,
+    height=800,
+    width=400,
     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
     y_axis_label="Pressure (dbar)",
