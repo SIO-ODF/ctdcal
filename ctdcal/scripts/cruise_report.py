@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from .. import ctd_plots, get_ctdcal_config
+from .. import ctd_plots, get_ctdcal_config, process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -207,6 +207,9 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
 def pressure_offset():
 
     data = pd.read_csv("data/logs/ondeck_pressure.csv")
+    data["SSSCC"] = data["SSSCC"].astype(str).str.zfill(5)
+    ssscc_list = process_ctd.get_ssscc_list(fname="data/ssscc/ssscc_odf.csv")
+    data = data.loc[data.SSSCC.isin(ssscc_list)]
     print(f"Average deck pressure:\n{data.describe().loc[['min', 'max', 'mean']]}\n")
     print(
         f"Average offset:\n{(data['ondeck_end_p'] - data['ondeck_start_p']).describe()}\n"
