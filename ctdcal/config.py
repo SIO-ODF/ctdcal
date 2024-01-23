@@ -48,7 +48,9 @@ fig_dirs = {
     "rinko": "data/logs/fitting_figs/oxy_rinko/",
 }
 
-# remnant of old system, will be pushed into xarray metadata/attrs
+# -------------------------------------------------\
+# EXCLUDE UNUSED COLS FOR 2307                     |
+#                                                  |
 # Labels for CTD columns
 column = {
     "p": "CTDPRS",
@@ -59,17 +61,21 @@ column = {
     "sal": "CTDSAL",
     # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
     # "s2": "CTDSAL2",
-    "rinko_oxy": "FREE1",  # CHECK THIS!
+    # "rinko_oxy": "FREE1",  # CHECK THIS!
     "oxyvolts": "CTDOXYVOLTS",
-    "refT": "REFTMP",
+    # "refT": "REFTMP",
     "refC": "BTLCOND",
     "refS": "SALNTY",
-    "refO": "OXYGEN",
+    # "refO": "OXYGEN",
     "lat": "GPSLAT",
     "lon": "GPSLON",
 }
 
+# -------------------------------------------------\
+# EXCLUDE UNUSED COLS FOR 2307                     |
+#                                                  |
 # List of columns to filter
 filter_cols = []
-for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]:
+# for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]:
+for x in ["p", "t1", "t2", "c1", "c2", "sal", "oxyvolts", "lat", "lon"]:
     filter_cols.append(column[x])

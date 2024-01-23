@@ -455,10 +455,10 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         # "CTDRINKO_FLAG_W": "",
         "CTDOXY": "UMOL/KG",
         "CTDOXY_FLAG_W": "",
-        "OXYGEN": "UMOL/KG",
-        "OXYGEN_FLAG_W": "",
-        "REFTMP": "ITS-90",
-        "REFTMP_FLAG_W": "",
+        # "OXYGEN": "UMOL/KG",
+        # "OXYGEN_FLAG_W": "",
+        # "REFTMP": "ITS-90",
+        # "REFTMP_FLAG_W": "",
     }
 
     # rename outputs as defined in user_settings.yaml
@@ -478,9 +478,12 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
     )
 
-    # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+    # -------------------------------------------------\
+    # EXCLUDE FOR 2307                                 |
+    #                                                  |
+    # # switch oxygen primary sensor to rinko
+    # btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+    # btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
@@ -501,14 +504,17 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     for index, row in full_depth_df.iterrows():
         btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
 
+    # -------------------------------------------------\
+    # EXCLUDE FOR 2307                                 |
+    #                                                  |
     # deal with nans
     # TODO: missing REFTMP not obvious til loading data - where to put this?
     # _reft_loader() is not the right place
     # maybe during loading step flag missing OXYGEN, REFTMP, BTLCOND?
-    btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
-        btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
-    )
-    btl_data = btl_data.where(~btl_data.isnull(), -999)
+    # btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
+    #     btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
+    # )
+    # btl_data = btl_data.where(~btl_data.isnull(), -999)
 
     # check columns
     try:

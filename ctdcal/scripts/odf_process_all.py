@@ -50,8 +50,11 @@ def odf_process_all():
     # generate salt .csv files
     odf_io.process_salts(ssscc_list)
 
+    # -------------------------------------------------\
+    # EXCLUDE FOR 2307                                 |
+    #                                                  |
     # generate reftemp .csv files
-    process_bottle.process_reft(ssscc_list)
+    # process_bottle.process_reft(ssscc_list)
 
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
@@ -68,29 +71,39 @@ def odf_process_all():
     # create cast depth log file
     process_ctd.make_depth_log(time_data_all)
 
+    # -------------------------------------------------\
+    # EXCLUDE FOR 2307                                 |
+    #                                                  |
     # calibrate temperature against reference
-    fit_ctd.calibrate_temp(btl_data_all, time_data_all)
+    # fit_ctd.calibrate_temp(btl_data_all, time_data_all)
 
-    # calibrate temperature against reference
+    # calibrate conductivity against reference
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
+    # -------------------------------------------------\
+    # EXCLUDE FOR 2307                                 |
+    #                                                  |
     # calculate params needs for oxy/rinko calibration
-    # TODO: move density matching to prepare_oxy
-    oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
+    # oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
 
+    # -------------------------------------------------\
+    # EXCLUDE FOR 2307                                 |
+    #                                                  |
     # calibrate oxygen against reference
-    oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
-    rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+    # oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+    # rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #####
     # Step 3: export data
     #####
 
     # export files for making cruise report figs
-    process_bottle.export_report_data(btl_data_all)
+    # process_bottle.export_report_data(btl_data_all)
 
     # export to Exchange format
     # TODO: clean this up more
+    btl_data_all.to_csv('btl_all.csv')
+
     process_ctd.export_ct1(time_data_all, ssscc_list)
     process_bottle.export_hy1(btl_data_all)
 

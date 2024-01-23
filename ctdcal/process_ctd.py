@@ -345,7 +345,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
                 log.warning(
                     f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
                 )
-        breakpoint()
+        # breakpoint()
     if len(end_df) == 0:
         log.warning("Failed to find ending deck pressure.")
         for n in [1, 2]:
@@ -355,7 +355,7 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
                 log.warning(
                     f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
                 )
-        breakpoint()
+        # breakpoint()
     # MK (3/23/20, 11am):
     # auto end calculation failed bc cond2 is still >30
     # may have to do manually or just use cond1 for station 00901
@@ -778,9 +778,13 @@ def export_ct1(df, ssscc_list):
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
         # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
-        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        # -------------------------------------------------\
+        # EXCLUDE FOR 2307                                 |
+        #                                                  |
+        # print(f"Using Rinko as CTDOXY for {ssscc}")
+        # time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+        # time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        # -------------------------------------------------/
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
