@@ -455,8 +455,8 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         # "CTDRINKO_FLAG_W": "",
         "CTDOXY": "UMOL/KG",
         "CTDOXY_FLAG_W": "",
-        # "OXYGEN": "UMOL/KG",
-        # "OXYGEN_FLAG_W": "",
+        "OXYGEN": "UMOL/KG",
+        "OXYGEN_FLAG_W": "",
         # "REFTMP": "ITS-90",
         # "REFTMP_FLAG_W": "",
     }

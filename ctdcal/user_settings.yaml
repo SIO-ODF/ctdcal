@@ -3,9 +3,9 @@
 # this is an example to fill with your own values
 
 # Cruise specifics
-expocode: "325020210316"
-section_id: "A20"
-ctd_serial: 914  # TODO: how to handle multiple CTDs on one cruise?
+expocode: "33RR20230629"
+section_id: "Goa_transit"
+ctd_serial: 569  # TODO: how to handle multiple CTDs on one cruise?
 
 # CTD output variables/units
 ctd_outputs:

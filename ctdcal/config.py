@@ -66,7 +66,7 @@ column = {
     # "refT": "REFTMP",
     "refC": "BTLCOND",
     "refS": "SALNTY",
-    # "refO": "OXYGEN",
+    "refO": "OXYGEN",
     "lat": "GPSLAT",
     "lon": "GPSLON",
 }

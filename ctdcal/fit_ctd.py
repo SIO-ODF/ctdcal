@@ -485,8 +485,8 @@ def calibrate_cond(btl_df, time_df):
     # merge in handcoded salt flags
     # TODO: make salt flagger move .csv somewhere else? or just always have it
     # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
-    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
-    if Path(salt_file).exists():
+    salt_file = Path(cfg.dirs["salt"], "salt_flags_handcoded.csv")  # abstract to config.py
+    if salt_file.exists():
         handcoded_salts = pd.read_csv(
             salt_file, dtype={"SSSCC": str, "salinity_flag": int}
         )

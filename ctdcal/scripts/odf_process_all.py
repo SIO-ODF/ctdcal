@@ -80,17 +80,14 @@ def odf_process_all():
     # calibrate conductivity against reference
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
-    # -------------------------------------------------\
-    # EXCLUDE FOR 2307                                 |
-    #                                                  |
     # calculate params needs for oxy/rinko calibration
-    # oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
+    oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
 
+    # calibrate oxygen against reference
+    oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
     # -------------------------------------------------\
     # EXCLUDE FOR 2307                                 |
     #                                                  |
-    # calibrate oxygen against reference
-    # oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
     # rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #####
