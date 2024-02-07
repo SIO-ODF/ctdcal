@@ -453,6 +453,15 @@ def calibrate_temp(btl_df, time_df):
 
     return True
 
+def no_calibrate_temp(flag_val, time_df):
+    """
+    Function for cast with no reference temperature to calibrate to. Skipping
+    the above 'calibrate_temp' function results in CTDTMP_FLAG_W of 9 in the
+    final continuous files, which is probably not what you want. This function
+    sets it to whatever you DO want.
+    """
+    time_df["CTDTMP_FLAG_W"] = flag_val
+    return
 
 def calibrate_cond(btl_df, time_df):
     # TODO: make this an ODF script in ctdcal/scripts?

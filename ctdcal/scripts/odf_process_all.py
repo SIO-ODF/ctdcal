@@ -76,6 +76,8 @@ def odf_process_all():
     #                                                  |
     # calibrate temperature against reference
     # fit_ctd.calibrate_temp(btl_data_all, time_data_all)
+    ctdtmp_flag_val = 1
+    fit_ctd.no_calibrate_temp(ctdtmp_flag_val, time_data_all)
 
     # calibrate conductivity against reference
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
