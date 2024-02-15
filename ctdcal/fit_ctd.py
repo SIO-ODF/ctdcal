@@ -6,7 +6,7 @@ import gsw
 import numpy as np
 import pandas as pd
 import yaml
-from scipy.ndimage.interpolation import shift
+from scipy.ndimage import shift
 
 from ctdcal import convert as convert
 from ctdcal import ctd_plots as ctd_plots
