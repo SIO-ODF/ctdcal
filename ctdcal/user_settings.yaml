@@ -4,7 +4,7 @@
 
 # Cruise specifics
 expocode: "325020210316"
-section_id: "A20"
+section_id: "I08S"
 ctd_serial: 914  # TODO: how to handle multiple CTDs on one cruise?
 
 # CTD output variables/units
@@ -21,9 +21,9 @@ ctd_outputs:
     CTDOXY:
         sensor: CTDOXY1
         units: UMOL/KG
-    # CTDRINKO:
-    #     sensor: CTDRINKO
-    #     units: UMOL/KG
+    CTDRINKO:
+        sensor: CTDRINKO
+        units: UMOL/KG
     CTDXMISS:
         sensor: CTDXMISS1
         units: 0-5VDC
