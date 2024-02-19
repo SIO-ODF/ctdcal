@@ -2,8 +2,41 @@
 #
 # TODO: organize these by editable/fixed variables
 from importlib import resources
+from munch import Munch
 
 import yaml
+
+
+class Parameters(object):
+    """
+    Base class to hold high level parameters for parsing and processing
+    """
+    def __init__(self, parameters=[]):
+        self.parameters = parameters
+
+    def create_dict(self):
+        """
+        Create a Bunch class object to store the parameter names for the data
+        files.
+        """
+        bunch = Munch()
+
+        for name in self.parameters:
+            bunch[name] = []
+
+        return bunch
+
+    def from_csv(self, fname):
+        """
+        Creates a list from a csv.
+        """
+        lines = []
+        with open(fname, 'r', encoding='utf8') as fid:
+            for line in fid:
+                if not line.startswith('#'):
+                    lines.append(line.strip())
+        return lines
+
 
 with resources.open_text("ctdcal", "user_settings.yaml") as f:
     settings = yaml.safe_load(f)
@@ -59,7 +92,7 @@ column = {
     "sal": "CTDSAL",
     # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
     # "s2": "CTDSAL2",
-    "rinko_oxy": "FREE1",  # CHECK THIS!
+    "rinko_oxy": "U_DEF_poly1",  # CHECK THIS!
     "oxyvolts": "CTDOXYVOLTS",
     "refT": "REFTMP",
     "refC": "BTLCOND",

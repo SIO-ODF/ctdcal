@@ -50,6 +50,11 @@ def retrieveBottleData(converted_df):
             .cumsum()
         )
         # converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL] == False)).astype(int).cumsum()
+
+        # cast 00701 has NaNs in the btl_fire column, this removes them. no other cast should
+        # be affected...
+        converted_df.dropna(inplace=True, subset=[BOTTLE_FIRE_COL])
+
         return converted_df.loc[converted_df[BOTTLE_FIRE_COL]]
         # return converted_df
     else:
@@ -127,7 +132,8 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
     Loads salt_file to dataframe and reindexes to match bottle data dataframe
     """
     salt_data = pd.read_csv(
-        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"]
+        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"],
+        comment='#'
     )
     salt_data.set_index(index_name)
     salt_data["SSSCC_SALT"] = Path(salt_file).stem.split("_")[0]
@@ -359,7 +365,8 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
                 log.warning(
                     "refT file for cast " + ssscc + " does not exist... skipping"
                 )
-                return
+                continue
+                # return
 
 
 def add_btlnbr_cols(df, btl_num_col):
@@ -475,7 +482,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     # sort by decreasing sample number (increasing pressure) and reindex
     btl_data = btl_data.sort_values(
-        by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
+        by=["STNNBR", "CASTNO", "SAMPNO"], ascending=[True, True, False], ignore_index=True
     )
 
     # switch oxygen primary sensor to rinko
@@ -500,6 +507,10 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     btl_data["DEPTH"] = -999
     for index, row in full_depth_df.iterrows():
         btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
+
+    # ## fix spike in cast 10301 where bottle 12 was accidentally closed on deck
+    # btl_data.loc[(btl_data['SSSCC'] == '10301') & (btl_data['SAMPNO'] == 12), 'CTDSAL_FLAG_W'] = 4
+    # btl_data.loc[(btl_data['SSSCC'] == '10301') & (btl_data['SAMPNO'] == 12), 'CTDOXY_FLAG_W'] = 4
 
     # deal with nans
     # TODO: missing REFTMP not obvious til loading data - where to put this?

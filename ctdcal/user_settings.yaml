@@ -3,7 +3,7 @@
 # this is an example to fill with your own values
 
 # Cruise specifics
-expocode: "325020210316"
+expocode: "325020240221"
 section_id: "I08S"
 ctd_serial: 914  # TODO: how to handle multiple CTDs on one cruise?
 
