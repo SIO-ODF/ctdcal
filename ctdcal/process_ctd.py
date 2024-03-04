@@ -1,3 +1,9 @@
+"""
+A module for reading, adjusting, or extracting continuous CTD data.
+
+Most reading is done in convert.py TODO: Move to here?
+"""
+
 import logging
 import warnings
 from datetime import datetime, timezone

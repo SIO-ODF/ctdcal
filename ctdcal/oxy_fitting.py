@@ -1,13 +1,13 @@
 """
-Module for processing oxygen from CTD and bottle samples.
+A module for processing oxygen from CTD and bottle samples.
 """
 
 import csv
 import logging
+import warnings
 import xml.etree.cElementTree as ET
 from collections import OrderedDict
 from pathlib import Path
-import warnings
 
 import gsw
 import numpy as np

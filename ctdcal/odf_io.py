@@ -1,3 +1,11 @@
+"""
+A module for ODF salinometer data processing.
+
+ODF uses custom code for the Guildline Autosalinometer 8400A/B, developed by Carl Mattson.
+OSIL/Guildline software is also supported, assuming the operator logs bottle information in the data files (.dat/.xlsx).
+See OSNAP-32 or GP17-ANT data sets for examples of OSIL usage in "salts_io.py".
+"""
+
 import csv
 import io
 import logging

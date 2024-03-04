@@ -1,3 +1,10 @@
+"""
+A module for reading/writing CTDCAL data products and data files.
+
+See the CCHDO data formats and parameters for typical data products related to GO-SHIP or other ODF projects.
+https://cchdo.ucsd.edu/formats 
+"""
+
 import logging
 from io import BufferedIOBase, BytesIO, StringIO
 from pathlib import Path

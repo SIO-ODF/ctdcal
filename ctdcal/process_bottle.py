@@ -1,4 +1,6 @@
-"""Library to create SBE .btl equivalent files.
+"""
+A module to create SBE .btl equivalent files, incorperating ODF discrete data.
+
 TODO: allow for variable bottle fire scans instead of SBE standard 36
     ex: user doesn't know how to change the config for the cast to add more scans,
     instead does it post-cast?

@@ -1,11 +1,16 @@
+"""
+A module for CTDCAL data visualization.
+"""
+
 import logging
 from pathlib import Path
-from ctdcal import get_ctdcal_config
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+
+from ctdcal import get_ctdcal_config
 
 log = logging.getLogger(__name__)
 cfg = get_ctdcal_config()
@@ -291,8 +296,8 @@ def plot_TS(df, f_out=None):
     Line plot of temperature and salinity for a single cast or series of casts.
     Modified from: https://oceanpython.org/2013/02/17/t-s-diagram/
     """
-    import matplotlib.ticker as tick
     import gsw
+    import matplotlib.ticker as tick
 
     #   Demarcate temperature, salinty, and limits for density
     temp = df.CTDTMP1

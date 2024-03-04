@@ -1,3 +1,9 @@
+"""
+A module for handling data flags in continuous and discrete data.
+
+See Swift 2010 for WOCE flag information (Hydro Manual).
+"""
+
 import numpy as np
 import pandas as pd
 

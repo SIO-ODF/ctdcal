@@ -1,3 +1,7 @@
+"""
+A module for reading and converting SeaBird data files.
+"""
+
 import logging
 from pathlib import Path
 
@@ -6,11 +10,10 @@ import numpy as np
 import pandas as pd
 
 from ctdcal import equations_sbe as sbe_eq
-from ctdcal import get_ctdcal_config
+from ctdcal import fit_ctd, get_ctdcal_config, io
 from ctdcal import process_bottle as btl
 from ctdcal import process_ctd as process_ctd
 from ctdcal import sbe_reader as sbe_rd
-from ctdcal import io, fit_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)

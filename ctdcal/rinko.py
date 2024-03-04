@@ -1,18 +1,19 @@
+"""
+A module for processing RINKO (JFE Advantech) optode data.
+
+See Uchida et al. 2008/Uchida 2010 for operating equations and more info.
+https://doi.org/10.1175/2008JTECHO549.1
+"""
+
+import logging
 from collections import namedtuple
 from pathlib import Path
 
-import logging
 import numpy as np
 import pandas as pd
 import scipy
 
-from ctdcal import (
-    ctd_plots,
-    get_ctdcal_config,
-    flagging,
-    process_ctd,
-    oxy_fitting,
-)
+from ctdcal import ctd_plots, flagging, get_ctdcal_config, oxy_fitting, process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)

@@ -1,3 +1,9 @@
+"""
+A module for fitting SeaBird data to discrete ODF measurements.
+
+Oxygen fitting routines are extracted to oxy_fitting.py and rinko.py for SBE43 and optode data, respectively.
+"""
+
 #!/usr/bin/env python
 import logging
 from pathlib import Path
