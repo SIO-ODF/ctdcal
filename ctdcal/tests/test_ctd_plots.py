@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -5,7 +8,21 @@ import pytest
 from ctdcal import ctd_plots
 
 
-def test_residual_vs_pressure(tmp_path):
+@pytest.fixture
+def sample_data():
+    #   For quickly plugging in to tests
+    param = pd.Series([1, 2, 3])
+    ref = pd.Series([4, 5, 6])
+    prs = pd.Series([1000, 2000, 3000])
+    stn = pd.Series([1, 1, 2])
+    df = pd.DataFrame({
+        'CTDTMP1': [10, 15, 20],
+        'CTDSAL': [35, 35.5, 36],
+        'SSSCC': ['001', '002', '003']
+    })
+    return param, ref, prs, stn, df
+
+def test_residual_vs_pressure(tmp_path, sample_data):
     param = pd.Series(data=[0, 1, 2], name="param")
     ref = pd.Series(data=[0, 1, 2], name="ref")
     prs = pd.Series(data=[0, 3000, 6000], name="prs")
@@ -71,6 +88,9 @@ def test_residual_vs_pressure(tmp_path):
             ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=f_out)
             assert f_out.exists()
 
+    param, ref, prs, _, _ = sample_data
+    ax = ctd_plots.residual_vs_pressure(param, ref, prs)
+    assert isinstance(ax, plt.Axes)
 
 def test_residual_vs_station(tmp_path):
     param = pd.Series(data=[0, 1, 2], name="param")
