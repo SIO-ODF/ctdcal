@@ -6,13 +6,14 @@ Loads the raw .dat files from the AutoSal "Salinometer Data Logger" software
 Developed for OSNAP32, 2022 with the intention of merging into odf_io
 """
 
-import gsw
 import csv
 import io
 import logging
+from pathlib import Path
+
+import gsw
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 from ctdcal import get_ctdcal_config
 
