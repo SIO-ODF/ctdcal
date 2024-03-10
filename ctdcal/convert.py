@@ -213,7 +213,10 @@ def make_btl_mean(ssscc_list):
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
             imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
-            bottle_df = btl.retrieveBottleData(imported_df)
+            ## AS 2024/03/08
+            ## I've added the ssscc to the below function call, so it can reference the
+            ## sbe .bl file to retrieve the actual firing order
+            bottle_df = btl.retrieveBottleData(imported_df, ssscc)
             mean_df = btl.bottle_mean(bottle_df)
 
             # export bottom bottle time/lat/lon info
@@ -437,7 +440,7 @@ def convertFromSBEReader(sbeReader, ssscc):
 
         ### Rinko block
         elif meta["sensor_id"] == "61":
-            if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO"):
+            if meta["sensor_info"]["SensorName"].lower() in ("rinkoo2v", "rinko", "rinko02"):
                 log.info("Processing Rinko O2")
                 # hysteresis correct then pass through voltage (see Uchida, 2010)
                 coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}

@@ -36,7 +36,28 @@ def retrieveBottleDataFromFile(converted_file):
 
 
 # Retrieve the bottle data from a dataframe created from a converted file.
-def retrieveBottleData(converted_df):
+def retrieveBottleData(converted_df, ssscc):
+    ## AS 2024/03/08
+    f = Path(cfg.dirs['raw'], '%s.bl' % ssscc)
+    btl_fire_order = [0]
+    btl_fire_num = [0]
+    with open(f, 'r') as bl:
+        for line in bl:
+            line = line.split(',')
+            try:
+                int(line[0])
+            except ValueError:
+                continue
+            btl_fire_order.append(int(line[0]))  # index of first bottle fired
+            btl_fire_num.append(int(line[1]))  # number of first bottle fired
+    bl = pd.DataFrame(btl_fire_num, index=btl_fire_order, columns=['btl_fire_num'])
+    # btl = converted_df.loc[converted_df[BOTTLE_FIRE_COL]]
+    # btl.loc[btl[BOTTLE_FIRE_COL]] = btl_fire_order
+    # return btl
+
+    ## AS 2024/03/08
+    ## Existing code will number bottles sequentially, regardless of actual firing order,
+    ## which is not the desired behavior here. I remove it...
     if BOTTLE_FIRE_COL in converted_df.columns:
         converted_df[BOTTLE_FIRE_NUM_COL] = (
             (
@@ -51,16 +72,18 @@ def retrieveBottleData(converted_df):
         )
         # converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL] == False)).astype(int).cumsum()
 
+        ## AS 2024/03/08
+        converted_df[BOTTLE_FIRE_NUM_COL] = bl.loc[converted_df[BOTTLE_FIRE_NUM_COL]].values
+
         # cast 00701 has NaNs in the btl_fire column, this removes them. no other cast should
         # be affected...
-        converted_df.dropna(inplace=True, subset=[BOTTLE_FIRE_COL])
+        # converted_df.dropna(inplace=True, subset=[BOTTLE_FIRE_COL])
 
         return converted_df.loc[converted_df[BOTTLE_FIRE_COL]]
         # return converted_df
     else:
         log.error("Bottle fire column:", BOTTLE_FIRE_COL, "not found")
-
-    return pd.DataFrame()  # empty dataframe
+        return pd.DataFrame()  # empty dataframe
 
 
 def bottle_mean(btl_df):
@@ -220,6 +243,11 @@ def load_all_btl_files(ssscc_list, cols=None):
                 columns=["CRavg", "BathTEMP", "BTLCOND"],
                 dtype=float,
             )
+            ## AS 3/10/2024
+            ## Non-sequentially fired bottle processing is leading to NaNs in the gaps. Drop
+            ## them here.
+            ## TODO is there a place to catch them earlier?
+            btl_data.dropna(inplace=True, subset=['btl_fire_num'])
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
@@ -258,14 +286,16 @@ def load_all_btl_files(ssscc_list, cols=None):
             refc_data,
             left_on="btl_fire_num",
             right_on="SAMPNO_SALT",
-            how="outer",
+            # how="outer",
+            how="left",
         )
         btl_data = pd.merge(
             btl_data,
             oxy_data,
             left_on="btl_fire_num",
             right_on="BOTTLENO_OXY",
-            how="outer",
+            # how="outer",
+            how="left",
         )
 
         if len(btl_data) > 36:
@@ -287,6 +317,12 @@ def load_all_btl_files(ssscc_list, cols=None):
     df_data_all = df_data_all.loc[:, ~df_data_all.columns.duplicated()]
 
     df_data_all["master_index"] = range(len(df_data_all))
+
+    ## AS 3/10/2024
+    ## There are a few casts that have an SSSCC but everything else is NaN, including
+    ## the btl_fire_num, which is causing problems later. Until I figure out what is
+    ## causing the bad rows, I can just dropna() them here...
+    df_data_all.dropna(inplace=True, subset=['btl_fire_num'])
 
     return df_data_all
 
@@ -384,6 +420,11 @@ def load_hy_file(path_to_hyfile):
 
 def export_report_data(df):
 
+    ## AS 3/10/2024
+    ## Biocasts have NaN rows causing conflict with the string slicing on the next
+    ## line. Drop them...
+    ## TODO Find where these are introduced and catch them there
+    df.dropna(inplace=True, subset=['SSSCC'])
     df["STNNBR"] = [int(x[0:3]) for x in df["SSSCC"]]
     df["CTDPRS"] = df["CTDPRS"].round(1)
     cruise_report_cols = [
@@ -425,7 +466,7 @@ def export_report_data(df):
     df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
     df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
-    df[cruise_report_cols].to_csv("data/scratch_folder/report_data.csv", index=False)
+    df[cruise_report_cols].to_csv("data/report/report_data.csv", index=False)
 
     return
 

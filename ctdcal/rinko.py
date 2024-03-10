@@ -197,13 +197,13 @@ def calibrate_oxy(btl_df, time_df, params):
     ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_r*.csv"))
     if not ssscc_subsets:  # if no r-segments exists, write one from full list
         log.debug(
-            "No CTDRINKO grouping file found... creating ssscc_r1.csv with all casts"
+            "No CTDRINKO grouping file found... creating ssscc_r1.csv with all oxy casts"
         )
         if not Path(cfg.dirs["ssscc"]).exists():
             Path(cfg.dirs["ssscc"]).mkdir()
         # ssscc_list = process_ctd.get_ssscc_list()
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
-        pd.Series(params.ssscc).to_csv(ssscc_subsets[0], header=None, index=False)
+        pd.Series(params.ssscc_oxy).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
         ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True, comment='#').to_list()
         f_stem = f.stem

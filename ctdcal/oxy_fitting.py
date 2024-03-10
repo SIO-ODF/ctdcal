@@ -493,6 +493,7 @@ def match_sigmas(
     btl_oxy,
     btl_tmp,
     btl_SA,
+    btl_idx,
     ctd_os,
     ctd_prs,
     ctd_tmp,
@@ -503,7 +504,8 @@ def match_sigmas(
 
     # Construct Dataframe from bottle and ctd values for merging
     btl_data = pd.DataFrame(
-        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA}
+        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA},
+        index=btl_idx
     )
     time_data = pd.DataFrame(
         data={
@@ -788,6 +790,9 @@ def calibrate_oxy(btl_df, time_df, params):
     # Track casts with oxy samples... AS 9/4/2023
     ssscc_to_fit = []
 
+    # AS
+    btl_df.set_index('master_index', inplace=True)
+
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
     for ssscc in params.ssscc:
@@ -804,6 +809,7 @@ def calibrate_oxy(btl_df, time_df, params):
             btl_data[cfg.column["refO"]],
             btl_data["CTDTMP1"],
             btl_data["SA"],
+            btl_data.index,
             time_data["OS"],
             time_data[cfg.column["p"]],
             time_data[cfg.column["t1"]],
@@ -820,7 +826,7 @@ def calibrate_oxy(btl_df, time_df, params):
         log.info(ssscc + " density matching done")
 
     # Only fit using OXYGEN flagged good (2)
-    all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    all_sbe43_merged = all_sbe43_merged.loc[btl_df["OXYGEN_FLAG_W"] == 2].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
