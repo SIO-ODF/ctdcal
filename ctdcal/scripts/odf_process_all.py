@@ -2,6 +2,10 @@
 Process all CTD and bottle data using ODF routines.
 """
 
+import logging
+
+import numpy as np
+
 # import needed ctdcal modules
 from .. import (
     convert,
@@ -13,8 +17,6 @@ from .. import (
     process_ctd,
     rinko,
 )
-
-import logging
 
 log = logging.getLogger(__name__)
 
@@ -97,7 +99,8 @@ def odf_process_all():
     #####
 
     # export files for making cruise report figs
-    # process_bottle.export_report_data(btl_data_all)
+    btl_data_all["REFTMP"] = btl_data_all["CTDRINKO"] = np.nan
+    process_bottle.export_report_data(btl_data_all)
 
     # export to Exchange format
     # TODO: clean this up more

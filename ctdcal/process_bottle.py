@@ -418,7 +418,7 @@ def export_report_data(df):
     df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
     df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
-    df[cruise_report_cols].to_csv("data/scratch_folder/report_data.csv", index=False)
+    df[cruise_report_cols].to_csv("data/report_data.csv", index=False)
 
     return
 

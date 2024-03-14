@@ -63,7 +63,7 @@ column = {
     # "s2": "CTDSAL2",
     # "rinko_oxy": "FREE1",  # CHECK THIS!
     "oxyvolts": "CTDOXYVOLTS",
-    # "refT": "REFTMP",
+    "refT": "REFTMP",
     "refC": "BTLCOND",
     "refS": "SALNTY",
     "refO": "OXYGEN",
