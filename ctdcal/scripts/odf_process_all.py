@@ -84,7 +84,7 @@ def odf_process_all():
     # calibrate temperature against reference
     fit_ctd.calibrate_temp(btl_data_all, time_data_all)
 
-    # calibrate temperature against reference
+    # calibrate conductivity against reference
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
     # calculate params needs for oxy/rinko calibration

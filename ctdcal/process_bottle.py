@@ -73,6 +73,8 @@ def retrieveBottleData(converted_df, ssscc):
         # converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL] == False)).astype(int).cumsum()
 
         ## AS 2024/03/08
+        ## Use the .bl file to map sequential position (from existing code) to actual
+        ## bottle number
         converted_df[BOTTLE_FIRE_NUM_COL] = bl.loc[converted_df[BOTTLE_FIRE_NUM_COL]].values
 
         # cast 00701 has NaNs in the btl_fire column, this removes them. no other cast should
@@ -88,7 +90,15 @@ def retrieveBottleData(converted_df, ssscc):
 
 def bottle_mean(btl_df):
     """Compute the mean for each bottle from a dataframe."""
-    btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
+    ## AS 03/13/2024
+    ## Another place that breaks on non-sequential bottles. The "max" bottle number is not
+    ## necessarily the last one in the btl_df. Any higher numbered bottle will not get
+    ## processed. Note that this will also cause blank rows for unfired bottles within
+    ## the sequence, but for now, these are removed at a later stage. There's probably a
+    ## better way to perform this step. For now, at least, let's fix the btl_max to be
+    ## the actual max...
+    # btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
+    btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].max())
     i = 1
     output = pd.DataFrame()
     while i <= btl_max:
