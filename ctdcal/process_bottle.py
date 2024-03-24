@@ -27,17 +27,14 @@ BOTTLE_FIRE_COL = "btl_fire"
 BOTTLE_FIRE_NUM_COL = "btl_fire_num"
 
 
-# Retrieve the bottle data from a converted file.
-def retrieveBottleDataFromFile(converted_file):
+def _get_bottle_order_from_bl_file(ssscc):
+    """
+    Helper function to get bottle firing order from the Sea Bird .bl file, which
+    is the best source when bottles have been fired non-sequentially.
 
-    converted_df = pd.read_pickle(converted_file)
-
-    return retrieveBottleData(converted_df)
-
-
-# Retrieve the bottle data from a dataframe created from a converted file.
-def retrieveBottleData(converted_df, ssscc):
-    ## AS 2024/03/08
+    :param ssscc: string - station/cast identifier
+    :return: pandas dataframe object
+    """
     f = Path(cfg.dirs['raw'], '%s.bl' % ssscc)
     btl_fire_order = [0]
     btl_fire_num = [0]
@@ -50,14 +47,26 @@ def retrieveBottleData(converted_df, ssscc):
                 continue
             btl_fire_order.append(int(line[0]))  # index of first bottle fired
             btl_fire_num.append(int(line[1]))  # number of first bottle fired
-    bl = pd.DataFrame(btl_fire_num, index=btl_fire_order, columns=['btl_fire_num'])
+    return pd.DataFrame(btl_fire_num, index=btl_fire_order, columns=['btl_fire_num'])
+
+# Retrieve the bottle data from a converted file.
+def retrieveBottleDataFromFile(converted_file):
+
+    converted_df = pd.read_pickle(converted_file)
+
+    return retrieveBottleData(converted_df)
+
+
+# Retrieve the bottle data from a dataframe created from a converted file.
+def retrieveBottleData(converted_df, ssscc):
+    ## AS 2024/03/08
+    ## Original code can only number bottles sequentially, regardless of actual
+    ## firing order. Modified here to use order recorded in .bl file...
+    bl = _get_bottle_order_from_bl_file(ssscc)
     # btl = converted_df.loc[converted_df[BOTTLE_FIRE_COL]]
     # btl.loc[btl[BOTTLE_FIRE_COL]] = btl_fire_order
     # return btl
 
-    ## AS 2024/03/08
-    ## Existing code will number bottles sequentially, regardless of actual firing order,
-    ## which is not the desired behavior here. I remove it...
     if BOTTLE_FIRE_COL in converted_df.columns:
         converted_df[BOTTLE_FIRE_NUM_COL] = (
             (
@@ -88,50 +97,48 @@ def retrieveBottleData(converted_df, ssscc):
         return pd.DataFrame()  # empty dataframe
 
 
-def bottle_mean(btl_df):
-    """Compute the mean for each bottle from a dataframe."""
-    ## AS 03/13/2024
-    ## Another place that breaks on non-sequential bottles. The "max" bottle number is not
-    ## necessarily the last one in the btl_df. Any higher numbered bottle will not get
-    ## processed. Note that this will also cause blank rows for unfired bottles within
-    ## the sequence, but for now, these are removed at a later stage. There's probably a
-    ## better way to perform this step. For now, at least, let's fix the btl_max to be
-    ## the actual max...
-    # btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
-    btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].max())
-    i = 1
-    output = pd.DataFrame()
-    while i <= btl_max:
-        output = pd.concat(
-            (
-                output,
-                btl_df[btl_df[BOTTLE_FIRE_NUM_COL] == i]
-                .mean()
-                .to_frame(name=i)
-                .transpose(),
-            )
-        )
-        i += 1
-    return output
-
-
-def bottle_median(btl_df):
-    """Compute the median for each bottle from a dataframe."""
-    btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
-    i = 1
-    output = pd.DataFrame()
-    while i <= btl_max:
-        output = pd.concat(
-            (
-                output,
-                btl_df[btl_df[BOTTLE_FIRE_NUM_COL] == i]
-                .median()
-                .to_frame(name=i)
-                .transpose(),
-            )
-        )
-        i += 1
-    return output
+# def bottle_mean(btl_df):
+#     """Compute the mean for each bottle from a dataframe."""
+#     ## AS 03/13/2024
+#     ## Another place that breaks on non-sequential bottles. The "max" bottle number is not
+#     ## necessarily the last one in the btl_df. Any higher numbered bottle was not getting
+#     ## processed. This entire function (and the median function below it) can be replaced
+#     ## with a single pandas groupby() operation that will retain the correct firing order.
+#     # btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
+#     btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].max())
+#     i = 1
+#     output = pd.DataFrame()
+#     while i <= btl_max:
+#         output = pd.concat(
+#             (
+#                 output,
+#                 btl_df[btl_df[BOTTLE_FIRE_NUM_COL] == i]
+#                 .mean()
+#                 .to_frame(name=i)
+#                 .transpose(),
+#             )
+#         )
+#         i += 1
+#     return output
+#
+#
+# def bottle_median(btl_df):
+#     """Compute the median for each bottle from a dataframe."""
+#     btl_max = int(btl_df[BOTTLE_FIRE_NUM_COL].tail(n=1))
+#     i = 1
+#     output = pd.DataFrame()
+#     while i <= btl_max:
+#         output = pd.concat(
+#             (
+#                 output,
+#                 btl_df[btl_df[BOTTLE_FIRE_NUM_COL] == i]
+#                 .median()
+#                 .to_frame(name=i)
+#                 .transpose(),
+#             )
+#         )
+#         i += 1
+#     return output
 
 
 def _load_btl_data(btl_file, cols=None):
@@ -253,11 +260,6 @@ def load_all_btl_files(ssscc_list, cols=None):
                 columns=["CRavg", "BathTEMP", "BTLCOND"],
                 dtype=float,
             )
-            ## AS 3/10/2024
-            ## Non-sequentially fired bottle processing is leading to NaNs in the gaps. Drop
-            ## them here.
-            ## TODO is there a place to catch them earlier?
-            btl_data.dropna(inplace=True, subset=['btl_fire_num'])
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
@@ -327,12 +329,6 @@ def load_all_btl_files(ssscc_list, cols=None):
     df_data_all = df_data_all.loc[:, ~df_data_all.columns.duplicated()]
 
     df_data_all["master_index"] = range(len(df_data_all))
-
-    ## AS 3/10/2024
-    ## There are a few casts that have an SSSCC but everything else is NaN, including
-    ## the btl_fire_num, which is causing problems later. Until I figure out what is
-    ## causing the bad rows, I can just dropna() them here...
-    df_data_all.dropna(inplace=True, subset=['btl_fire_num'])
 
     return df_data_all
 
@@ -433,8 +429,8 @@ def export_report_data(df):
     ## AS 3/10/2024
     ## Biocasts have NaN rows causing conflict with the string slicing on the next
     ## line. Drop them...
-    ## TODO Find where these are introduced and catch them there
-    df.dropna(inplace=True, subset=['SSSCC'])
+    ## TODO Find where these are introduced and catch them there [Fixed now??]
+    # df.dropna(inplace=True, subset=['SSSCC'])
     df["STNNBR"] = [int(x[0:3]) for x in df["SSSCC"]]
     df["CTDPRS"] = df["CTDPRS"].round(1)
     cruise_report_cols = [

@@ -1,4 +1,5 @@
-### configuration file for odf_process_all.py
+# user configuration file
+# TODO: consolidate and organize all the various config files
 #
 # TODO: organize these by editable/fixed variables
 from importlib import resources
@@ -11,7 +12,8 @@ class Parameters(object):
     """
     Base class to hold high level parameters for parsing and processing
     """
-    def __init__(self, parameters=[]):
+    def __init__(self, parameters=None):
+        parameters = [] if parameters is None else parameters
         self.parameters = parameters
 
     def create_dict(self):
@@ -106,3 +108,13 @@ column = {
 filter_cols = []
 for x in ["p", "t1", "t2", "c1", "c2", "sal", "rinko_oxy", "oxyvolts", "lat", "lon"]:
     filter_cols.append(column[x])
+
+# Fitting coefficients file
+coeffs_file = '_fit_coefs.yaml'
+
+# Cast Tools settings
+win_size = 2     # default filter window size
+max_soak = 20    # maximum soak pressure threshold
+despike_deltas = {'CTDSAL': 0.001,
+                  'CTDTMP1': 0.75,
+                  'CTDTMP2': 0.75}   # despike filter thresholds

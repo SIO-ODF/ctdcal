@@ -22,6 +22,9 @@ def cast_details(df, ssscc, log_file=None):
     First find alternating periods of pumps on and pumps off, then select the
     pumps on period with the highest pressure. Get values from the row with the
     highest pressure, and return all values to be sent to log.
+    ## AS 2024/03/21
+    ## Disabling everything except the details logging
+    ## TODO: Pare this function down, maybe move into cast_tools
 
     Parameters
     ----------
@@ -50,7 +53,8 @@ def cast_details(df, ssscc, log_file=None):
     b_alt : Altimeter reading at bottom of cast
     """
     # df_cast = _trim_soak_period(df)
-    df_cast = _trim_soak_period(ssscc, df)
+    # df_cast = _trim_soak_period(ssscc, df)
+    df_cast = df
 
     # TODO: call parameters from config file instead
     p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))
@@ -77,9 +81,10 @@ def cast_details(df, ssscc, log_file=None):
     )
 
     # remove upcast
-    df_downcast = df_cast[:p_max_ind].copy()
+    # df_downcast = df_cast[:p_max_ind].copy()
 
-    return df_downcast
+    # return df_downcast
+    return
 
 
 def _trim_soak_period(ssscc, df=None):
@@ -278,6 +283,12 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     """
     Find and remove times when rosette is on deck.
     Optionally log average pressure at start and end of cast.
+    ## AS 2024/03/21
+    ## I don't require the trimming of on-deck times after implementing an alternate
+    ## soak and upcast trimming stage. I'm disabling that functionality, but calling
+    ## the function still anyway because it also calculates and records on-deck
+    ## pressure offsets.
+    ## TODO: Pare this down, rename it to what it actually does
 
     Parameters
     ----------
@@ -362,16 +373,20 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
                     f"No values below {cond_startup} found for {cfg.column[f'c{n}']}"
                 )
         breakpoint()
+
+    ## AS 2024/03/21
+    ## disabling the trimming...
     # MK (3/23/20, 11am):
     # auto end calculation failed bc cond2 is still >30
     # may have to do manually or just use cond1 for station 00901
-    trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
+    # trimmed_df = df.iloc[start_df.index.max() : end_df.index.min()].copy()
 
     # Log ondeck pressures
     if log_file is not None:
         proj_io.write_pressure_details(stacast, log_file, start_p, end_p)
 
-    return trimmed_df
+    # return trimmed_df
+    return
 
 
 def roll_filter(df, p_col="CTDPRS", direction="down"):

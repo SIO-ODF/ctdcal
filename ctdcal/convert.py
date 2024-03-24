@@ -10,6 +10,7 @@ from . import get_ctdcal_config
 from . import process_bottle as btl
 from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
+from ctdcal.tools.cast_tools import Cast
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -143,21 +144,44 @@ def make_time_files(ssscc_list):
     log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
-            converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
-            # Remove any pressure spikes
-            bad_rows = converted_df["CTDPRS"].abs() > 6500
-            if bad_rows.any():
-                log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
-            converted_df.loc[bad_rows, :] = np.nan
-            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+            ## AS 2024/03/21
+            ## Implementing a better(?) soak detection and cast trimming procedure,
+            ## and reordering some of the steps below because they have not been
+            ## performing well. Maybe it's the extreme weather on this cruise, but
+            ## they could stand to be improved regardless.
+            # converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+            cast = Cast(ssscc)
+            cast.load_cast()
 
             # Trim to times when rosette is in water
-            trimmed_df = process_ctd.remove_on_deck(
-                converted_df,
+            ## AS 2024/03/21
+            ## Disabling the trimmage because that happens elsewhere now...
+            process_ctd.remove_on_deck(
+                cast.raw,
                 ssscc,
                 log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
             )
+
+            ## Filter the data...
+            cast.filter(cast.raw, window='hann', win_size=6, cols=cfg.filter_cols)
+
+            ## Now do the trimming...
+            cast.parse_downcast(cast.filtered)
+            cast.trim_soak(cast.downcast, 30)
+
+            # Remove any pressure spikes
+            bad_rows = cast.downcast["CTDPRS"].abs() > 6500
+            if bad_rows.any():
+                log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
+                cast.downcast.loc[bad_rows, :] = np.nan
+                cast.downcast.interpolate(limit=24, limit_area="inside", inplace=True)
+
+            ## Despike...
+            ## AS 2024/03/22
+            ## Testing this... needs work still, but hey, might have potential
+            # cast.despike_downcast('CTDSAL', span=240)
+
 
             # # TODO: switch to loop instead, e.g.:
             # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
@@ -177,22 +201,24 @@ def make_time_files(ssscc_list):
 
             # TODO: add despike/wild edit filter (optional?)
 
-            # Filter data
-            filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df,
-                window="triangle",
-                parameters=cfg.filter_cols,
-            )
+            # # Filter data
+            # filter_data = process_ctd.raw_ctd_filter(
+            #     converted_df,
+            #     window="triangle",
+            #     parameters=cfg.filter_cols,
+            # )
 
             # Trim to downcast
-            cast_data = process_ctd.cast_details(
-                filter_data,
+            ## Already trimmed, so just do the cast details things...
+            # cast_data = process_ctd.cast_details(
+            process_ctd.cast_details(
+                cast.raw,
                 ssscc,
                 log_file=cfg.dirs["logs"] + "cast_details.csv",
             )
 
-            cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
-
+            # cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
+            cast.downcast.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
 
 def make_btl_mean(ssscc_list):
     # TODO: add (some) error handling from odf_process_bottle.py
@@ -217,7 +243,11 @@ def make_btl_mean(ssscc_list):
             ## I've added the ssscc to the below function call, so it can reference the
             ## sbe .bl file to retrieve the actual firing order
             bottle_df = btl.retrieveBottleData(imported_df, ssscc)
-            mean_df = btl.bottle_mean(bottle_df)
+
+            ## The bottle_mean() function is inefficient and does not respect non-sequential
+            ## firing order. A better result can be had with a single pandas operation.
+            # mean_df = btl.bottle_mean(bottle_df)
+            mean_df = bottle_df.groupby('btl_fire_num', as_index=False).mean()
 
             # export bottom bottle time/lat/lon info
             fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"

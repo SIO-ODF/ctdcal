@@ -18,7 +18,7 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def load_fit_yaml(fname=f"{cfg.dirs['logs']}fit_coefs.yaml", to_object=False):
+def load_fit_yaml(fname=f"{cfg.dirs['logs']}{cfg.coeffs_file}", to_object=False):
     """Load polynomail fit order information from .yaml file."""
 
     with open(fname, "r") as f:
