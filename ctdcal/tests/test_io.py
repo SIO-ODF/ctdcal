@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import requests
 
-from ctdcal import io
+from ctdcal import proj_io
 
 
 def check_type(to_check, sub_dtype):
@@ -44,7 +44,7 @@ def test_load_cnv(tmp_path):
         for line in content:
             f.write(line)
 
-    cnv = io.load_cnv(tmp_path / "test_1.cnv")
+    cnv = proj_io.load_cnv(tmp_path / "test_1.cnv")
     assert cnv.shape == (4, 3)
     assert check_type(cnv, float)
     assert cnv.columns.tolist() == ["prDM", "depSM", "t090C"]
@@ -70,7 +70,7 @@ def test_load_exchange_btl(caplog, tmp_path, monkeypatch):
             f.write(line)
 
     with caplog.at_level(logging.INFO):
-        hy1 = io.load_exchange_btl(tmp_path / fname)
+        hy1 = proj_io.load_exchange_btl(tmp_path / fname)
     assert hy1.shape == (2, 5)
     assert check_type(hy1[["EXPOCODE", "STNNBR", "CASTNO", "SAMPNO"]], int)
     assert all(hy1["SECT_ID"] == "ABC")  # should not have any leading spaces
@@ -78,7 +78,7 @@ def test_load_exchange_btl(caplog, tmp_path, monkeypatch):
 
     # check read works with str path as well
     with caplog.at_level(logging.INFO):
-        assert hy1.equals(io.load_exchange_btl(f"{str(tmp_path)}/{fname}"))
+        assert hy1.equals(proj_io.load_exchange_btl(f"{str(tmp_path)}/{fname}"))
         assert f"{fname} from local file" in caplog.messages[1]
 
     # mock downloading data from CCHDO
@@ -94,7 +94,7 @@ def test_load_exchange_btl(caplog, tmp_path, monkeypatch):
 
     # check read works from URL
     with caplog.at_level(logging.INFO):
-        assert hy1.equals(io.load_exchange_btl(f"http://fakeurl/{fname}"))
+        assert hy1.equals(proj_io.load_exchange_btl(f"http://fakeurl/{fname}"))
         assert f"{fname} from http link" in caplog.messages[2]
 
 
@@ -130,7 +130,7 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
             f.write(line)
 
     with caplog.at_level(logging.INFO):
-        header, ct1 = io.load_exchange_ctd(tmp_path / fname)
+        header, ct1 = proj_io.load_exchange_ctd(tmp_path / fname)
     assert ct1.shape == (2, 7)
     assert len(header) == 11
     assert check_type(ct1[["CTDPRS", "CTDTMP", "CTDSAL", "CTDOXY"]], float)
@@ -140,7 +140,7 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # check read works with str path as well
     caplog.clear()
     with caplog.at_level(logging.INFO):
-        header_str, ct1_str = io.load_exchange_ctd(f"{str(tmp_path)}/{fname}")
+        header_str, ct1_str = proj_io.load_exchange_ctd(f"{str(tmp_path)}/{fname}")
         assert ct1.equals(ct1_str)
         assert header_str == header
         assert f"{fname} from local file" in caplog.messages[0]
@@ -159,7 +159,7 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # check read works from URL
     caplog.clear()
     with caplog.at_level(logging.INFO):
-        header_url, ct1_url = io.load_exchange_ctd(f"http://fakeurl/{fname}")
+        header_url, ct1_url = proj_io.load_exchange_ctd(f"http://fakeurl/{fname}")
         assert ct1.equals(ct1_url)
         assert header_url == header
         assert f"{fname} from http link" in caplog.messages[0]
@@ -177,7 +177,7 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # check read works from .zip
     caplog.clear()
     with caplog.at_level(logging.INFO):
-        header_zip, ct1_zip = io.load_exchange_ctd(tmp_path / zname)
+        header_zip, ct1_zip = proj_io.load_exchange_ctd(tmp_path / zname)
     assert "from local file" in caplog.messages[0]
     assert "from .zip" in caplog.messages[1]
     assert all(["open file object" in caplog.messages[n] for n in [2, 3, 4]])
@@ -188,7 +188,7 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # check reading specific # of files from .zip works
     caplog.clear()
     with caplog.at_level(logging.INFO):
-        header_zip, zipped = io.load_exchange_ctd(tmp_path / zname, n_files=2)
+        header_zip, zipped = proj_io.load_exchange_ctd(tmp_path / zname, n_files=2)
     assert "from local file" in caplog.messages[0]
     assert "from .zip" in caplog.messages[1]
     assert all(["open file object" in caplog.messages[n] for n in [2, 3]])
@@ -204,7 +204,7 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
 
     # check error on recursive .zip
     with pytest.raises(ZipImportError, match="Recursive .zip files"):
-        io.load_exchange_ctd(tmp_path / "level0.zip")
+        proj_io.load_exchange_ctd(tmp_path / "level0.zip")
 
 
 def test_write_pressure_details(tmp_path):
@@ -212,11 +212,11 @@ def test_write_pressure_details(tmp_path):
 
     # check file is created if it doesn't exist
     assert not (f_path).exists()
-    io.write_pressure_details("00101", f_path, "00:00:01", "00:04:01")
+    proj_io.write_pressure_details("00101", f_path, "00:00:01", "00:04:01")
     assert (f_path).exists()
 
     # check only new data are appended (not another header)
-    io.write_pressure_details("00201", f_path, "00:05:01", "00:09:01")
+    proj_io.write_pressure_details("00201", f_path, "00:05:01", "00:09:01")
     with open(f_path, "rb") as f:
         contents = f.readlines()
         assert len(contents) == 3
@@ -230,11 +230,11 @@ def test_write_cast_details(tmp_path):
 
     # check file is created if it doesn't exist
     assert not f_path.exists()
-    io.write_cast_details("00101", f_path, 1.0, 2.0, 3.0, 0.0, 100.0, 5.0, -70.0, 170.0)
+    proj_io.write_cast_details("00101", f_path, 1.0, 2.0, 3.0, 0.0, 100.0, 5.0, -70.0, 170.0)
     assert f_path.exists()
 
     # check only new data are appended (not another header)
-    io.write_cast_details("00201", f_path, 2.0, 3.0, 4.0, 0.0, 99.0, 6.0, -70.0, 170.0)
+    proj_io.write_cast_details("00201", f_path, 2.0, 3.0, 4.0, 0.0, 99.0, 6.0, -70.0, 170.0)
     with open(f_path, "rb") as f:
         contents = f.readlines()
         assert len(contents) == 3
