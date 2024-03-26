@@ -58,7 +58,7 @@ scan_header_lookup = {
     'u_def2_V':{'long_name': 'User Defined 2', 'type':'float64'},
     'fluoro_ug/l':{'long_name': 'Fluorometer', 'type':'float64'},
     'alti_m':{'long_name': 'Altimeter', 'type':'float64'},
-    'cstar_ug/l'{'long_name': 'CStar Transmissometer', 'type':'float64'},
+    'cstar_ug/l':{'long_name': 'CStar Transmissometer', 'type':'float64'},
     'lat_ddeg':{'long_name':'Latitude Decimal Degrees', 'type':'float64'},
     'lon_ddeg': {'long_name':'Longitude Decimal Degrees', 'type':'float64'},
     'new_fix_bool': {'long_name':'New Fix?', 'type':'bool_'},
