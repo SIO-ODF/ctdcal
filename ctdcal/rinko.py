@@ -1,18 +1,12 @@
+import logging
 from collections import namedtuple
 from pathlib import Path
 
-import logging
 import numpy as np
 import pandas as pd
 import scipy
 
-from . import (
-    ctd_plots,
-    get_ctdcal_config,
-    flagging,
-    process_ctd,
-    oxy_fitting,
-)
+from . import ctd_plots, flagging, get_ctdcal_config, oxy_fitting, process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -203,7 +197,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
-        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str").squeeze(axis=1).to_list()
         f_stem = f.stem
         (rinko_coefs_group, _) = rinko_oxy_fit(
             good_data.loc[good_data["SSSCC"].isin(ssscc_sublist)].copy(),
