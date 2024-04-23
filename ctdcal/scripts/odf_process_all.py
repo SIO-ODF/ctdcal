@@ -2,8 +2,10 @@
 Process all CTD and bottle data using ODF routines.
 """
 
+import logging
+
 # import needed ctdcal modules
-from .. import (
+from ctdcal import (
     convert,
     fit_ctd,
     get_ctdcal_config,
@@ -13,8 +15,6 @@ from .. import (
     process_ctd,
     rinko,
 )
-
-import logging
 
 log = logging.getLogger(__name__)
 

@@ -16,9 +16,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import oxy_fitting as oxy_fitting
+from ctdcal import flagging as flagging
+from ctdcal import get_ctdcal_config
+from ctdcal import oxy_fitting as oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -418,7 +418,7 @@ def export_report_data(df):
     df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
     df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
-    df[cruise_report_cols].to_csv("data/scratch_folder/report_data.csv", index=False)
+    df[cruise_report_cols].to_csv("data/report_data.csv", index=False)
 
     return
 

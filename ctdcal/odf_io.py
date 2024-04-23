@@ -7,7 +7,7 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import get_ctdcal_config
+from ctdcal import get_ctdcal_config
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -149,6 +149,7 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
 
     """
     for ssscc in ssscc_list:
+        print(ssscc)
         if (Path(salt_dir) / f"{ssscc}_salts.csv").exists():
             log.info(f"{ssscc}_salts.csv already exists in {salt_dir}... skipping")
             continue
