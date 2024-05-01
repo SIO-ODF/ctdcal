@@ -13,6 +13,7 @@ from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 
+import gsw
 import numpy as np
 import pandas as pd
 
@@ -175,6 +176,12 @@ def load_all_btl_files(ssscc_list, cols=None):
 
     """
     df_data_all = pd.DataFrame()
+    salt_reprocessed = cfg.dirs["salt"] + "reprocessed_salts.csv"
+
+    from ctdcal import io as odf_io_2
+    discrete_data = odf_io_2.load_exchange_btl(salt_reprocessed)
+    discrete_data["SSSCC"] = discrete_data["STNNBR"].astype(str).str.zfill(3) + discrete_data["CASTNO"].astype(str).str.zfill(2)
+    discrete_data = discrete_data.rename(columns={"SAMPNO":"btl_fire_num"})
 
     for ssscc in ssscc_list:
         log.info("Loading BTL data for station: " + ssscc + "...")
@@ -182,6 +189,7 @@ def load_all_btl_files(ssscc_list, cols=None):
         btl_data = _load_btl_data(btl_file, cols)
 
         ### load REFT data
+        # reft_data = discrete_data[["btl_fire_num","REFTMP"]].loc[discrete_data.SSSCC == ssscc]    #   Not doing this one, need the "diff" column for flagging
         reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
         try:
             reft_data = _load_reft_data(reft_file)
@@ -198,51 +206,53 @@ def load_all_btl_files(ssscc_list, cols=None):
             reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
 
         ### load REFC data
-        refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
-        try:
-            refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
-            if len(refc_data) > 36:
-                log.error(f"len(refc_data) > 36 for {ssscc}, check autosal file")
-        except FileNotFoundError:
-            log.warning(
-                "Missing (or misnamed) REFC Data Station: "
-                + ssscc
-                + "...filling with NaNs"
-            )
-            refc_data = pd.DataFrame(
-                index=btl_data.index,
-                columns=["CRavg", "BathTEMP", "BTLCOND"],
-                dtype=float,
-            )
-            refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
+        refc_data = discrete_data[["btl_fire_num","SALNTY"]].loc[discrete_data.SSSCC == ssscc]
+        # refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
+        # try:
+        #     refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
+        #     if len(refc_data) > 36:
+        #         log.error(f"len(refc_data) > 36 for {ssscc}, check autosal file")
+        # except FileNotFoundError:
+        #     log.warning(
+        #         "Missing (or misnamed) REFC Data Station: "
+        #         + ssscc
+        #         + "...filling with NaNs"
+        #     )
+        #     refc_data = pd.DataFrame(
+        #         index=btl_data.index,
+        #         columns=["CRavg", "BathTEMP", "BTLCOND"],
+        #         dtype=float,
+        #     )
+        #     refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
-        oxy_file = cfg.dirs["oxygen"] + ssscc
-        try:
-            oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
-            if len(oxy_data) > 36:
-                log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
-        except FileNotFoundError:
-            log.warning(
-                "Missing (or misnamed) REFO Data Station: "
-                + ssscc
-                + "...filling with NaNs"
-            )
-            oxy_data = pd.DataFrame(
-                index=btl_data.index,
-                columns=[
-                    "FLASKNO",
-                    "TITR_VOL",
-                    "TITR_TEMP",
-                    "DRAW_TEMP",
-                    "TITR_TIME",
-                    "END_VOLTS",
-                ],
-                dtype=float,
-            )
-            oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
-            oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
-            oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
+        oxy_data = discrete_data[["btl_fire_num", "OXYGEN"]].loc[discrete_data.SSSCC == ssscc]
+        # oxy_file = cfg.dirs["oxygen"] + ssscc
+        # try:
+        #     oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
+        #     if len(oxy_data) > 36:
+        #         log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
+        # except FileNotFoundError:
+        #     log.warning(
+        #         "Missing (or misnamed) REFO Data Station: "
+        #         + ssscc
+        #         + "...filling with NaNs"
+        #     )
+        #     oxy_data = pd.DataFrame(
+        #         index=btl_data.index,
+        #         columns=[
+        #             "FLASKNO",
+        #             "TITR_VOL",
+        #             "TITR_TEMP",
+        #             "DRAW_TEMP",
+        #             "TITR_TIME",
+        #             "END_VOLTS",
+        #         ],
+        #         dtype=float,
+        #     )
+        #     oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
+        #     oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
+        #     oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
 
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
@@ -250,15 +260,17 @@ def load_all_btl_files(ssscc_list, cols=None):
         btl_data = pd.merge(
             btl_data,
             refc_data,
-            left_on="btl_fire_num",
-            right_on="SAMPNO_SALT",
+            on="btl_fire_num",
+            # left_on="btl_fire_num",
+            # right_on="SAMPNO_SALT",
             how="outer",
         )
         btl_data = pd.merge(
             btl_data,
             oxy_data,
-            left_on="btl_fire_num",
-            right_on="BOTTLENO_OXY",
+            on="btl_fire_num",
+            # left_on="btl_fire_num",
+            # right_on="BOTTLENO_OXY",
             how="outer",
         )
 
@@ -276,6 +288,15 @@ def load_all_btl_files(ssscc_list, cols=None):
                 "Columns of " + ssscc + " do not match those of previous columns"
             )
         # print("* Finished BTL data station: " + ssscc + " *")
+
+    #   Derive conductivity from the salinity values for use later
+    #   Normally: convert.CR_to_cond
+    #   Take cond. ratio, make salinity (effectively skipping this step)
+    #       salinity = gsw.SP_salinometer((cr / 2.0), bath_t)
+    #   Then make cond. from reft, bottle pressure
+    #       cond = gsw.C_from_SP(salinity, ref_t, btl_p)
+    #   Saved in column called "BTLCOND" for fitting
+    df_data_all["BTLCOND"] = gsw.C_from_SP(df_data_all["SALNTY"],df_data_all["CTDTMP1"],df_data_all["CTDPRS"])
 
     # Drop duplicated columns generated by concatenation
     df_data_all = df_data_all.loc[:, ~df_data_all.columns.duplicated()]
@@ -451,15 +472,29 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         "SALNTY_FLAG_W": "",
         # "CTDOXY": "UMOL/KG",
         # "CTDOXY_FLAG_W": "",
-        # "CTDRINKO": "UMOL/KG",
-        # "CTDRINKO_FLAG_W": "",
+        "CTDRINKO": "UMOL/KG",
+        "CTDRINKO_FLAG_W": "",
         "CTDOXY": "UMOL/KG",
         "CTDOXY_FLAG_W": "",
         "OXYGEN": "UMOL/KG",
         "OXYGEN_FLAG_W": "",
         "REFTMP": "ITS-90",
         "REFTMP_FLAG_W": "",
+        "CTDFLUOR": "VOLTS",
+        "CTDFLUOR_FLAG_W": "",
+        "CTDXMISS": "VOLTS",
+        "CTDXMISS_FLAG_W": "",
+        "CTDBACKSCATTER": "VOLTS",
+        "CTDBACKSCATTER_FLAG_W": "",
     }
+
+    # switch oxygen primary sensor to rinko for select casts)
+    #   Was including 01201, but fitting causes a major spike at around 1000 m
+    rinko_list = ["02001", "02401", "06901", "07401", "07501", "09801", "10501"]
+    print(f"Using RINKO bottle data for select casts: {rinko_list}")
+    btl_data.loc[btl_data["SSSCC"].isin(rinko_list), "CTDOXY"] = btl_data.loc[btl_data["SSSCC"].isin(rinko_list), "CTDRINKO"]
+    # btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+    # btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
 
     # rename outputs as defined in user_settings.yaml
     for param, attrs in cfg.ctd_outputs.items():
@@ -477,10 +512,6 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     btl_data = btl_data.sort_values(
         by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
     )
-
-    # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
@@ -509,6 +540,8 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
     )
     btl_data = btl_data.where(~btl_data.isnull(), -999)
+
+    btl_data[["CTDFLUOR_FLAG_W","CTDXMISS_FLAG_W","CTDBACKSCATTER_FLAG_W"]] = 1
 
     # check columns
     try:
