@@ -737,7 +737,7 @@ def export_ct1(df, ssscc_list):
     # TODO: may not always have these channels so don't hardcode them in!
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
-    # df["CTDBACKSCATTER_FLAG_W"] = 1
+    df["CTDBACKSCATTER_FLAG_W"] = 1
 
     # rename outputs as defined in user_settings.yaml
     for param, attrs in cfg.ctd_outputs.items():
@@ -786,12 +786,56 @@ def export_ct1(df, ssscc_list):
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
         # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
-        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        #   Was including 01201, but the RINKO has some discontinuity in the upper 1000 m
+        if ssscc in {"02001", "02401", "06901", "07401", "07501", "09801", "10501"}:
+            print(f"Using Rinko as CTDOXY for {ssscc}")
+            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
+
+        #   Apply all the manual fixes to the continuous data
+        if ssscc == "01001":
+            #   Salinity noisy below 3750 dbar
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS > 3748] = 3
+
+        elif ssscc == "01101":
+            #   Salinity noisy below 3700 dbar
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS > 3698] = 3
+
+        elif ssscc == "01201":
+            #   Oxygen data noisy below 4000 dbar
+            #   Salinity data noisy below 3976 dbar
+            time_data.CTDOXY_FLAG_W.loc[time_data.CTDPRS > 3998] = 3
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS > 3974] = 3
+
+        elif ssscc == "02001":
+            #   Flag oxygen spike at prs = 80, 82 as 3
+            time_data.CTDOXY_FLAG_W.loc[time_data.CTDPRS == 80] = 3
+            time_data.CTDOXY_FLAG_W.loc[time_data.CTDPRS == 82] = 3
+
+        elif ssscc == "02701":
+            #   Salinity spike 1420 dbar
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS == 1420] = 3
+
+        elif ssscc == "05401":
+            #   Salinity spike 384 dbar
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS == 384] = 3
+
+        elif ssscc == "06701":
+            #   Salinity spike 522 dbar
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS == 522] = 3
+
+        elif ssscc == "08001":
+            #   Salinity spike 940 dbar
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS == 940] = 3
+
+        elif ssscc == "08701":
+            #   Salinity spikes at 1446, 2610 dbar
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS == 1446] = 3
+            time_data.CTDSAL_FLAG_W.loc[time_data.CTDPRS == 2610] = 3
+
 
         # force flags back to int (TODO: make flags categorical)
         for col in time_data.columns:
