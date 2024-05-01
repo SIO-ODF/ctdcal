@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import ctd_plots, flagging, get_ctdcal_config, oxy_fitting, process_ctd
+from ctdcal import ctd_plots, flagging, get_ctdcal_config, oxy_fitting, process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -210,6 +210,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         # NOTE (4/9/21): tried adding time drift term unsuccessfully
         # Uchida (2010) says fitting individual stations is the same (even preferred?)
         for ssscc in ssscc_sublist:
+            print(f"RINKO: {ssscc}")
             (rinko_coefs_ssscc, _) = rinko_oxy_fit(
                 good_data.loc[good_data["SSSCC"] == ssscc].copy(),
                 rinko_coef0=rinko_coefs_group,
@@ -353,6 +354,8 @@ def rinko_oxy_fit(
     # )
 
     bad_df = pd.DataFrame()
+    if any((btl_df.CTDPRS < 0) & (-1 < btl_df.CTDPRS)): #   If there are any surface bottles that had a pressure reading in the -decimals
+        btl_df.loc[btl_df.CTDPRS < 0] = 0.1
     weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
     fit_data = (
         btl_df[cfg.column["rinko_oxy"]],
@@ -384,6 +387,7 @@ def rinko_oxy_fit(
 
     cutoff = 2.8 * np.std(btl_df["residual"])
     thrown_values = btl_df[np.abs(btl_df["residual"]) > cutoff]
+    thrown_values = thrown_values[thrown_values["OXYGEN"] != -999]
     bad_df = pd.concat([bad_df, thrown_values])
     btl_df = btl_df[np.abs(btl_df["residual"]) <= cutoff].copy()
 
