@@ -475,12 +475,13 @@ def calibrate_cond(btl_df, time_df):
     """
     log.info("Calibrating conductivity")
     # calculate BTLCOND values from autosal data
-    btl_df[cfg.column["refC"]] = convert.CR_to_cond(
-        btl_df["CRavg"],
-        btl_df["BathTEMP"],
-        btl_df[cfg.column["t1"]],
-        btl_df[cfg.column["p"]],
-    )
+    if cfg.column["refC"] not in btl_df.columns:
+        btl_df[cfg.column["refC"]] = convert.CR_to_cond(
+            btl_df["CRavg"],
+            btl_df["BathTEMP"],
+            btl_df[cfg.column["t1"]],
+            btl_df[cfg.column["p"]],
+        )
 
     # merge in handcoded salt flags
     # TODO: make salt flagger move .csv somewhere else? or just always have it
