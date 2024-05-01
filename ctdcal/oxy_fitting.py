@@ -13,10 +13,10 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import ctd_plots as ctd_plots
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import process_ctd as process_ctd
+from ctdcal import ctd_plots as ctd_plots
+from ctdcal import flagging as flagging
+from ctdcal import get_ctdcal_config
+from ctdcal import process_ctd as process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -722,18 +722,23 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
     # Convert CTDOXY units
     btl_df["CTDOXY"] = oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
     # Calculate bottle oxygen
-    btl_df[cfg.column["refO"]] = calculate_bottle_oxygen(
-        ssscc_list,
-        btl_df["SSSCC"],
-        btl_df["TITR_VOL"],
-        btl_df["TITR_TEMP"],
-        btl_df["FLASKNO"],
-    )
-    btl_df[cfg.column["refO"]] = oxy_ml_to_umolkg(
-        btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
-    )
+    # btl_df[cfg.column["refO"]] = calculate_bottle_oxygen(
+    #     ssscc_list,
+    #     btl_df["SSSCC"],
+    #     btl_df["TITR_VOL"],
+    #     btl_df["TITR_TEMP"],
+    #     btl_df["FLASKNO"],
+    # )
+    # btl_df[cfg.column["refO"]] = oxy_ml_to_umolkg(
+    #     btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
+    # )
+    btl_df["OXYGEN"].loc[btl_df["OXYGEN"] == -999] = np.nan
     btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["refO"]])
     # Load manual OXYGEN flags
+    #   Flags must have the following columns:
+    #   SSSCC, as a 5-character string
+    #   SAMPNO, the bottle drawn from (merging in on btl_fire_num)
+    #   Flag, overwriting the value of OXYGEN_FLAG_W
     if Path("data/oxygen/manual_oxy_flags.csv").exists():
         manual_flags = pd.read_csv(
             "data/oxygen/manual_oxy_flags.csv", dtype={"SSSCC": str}
@@ -819,11 +824,19 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Fit each cast individually
     for ssscc in ssscc_list:
-        sbe_coef, sbe_df = sbe43_oxy_fit(
-            all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
-            sbe_coef0=sbe_coef0,
-            f_suffix=f"_{ssscc}",
-        )
+        if ssscc == "90101":
+            coefs = (0.4072602158955287,-0.4729553169922034,2.4585396694643844,0.007609157193166989,0.03824804401927853)
+            sbe_coef, sbe_df = sbe43_oxy_fit(
+                all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
+                sbe_coef0=coefs,
+                f_suffix=f"_{ssscc}",
+            )
+        else:
+            sbe_coef, sbe_df = sbe43_oxy_fit(
+                all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
+                sbe_coef0=sbe_coef0,
+                f_suffix=f"_{ssscc}",
+            )
         # build coef dictionary
         if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
             sbe43_dict[ssscc] = sbe_coef
