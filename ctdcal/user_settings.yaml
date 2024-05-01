@@ -3,9 +3,9 @@
 # this is an example to fill with your own values
 
 # Cruise specifics
-expocode: "325020210316"
-section_id: "A20"
-ctd_serial: 914  # TODO: how to handle multiple CTDs on one cruise?
+expocode: "320620180309"
+section_id: "S04P"
+ctd_serial: 1281 # TODO: how to handle multiple CTDs on one cruise?
 
 # CTD output variables/units
 ctd_outputs:
@@ -29,4 +29,7 @@ ctd_outputs:
         units: 0-5VDC
     CTDFLUOR:
         sensor: CTDFLUOR1
+        units: 0-5VDC
+    CTDBACKSCATTER:
+        sensor: CTDBACKSCATTER
         units: 0-5VDC
