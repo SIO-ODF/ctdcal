@@ -48,7 +48,7 @@ def odf_process_all():
     convert.make_btl_mean(ssscc_list)
 
     # generate salt .csv files
-    odf_io.process_salts(ssscc_list)
+    # odf_io.process_salts(ssscc_list)  #   DON'T DO - AUTOSAL SALTS WERE REPROCESSED
 
     # generate reftemp .csv files
     process_bottle.process_reft(ssscc_list)
@@ -61,6 +61,16 @@ def odf_process_all():
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
     btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
 
+    print("***Using secondary pump for stations 074 and 075")
+    time_data_all["CTDTMP1"].loc[time_data_all.SSSCC == "07401"] = time_data_all["CTDTMP2"].loc[time_data_all.SSSCC == "07401"].copy()
+    time_data_all["CTDTMP1"].loc[time_data_all.SSSCC == "07501"] = time_data_all["CTDTMP2"].loc[time_data_all.SSSCC == "07501"].copy()
+    btl_data_all["CTDTMP1"].loc[btl_data_all.SSSCC == "07401"] = btl_data_all["CTDTMP2"].loc[btl_data_all.SSSCC == "07401"].copy()
+    btl_data_all["CTDTMP1"].loc[btl_data_all.SSSCC == "07501"] = btl_data_all["CTDTMP2"].loc[btl_data_all.SSSCC == "07501"].copy()
+    time_data_all["CTDCOND1"].loc[time_data_all.SSSCC == "07401"] = time_data_all["CTDCOND2"].loc[time_data_all.SSSCC == "07401"].copy()
+    time_data_all["CTDCOND1"].loc[time_data_all.SSSCC == "07501"] = time_data_all["CTDCOND2"].loc[time_data_all.SSSCC == "07501"].copy()
+    btl_data_all["CTDCOND1"].loc[btl_data_all.SSSCC == "07401"] = btl_data_all["CTDCOND2"].loc[btl_data_all.SSSCC == "07401"].copy()
+    btl_data_all["CTDCOND1"].loc[btl_data_all.SSSCC == "07501"] = btl_data_all["CTDCOND2"].loc[btl_data_all.SSSCC == "07501"].copy()
+
     # process pressure offset
     process_ctd.apply_pressure_offset(btl_data_all)
     process_ctd.apply_pressure_offset(time_data_all)
@@ -72,14 +82,19 @@ def odf_process_all():
     fit_ctd.calibrate_temp(btl_data_all, time_data_all)
 
     # calibrate temperature against reference
+    print("***Calibrating conductivity")
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
     # calculate params needs for oxy/rinko calibration
     # TODO: move density matching to prepare_oxy
+    print("***Preparing oxygen")
     oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
 
     # calibrate oxygen against reference
+    print("***Calibrating SBE43")
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+
+    print("***Calibrating RINKO")
     rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #####
