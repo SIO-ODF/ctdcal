@@ -231,7 +231,7 @@ def ctd_align(inMat=None, col=None, time=0.0):
     if (inMat is not None) & (col is not None) & (time > 0.0):
         # Time to advance
         advnc = int(fl * time)
-        tmp = np.arange(advnc, dtype=np.float)
+        tmp = np.arange(advnc, dtype=float)
         last = inMat[col][len(inMat) - 1]
         tmp.fill(float(last))
         inMat[col] = np.concatenate((inMat[col][advnc:], tmp))

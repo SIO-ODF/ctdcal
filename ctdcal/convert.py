@@ -1,12 +1,12 @@
+import logging
 from pathlib import Path
 
 import gsw
-import logging
 import numpy as np
 import pandas as pd
 
-from ctdcal import get_ctdcal_config, fit_ctd
 from ctdcal import equations_sbe as sbe_eq
+from ctdcal import fit_ctd, get_ctdcal_config
 from ctdcal import process_bottle as btl
 from ctdcal import process_ctd as process_ctd
 from ctdcal import sbe_reader as sbe_rd
@@ -147,8 +147,11 @@ def hex_to_ctd(ssscc_list, group="ODF"):
                 print(f"{ssscc} offsetting C1 by 0.073 seconds...")
                 inMat = np.transpose(converted_df.to_numpy())  #   Initial transposition
                 inMat = process_ctd.ctd_align(
-                    inMat=inMat, col=4, time=0.073
+                    inMat=inMat, col=3, time=0.073
                 )  # CTDCOND1
+                inMat = process_ctd.ctd_align(
+                    inMat=inMat, col=4, time=0.073
+                )  # CTDCOND2
                 print(
                     f"{ssscc} offsetting CTDOXY1 and oxygen voltage by 3.5 seconds each..."
                 )
