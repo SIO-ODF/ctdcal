@@ -144,7 +144,7 @@ def hex_to_ctd(ssscc_list, group="ODF"):
             #   OSNAP request
             if group == "WHOI":
                 #   V1 box offsets primary line by 0.073 sec, but not the secondary line. This is 1.7 scans, rounded down to 1
-                print(f"{ssscc} offsetting C1 by 0.073 seconds...")
+                print(f"{ssscc} offsetting C1, C2 by 0.073 seconds...")
                 inMat = np.transpose(converted_df.to_numpy())  #   Initial transposition
                 inMat = process_ctd.ctd_align(
                     inMat=inMat, col=3, time=0.073
