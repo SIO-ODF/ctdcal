@@ -7,25 +7,25 @@ This script is a modified version of odf_process_all deveoped by SIO-ODF.
 Aaron Mau, 2022
 """
 
+import logging
+
+import gsw
+import numpy as np
+import pandas as pd
+
 # import needed ctdcal modules
 from ctdcal import (
     convert,
+    ctd_plots,
     fit_ctd,
+    flagging,
     get_ctdcal_config,
+    osnap_oxy,
     oxy_fitting,
     process_bottle,
     process_ctd,
     salts_io,
-    osnap_oxy,
-    flagging,
-    ctd_plots,
 )
-
-import pandas as pd
-import numpy as np
-import gsw
-
-import logging
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -79,29 +79,29 @@ def whoi_process_all(group="WHOI"):
     process_ctd.make_depth_log(time_data_all)
 
     #   Flag the temp data relative to itself, don't fit it w/o reference. Using ODF threshold defaults.
-    # time_data_all["CTDTMP_FLAG_W"] = flagging.by_residual(
-    #     time_data_all.CTDTMP1, time_data_all.CTDTMP2, time_data_all.CTDPRS
-    # )
-    # btl_data_all["CTDTMP_FLAG_W"] = flagging.by_residual(
-    #     btl_data_all.CTDTMP1, btl_data_all.CTDTMP2, btl_data_all.CTDPRS
-    # )  #   These columns should go in the output file.
-    time_data_all["CTDTMP_FLAG_W"] = 1  #   ANo reference. By WOCE def.
-    btl_data_all["CTDTMP_FLAG_W"] = 1
+    time_data_all["CTDTMP_FLAG_W"] = flagging.by_residual(
+        time_data_all.CTDTMP1, time_data_all.CTDTMP2, time_data_all.CTDPRS
+    )
+    btl_data_all["CTDTMP_FLAG_W"] = flagging.by_residual(
+        btl_data_all.CTDTMP1, btl_data_all.CTDTMP2, btl_data_all.CTDPRS
+    )  #   These columns should go in the output file.
+    # time_data_all["CTDTMP_FLAG_W"] = 1  #   ANo reference. By WOCE def.
+    # btl_data_all["CTDTMP_FLAG_W"] = 1
 
     #   Calibrate conductivity
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
-    skip_list = [
-        "168",
-        "169",
-        "189",
-        "191",
-        "192",
-        "194",
-        "195",
-        "200",
-    ]  #   A list of stations where salts were not taken whatsoever. No ref, so use 1.
-    btl_data_all.loc[btl_data_all.SSSCC.isin(skip_list), "CTDSAL_FLAG_W"] = 1
-    time_data_all.loc[time_data_all.SSSCC.isin(skip_list), "CTDSAL_FLAG_W"] = 1
+    # skip_list = [
+    #         # "168",
+    #         # "169", 
+    #         "189",
+    #         "191",
+    #         "192",
+    #         "194",
+    #         "195",
+    #         "200",
+    #     ]  #   A list of stations where salts were not taken whatsoever. No ref, so use 1.
+    # btl_data_all.loc[btl_data_all.SSSCC.isin(skip_list), "CTDSAL_FLAG_W"] = 1
+    # time_data_all.loc[time_data_all.SSSCC.isin(skip_list), "CTDSAL_FLAG_W"] = 1
 
     btl_data_all, time_data_all = osnap_oxy.ctd_oxy_converter(
         btl_data_all, time_data_all
@@ -125,8 +125,9 @@ def whoi_process_all(group="WHOI"):
     print("Writing out data products...")
 
     try:
-        import xarray as xr
         import datetime
+
+        import xarray as xr
 
         depth_df = pd.read_csv(
             cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
@@ -173,7 +174,7 @@ def whoi_process_all(group="WHOI"):
             "CTDOXY1": "ML/L",
             "CTDOXYVOLTS": "0-5VDC",
             "ALT": "M",
-            "CTDFLUOR": "mg/m^3",
+            "CTDFLUOR": "0-5VDC",
             "TURBIDITY": "0-5VDC",
             "CTDXMISS": "0-5VDC",
             "FLUOR_CDOM": "0-5VDC",
@@ -192,7 +193,7 @@ def whoi_process_all(group="WHOI"):
             "GPSLAT",
             "GPSLON",
             "CTDPRS",
-            "CTDTMP1",
+            "CTDTMP",
             "CTDTMP2",
             "CTDTMP_FLAG_W",
             "CTDCOND1",
@@ -454,18 +455,18 @@ def whoi_process_all(group="WHOI"):
         btl_df[cfg.column["sal"]], old_flags=btl_df[cfg.column["sal"] + "_FLAG_W"]
     )
 
-    #   Adjust flags for select stations where no salt samples were taken
-    skip_list = [
-        "189",
-        "191",
-        "192",
-        "194",
-        "195",
-        "200",
-    ]
-    print(f"Marking {skip_list} as flag 1.")
-    btl_df.loc[btl_df.SSSCC.isin(skip_list), [cfg.column["sal"] + "_FLAG_W"]] = 1
-    time_df.loc[time_df.SSSCC.isin(skip_list), [cfg.column["sal"] + "_FLAG_W"]] = 1
+    # #   Adjust flags for select stations where no salt samples were taken
+    # skip_list = [
+    #     "189",
+    #     "191",
+    #     "192",
+    #     "194",
+    #     "195",
+    #     "200",
+    # ]
+    # print(f"Marking {skip_list} as flag 1.")
+    # btl_df.loc[btl_df.SSSCC.isin(skip_list), [cfg.column["sal"] + "_FLAG_W"]] = 1
+    # time_df.loc[time_df.SSSCC.isin(skip_list), [cfg.column["sal"] + "_FLAG_W"]] = 1
 
     #   OXY FITTING
     #   We know that the fitting routine does a poor job on the upcast without using the downcast coeffs.
@@ -647,9 +648,9 @@ def whoi_process_all(group="WHOI"):
     save_btl = btl_df[btl_cols.keys()].to_xarray()
     save_btl.attrs = btl_cols
     save_btl.attrs["description"] = "OSNAP32 Bottle data"
-    save_btl.attrs[
-        "no_sample_stations"
-    ] = skip_list  #   Provide the list of stations where no bottles were sampled
+    # save_btl.attrs[
+    #     "no_sample_stations"
+    # ] = skip_list  #   Provide the list of stations where no bottles were sampled
     save_btl.to_netcdf(path=outfile + ".nc")
 
     time_cols = {
@@ -670,7 +671,30 @@ def whoi_process_all(group="WHOI"):
         "CTDOXY1": "ML/L",
         "CTDOXYVOLTS": "0-5VDC",
         "ALT": "M",
-        "CTDFLUOR": "mg/m^3",
+        "CTDFLUOR": "0-5VDC",
+        "TURBIDITY": "0-5VDC",
+        "CTDXMISS": "0-5VDC",
+        "FLUOR_CDOM": "0-5VDC",
+    }
+    time_cols_down = {
+        "SSSCC": "Station",
+        "DateTime": "",
+        "GPSLAT": "Dec Degrees",
+        "GPSLON": "Dec Degrees",
+        "CTDPRS": "DBAR",
+        "CTDTMP": "ITS-90",
+        "CTDTMP2": "ITS-90",
+        "CTDTMP_FLAG_W": "",
+        "CTDCOND1": "mS/cm",
+        "CTDCOND2": "mS/cm",
+        "CTDSAL": "PSS-78",
+        "CTDSAL_FLAG_W": "",
+        "CTDOXY_SIO": "UMOL/KG",
+        "CTDOXY_FLAG_W": "",
+        "CTDOXY1": "ML/L",
+        "CTDOXYVOLTS": "0-5VDC",
+        "ALT": "M",
+        "CTDFLUOR": "0-5VDC",
         "TURBIDITY": "0-5VDC",
         "CTDXMISS": "0-5VDC",
         "FLUOR_CDOM": "0-5VDC",
@@ -713,17 +737,17 @@ def whoi_process_all(group="WHOI"):
         down_2db["SSSCC"] = ssscc
 
         up_2db = up_2db[time_cols.keys()].to_xarray()
-        down_2db = down_2db[time_cols.keys()].to_xarray()
+        down_2db = down_2db[time_cols_down.keys()].to_xarray()
         up_2db.attrs = time_cols
         down_2db.attrs = time_cols
-        if ssscc in skip_list:
-            up_2db.attrs["cond_warn"] = "No salinity samples taken"
-            down_2db.attrs["cond_warn"] = "No salinity samples taken"
+        # if ssscc in skip_list:
+        #     up_2db.attrs["cond_warn"] = "No salinity samples taken"
+        #     down_2db.attrs["cond_warn"] = "No salinity samples taken"
 
         up_2db.attrs["description"] = "OSNAP32 2 decibar average of station upcast"
         up_2db.to_netcdf(path=upcast_out)
 
-        up_2db.attrs["description"] = "OSNAP32 2 decibar average of station downcast"
+        down_2db.attrs["description"] = "OSNAP32 2 decibar average of station downcast"
         down_2db.to_netcdf(path=downcast_out)
 
     print("All data fit and exported:")
