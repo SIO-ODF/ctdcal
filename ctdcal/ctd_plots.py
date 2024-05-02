@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+
 from ctdcal import get_ctdcal_config
 
 cfg = get_ctdcal_config()
@@ -98,9 +99,19 @@ def residual_vs_pressure(
         idx, uniques = pd.factorize(stn)  # find unique stations #s and index them
         sc = ax.scatter(diff, prs, c=idx, marker="+")
         cbar = plt.colorbar(sc, ax=ax, pad=0.1)  # set cbar ticks to station names
-        tick_inds = cbar.get_ticks().astype(int)
-        cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
-        cbar.ax.set_yticklabels(uniques[tick_inds])
+        try:
+            tick_inds = cbar.get_ticks().astype(int)
+            if tick_inds[-1]>len(uniques):
+                tick_inds[-1] = len(uniques)-1
+            cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
+            cbar.ax.set_yticklabels(uniques[tick_inds])
+        except IndexError:
+            # num_ticks = min(len(uniques), 10)  # Limit the maximum number of ticks for legibility
+            # tick_inds = range(num_ticks)
+            # cbar.ax.set_yticklabels(uniques[tick_inds])
+            num_ticks = min(len(uniques), 10)
+            cbar.ax.yaxis.set_major_locator(ticker.MaxNLocator(num_ticks))
+            cbar.ax.set_yticklabels(uniques)
         cbar.ax.set_title("Station")
     else:
         sc = ax.scatter(diff, prs, marker="+")
@@ -284,7 +295,7 @@ def haversine(lat1, lon1, lat2, lon2, units="km"):
     dout : Float
         Calculated distance between points with units specified by 'units'
     """
-    from math import radians, cos, sin, asin, sqrt
+    from math import asin, cos, radians, sin, sqrt
 
     # convert decimal degrees to radians
     lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
@@ -674,8 +685,8 @@ def osnap_plot_TS(df, f_out=None):
     Line plot of temperature and salinity for a single cast or series of casts.
     Modified from: https://oceanpython.org/2013/02/17/t-s-diagram/
     """
-    import matplotlib.ticker as tick
     import gsw
+    import matplotlib.ticker as tick
 
     #   Demarcate temperature, salinty, and limits for density
     temp = df.CTDTMP1
