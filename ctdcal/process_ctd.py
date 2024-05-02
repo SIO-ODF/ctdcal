@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-from . import get_ctdcal_config, io, oxy_fitting
+from ctdcal import get_ctdcal_config, io, oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -489,7 +489,12 @@ def binning_df(df, p_column="CTDPRS", bin_size=2):
     )
     df_out.loc[:, p_column] = df_out["bins"].astype(float)
 
-    return df_out.groupby("bins").mean()
+    try:
+        g = df_out.groupby("bins", observed=False).mean()
+    except:
+        df_out.SSSCC = df_out.SSSCC.astype("int")
+        g = df_out.groupby("bins", observed=False).mean()
+    return g
 
 
 def _fill_surface_data(df, bin_size=2):
