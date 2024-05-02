@@ -1,12 +1,12 @@
 #!/usr/bin/env python
+import logging
 from pathlib import Path
 
 import gsw
-import logging
 import numpy as np
 import pandas as pd
-from scipy.ndimage.interpolation import shift
 import yaml
+from scipy.ndimage.interpolation import shift
 
 from ctdcal import convert as convert
 from ctdcal import ctd_plots as ctd_plots
