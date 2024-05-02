@@ -362,7 +362,7 @@ def export_report_data(df):
         "CTDTMP1_FLAG_W",
         "CTDTMP2",
         "CTDTMP2_FLAG_W",
-        "REFTMP",
+        # "REFTMP",
         "CTDCOND1",
         "CTDCOND1_FLAG_W",
         "CTDCOND2",
