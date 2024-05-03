@@ -1,6 +1,7 @@
 import io
 import logging
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -227,3 +228,28 @@ def test_process_salts(tmp_path, caplog):
     with caplog.at_level(logging.INFO):
         odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
         assert "90909_salts.csv already exists" in caplog.messages[1]
+
+    def test_printProgressBar():
+        # Test parameters
+        iteration = 3
+        total = 10
+        prefix = "Progress"
+        suffix = "Complete"
+        decimals = 1
+        length = 20
+        fill = "#"
+        printEnd = "\r"
+
+        # Expected output
+        expected_output = "\rProgress |###-------| 30.0% Complete"
+
+        # Redirect stdout to mock_stdout
+        with patch('sys.stdout', io.StringIO()):
+            # Call function
+            odf_io.printProgressBar(iteration, total, prefix, suffix, decimals, length, fill, printEnd)
+
+        # Get value from mock_stdout
+        actual_output = io.StringIO().getvalue()
+
+        # Check if the actual output matches the expected output
+        assert actual_output == expected_output
