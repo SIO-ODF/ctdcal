@@ -478,7 +478,11 @@ def binning_df(df, p_column="CTDPRS", bin_size=2):
     )
     df_out.loc[:, p_column] = df_out["bins"].astype(float)
 
-    return df_out.groupby("bins").mean()
+    try:
+        #   Python 3.8
+        return df_out.groupby("bins", observed=False).mean()
+    except TypeError:
+        return df_out.groupby("bins", observed=False).mean(numeric_only=True)
 
 
 def _fill_surface_data(df, bin_size=2):
