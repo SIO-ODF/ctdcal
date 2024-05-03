@@ -221,9 +221,10 @@ def whoi_process_all(group="WHOI"):
         ctd_plots.osnap_suite(
             btl_data_prefit, btl_data_fit, time_data_prefit, time_data_fit
         )
+        
     except:
         print("Could not export final data.")
-
+    process_ctd.export_ct1(time_data_fit,ssscc_list)
     print("All 24 Hz downcast fit data exported.")
 
     #   UPCASTS
