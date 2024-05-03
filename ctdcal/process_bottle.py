@@ -27,16 +27,21 @@ BOTTLE_FIRE_COL = "btl_fire"
 BOTTLE_FIRE_NUM_COL = "btl_fire_num"
 
 
-# Retrieve the bottle data from a converted file.
 def retrieveBottleDataFromFile(converted_file):
-
+    """
+    Retrieve the bottle data from a converted file.
+    """
     converted_df = pd.read_pickle(converted_file)
 
     return retrieveBottleData(converted_df)
 
 
-# Retrieve the bottle data from a dataframe created from a converted file.
 def retrieveBottleData(converted_df):
+    """
+    Retrieve the bottle data from a dataframe created from a converted file.
+
+    Looks for changes in the BOTTLE_FIRE_COL column, ready to be averaged in making the CTD bottle file.
+    """
     if BOTTLE_FIRE_COL in converted_df.columns:
         converted_df[BOTTLE_FIRE_NUM_COL] = (
             (
@@ -137,6 +142,9 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
 
 
 def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
+    """
+    Adds lat/lon, date, and time to dataframe based on the values in the bottom_bottle_details.csv
+    """
     cast_details = pd.read_csv(
         # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
         cfg.dirs["logs"] + "bottom_bottle_details.csv",
@@ -286,6 +294,9 @@ def load_all_btl_files(ssscc_list, cols=None):
 
 
 def _reft_loader(ssscc, reft_dir):
+    """
+    Loads SBE35.cap files and assembles into a dataframe.
+    """
     # semi-flexible search for reft file (in the form of *ssscc.cap)
     try:
         reft_path = sorted(Path(reft_dir).glob(f"*{ssscc}.cap"))[0]
@@ -342,8 +353,8 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
     SBE35 reference thermometer processing function. Load in .cap files for given
     station/cast list, perform basic flagging, and export to .csv files.
 
-    Inputs
-    ------
+    Parameters
+    -------
     ssscc_list : list of str
         List of stations to process
     reft_dir : str, optional
@@ -363,6 +374,21 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
 
 
 def add_btlnbr_cols(df, btl_num_col):
+    """
+    Initialize bottle number column and initialize WOCE bottle flags.
+
+    Parameters
+    ----------
+    df : Pandas DataFrame
+        Bottle DataFrame containing a defined rosette bottle number
+    btl_num_col : String
+        String of bottle column to be reassigned
+    
+    Returns
+    -------
+    df : Pandas DataFrame
+        Bottle DataFrame with BTLNBR and flag columns as type int
+    """
     df["BTLNBR"] = df[btl_num_col].astype(int)
     # default to everything being good
     df["BTLNBR_FLAG_W"] = 2
@@ -370,13 +396,36 @@ def add_btlnbr_cols(df, btl_num_col):
 
 
 def load_hy_file(path_to_hyfile):
+    """
+    Read in an exchange-formatted bottle file as a Pandas DataFrame.
+
+    Inputs
+    ------
+    path_to_hyfile : String or Path object
+        The path to the bottle file.
+
+    Returns
+    -------
+    df : Pandas DataFrame
+        The bottle file without the lead/end rows, comments, or units
+    """
+    
     df = pd.read_csv(path_to_hyfile, comment="#", skiprows=[0])
-    df = df[df["EXPOCODE"] != "END_DATA"]
+    df = df.drop(df.index[0])   #   Drop the units
+    df = df[df["EXPOCODE"] != "END_DATA"]   #   Drop the final row
     return df
 
 
 def export_report_data(df):
+    """
+    Write out the data used for report generation as a csv.
 
+    Params
+    ------
+    df : Pandas DataFrame
+        Fit bottle data
+
+    """
     df["STNNBR"] = [int(x[0:3]) for x in df["SSSCC"]]
     df["CTDPRS"] = df["CTDPRS"].round(1)
     cruise_report_cols = [
@@ -424,6 +473,19 @@ def export_report_data(df):
 
 
 def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
+    """
+    Write out the exchange-lite formatted hy1 bottle file.
+
+    Params
+    ------
+    df : Pandas DataFrame
+        Fit bottle data
+    out_dir = String or Path object, optional
+        The path for where to write the hy1 file
+    org : String, optional
+        The organization or group used to determine subroutines
+
+    """
     log.info("Exporting bottle file")
     btl_data = df.copy()
     now = datetime.now()
