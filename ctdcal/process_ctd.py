@@ -791,6 +791,10 @@ def export_ct1(df, ssscc_list):
     for ssscc in ssscc_list:
 
         time_data = df[df["SSSCC"] == ssscc].copy()
+
+        time_data["CTDSAL_FLAG_W"].loc[time_data["CTDSAL"] < 21] = 3    #   Flag where fitting may be underconstrained
+        time_data["CTDOXY_FLAG_W"].loc[time_data["CTDOXY"] > 410]   = 3 #   These are exclusively spikes in the oxygen values
+
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
         # if int(ssscc[:3]) > 35:
