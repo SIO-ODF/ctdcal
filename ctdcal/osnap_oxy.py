@@ -9,10 +9,11 @@ A modification of the ODF oxy routine for oxygen data that is already in units o
 Developed for OSNAP32, 2022 with the intention of creating a "generic" oxy loader that can be merged into 
 ctdcal's other modules.
 """
-from ctdcal import get_ctdcal_config, oxy_fitting, flagging
-import pandas as pd
-import numpy as np
 import gsw
+import numpy as np
+import pandas as pd
+
+from ctdcal import flagging, get_ctdcal_config, oxy_fitting
 
 pd.options.mode.chained_assignment = None
 cfg = get_ctdcal_config()
@@ -22,12 +23,14 @@ def ctd_oxy_converter(btl_df, time_df):
     """Convert SBE43's output into umol/kg"""
     #   Extract the import bits of load_all_btl_files
 
+    #   Absolute salinity   
     btl_df["SA"] = gsw.SA_from_SP(
         btl_df[cfg.column["sal"]],
         btl_df[cfg.column["p"]],
         btl_df[cfg.column["lon"]],
         btl_df[cfg.column["lat"]],
     )
+    #   Conservative temperature
     btl_df["CT"] = gsw.CT_from_t(
         btl_df["SA"],
         btl_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
