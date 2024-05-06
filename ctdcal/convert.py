@@ -179,6 +179,15 @@ def hex_to_ctd(ssscc_list, group="ODF"):
                 #     lambda x: datetime.datetime.fromtimestamp(x)
                 # ).astype(str)
 
+                if ssscc == "117" or ssscc == "176" or ssscc == "120":  #   Swap the lines where there may be clogs in primary
+                    print(f"Swapping primary and secondary lines at station {ssscc}")
+                    temp_col_T = converted_df["CTDTMP1"].copy()
+                    temp_col_C = converted_df["CTDCOND1"].copy()
+                    converted_df["CTDTMP1"] = converted_df["CTDTMP2"]
+                    converted_df["CTDCOND1"] = converted_df["CTDCOND2"]
+                    converted_df["CTDTMP2"] = temp_col_T
+                    converted_df["CTDCOND2"] = temp_col_C
+
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
