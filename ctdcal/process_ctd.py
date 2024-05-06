@@ -797,6 +797,9 @@ def export_ct1(df, ssscc_list):
         # print(f"Using Rinko as CTDOXY for {ssscc}")
         # time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
         # time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        if ssscc == "176":
+            time_data.CTDOXY_FLAG_W.loc[time_data.CTDPRS > 564] = 3 #   Flag the oxygen bump
+
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
