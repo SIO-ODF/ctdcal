@@ -28,5 +28,8 @@ ctd_outputs:
         sensor: CTDXMISS1
         units: 0-5VDC
     CTDFLUOR:
-        sensor: CTDFLUOR1
-        units: 0-5VDC
+        sensor: CTDFLUOR2
+        units: MG/M^3
+    CTDTURB:
+        sensor: CTDTURB2
+        units: NTU
