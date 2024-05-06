@@ -835,7 +835,7 @@ def export_ct1(df, ssscc_list):
         file_datetime = file_datetime + "ODFSIO"
         # TODO: only "cast" needs to be int; "station" is explicitly allowed to incl.
         # letters/etc. Moving from SSSCC to station & cast fields will be beneficial
-        with open(f"{cfg.dirs['pressure']}{ssscc}_ct1.csv", "w+") as f:
+        with open(f"{cfg.dirs['pressure']}{ssscc}01_ct1.csv", "w+") as f:
             # put in logic to check columns?
             # number_headers should be calculated, not defined
             ctd_header = (  # this is ugly but prevents tabs before label
@@ -844,7 +844,7 @@ def export_ct1(df, ssscc_list):
                 f"EXPOCODE = {cfg.expocode}\n"
                 f"SECT_ID = {cfg.section_id}\n"
                 f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
-                f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
+                f"CASTNO = 01\n"  # CASTNO = CC
                 f"DATE = {b_datetime[0]}\n"
                 f"TIME = {b_datetime[1]}\n"
                 f"LATITUDE = {btm_lat:.4f}\n"
