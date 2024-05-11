@@ -892,11 +892,17 @@ def calibrate_oxy(btl_df, time_df, ssscc_list, cfg=cfg):
 
     # Fit each cast individually
     for ssscc in ssscc_list:
-        sbe_coef, sbe_df = sbe43_oxy_fit(
-            all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
-            sbe_coef0=sbe_coef0,
-            f_suffix=f"_{ssscc}",
-        )
+        extract_df = all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy()
+        # if extract_df.empty:
+        #     print(f"{ssscc} has no oxygen values - Applying coef0 for fitting")
+        #     sbe_coef = sbe_coef0
+        #     sbe_df = extract_df
+        if not extract_df.empty:
+            sbe_coef, sbe_df = sbe43_oxy_fit(
+                extract_df,
+                sbe_coef0=sbe_coef0,
+                f_suffix=f"_{ssscc}",
+            )
         # build coef dictionary
         if ssscc not in sbe43_dict.keys():  # don't overwrite NaN'd stations
             sbe43_dict[ssscc] = sbe_coef
