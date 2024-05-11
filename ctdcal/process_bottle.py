@@ -516,6 +516,8 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF", cfg=cfg):
         if param not in btl_data.columns:
             btl_data.rename(columns={attrs["sensor"]: param}, inplace=True)
 
+    btl_data = btl_data[btl_data.SSSCC.notna()]
+
     btl_data["EXPOCODE"] = cfg.expocode.strip("_GTC")
     btl_data["SECT_ID"] = cfg.section_id
     btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
