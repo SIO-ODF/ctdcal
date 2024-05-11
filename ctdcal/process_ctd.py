@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy.signal as sig
 
-from ctdcal import get_ctdcal_config, io, oxy_fitting, flagging
+from ctdcal import flagging, get_ctdcal_config, io, oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -470,7 +470,12 @@ def binning_df(df, p_column="CTDPRS", bin_size=2):
     )
     df_out.loc[:, p_column] = df_out["bins"].astype(float)
 
-    return df_out.groupby("bins").mean()
+    try:
+        g = df_out.groupby("bins", observed=False).mean()
+    except:
+        df_out.SSSCC = df_out.SSSCC.astype("int")
+        g = df_out.groupby("bins", observed=False).mean()
+    return g
 
 
 def _fill_surface_data(df, bin_size=2):
@@ -856,9 +861,12 @@ def export_ct1(df, ssscc_list, df2 = None, df3 = None, cfg=cfg):
         time_data = pressure_sequence(time_data)    #   2 dbar average step
         # switch oxygen primary sensor to rinko
         if cfg.platform == "ODF":
-            log.info(f"Using Rinko as CTDOXY for {ssscc}")
-            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+            if ssscc == "03403":
+                log.info(f"Keeping SBE43 for {ssscc}")
+            else:
+                log.info(f"Using Rinko as CTDOXY for {ssscc}")
+                time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+                time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
 
