@@ -91,20 +91,30 @@ def residual_vs_pressure(
     plt.figure(figsize=(7, 6))
     ax = plt.axes()
 
-    # color scatter by stations if given
-    if stn is not None:
-        idx, uniques = pd.factorize(stn)  # find unique stations #s and index them
-        if uniques.empty:
-            sc = ax.scatter(diff, prs, marker="+")
-        else:
+    #   Don't break the code when there were no discrete data run
+    if ref is not None:
+        # color scatter by stations if given
+        if stn is not None:
+            idx, uniques = pd.factorize(stn)  # find unique stations #s and index them
             sc = ax.scatter(diff, prs, c=idx, marker="+")
             cbar = plt.colorbar(sc, ax=ax, pad=0.1)  # set cbar ticks to station names
-            tick_inds = cbar.get_ticks().astype(int)
-            cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
-            cbar.ax.set_yticklabels(uniques[tick_inds])
+            try:
+                tick_inds = cbar.get_ticks().astype(int)
+                if tick_inds[-1]>len(uniques):
+                    tick_inds[-1] = len(uniques)-1
+                cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
+                cbar.ax.set_yticklabels(uniques[tick_inds])
+            except IndexError:
+                # num_ticks = min(len(uniques), 10)  # Limit the maximum number of ticks for legibility
+                # tick_inds = range(num_ticks)
+                # cbar.ax.set_yticklabels(uniques[tick_inds])
+                num_ticks = min(len(uniques), 10)
+                cbar.ax.yaxis.set_major_locator(ticker.MaxNLocator(num_ticks))
+                if uniques is not None:
+                    cbar.ax.set_yticklabels(uniques)
             cbar.ax.set_title("Station")
-    else:
-        sc = ax.scatter(diff, prs, marker="+")
+        else:
+            sc = ax.scatter(diff, prs, marker="+")
 
     # formatting
     title = None
