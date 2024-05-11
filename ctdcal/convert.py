@@ -275,23 +275,27 @@ def make_btl_mean(ssscc_list, cfg=cfg):
                     mean_df = mean_df.drop(index=14)
                     mean_df["btl_fire_num"] = np.arange(1, 25)
 
-                    mean_df["SAMPNO"] = mean_df.loc[:, "btl_fire_num"].copy()
-                    mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
-                    mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").ffill()
-                    if mean_df.isna().any().any():
-                        log.info(f"NaN data in {ssscc} after ffill, applying bfill as well.")
-                        mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").bfill()
-                    mean_df["btl_fire_num"] = mean_df["SAMPNO"]
+                mean_df["SAMPNO"] = mean_df.loc[:, "btl_fire_num"].copy()
+                mean_df = mean_df.loc[mean_df["SAMPNO"].isin(btl_map["PYLON"].unique()), :]
+                mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").ffill()
+                if mean_df.isna().any().any():
+                    log.info(f"NaN data in {ssscc} after ffill, applying bfill as well.")
+                    mean_df = mean_df.merge(btl_map, how="right").groupby("PYLON").bfill()
+                mean_df["btl_fire_num"] = mean_df["SAMPNO"]
 
-                    # deal with bottles fired out of order
-                    bl_data = btl.read_bl(Path(cfg.dirs["raw"]) / f"GTC_{ssscc}.bl")
-                    bl_data = bl_data.drop(columns=["time", "start_idx", "end_idx"])
+                # deal with bottles fired out of order
+                bl_data = btl.read_bl(Path(cfg.dirs["raw"]) / f"GTC_{ssscc}.bl")
+                bl_data = bl_data.drop(columns=["time", "start_idx", "end_idx"])
 
                 if ssscc == "01302":
                     # bottle 13 mistakenly fired twice
                     bl_data = bl_data.drop_duplicates(subset="btl_fire_num", keep="last")
                     bl_data.loc[:, "index"] = np.arange(1, 25)
                     bl_data = bl_data.reset_index(drop=True)
+
+                elif ssscc == "03801":
+                    log.info(f"Something weird with {ssscc}: Assigning .bl index as the only correct map in the console logs.")
+                    mean_df["SAMPNO"] = bl_data["index"]
 
                 if all(bl_data["index"].values == mean_df["SAMPNO"].values):
                     log.info(f"Using {ssscc}.bl file for btl_fire_num")
