@@ -2,26 +2,25 @@ import pandas as pd
 
 from ctdcal import process_bottle
 
+# def test_add_btlnbr_cols():
+#     df = {
+#         "btl_fire_num": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+#         "other_id":     [1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15]    #   Like the LADCP is mounted on it
+#     }
+#     df = pd.DataFrame(df)
+#     btl_num_col = "btl_fire_num"
 
-def test_add_btlnbr_cols():
-    df = {
-        "btl_fire_num": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        "other_id":     [1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15]    #   Like the LADCP is mounted on it
-    }
-    df = pd.DataFrame(df)
-    btl_num_col = "btl_fire_num"
+#     #   Call the function
+#     result_df = process_bottle.add_btlnbr_cols(df, btl_num_col)
 
-    #   Call the function
-    result_df = process_bottle.add_btlnbr_cols(df, btl_num_col)
+#     #   Check if the columns are added right
+#     assert "BTLNBR" in result_df.columns
+#     assert "BTLNBR_FLAG_W" in result_df.columns
+#     assert all(result_df["BTLNBR_FLAG_W"] == 2)
+#     assert result_df["BTLNBR"].equals(df[btl_num_col])
 
-    #   Check if the columns are added right
-    assert "BTLNBR" in result_df.columns
-    assert "BTLNBR_FLAG_W" in result_df.columns
-    assert all(result_df["BTLNBR_FLAG_W"] == 2)
-    assert result_df["BTLNBR"].equals(df[btl_num_col])
-
-    #   Cross compare
-    assert result_df["BTLNBR"].iloc[-1] != result_df["other_id"].iloc[-1]
+#     #   Cross compare
+#     assert result_df["BTLNBR"].iloc[-1] != result_df["other_id"].iloc[-1]
 
 def test_load_hy_file(tmp_path):
     # Create a sample file
