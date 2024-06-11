@@ -1,3 +1,7 @@
+"""
+A module for handling continuous CTD data processing, including file write-outs.
+"""
+
 import logging
 import warnings
 from datetime import datetime, timezone

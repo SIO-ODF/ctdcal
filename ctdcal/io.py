@@ -1,3 +1,7 @@
+"""
+A module for handling ODF input-output files related to CTDCAL.
+"""
+
 import logging
 from io import BufferedIOBase, BytesIO, StringIO
 from pathlib import Path
