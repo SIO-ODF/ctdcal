@@ -1,3 +1,7 @@
+"""
+A module for handling flags for bottle and continuous data.
+"""
+
 import numpy as np
 import pandas as pd
 

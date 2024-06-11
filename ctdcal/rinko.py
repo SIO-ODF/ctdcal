@@ -1,18 +1,16 @@
+"""
+A module for working with the RINKO analog optode.
+"""
+
+import logging
 from collections import namedtuple
 from pathlib import Path
 
-import logging
 import numpy as np
 import pandas as pd
 import scipy
 
-from . import (
-    ctd_plots,
-    get_ctdcal_config,
-    flagging,
-    process_ctd,
-    oxy_fitting,
-)
+from . import ctd_plots, flagging, get_ctdcal_config, oxy_fitting, process_ctd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)

@@ -1,3 +1,7 @@
+"""
+A module for fitting CTD discrete/bottle and continuous data.
+"""
+
 #!/usr/bin/env python
 import logging
 from pathlib import Path

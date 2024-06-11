@@ -1,3 +1,6 @@
+"""
+A module for plotting and visualizing the CTDCAL data products.
+"""
 import logging
 from pathlib import Path
 
