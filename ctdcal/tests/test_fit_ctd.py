@@ -1,7 +1,9 @@
-from ctdcal import fit_ctd
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
+
+from ctdcal import fit_ctd
 
 
 @pytest.mark.parametrize("xN, yN", [(1, 0), (0, 1), (1, 1), (2, 1), (1, 2)])
@@ -53,3 +55,12 @@ def test_apply_polyfit():
     # check error if input is not tuple
     with pytest.raises(TypeError):
         fit_ctd.apply_polyfit(y, (0,), [y, (0,)])
+
+def test_generate_yaml(tmp_path):
+    fname = str(tmp_path) + "filename.yaml"
+    fit_ctd.generate_yaml("filename.yaml", str(tmp_path))
+    with open(fname, 'r') as f:
+        generated_data = yaml.safe_load(f)
+
+    assert generated_data['t2']['ssscc_t1']['T_order'] == 0
+    assert generated_data['c1']['ssscc_c1']['zRange'] == '1000:6000'
