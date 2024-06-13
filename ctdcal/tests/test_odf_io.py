@@ -229,7 +229,7 @@ def test_process_salts(tmp_path, caplog):
         odf_io.process_salts(["90909"], salt_dir=str(tmp_path))
         assert "90909_salts.csv already exists" in caplog.messages[1]
 
-    def test_printProgressBar():
+    def test_print_progress_bar():
         # Test parameters
         iteration = 3
         total = 10
@@ -246,7 +246,7 @@ def test_process_salts(tmp_path, caplog):
         # Redirect stdout to mock_stdout
         with patch('sys.stdout', io.StringIO()):
             # Call function
-            odf_io.printProgressBar(iteration, total, prefix, suffix, decimals, length, fill, printEnd)
+            odf_io.print_progress_bar(iteration, total, prefix, suffix, decimals, length, fill, printEnd)
 
         # Get value from mock_stdout
         actual_output = io.StringIO().getvalue()

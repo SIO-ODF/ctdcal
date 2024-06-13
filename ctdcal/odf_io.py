@@ -168,7 +168,7 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
             )  # .round(4)
             _salt_exporter(saltDF, salt_dir)
 
-def printProgressBar(
+def print_progress_bar(
     iteration,
     total,
     prefix="",
@@ -179,6 +179,8 @@ def printProgressBar(
     printEnd="\r",
 ):
     """
+    A progress bar, helpful for implementing into loops or highlighting progression through processing.
+    
     https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters/13685020
     credit: u/Greenstick
     Call in a loop to create terminal progress bar
@@ -195,7 +197,7 @@ def printProgressBar(
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + "-" * (length - filledLength)
-    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)
+    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)  #   Potential to add to log
     # Print New Line on Complete
     if iteration == total:
         print()
