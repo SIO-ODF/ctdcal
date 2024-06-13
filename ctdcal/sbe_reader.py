@@ -15,7 +15,11 @@ from pytz import timezone
 
 
 class SBEReader:
-    """Code originally written by Andrew Barna, January-March 2016."""
+    """
+    Read .HEX, .XMLCON files into a Pandas DataFrame.
+
+    Code originally written by Andrew Barna, January-March 2016.
+    """
 
     def __init__(self, raw_hex, xml_config):
         """expects long character string inputs"""
