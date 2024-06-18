@@ -6,7 +6,7 @@ sensors.
 
 import logging
 from importlib import resources
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ def get_ctdcal_config():
     """
     # compile config.py and save variables to dict
     config = {}
-    with resources.path("ctdcal", "config.py") as filepath:
+    with resources.files("ctdcal", "config.py") as filepath:
         try:
             with open(filepath, mode="rb") as f:
                 exec(compile(f.read(), filepath, "exec"), config)
