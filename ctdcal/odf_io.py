@@ -86,7 +86,7 @@ def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
         questionable.to_csv(flag_file, mode="a+", index=False, header=None)
 
     # add time (in seconds) needed for autosal drift removal step
-    saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"])
+    saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"], format="%H:%M:%S")
     saltDF["IndexTime"] = (saltDF["IndexTime"] - saltDF["IndexTime"].iloc[0]).dt.seconds
     saltDF["IndexTime"] += (saltDF["IndexTime"] < 0) * (3600 * 24)  # fix overnight runs
 

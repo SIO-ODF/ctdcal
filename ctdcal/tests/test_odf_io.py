@@ -136,7 +136,7 @@ def test_salt_loader(caplog, tmp_path):
     d = tmp_path / "salt"
     d.mkdir()
     fake_file = d / "90909"
-    fake_file.write_text("\n1 2 3 4 5 6 7 00:01 00:02 10 11")
+    fake_file.write_text("\n1 2 3 4 5 6 7 00:01:00 00:02:00 10 11") #   0001 06 13 24 1.99187   13 5427 16:31:39  16:32:16  02 1.99186 1.99188
     saltDF, refDF = odf_io._salt_loader(fake_file)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
     assert check_type(saltDF[["CRavg", "Reading1"]], float)
