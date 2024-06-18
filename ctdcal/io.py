@@ -50,7 +50,7 @@ def load_cnv(cnv_file: Union[str, Path]) -> pd.DataFrame:
         cnv_file,
         skiprows=range(0, data_index),
         # delim_whitespace=True,
-        sep='\s+',
+        sep=r'\s+',
         names=cols,
         engine="python",
         skipinitialspace=True,
