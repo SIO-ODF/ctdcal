@@ -39,6 +39,7 @@ def make_salt_file(stn=1, cast=1, comment=None, flag=False, to_file=None):
     salts.insert(2, "SAMPNO", [f"{x:02.0f}" for x in salts.index])
     salts.insert(4, "CRavg", np.linspace(1.95, 1.98, 12)[::-1])
     salts.insert(5, "autosalSAMPNO", salts["SAMPNO"].astype(int))
+    salts["autosalSAMPNO"] = salts["autosalSAMPNO"].astype(object)  #   Change dtype for integers and strings
     salts.loc[[0, 11], "autosalSAMPNO"] = "worm"
     times = pd.date_range(start="18:32:04", end="19:36:03", periods=24)
     salts["StartTime"] = times[::2].strftime("%H:%M:%S")
