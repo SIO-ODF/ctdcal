@@ -25,7 +25,8 @@ def get_ctdcal_config():
     """
     # compile config.py and save variables to dict
     config = {}
-    with resources.files("ctdcal", "config.py") as filepath:
+    filepath = resources.files("ctdcal")
+    with filepath.joinpath("config.py") as filepath:
         try:
             with open(filepath, mode="rb") as f:
                 exec(compile(f.read(), filepath, "exec"), config)

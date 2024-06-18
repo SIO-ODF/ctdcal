@@ -126,7 +126,8 @@ def cruise_report():
 def qc():  # pragma: no cover
     """Launch interactive data flagging web app for QA/QC"""
     io_loop = IOLoop.current()
-    with resources.files("ctdcal.tools", "data_qc.py") as fname:
+    tools_dir = resources.files("ctdcal.tools")
+    with tools_dir.joinpath("data_qc.py") as fname:
         bokeh_app = Application(ScriptHandler(filename=fname))
     server = Server(bokeh_app, io_loop=io_loop)
     server.start()
