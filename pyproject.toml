@@ -10,7 +10,7 @@ write_to_template = 'version = "{version}"'
 profile = "black"
 
 [tool.mypy]
-python_version = 3.10
+python_version = 3.11
 files = "ctdcal/io.py"
 
 [[tool.mypy.overrides]]
