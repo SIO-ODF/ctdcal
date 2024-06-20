@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 def load_fit_yaml(fname=f"{cfg.dirs['logs']}fit_coefs.yaml", to_object=False):
     """Load polynomial fit order information from .yaml file."""
 
-    if not Path(fname.exists()):
+    if not Path(fname).exists():
         log.warning("Warning: Coefficients fit order YAML does not exist. Generating from scratch...")
         generate_yaml()
 
