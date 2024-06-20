@@ -437,7 +437,7 @@ def convertFromSBEReader(sbeReader, ssscc):
 
         ### Rinko block
         elif meta["sensor_id"] == "61":
-            if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO", "RINKOO2"):
+            if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO", "RINKOO2", "Rinko02"):
                 log.info("Processing Rinko O2")
                 # hysteresis correct then pass through voltage (see Uchida, 2010)
                 coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
@@ -446,7 +446,7 @@ def convertFromSBEReader(sbeReader, ssscc):
                     p_array,
                     coefs,
                 )
-            elif meta["sensor_info"]["SensorName"] in ("RINKOT"):
+            elif meta["sensor_info"]["SensorName"] in ("RinkoT"):
                 log.info("Processing Rinko T")
                 converted_df[col] = raw_df[meta["column"]]
 
