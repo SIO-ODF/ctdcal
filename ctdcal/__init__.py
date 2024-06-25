@@ -30,8 +30,8 @@ def get_ctdcal_config():
     config_file_path = resource_path / "config.py"
 
     try:
-        with open(config_file_path, mode="rb") as f:
-            exec(compile(f.read(), str(config_file_path), "exec"), config)
+        #   Read the config file as bytes, compile the bytes, and create the 'config' dictionary
+        exec(compile(config_file_path.read_bytes(), str(config_file_path), "exec"), config)
     except OSError:
         log.error(f"Failed to load config file {config_file_path}")
 
