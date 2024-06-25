@@ -65,11 +65,20 @@ def test_residual_vs_pressure(tmp_path):
 
     # check figure saving
     # TODO: pymark parameterize?
+    # for ext in [".jpg", ".png", ".pdf"]:
+    #     with (tmp_path / "figures" / f"fig1{ext}") as f_out:
+    #         assert not f_out.exists()
+    #         ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=f_out)
+    #         assert f_out.exists()
+
     for ext in [".jpg", ".png", ".pdf"]:
-        with (tmp_path / "figures" / f"fig1{ext}") as f_out:
-            assert not f_out.exists()
-            ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=f_out)
-            assert f_out.exists()
+        output_path = tmp_path / "figures"
+        output_path.mkdir(parents=True, exist_ok=True)
+        file_path = output_path / f"fig1{ext}"
+
+        assert not file_path.exists()
+        ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
+        assert file_path.exists()   # Verify that the file has been created
 
 
 def test_residual_vs_station(tmp_path):
@@ -125,10 +134,17 @@ def test_residual_vs_station(tmp_path):
     # check figure saving
     # TODO: pymark parameterize?
     for ext in [".jpg", ".png", ".pdf"]:
-        with (tmp_path / "figures" / f"fig2{ext}") as f_out:
-            assert not f_out.exists()
-            ctd_plots.residual_vs_station(x, x, x, x, f_out=f_out)
-            assert f_out.exists()
+        # with (tmp_path / "figures" / f"fig2{ext}") as f_out:
+        #     assert not f_out.exists()
+        #     ctd_plots.residual_vs_station(x, x, x, x, f_out=f_out)
+        #     assert f_out.exists()
+        output_path = tmp_path / "figures"
+        output_path.mkdir(parents=True, exist_ok=True)
+        file_path = output_path / f"fig2{ext}"
+
+        assert not file_path.exists()
+        ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
+        assert file_path.exists()   # Verify that the file has been created
 
 
 def test_intermediate_residual_plot(tmp_path):
@@ -157,7 +173,14 @@ def test_intermediate_residual_plot(tmp_path):
     # TODO: pymark parameterize?
     x = np.array([0, 0, 0])
     for ext in [".jpg", ".png", ".pdf"]:
-        with (tmp_path / "figures" / f"fig3{ext}") as f_out:
-            assert not f_out.exists()
-            ctd_plots._intermediate_residual_plot(x, x, x, f_out=f_out)
-            assert f_out.exists()
+        # with (tmp_path / "figures" / f"fig3{ext}") as f_out:
+        #     assert not f_out.exists()
+        #     ctd_plots._intermediate_residual_plot(x, x, x, f_out=f_out)
+        #     assert f_out.exists()
+        output_path = tmp_path / "figures"
+        output_path.mkdir(parents=True, exist_ok=True)
+        file_path = output_path / f"fig3{ext}"
+
+        assert not file_path.exists()
+        ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
+        assert file_path.exists()   # Verify that the file has been created

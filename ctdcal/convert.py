@@ -1,3 +1,7 @@
+"""
+A module for handling SeaBird raw .HEX files, including the generation of bottle-extractions, downcast isolation, and SBE3/4C handling.
+"""
+
 import logging
 from pathlib import Path
 
@@ -140,6 +144,22 @@ def hex_to_ctd(ssscc_list):
 
 
 def make_time_files(ssscc_list):
+    """
+    Make continuous time.pkl files from converted files in hex_to_ctd.
+
+    Data have a generic roll filter applied. Columns to filter are defined in the config.
+    
+    The time on deck, the soak, and the upcast are removed to provide a continuous downcast.
+    
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations/hex files to convert
+
+    Returns
+    -------
+    .PKL file of continuous, filtered downcast data.
+    """
     log.info("Generating time.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():

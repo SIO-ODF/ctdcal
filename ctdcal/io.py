@@ -1,3 +1,7 @@
+"""
+A module for handling ODF input-output files related to CTDCAL.
+"""
+
 import logging
 from io import BufferedIOBase, BytesIO, StringIO
 from pathlib import Path
@@ -45,7 +49,8 @@ def load_cnv(cnv_file: Union[str, Path]) -> pd.DataFrame:
     return pd.read_csv(
         cnv_file,
         skiprows=range(0, data_index),
-        delim_whitespace=True,
+        # delim_whitespace=True,
+        sep=r'\s+',
         names=cols,
         engine="python",
         skipinitialspace=True,

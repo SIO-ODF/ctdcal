@@ -1,3 +1,7 @@
+"""
+A module for handling Autosalinomter files, in the ODF format (Carl Mattson).
+"""
+
 import csv
 import io
 import logging
@@ -82,7 +86,7 @@ def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
         questionable.to_csv(flag_file, mode="a+", index=False, header=None)
 
     # add time (in seconds) needed for autosal drift removal step
-    saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"])
+    saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"], format="%H:%M:%S")
     saltDF["IndexTime"] = (saltDF["IndexTime"] - saltDF["IndexTime"].iloc[0]).dt.seconds
     saltDF["IndexTime"] += (saltDF["IndexTime"] < 0) * (3600 * 24)  # fix overnight runs
 
@@ -164,7 +168,7 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
             )  # .round(4)
             _salt_exporter(saltDF, salt_dir)
 
-def printProgressBar(
+def print_progress_bar(
     iteration,
     total,
     prefix="",
@@ -175,6 +179,8 @@ def printProgressBar(
     printEnd="\r",
 ):
     """
+    A progress bar, helpful for implementing into loops or highlighting progression through processing.
+    
     https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters/13685020
     credit: u/Greenstick
     Call in a loop to create terminal progress bar
@@ -191,7 +197,7 @@ def printProgressBar(
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + "-" * (length - filledLength)
-    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)
+    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)  #   Potential to add to log
     # Print New Line on Complete
     if iteration == total:
         print()

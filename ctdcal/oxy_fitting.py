@@ -472,6 +472,9 @@ def _PMEL_oxy_eq(coefs, inputs, cc=[1.92634e-4, -4.64803e-2]):
 
 
 def PMEL_oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
+    """
+    Do a weighted oxygen residual fit using PMEL's SBE43 equation.
+    """
     # TODO: optionally include other residual types
     # (abstracted from PMEL code oxygen_cal_ml.m)
     # unweighted L2: sum((ref - oxy)^2)  # if weighted fails
@@ -498,6 +501,9 @@ def match_sigmas(
     ctd_oxyvolts,
     ctd_time,
 ):
+    """
+    Density match time/btl oxy dataframes between up/downcasts.
+    """
 
     # Construct Dataframe from bottle and ctd values for merging
     btl_data = pd.DataFrame(
@@ -580,6 +586,9 @@ def match_sigmas(
 
 
 def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
+    """
+    Fit weighted oxygen data following match_sigmas with the option for initial coefficients.
+    """
 
     # Plot data to be fit together
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit.pdf"

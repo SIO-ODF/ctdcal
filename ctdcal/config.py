@@ -5,7 +5,9 @@ from importlib import resources
 
 import yaml
 
-with resources.open_text("ctdcal", "user_settings.yaml") as f:
+# with resources.open_text("ctdcal", "user_settings.yaml") as f:    #   Python 3.8
+#     settings = yaml.safe_load(f)
+with resources.files("ctdcal").joinpath("user_settings.yaml").open('r') as f:
     settings = yaml.safe_load(f)
 
 # Unpack user settings (any sanitizing/checks needed? probably)

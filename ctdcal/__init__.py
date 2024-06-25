@@ -5,8 +5,9 @@ sensors.
 """
 
 import logging
+import pathlib
 from importlib import resources
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 log = logging.getLogger(__name__)
 
@@ -25,12 +26,14 @@ def get_ctdcal_config():
     """
     # compile config.py and save variables to dict
     config = {}
-    with resources.path("ctdcal", "config.py") as filepath:
-        try:
-            with open(filepath, mode="rb") as f:
-                exec(compile(f.read(), filepath, "exec"), config)
-        except OSError:
-            log.error(f"Failed to load config file {filepath}")
+    resource_path = pathlib.Path(resources.files("ctdcal"))
+    config_file_path = resource_path / "config.py"
+
+    try:
+        #   Read the config file as bytes, compile the bytes, and create the 'config' dictionary
+        exec(compile(config_file_path.read_bytes(), str(config_file_path), "exec"), config)
+    except OSError:
+        log.error(f"Failed to load config file {config_file_path}")
 
     for k in list(config.keys()):
         if k.startswith("__"):
