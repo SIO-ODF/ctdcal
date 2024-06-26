@@ -204,7 +204,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:
-        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True).to_list()
+        ssscc_sublist = pd.read_csv(f, header=None, dtype="str", squeeze=True, comment='#').to_list()
         f_stem = f.stem
         (rinko_coefs_group, _) = rinko_oxy_fit(
             good_data.loc[good_data["SSSCC"].isin(ssscc_sublist)].copy(),

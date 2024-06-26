@@ -627,12 +627,25 @@ def make_ssscc_list(fname="data/ssscc.csv"):
 
 def get_ssscc_list(fname="data/ssscc.csv"):
     """
-    Load in list of stations/casts to process.
+    Load a list of casts from a file.
+
+    Parameters
+    ----------
+    fname : path_like
+        Input file. Type is anything that can be interpreted by Python as a
+        path, such as a string or a Pathlib object.
+
+    Returns
+    -------
+    list
+        Cast names or identifiers, as a list of strings.
     """
     ssscc_list = []
-    with open(fname, "r") as filename:
-        ssscc_list = [line.strip() for line in filename]
-
+    with open(fname, "r") as lines:
+        for line in lines:
+            # skip comment lines
+            if not line.startswith("#"):
+                ssscc_list.append(line.strip())
     return ssscc_list
 
 

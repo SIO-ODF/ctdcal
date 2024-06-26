@@ -370,7 +370,7 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
                 log.warning(
                     "refT file for cast " + ssscc + " does not exist... skipping"
                 )
-                return
+                continue
 
 
 def add_btlnbr_cols(df, btl_num_col):
