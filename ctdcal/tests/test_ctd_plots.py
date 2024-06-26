@@ -204,6 +204,7 @@ def test_param_vs_param(tmp_path, example_data):
         output_path.mkdir(parents=True, exist_ok=True)
         file_path = output_path / f"not_TS{ext}"
 
+        #   Check that the plotted figure generates and is saved as expected
         assert not file_path.exists()
         ax = ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
                                       example_data["param2"], example_data["label2"])   #   Should return figure axis
@@ -215,6 +216,7 @@ def test_param_vs_param(tmp_path, example_data):
                                  example_data["param2"], example_data["label2"], f_out=file_path)
         assert file_path.exists()
 
+        #   Now check that the TS contour plotting subroutine works
         file_path = output_path / f"TS{ext}"
         assert not file_path.exists()
         ax = ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
@@ -222,7 +224,7 @@ def test_param_vs_param(tmp_path, example_data):
                                       stn=example_data["stn"], tsT=example_data["tsT"], tsS=example_data["tsS"])
         assert np.allclose(ax.get_xticks(), [32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. ])  #   Should be unchanged
         assert len(ax.collections[-1].get_paths()) == 9 #   Should generate 9 contours
-        assert len(ax.collections[-1].labelTexts) == 7  #   Should have text on 9 of the contour lines
+        assert len(ax.collections[-1].labelTexts) == 7  #   Should have text on 7 of the contour lines
         assert ax.collections[-1].labelTexts[4].get_text() == "26.4"    #   The density calculations should have produced specific text on the 5th contour
         ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
                                  example_data["param2"], example_data["label2"], 
