@@ -186,54 +186,45 @@ def test_intermediate_residual_plot(tmp_path):
         assert file_path.exists()   # Verify that the file has been created
 
 
-# @pytest.fixture
-# def example_data():
-#     return {
-#         'param1': np.array([33, 33.5, 34, 35, 35.5]),
-#         'param2': np.array([0.1, 10, 15, 20, 20]),
-        # 'label1': "Salinity",
-        # 'label2': "Temperature",
-        # 'stn': np.array(["1", "2", "3", "4", "5"]),
-        # 'tsS': np.array([33, 33.5, 34, 35, 35.5]),
-        # 'tsT': np.array([0.1, 10, 15, 20, 20]),
-#     }
+@pytest.fixture
+def example_data():
+    return {
+        'param1': np.array([33, 33.5, 34, 35, 35.5]),
+        'param2': np.array([0.1, 10, 15, 20, 20]),
+        'label1': "Salinity",
+        'label2': "Temperature",
+        'stn': np.array(["1", "2", "3", "4", "5"]),
+        'tsS': np.array([33, 33.5, 34, 35, 35.5]),
+        'tsT': np.array([0.1, 10, 15, 20, 20]),
+    }
 
-def test_param_vs_param(tmp_path):
-    param1 = np.array([33, 33.5, 34, 35, 35.5])
-    param2= np.array([0.1, 10, 15, 20, 20])
-    label1= "Salinity"
-    label2= "Temperature"
-    stn= np.array(["1", "2", "3", "4", "5"])
-    tsS= np.array([33, 33.5, 34, 35, 35.5])
-    tsT= np.array([0.1, 10, 15, 20, 20])
-
+def test_param_vs_param(tmp_path, example_data):
     for ext in [".jpg", ".png", ".pdf"]:
         output_path = tmp_path / "figures"
         output_path.mkdir(parents=True, exist_ok=True)
         file_path = output_path / f"not_TS{ext}"
 
         assert not file_path.exists()
-        ax = ctd_plots.param_vs_param(param1, label1, 
-                                      param2, label2)   #   Should return figure axis
+        ax = ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
+                                      example_data["param2"], example_data["label2"])   #   Should return figure axis
         assert np.allclose(ax.get_xticks(), [32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. ])
         assert np.allclose(ax.get_yticks(), [-2.5,  0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. , 22.5])
-        assert ax.get_xlabel() == label1
-        assert ax.get_ylabel() == label2
-        ctd_plots.param_vs_param(param1, label1, 
-                                 param2, label2, f_out=file_path)
+        assert ax.get_xlabel() == example_data["label1"]
+        assert ax.get_ylabel() == example_data["label2"]
+        ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
+                                 example_data["param2"], example_data["label2"], f_out=file_path)
         assert file_path.exists()
 
         file_path = output_path / f"TS{ext}"
         assert not file_path.exists()
-        ax = ctd_plots.param_vs_param(param1, label1, 
-                                      param2, label2, 
-                                      stn=stn, tsT=tsT, tsS=tsS)
+        ax = ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
+                                      example_data["param2"], example_data["label2"], 
+                                      stn=example_data["stn"], tsT=example_data["tsT"], tsS=example_data["tsS"])
         assert np.allclose(ax.get_xticks(), [32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. ])  #   Should be unchanged
         assert len(ax.collections[-1].get_paths()) == 9 #   Should generate 9 contours
         assert len(ax.collections[-1].labelTexts) == 7  #   Should have text on 9 of the contour lines
-        #   The density calculations should have produced specific text on the 5th contour
-        assert ax.collections[-1].labelTexts[4].get_text() == "26.4"    
-        ctd_plots.param_vs_param(param1, label1, 
-                                 param2, label2, 
-                                 f_out=file_path, stn=stn, tsT=tsT, tsS=tsS)
+        assert ax.collections[-1].labelTexts[4].get_text() == "26.4"    #   The density calculations should have produced specific text on the 5th contour
+        ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
+                                 example_data["param2"], example_data["label2"], 
+                                 f_out=file_path, stn=example_data["stn"], tsT=example_data["tsT"], tsS=example_data["tsS"])
         assert file_path.exists()
