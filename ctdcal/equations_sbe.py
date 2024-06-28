@@ -240,9 +240,6 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0, decimals=4):
     oxy_ml_l : array-like
         Converted oxygen (mL/L)
     """
-    # TODO: is there any reason for this to output mL/L? if oxygen eq uses o2sol
-    # in umol/kg, result is in umol/kg... which is what we use at the end anyway?
-
     _check_coefs(coefs, ["Soc", "offset", "Tau20", "A", "B", "C", "E"])
     volts = _check_volts(volts)
     t_Kelvin = np.array(t) + 273.15
@@ -252,7 +249,7 @@ def sbe43(volts, p, t, c, coefs, lat=0.0, lon=0.0, decimals=4):
     CT = gsw.CT_from_t(SA, t, p)
     sigma0 = gsw.sigma0(SA, CT)
     o2sol = gsw.O2sol(SA, CT, p, lon, lat)  # umol/kg
-    o2sol_ml_l = oxy_umolkg_to_ml(o2sol, sigma0)  # equation expects mL/L (see TODO)
+    o2sol_ml_l = oxy_umolkg_to_ml(o2sol, sigma0)  # equation expects mL/L
 
     # NOTE: lat/lon always required to get o2sol (and need SA/CT for sigma0 anyway)
     # the above is equivalent to:
@@ -305,9 +302,6 @@ def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
 
     See Application Note 64-3 for more information.
     """
-    # TODO: vectorize (if possible), will probably require matrix inversion
-    # TODO: any NaNs will be propagated through entire timeseries: feature or bug?
-
     _check_coefs(coefs, ["H1", "H2", "H3", "offset"])
     volts = _check_volts(volts)
 
@@ -426,8 +420,6 @@ def seapoint_fluor(volts, coefs, decimals=6):
     According to .xmlcon, GainSetting "is an array index, not the actual gain setting."
     """
     _check_coefs(coefs, ["GainSetting", "Offset"])
-    # TODO: actual calibration/conversion/something?
-    # TODO: move this to different module? edge case since it's the only Seapoint sensor
     volts = np.array(volts)
     fluoro = np.around(volts, decimals)
 
