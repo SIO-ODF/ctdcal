@@ -1,6 +1,5 @@
 ### configuration file for odf_process_all.py
 #
-# TODO: organize these by editable/fixed variables
 from importlib import resources
 
 import yaml
@@ -18,7 +17,6 @@ ctd_outputs = settings["ctd_outputs"]
 
 # CTD file (.ct1) variable outputs
 # move elsewhere when xarray is implemented
-# TODO: check against cchdo.params?
 ctd_col_names, ctd_col_units = [], []
 for (param, attrs) in ctd_outputs.items():
     if param == "CTDPRS":
@@ -59,8 +57,6 @@ column = {
     "c1": "CTDCOND1",
     "c2": "CTDCOND2",
     "sal": "CTDSAL",
-    # "s1": "CTDSAL1",  # TODO: calc salinity from primary and secondary sensors
-    # "s2": "CTDSAL2",
     "rinko_oxy": "U_DEF_poly1",  # CHECK THIS!
     "oxyvolts": "CTDOXYVOLTS",
     "refT": "REFTMP",
