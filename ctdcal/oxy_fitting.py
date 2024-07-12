@@ -49,7 +49,6 @@ def load_winkler_oxy(oxy_file):
                 row = row[:9]
             oxy_array.append(row)
 
-    # TODO turn params into a dict with useful labels
     params = oxy_array.pop(0)  # save file header info for later (Winkler values)
     cols = OrderedDict(
         [
@@ -206,7 +205,7 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
         params = pd.concat([params, df])
 
     # get flask volumes and merge with titration parameters
-    flask_df = load_flasks()  # TODO: volume correction from thermal expansion?
+    flask_df = load_flasks()
     volumes = pd.merge(flask_nums, flask_df, how="left")["FLASK_VOL"].values
     params = pd.merge(ssscc_col, params, how="left")
 
@@ -215,7 +214,6 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
     rho_T_KIO3 = gsw.rho_t_exact(0, params["T_KIO3"], 0)
     N_KIO3_20C = params["N_KIO3"] * (rho_T_KIO3 / rho_20C)
 
-    # TODO: does KIO3 volume get corrected? what is the recorded value?
     # V_KIO3_20C = correct_flask_vol(params["V_KIO3"], t=params["T_KIO3"])
 
     # calculate O2 concentration (in mL/L)
@@ -241,8 +239,6 @@ def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
     Oxygen hysteresis can be corrected before conversion from volts to oxygen
     concentration, see equations_sbe.sbe43_hysteresis_voltage()
 
-    # TODO: should this just be a wrapper that calls sbe43_hysteresis_voltage()?
-
     Parameters
     ----------
     oxygen : array-like
@@ -267,7 +263,6 @@ def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24
     -----
     See Application Note 64-3 for more information.
     """
-    # TODO: vectorize (if possible), will probably require matrix inversion
     dt = 1 / freq
     D = 1 + H1 * (np.exp(pressure / H2) - 1)
     C = np.exp(-1 * dt / H3)
@@ -352,7 +347,6 @@ def calculate_dV_dt(oxy_volts, time, nan_replace=True):
     dV_dt : array-like
         Time derivative of oxygen voltage
     """
-    # TODO: experiment with dt, filtering
     # Uchida (2008): dV/dt "estimated by linear fits over 2 second intervals"
     # should dt just be 1 / freq? i.e. 1/24 Hz
 
@@ -367,7 +361,6 @@ def calculate_dV_dt(oxy_volts, time, nan_replace=True):
     if nan_replace:
         dV_dt = np.nan_to_num(dV_dt, nan=np.nanmean(dV_dt))
 
-    # TODO: should we do some kind of filtering? e.g.:
     # (PMEL does this calculation on binned data already so filtering is not the same)
     # a = 1
     # windowsize = 5
@@ -384,8 +377,6 @@ def _get_sbe_coef(idx=0):
 
     Returns the following tuple of coefficients: Soc, offset, Tau20, Tcor, E
     """
-    # TODO: does scipy's minimize function needs a tuple? can this be improved further?
-
     station = process_ctd.get_ssscc_list()[idx]
     xmlfile = cfg.dirs["raw"] + station + ".XMLCON"
 
@@ -415,8 +406,6 @@ def calculate_weights(pressure):
     weights : array-like
         Weight factor for each pressure value
     """
-    # TODO: automatic weight calculation rather than hardcoded (machine learning?)
-
     epsilon = 1e-5  # small offset to avoid interpolation issues
 
     # define piecewise weight function dependent on pressure
@@ -475,7 +464,6 @@ def PMEL_oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
     """
     Do a weighted oxygen residual fit using PMEL's SBE43 equation.
     """
-    # TODO: optionally include other residual types
     # (abstracted from PMEL code oxygen_cal_ml.m)
     # unweighted L2: sum((ref - oxy)^2)  # if weighted fails
     # unweighted L4: sum((ref - oxy)^4)  # unsure of use case
@@ -559,7 +547,6 @@ def match_sigmas(
         )
         time_sigma_sorted = np.insert(time_sigma_sorted, 0, sigma_min - 1e-4)
         time_sigma_sorted = np.append(time_sigma_sorted, sigma_max + 1e-4)
-        # TODO: can this be vectorized?
         cols = ["CTDPRS", "CTDOXYVOLTS", "CTDTMP", "dv_dt", "OS"]
         inds = np.concatenate(([0], np.arange(0, len(time_data)), [len(time_data) - 1]))
         for col in cols:
@@ -642,13 +629,10 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
         merged_df["residual"] = merged_df["REFOXY"] - merged_df["CTDOXY"]
         cutoff = 2.8 * np.std(merged_df["residual"])
         thrown_values = merged_df[np.abs(merged_df["residual"]) > cutoff]
-        # TODO: get some kind of logging in here in case things go awry
-        # e.g. count of thrown values, start/final stdev, failing to converge, etc.
         bad_df = pd.concat([bad_df, thrown_values])
         merged_df = merged_df[np.abs(merged_df["residual"]) <= cutoff].copy()
 
     # intermediate plots to diagnose data chunks goodness
-    # TODO: implement into bokeh/flask dashboard
     if f_suffix is not None:
         f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}.pdf"
         ctd_plots._intermediate_residual_plot(
@@ -839,9 +823,6 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         # all non-NaN oxygen data with flags
         all_sbe43_fit = pd.concat([all_sbe43_fit, sbe_df])
 
-    # TODO: save outlier data from fits?
-    # TODO: secondary oxygen flagging step (instead of just taking outliers from fit routine)
-
     # apply coefs
     time_df["CTDOXY"] = np.nan
     for ssscc in ssscc_list:
@@ -877,7 +858,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         log.info(ssscc + " time data fitting done")
 
     # flag CTDOXY with more than 1% difference
-    time_df["CTDOXY_FLAG_W"] = 2  # TODO: actual flagging of some kind?
+    time_df["CTDOXY_FLAG_W"] = 2
     btl_df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(
         btl_df["CTDOXY"], btl_df["OXYGEN"], percent_thresh=1
     )
