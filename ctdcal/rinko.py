@@ -65,8 +65,6 @@ def correct_pressure(P, d, E):
     P_d : array-like
         Temperature- and pressure-corrected DO [%]
     """
-
-    # TODO: check d range to make sure it's MPa
     # what is the dbar ~ MPa?
 
     P_d = P * (1 + E * d)
@@ -146,7 +144,6 @@ def oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
     """
     A weighted residual fit in a similar manner to that of the SBE43 method of oxy_fitting.py.
     """
-    # TODO: optionally include other residual types
     # (abstracted from PMEL code oxygen_cal_ml.m)
     # unweighted L2: sum((ref - oxy)^2)  # if weighted fails
     # unweighted L4: sum((ref - oxy)^4)  # unsure of use case
@@ -286,7 +283,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             coefs_df.loc[ssscc] = rinko_coefs_ssscc
 
     # flag CTDRINKO with more than 1% difference
-    time_df["CTDRINKO_FLAG_W"] = 2  # TODO: actual flagging of some kind?
+    time_df["CTDRINKO_FLAG_W"] = 2
     btl_df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(
         btl_df["CTDRINKO"], btl_df["OXYGEN"], percent_thresh=1
     )
@@ -340,14 +337,6 @@ def rinko_oxy_fit(
     https://cchdo.ucsd.edu/data/2362/p09_49RY20100706do.txt
     (there's probably a better way – are there physical meanings?)
     """
-    # TODO: this should all get turned into a reusable/semi-general function.
-    # It's used 2x here and 2x in oxy_fitting.sbe43_oxy_fit()
-    # something like this:
-    #
-    # coefs, thrown_values = iter_oxy_fit(inputs, _Uchida_DO_eq)
-    # while not thrown_values.empty:
-    #     coefs, thrown_values = iter_oxy_fit(inputs, _Uchida_DO_eq)
-
     # # Plot data to be fit together
     # f_out = f"{cfg.fig_dirs['ox']}rinko_residual{f_suffix}_prefit.pdf"
     # ctd_plots._intermediate_residual_plot(
@@ -420,7 +409,6 @@ def rinko_oxy_fit(
         btl_df = btl_df[np.abs(btl_df["residual"]) <= cutoff].copy()
 
     # intermediate plots to diagnose data chunks goodness
-    # TODO: implement into bokeh/flask dashboard
     if f_suffix is not None:
         f_out = f"{cfg.fig_dirs['rinko']}rinko_residual{f_suffix}.pdf"
         ctd_plots._intermediate_residual_plot(
