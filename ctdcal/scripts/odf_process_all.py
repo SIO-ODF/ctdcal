@@ -75,7 +75,6 @@ def odf_process_all():
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
 
     # calculate params needs for oxy/rinko calibration
-    # TODO: move density matching to prepare_oxy
     oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
 
     # calibrate oxygen against reference
@@ -90,7 +89,6 @@ def odf_process_all():
     process_bottle.export_report_data(btl_data_all)
 
     # export to Exchange format
-    # TODO: clean this up more
     process_ctd.export_ct1(time_data_all, ssscc_list)
     process_bottle.export_hy1(btl_data_all)
 
