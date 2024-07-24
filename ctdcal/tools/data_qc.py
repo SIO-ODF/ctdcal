@@ -23,9 +23,6 @@ from ctdcal import get_ctdcal_config, io
 
 cfg = get_ctdcal_config()
 
-# TODO: abstract parts of this to a separate file
-# TODO: following above, make parts reusable?
-
 # load continuous CTD data and make into a dict (only ~20MB)
 file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
 ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
