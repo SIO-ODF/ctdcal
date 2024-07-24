@@ -5,7 +5,7 @@
 # Cruise specifics
 expocode: "325020210316"
 section_id: "A20"
-ctd_serial: 914  # TODO: how to handle multiple CTDs on one cruise?
+ctd_serial: 914
 
 # CTD output variables/units
 ctd_outputs:
