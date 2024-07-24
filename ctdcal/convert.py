@@ -177,7 +177,6 @@ def make_time_files(ssscc_list):
                 log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
             )
 
-            # # TODO: switch to loop instead, e.g.:
             # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
 
             # if not c1_col in raw_data.dtype.names:
@@ -192,8 +191,6 @@ def make_time_files(ssscc_list):
             #     print('do_col data not found, skipping')
             # else:
             #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
-
-            # TODO: add despike/wild edit filter (optional?)
 
             # Filter data
             filter_data = process_ctd.raw_ctd_filter(
