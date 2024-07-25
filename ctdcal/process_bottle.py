@@ -1,7 +1,4 @@
 """Library to create SBE .btl equivalent files.
-TODO: allow for variable bottle fire scans instead of SBE standard 36
-    ex: user doesn't know how to change the config for the cast to add more scans,
-    instead does it post-cast?
 
 Joseph Gum SIO/ODF
 Nov 7, 2016
@@ -203,7 +200,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             )
             reft_data = pd.DataFrame(index=btl_data.index, columns=["T90"], dtype=float)
             reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
-            reft_data["SSSCC_TEMP"] = ssscc  # TODO: is this ever used?
+            reft_data["SSSCC_TEMP"] = ssscc
 
         ### load REFC data
         refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
@@ -248,8 +245,8 @@ def load_all_btl_files(ssscc_list, cols=None):
                 ],
                 dtype=float,
             )
-            oxy_data["STNNO_OXY"] = ssscc[:3]  # TODO: are these values
-            oxy_data["CASTNO_OXY"] = ssscc[3:]  # ever used?
+            oxy_data["STNNO_OXY"] = ssscc[:3]
+            oxy_data["CASTNO_OXY"] = ssscc[3:]
             oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
 
         ### clean up dataframe
@@ -340,7 +337,6 @@ def _reft_loader(ssscc, reft_dir):
     reftDF.loc[reftDF["diff"].abs() >= 3000, "REFTMP_FLAG_W"] = 3
 
     # add in STNNBR, CASTNO columns
-    # TODO: should these be objects or floats? be consistent!
     # string prob better for other sta/cast formats (names, letters, etc.)
     reftDF["STNNBR"] = ssscc[0:3]
     reftDF["CASTNO"] = ssscc[3:5]
@@ -348,7 +344,6 @@ def _reft_loader(ssscc, reft_dir):
 
 
 def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
-    # TODO: import reft_dir from a config file
     """
     SBE35 reference thermometer processing function. Load in .cap files for given
     station/cast list, perform basic flagging, and export to .csv files.
@@ -491,7 +486,6 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     now = datetime.now()
     file_datetime = now.strftime("%Y%m%d")
 
-    # TODO: move to config; integrate Barna's "params" package instead?
     btl_columns = {
         "EXPOCODE": "",
         "SECT_ID": "",
@@ -564,9 +558,6 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
 
     # deal with nans
-    # TODO: missing REFTMP not obvious til loading data - where to put this?
-    # _reft_loader() is not the right place
-    # maybe during loading step flag missing OXYGEN, REFTMP, BTLCOND?
     btl_data["REFTMP_FLAG_W"] = flagging.nan_values(
         btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
     )

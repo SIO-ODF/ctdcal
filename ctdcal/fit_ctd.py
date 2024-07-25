@@ -161,7 +161,6 @@ def _flag_btl_data(
         Data flagged as bad (flag 4s)
 
     """
-    # TODO: thresh should probably be put in config/cast-by-cast config
     prs = cfg.column["p"]
 
     # Remove extreme outliers and code bad
@@ -361,8 +360,6 @@ def apply_polyfit(y, y_coefs, *args):
 
 
 def calibrate_temp(btl_df, time_df):
-    # TODO: make this an ODF script in ctdcal/scripts?
-    # TODO: break off parts of this to useful functions for all vars (C/T/O)
     """
     Least-squares fit CTD temperature data against reference data.
 
@@ -430,7 +427,6 @@ def calibrate_temp(btl_df, time_df):
             )
 
             # 3) calculate fit coefs
-            # TODO: truncate coefs (10 digits? look at historical data)
             P_order = fit_yaml[tN][f_stem]["P_order"]
             T_order = fit_yaml[tN][f_stem]["T_order"]
             coef_dict = multivariate_fit(
@@ -486,7 +482,6 @@ def calibrate_temp(btl_df, time_df):
         )
 
         # export temp quality flags
-        # TODO: make these flags useful/less cluttered
         T_flag.sort_index().to_csv(f"{cfg.dirs['logs']}qual_flag_{tN}.csv", index=False)
 
         # export temp fit params (formated to 5 sig figs, scientific notation)
@@ -496,17 +491,12 @@ def calibrate_temp(btl_df, time_df):
         T_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{tN}.csv", index=False)
 
     # flag temperature data
-    # TODO: CTDTMP_FLAG_W historically not included in hy1 file... should it be?
-    time_df["CTDTMP_FLAG_W"] = 2  # TODO: flag w/ REFT somehow? discrete vs continuous
+    time_df["CTDTMP_FLAG_W"] = 2
 
     return True
 
 
 def calibrate_cond(btl_df, time_df):
-    # TODO: make this an ODF script in ctdcal/scripts?
-    # TODO: break off parts of this to useful functions for all vars (C/T/O)
-    # TODO: salt subset lists aren't loading in increasing order:
-    # (still functions properly but the fit_coef_c#.csv is confusing as a result)
     """
     Least-squares fit CTD conductivity data against bottle salts.
 
@@ -531,8 +521,6 @@ def calibrate_cond(btl_df, time_df):
     )
 
     # merge in handcoded salt flags
-    # TODO: make salt flagger move .csv somewhere else? or just always have it
-    # somewhere else and read it from that location (e.g. in data/scratch_folder/salts)
     salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
     if Path(salt_file).exists():
         handcoded_salts = pd.read_csv(
@@ -542,7 +530,6 @@ def calibrate_cond(btl_df, time_df):
             columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
         ).drop(columns=["diff", "Comments"])
         btl_df = btl_df.merge(handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left")
-        # TODO: may be easier to try using flagging._merge_flags()?
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
             btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
         )
@@ -599,7 +586,6 @@ def calibrate_cond(btl_df, time_df):
             )
 
             # 3) calculate fit coefs
-            # TODO: truncate coefs (10 digits? look at historical data)
             P_order = fit_yaml[cN][f_stem]["P_order"]
             T_order = fit_yaml[cN][f_stem]["T_order"]
             C_order = fit_yaml[cN][f_stem]["C_order"]
@@ -660,7 +646,6 @@ def calibrate_cond(btl_df, time_df):
         )
 
         # export cond quality flags
-        # TODO: make these flags useful/less cluttered
         C_flag.sort_index().to_csv(f"{cfg.dirs['logs']}qual_flag_{cN}.csv", index=False)
 
         # export cond fit params
@@ -670,7 +655,6 @@ def calibrate_cond(btl_df, time_df):
         C_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{cN}.csv", index=False)
 
     # recalculate salinity with calibrated C/T
-    # TODO: compute CTDSAL1 and *2? how to decide which to use
     time_df[cfg.column["sal"]] = gsw.SP_from_C(
         time_df[cfg.column["c1"]],
         time_df[cfg.column["t1"]],
@@ -683,7 +667,6 @@ def calibrate_cond(btl_df, time_df):
     )
 
     # flag salinity data
-    # TODO: flag time using handcoded salts somehow? discrete vs continuous
     time_df[cfg.column["sal"] + "_FLAG_W"] = 2
     btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.by_residual(
         btl_df[cfg.column["sal"]],

@@ -127,7 +127,6 @@ def outliers(
     flags = np.full(np.shape(data), flag_good).squeeze()
 
     # function aliases
-    # TODO: is ignore_nan needed? not very useful atm
     if ignore_nan:
         mean, std = np.nanmean, np.nanstd
     else:

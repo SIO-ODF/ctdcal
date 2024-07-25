@@ -222,8 +222,3 @@ def _intermediate_residual_plot(
 
     # save to path or return axis (primarily for testing)
     return _save_fig(ax, f_out)
-
-
-# TODO: more plots! what does ODV have?
-# section plots (w/ PyDiva)
-# parameter-parameter plots

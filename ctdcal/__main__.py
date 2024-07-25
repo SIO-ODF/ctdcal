@@ -81,9 +81,6 @@ def import_data():
     # something like this?
     # ctdcal import _path_
 
-    # TODO: smart imports based on file ext? .hex, .xmlcon, .cap
-    # NOTE: ODF file types vs. others (oxygen, salt)
-
     raise NotImplementedError
 
 

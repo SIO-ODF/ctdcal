@@ -11,19 +11,6 @@ log = logging.getLogger(__name__)
 btl_file = "data/scratch_folder/report_data.csv"
 btl_df = pd.read_csv(btl_file)
 
-# TODO: these were in old plots module; worth adding?
-# (BTLCOND - C1) vs. BTLCOND
-# (BTLCOND - C2) vs. BTLCOND
-# (C1 - C2) vs. BTLCOND
-# (BTLCOND - C1_uncorrected) vs. STNNBR
-# (BTLCOND - C2_uncorrected) vs. STNNBR
-# (C1_uncorrected - C2_uncorrected) vs. STNNBR
-# T1 vs. (OXYGEN - CTDOXY)
-# (OXYGEN - CTDOXY) vs. STNNBR (c=T1)
-# deep(OXYGEN - CTDOXY) vs. STNNBR (c=T1)
-# OXYGEN vs. (OXYGEN - CTDOXY) (c=STNNBR)
-# OXYGEN vs. (OXYGEN - CTDOXY) (c=CTDPRS)
-
 
 def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
 

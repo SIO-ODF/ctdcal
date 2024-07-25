@@ -40,7 +40,6 @@ def cnv_to_ct1():
             df.insert(idx * 2 + 1, col + "_FLAG_W", flags)
 
         # export to pressure folder
-        # TODO: replace this with a to_exchange() function (should live in ctdcal.io)
         df.to_csv(f"{cfg.dirs['pressure']}{f.stem}_ct1.csv", na_rep="-999")
 
 
@@ -49,7 +48,6 @@ def cnv_to_hy1():
     A script for converting Sea-Bird .cnv files to an uncalibrated Exchange bottle file
     for plotting and QA/QC purposes (in ODV, etc.).
     """
-    # TODO: make bottle file
     # this will probably have significant overlap with cnv_to_ct1()
     # maybe there should be three functions in this file?:
     # _load_cnv_files (load/map names, add flags)
