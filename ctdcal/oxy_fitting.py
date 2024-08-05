@@ -808,7 +808,10 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         log.info(ssscc + " density matching done")
 
     # Only fit using OXYGEN flagged good (2)
-    all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    try:
+        all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    except ValueError:
+        raise
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")

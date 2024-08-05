@@ -145,7 +145,8 @@ def odf_process_bio():
     #   Step 7: Calibrate the temperature
     #   Note: The refT for the bio casts exist and can be refit.
     # calibrate_temp_bio(btl_data_all, time_data_all, t1_coefs, t2_coefs)
-    fit_ctd.calibrate_temp(btl_data_all, time_data_all)
+    # fit_ctd.calibrate_temp(btl_data_all, time_data_all)
+    get_fit_temp(btl_data_all, time_data_all, ssscc_list)
     print("BIO temp calibration complete.")
 
     #   Step 8: Calibrate the cond w/ pre-existing coeffs
@@ -618,6 +619,40 @@ def export_hy1_bio(df, out_dir=cfg.dirs["bio"], org="ODF"):
         f.write("\n" + "END_DATA")
 
     return
+
+def get_fit_temp(btl_df, time_df, ssscc):
+    fit_yaml = fit_ctd.load_fit_yaml()
+    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_t*.csv"))
+    ssscc_sublist = [pd.read_csv(f, header=0, names=['cc'], usecols=['cc']) for f in ssscc_subsets]
+    ssscc_index = [g['cc'].min() for g in ssscc_sublist]
+    for tN in ["t1", "t2"]:
+        coef_dict = pd.read_csv(cfg.dirs["logs"] + f"fit_coef_{tN}.csv")
+        for i, f in enumerate(ssscc_subsets):
+            btl_rows = btl_df["SSSCC"].isin(ssscc_sublist).values
+            f_stem = f.stem
+            P_order = fit_yaml[tN][f_stem]["P_order"]
+            T_order = fit_yaml[tN][f_stem]["T_order"]
+            P_coefs = tuple(coef_dict.loc[coef_dict['SSSCC'] == ssscc_index[i], f"cp{n}"].iloc[0] for n in np.arange(1, P_order + 1))
+            T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1))
+            btl_df[cfg.column[tN]] = fit_ctd.apply_polyfit(
+                    btl_df[cfg.column[tN]],
+                    (coef_dict.loc[coef_dict['SSSCC'] == ssscc_index[i], "c0"].iloc[0],) + T_coefs,
+                    (btl_df[cfg.column["p"]], P_coefs),
+            )
+            time_df[cfg.column[tN]] = fit_ctd.apply_polyfit(
+                    time_df[cfg.column[tN]],
+                    (coef_dict.loc[coef_dict['SSSCC'] == ssscc_index[i], "c0"].iloc[0],) + T_coefs,
+                    (time_df[cfg.column["p"]], P_coefs),
+            )
+            df_ques, df_bad = fit_ctd._flag_btl_data(
+                    btl_df[btl_rows],
+                    param=cfg.column[tN],
+                    ref=cfg.column["refT"]
+            )
+    if any(btl_df["REFTMP_FLAG_W"].notnull()):
+        time_df["CTDTMP_FLAG_W"] = 2  # TODO: flag w/ REFT somehow? discrete vs continuous
+    else:
+        time_df["CTDTMP_FLAG_W"] = 3    # Questionable until proven innocent (no refT)
 
 
 if __name__ == "__main__":

@@ -640,6 +640,26 @@ def calibrate_cond(btl_df, time_df):
         btl_df[cfg.column["p"]],
     )
 
+    ## AS 2024/5/9
+    ## use c2/t2 for stations 10 to 32
+    # use_secondary = ['01001', '01101', '01201', '01301', '01401', '01501', '01601', '01701', '01801',
+    #                  '01901', '02001', '02101', '02201', '02302', '02401', '02501', '02602', '02701',
+    #                  '02801', '02902', '03001', '03101', '03203']
+    # s2 = gsw.SP_from_C(
+    #     time_df[cfg.column["c2"]],
+    #     time_df[cfg.column["t2"]],
+    #     time_df[cfg.column["p"]],
+    # )
+    # time_df['CTDSAL'].mask(time_df['SSSCC'].isin(use_secondary), s2, inplace=True)
+    #
+    # s2 = gsw.SP_from_C(
+    #     btl_df[cfg.column["c2"]],
+    #     btl_df[cfg.column["t2"]],
+    #     btl_df[cfg.column["p"]],
+    # )
+    # btl_df['CTDSAL'].mask(btl_df['SSSCC'].isin(use_secondary), s2, inplace=True)
+
+
     # flag salinity data
     # TODO: flag time using handcoded salts somehow? discrete vs continuous
     time_df[cfg.column["sal"] + "_FLAG_W"] = 2

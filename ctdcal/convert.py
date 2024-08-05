@@ -168,6 +168,18 @@ def hex_to_ctd(ssscc_list):
             #   Issues with btl_fire_num needing to be renumbered (SSSCC=10201) need to go in make_btl_mean
 
 
+            ## <-- AS 5/15/2024
+            ## copy t2/c2 to t1/c1 for stations to use secondary sensors instead of primary
+            use_secondary = ['01301', '01401', '01501', '01601', '01701', '01801',
+                             '01901', '02001', '02101', '02201', '02302', '02401', '02501', '02602', '02701',
+                             '02801', '02902', '03001', '03101', '03203',
+                             '02301',  '02601', '02901', '03202']
+            if ssscc in use_secondary:
+                swap_df = converted_df[['CTDTMP1', 'CTDCOND1']]
+                converted_df[['CTDTMP1', 'CTDCOND1']] = converted_df[['CTDTMP2', 'CTDCOND2']]
+                converted_df[['CTDTMP2', 'CTDCOND2']] = swap_df
+            ## -->
+
             converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
