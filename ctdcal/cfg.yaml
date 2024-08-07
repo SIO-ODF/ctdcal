@@ -1,0 +1,4 @@
+# Example user configuration file
+#
+# To use, call ctdcal.common.load_user_config(<this file>)
+datadir: "~/data/pomegranate"
