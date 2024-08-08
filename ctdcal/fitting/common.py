@@ -7,7 +7,6 @@
 :brief: Common code for use across ctdcal fitting modules
 """
 import json
-from pathlib import Path
 
 from munch import Munch
 
@@ -16,6 +15,7 @@ class BottleFlags(Munch):
     """
     A dictionary class with the attribute-style access of Munch, plus methods
     for adding nodes and flag data, and loading or saving to/from a JSON file.
+    TODO: Move this to ctdcal.flagging.common after reorg
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,8 +46,26 @@ class BottleFlags(Munch):
 # --------------------
 
 # BottleFlag wrangling
+# TODO: Move to ctdcal.flagging.common after reorg
 def df_node_to_BottleFlag(df, label):
+    """
+    Convert a flag node from a DataFrame to a formatted BottleFlags object
+
+    Parameters
+    ----------
+    df - DataFrame
+    label - str
+
+    Returns
+    -------
+    BottleFlags object
+    """
     node_dict = df.to_dict()
     for k, v in node_dict.items():
         node_dict[k] = [vv for kk, vv in v.items()]
     return BottleFlags({label: BottleFlags(node_dict)})
+
+def get_node(fname, label):
+    with open(fname, 'r') as f:
+        flags = json.load(f)
+        return BottleFlags(flags[label])

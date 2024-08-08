@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from ctdcal.fitting.common import BottleFlags, df_node_to_BottleFlag
+from ctdcal.fitting.common import BottleFlags, df_node_to_BottleFlag, get_node
 
 
 class TestBottleFlags:
@@ -49,6 +49,13 @@ class TestBottleFlags:
 
 class TestBottleFlagWrangling:
     @pytest.fixture
+    def sample_data(self, tmp_path):
+        fname = tmp_path / 'data.json'
+        with open(fname, 'w') as f:
+            json.dump({'spam': {'egg': ['a', 'b'], 'sausage': ['C', 'D']}}, f)
+        return fname
+
+    @pytest.fixture
     def sample_df(self):
         spam_dict = {'spam': {'egg': ['a', 'b'], 'sausage': ['C', 'D']}}
         spam_df = pd.DataFrame.from_dict(spam_dict['spam'])
@@ -58,3 +65,7 @@ class TestBottleFlagWrangling:
         bf = df_node_to_BottleFlag(sample_df, 'spam')
         assert type(bf.spam.sausage) is list
         assert bf.spam.sausage[0] == 'C'
+
+    def test_get_node(self, sample_data):
+        node = get_node(sample_data, 'spam')
+        assert node.sausage[0] == 'C'
