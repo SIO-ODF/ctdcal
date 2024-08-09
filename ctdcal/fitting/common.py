@@ -42,12 +42,16 @@ class BottleFlags(Munch):
             f.write(self.toJSON())
 
 
+class NodeNotFoundError(Exception):
+    pass
+
+
 # Function definitions
 # --------------------
 
 # BottleFlag wrangling
 # TODO: Move to ctdcal.flagging.common after reorg
-def df_node_to_BottleFlag(df, label):
+def df_node_to_BottleFlags(df):
     """
     Convert a flag node from a DataFrame to a formatted BottleFlags object
 
@@ -63,9 +67,20 @@ def df_node_to_BottleFlag(df, label):
     node_dict = df.to_dict()
     for k, v in node_dict.items():
         node_dict[k] = [vv for kk, vv in v.items()]
-    return BottleFlags({label: BottleFlags(node_dict)})
+    return BottleFlags(node_dict)
+
 
 def get_node(fname, label):
     with open(fname, 'r') as f:
         flags = json.load(f)
         return BottleFlags(flags[label])
+
+
+def save_node(fname, node, label):
+    with open(fname, 'r') as f:
+        flags = BottleFlags.fromJSON(f.read())
+    if label in flags:
+        flags[label] = node
+    else:
+        raise NodeNotFoundError("The node '%s' was not found in %s" % (label, fname))
+    flags.save(fname)

@@ -1,11 +1,10 @@
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
-from ctdcal.fitting.common import BottleFlags, df_node_to_BottleFlag, get_node
+from ctdcal.fitting.common import BottleFlags, df_node_to_BottleFlags, get_node, save_node, NodeNotFoundError
 
 
 class TestBottleFlags:
@@ -62,10 +61,27 @@ class TestBottleFlagWrangling:
         return spam_df
 
     def test_df_node_to_BottleFlag(self, sample_df):
-        bf = df_node_to_BottleFlag(sample_df, 'spam')
-        assert type(bf.spam.sausage) is list
-        assert bf.spam.sausage[0] == 'C'
+        spam = df_node_to_BottleFlags(sample_df)
+        assert type(spam.sausage) is list
+        assert spam.sausage[0] == 'C'
 
     def test_get_node(self, sample_data):
         node = get_node(sample_data, 'spam')
         assert node.sausage[0] == 'C'
+
+    def test_save_node(self, sample_data, tmp_path):
+        fname = Path(tmp_path, 'sample_copy.json')
+        with open(sample_data, 'r') as f:
+            flags = BottleFlags.fromJSON(f.read())
+        flags.save(fname)
+        spam = get_node(fname, 'spam')
+        assert 'x' not in spam.egg
+        spam.update_node(egg='x', sausage='Y')
+        # Test good node
+        save_node(fname, spam, 'spam')
+        with open(fname, 'r') as f:
+            flags = BottleFlags.fromJSON(f.read())
+        assert 'x' in flags.spam.egg
+        # Test bad node
+        with pytest.raises(NodeNotFoundError):
+            save_node(fname, spam, 'limburger')
