@@ -20,7 +20,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-USERCONFIG = '../cfg.yaml'
+USERCONFIG = 'ctdcal/cfg.yaml'
 user_cfg = load_user_config(validate_file(USERCONFIG))
 
 

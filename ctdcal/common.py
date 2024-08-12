@@ -44,9 +44,9 @@ def validate_dir(pathname, create=False):
     elif p.is_dir():
         return p
     elif p.exists():
-        raise FileExistsError
+        raise FileExistsError("%s already exists but is not a directory." % str(p))
     else:
-        raise FileNotFoundError
+        raise FileNotFoundError("The directory %s could not be found" % str(p))
 
 
 def validate_file(pathname, create=False):
@@ -74,6 +74,6 @@ def validate_file(pathname, create=False):
     elif p.is_file():
         return p
     elif p.exists():
-        raise FileExistsError
+        raise FileExistsError("%s exists but is not a file." % str(p))
     else:
-        raise FileNotFoundError
+        raise FileNotFoundError("The file %s could not be found." % str(p))
