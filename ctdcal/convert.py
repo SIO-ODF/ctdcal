@@ -18,7 +18,6 @@ from . import sbe_reader as sbe_rd
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
-# TODO: move this to a separate file?
 # lookup table for sensor data
 # DOUBLE CHECK TYPE IS CORRECT #
 short_lookup = {
@@ -118,7 +117,6 @@ short_lookup = {
 
 
 def hex_to_ctd(ssscc_list):
-    # TODO: add (some) error handling from odf_convert_sbe.py
     """
     Convert raw CTD data and export to .pkl files.
 
@@ -179,7 +177,6 @@ def make_time_files(ssscc_list):
                 log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
             )
 
-            # # TODO: switch to loop instead, e.g.:
             # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
 
             # if not c1_col in raw_data.dtype.names:
@@ -194,8 +191,6 @@ def make_time_files(ssscc_list):
             #     print('do_col data not found, skipping')
             # else:
             #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
-
-            # TODO: add despike/wild edit filter (optional?)
 
             # Filter data
             filter_data = process_ctd.raw_ctd_filter(
@@ -215,7 +210,6 @@ def make_time_files(ssscc_list):
 
 
 def make_btl_mean(ssscc_list):
-    # TODO: add (some) error handling from odf_process_bottle.py
     """
     Create "bottle mean" files from continuous CTD data averaged at the bottle stops.
 
@@ -380,7 +374,6 @@ def convertFromSBEReader(sbeReader, ssscc):
 
     # Queue sorting forces it to be in order, so we don't worry about order here
     # Assumes first channel for each sensor is primary for computing following data
-    # TODO: rework to use config.py file to determine which is primary
     queue_metadata = sorted(queue_metadata, key=lambda sensor: sensor["ranking"])
 
     # Initialize converted dataframe
@@ -424,8 +417,6 @@ def convertFromSBEReader(sbeReader, ssscc):
         ### Oxygen block
         elif meta["sensor_id"] == "38":
             log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
-            # TODO: put some kind of user-enabled flag in config.py, e.g.
-            # if cfg["correct_oxy_hysteresis"]:
             V_corrected = sbe_eq.sbe43_hysteresis_voltage(
                 raw_df[meta["column"]], p_array, coefs
             )

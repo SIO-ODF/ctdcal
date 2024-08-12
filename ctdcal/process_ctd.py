@@ -55,7 +55,6 @@ def cast_details(df, ssscc, log_file=None):
     """
     df_cast = _trim_soak_period(df)
 
-    # TODO: call parameters from config file instead
     p_start = float(np.around(df_cast["CTDPRS"].head(1), 4))
     p_max_ind = df_cast["CTDPRS"].argmax()
     p_max = float(np.around(df_cast["CTDPRS"].max(), 4))
@@ -189,7 +188,6 @@ def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
         for idx, df in enumerate(df_list):
             if df["CTDPRS"].max() < P_downcast:
                 # make sure it's soak, not a stop to switch to autocast (i.e. A20 2021)
-                # TODO: try instead finding max depth then working backwards?
                 if df.max()["movement"] == "stop" and len(df) > 1:
                     last_idx = idx
             else:
@@ -293,7 +291,6 @@ def remove_on_deck(df, stacast, cond_startup=20.0, log_file=None):
     trimmed_df : DataFrame
         Raw CTD data trimmed to times when rosette is in water
     """
-    # TODO: move these to config file
     # Frequency
     fl = 24
     fl2 = fl * 2
@@ -419,20 +416,17 @@ def pressure_sequence(df, p_col="CTDPRS", direction="down"):
     df_binned : DataFrame
         Pressure binned CTD data
     """
-    # TODO: optional start/end pressure values?
-
     # change to take dataframe with the following properties
     # * in water data only (no need to find cast start/end)
     # * The full down and up time series (not already split since this method will do it)
-    # New "algorithm" (TODO spell this right)
+    # New "algorithm"
     # * if direction is "down", use the input as is
     # * if direction is "up", invert the row order of the input dataframe
     # Use the "roll filter" method to get only the rows to be binned
     # * the roll filter will treat the "up" part of the cast as a giant roll to be filtered out
     # * the reversed dataframe will ensure we get the "up" or "down" part of the cast
     # * there is no need to reverse the dataframe again as the pressure binning process will remove any "order" information (it doesn't care about the order)
-    # That's basically all I (barna) have so far TODO Binning, etc...
-    # pandas.cut() to do binning
+    # That's basically all I (barna) have so far
 
     df_filtered = roll_filter(df, p_col, direction=direction)
 
@@ -441,7 +435,7 @@ def pressure_sequence(df, p_col="CTDPRS", direction="down"):
     # so those bin averages are not the same as the first good binned value.
     # df_filled = _fill_surface_data(df_filtered, bin_size=2)
 
-    df_binned = binning_df(df_filtered, bin_size=2)  # TODO: abstract bin_size in config
+    df_binned = binning_df(df_filtered, bin_size=2)
     fill_rows = df_binned["CTDPRS"].isna()
     df_binned.loc[fill_rows, "CTDPRS"] = df_binned[fill_rows].index.to_numpy()
     df_binned.bfill(inplace=True)
@@ -540,7 +534,6 @@ def _get_pressure_offset(start_vals, end_vals):
 
 
 def apply_pressure_offset(df, p_col="CTDPRS"):
-    # TODO: import p_col from config file
     """
     Calculate pressure offset using deck pressure log and apply it to the data.
     Pressure flag column is added with value 2, indicating the data are calibrated.
@@ -571,7 +564,6 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
 
 
 def make_depth_log(time_df, threshold=80):
-    # TODO: get column names from config file
     """
     Create depth log file from maximum depth of each station/cast in time DataFrame.
     If rosette does not get within the threshold distance of the bottom, returns NaN.
@@ -584,7 +576,6 @@ def make_depth_log(time_df, threshold=80):
         Maximum altimeter reading to consider cast "at the bottom" (defaults to 80)
 
     """
-    # TODO: make inputs be arraylike rather than dataframe
     df = time_df[["SSSCC", "CTDPRS", "GPSLAT", "ALT"]].copy().reset_index()
     df_group = df.groupby("SSSCC", sort=False)
     idx_p_max = df_group["CTDPRS"].idxmax()
@@ -746,8 +737,6 @@ def export_ct1(df, ssscc_list):
     log.info("Exporting CTD files")
 
     # initial flagging (some of this should be moved)
-    # TODO: lump all uncalibrated together; smart flagging like ["CTD*_FLAG_W"] = 1
-    # TODO: may not always have these channels so don't hardcode them in!
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
     # df["CTDBACKSCATTER_FLAG_W"] = 1
@@ -786,7 +775,6 @@ def export_ct1(df, ssscc_list):
             cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
         )
     except FileNotFoundError:
-        # TODO: add logging; look into inheriting/extending a class to add features
         log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
         manual_depth_df.to_csv(cfg.dirs["logs"] + "manual_depth_log.csv", index=False)
@@ -806,7 +794,7 @@ def export_ct1(df, ssscc_list):
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
-        # force flags back to int (TODO: make flags categorical)
+        # force flags back to int
         for col in time_data.columns:
             if col.endswith("FLAG_W"):
                 time_data[col] = time_data[col].astype(int)
@@ -824,15 +812,12 @@ def export_ct1(df, ssscc_list):
             .strftime("%Y%m%d %H%M")
             .split(" ")
         )
-        # TODO: yo-yo casts are an edge case where this may be different
         btm_lat = cast_dict["latitude"]
         btm_lon = cast_dict["longitude"]
 
         now = datetime.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d")  # %H:%M")
         file_datetime = file_datetime + "ODFSIO"
-        # TODO: only "cast" needs to be int; "station" is explicitly allowed to incl.
-        # letters/etc. Moving from SSSCC to station & cast fields will be beneficial
         with open(f"{cfg.dirs['pressure']}{ssscc}_ct1.csv", "w+") as f:
             # put in logic to check columns?
             # number_headers should be calculated, not defined

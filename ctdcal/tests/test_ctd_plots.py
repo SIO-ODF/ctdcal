@@ -64,7 +64,6 @@ def test_residual_vs_pressure(tmp_path):
     assert unlabeled.collections[0].colorbar is None
 
     # check figure saving
-    # TODO: pymark parameterize?
     # for ext in [".jpg", ".png", ".pdf"]:
     #     with (tmp_path / "figures" / f"fig1{ext}") as f_out:
     #         assert not f_out.exists()
@@ -132,7 +131,6 @@ def test_residual_vs_station(tmp_path):
     assert unlabeled.get_title() == ""
 
     # check figure saving
-    # TODO: pymark parameterize?
     for ext in [".jpg", ".png", ".pdf"]:
         # with (tmp_path / "figures" / f"fig2{ext}") as f_out:
         #     assert not f_out.exists()
@@ -170,7 +168,6 @@ def test_intermediate_residual_plot(tmp_path):
     assert all(thresh_right[:, 1] == np.array([6000, 2000, 1000, 500, 0]))
 
     # check figure saving
-    # TODO: pymark parameterize?
     x = np.array([0, 0, 0])
     for ext in [".jpg", ".png", ".pdf"]:
         # with (tmp_path / "figures" / f"fig3{ext}") as f_out:

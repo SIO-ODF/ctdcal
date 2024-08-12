@@ -224,6 +224,7 @@ def _intermediate_residual_plot(
     # save to path or return axis (primarily for testing)
     return _save_fig(ax, f_out)
 
+
 def param_vs_param(param1, label1, param2, label2, f_out=None, stn=None, tsT=None, tsS=None):
     """
     Scatter plots two CTD parameters against each other with support for TS plotting.

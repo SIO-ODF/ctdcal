@@ -4,7 +4,6 @@ import pandas as pd
 import pytest
 
 
-# TODO: make a class and recycle 3 data sets, separating outliers and NaNs:
 # data = [np.nan] + 97 * [0] + [100, 100]
 # data = pd.Series([np.nan] + 97 * [0] + [100, 100])
 # data = pd.DataFrame([np.nan] + 97 * [0] + [100, 100])

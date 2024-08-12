@@ -60,9 +60,6 @@ def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
         cols["Reading{}".format(ii + 1)] = float
     saltDF.columns = list(cols.keys())  # name columns
 
-    # TODO: check autosalSAMPNO against SAMPNO for mismatches?
-    # TODO: handling for re-samples?
-
     # check for commented out lines
     commented = saltDF["STNNBR"].str.startswith(("#", "x"))
     if commented.any():
