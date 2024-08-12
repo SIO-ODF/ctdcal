@@ -24,7 +24,7 @@ from ctdcal.common import load_user_config, validate_file
 from ctdcal.fitting.common import get_node, df_node_to_BottleFlags, save_node
 
 cfg = get_ctdcal_config()
-USERCONFIG = '../cfg.yaml'
+USERCONFIG = 'ctdcal/cfg.yaml'
 user_cfg = load_user_config(validate_file(USERCONFIG))
 FLAGFILE = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
 
@@ -157,8 +157,8 @@ src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
 fig = figure(
-    plot_height=800,
-    plot_width=400,
+    height=800,
+    width=400,
     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
     y_axis_label="Pressure (dbar)",
@@ -196,7 +196,7 @@ upcast_sal = fig.triangle(
     source=src_plot_upcast,
     legend_label="Upcast CTD sample",
 )
-fig.select(BoxSelectTool).select_every_mousemove = False
+fig.select(BoxSelectTool).continuous = False
 fig.y_range.flipped = True  # invert y-axis
 fig.legend.location = "bottom_right"
 fig.legend.border_line_width = 3
