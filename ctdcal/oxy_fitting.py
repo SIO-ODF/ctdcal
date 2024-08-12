@@ -45,7 +45,9 @@ def load_winkler_oxy(oxy_file):
         )
         oxy_array = []
         for row in oxyF:
-            if len(row) > 9:
+            if row[0].startswith('#'):
+                continue
+            elif len(row) > 9:
                 row = row[:9]
             oxy_array.append(row)
 
