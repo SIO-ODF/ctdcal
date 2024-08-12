@@ -41,7 +41,7 @@ def load_winkler_oxy(oxy_file):
 
     with open(oxy_file, newline="") as f:
         oxyF = csv.reader(
-            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
+            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True
         )
         oxy_array = []
         for row in oxyF:
