@@ -8,7 +8,7 @@ from .. import ctd_plots, get_ctdcal_config
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
-btl_file = "data/scratch_folder/report_data.csv"
+btl_file = "data/report_data.csv"
 btl_df = pd.read_csv(btl_file)
 
 
