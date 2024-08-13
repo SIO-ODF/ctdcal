@@ -173,6 +173,9 @@ def by_percent_diff(
     data = np.squeeze(data)
     ref_data = np.squeeze(ref_data)
 
+    #   Avoid dividing by zero whenever possible
+    data = np.where(data == 0, np.nan, data)
+
     percent_diff = (np.abs(data - ref_data) / data).squeeze() * 100
     flags = np.full(np.shape(percent_diff), flag_good).squeeze()
 
