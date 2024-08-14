@@ -10,7 +10,7 @@ def main(argv):
     Needs to be cleaned up from script form to other form, hopefully
     """
     # general fileloading area
-    output_file = "data/scratch_folder/ctd_to_bottle.csv"
+    output_file = "data/ctd_to_bottle.csv"
     file_ssscc = "data/ssscc.csv"
     df_all = pd.DataFrame()
 

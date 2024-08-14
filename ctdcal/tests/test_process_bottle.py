@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from ctdcal import process_bottle
 
@@ -21,6 +22,7 @@ from ctdcal import process_bottle
 
 #     #   Cross compare
 #     assert result_df["BTLNBR"].iloc[-1] != result_df["other_id"].iloc[-1]
+
 
 def test_load_hy_file(tmp_path):
     # Create a sample file
@@ -51,6 +53,7 @@ END_DATA
     assert "END_DATA" not in df["EXPOCODE"].values
     #   Value check
     assert df["BTLNBR"].iloc[-1] == 34
+
 
 def test_load_btl_data(tmp_path):
     fname = tmp_path / "90909_btl_mean.pkl"
@@ -110,3 +113,60 @@ def test_load_salt_data(tmp_path):
     # test read
     salt_data = process_bottle._load_salt_data(fname)
     assert all(salt_data["SSSCC_SALT"] == "90909")
+
+
+@pytest.fixture
+def df1():
+    return pd.DataFrame(
+        {
+            "STNNBR": [101, 102, 100],
+            "CASTNO": [1, 1, 1],
+            "SAMPNO": [10, 11, 16],
+            "TEMP": [20.5, 20.3, 19.6],
+            "COND": [35.0, 34.9, 36.1],
+            "OXY": [140.1, 128.0, 107.7],
+        }
+    )
+
+
+@pytest.fixture
+def df2():
+    return pd.DataFrame(
+        {
+            "STNNBR": [103, 104],
+            "CASTNO": [1, 1],
+            "SAMPNO": [12, 13],
+            "TEMP": [20.1, 19.8],
+            "COND": [35.1, 35.2],
+            "OXY": [108.1, 107.9],
+            "XMISS": [90.5, 89.8],
+        }
+    )
+
+
+def test_merge_hy1(df1, df2):
+    merged_df = process_bottle.merge_hy1(df1, df2)
+
+    #   Test for matching columns, dimensions, and contents
+    assert list(merged_df.columns) == [
+        "STNNBR",
+        "CASTNO",
+        "SAMPNO",
+        "TEMP",
+        "COND",
+        "OXY",
+        "XMISS",
+    ]
+    assert len(merged_df) == len(df1) + len(df2)
+    assert not pd.isna(merged_df["XMISS"].iloc[-1])
+
+    #   Test the sorting
+    assert merged_df["STNNBR"].is_monotonic_increasing
+    assert merged_df["CASTNO"].is_monotonic_increasing
+    #   Sample number can be anything in this case
+
+    #   Test handling NaNs
+    df1.loc[0, "STNNBR"] = None
+    merged_df = process_bottle.merge_hy1(df1, df2)
+    assert merged_df["STNNBR"].isna().sum() == 1
+    assert merged_df["SAMPNO"].notna().all()  #   No NaNs introduced

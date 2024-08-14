@@ -378,7 +378,7 @@ def add_btlnbr_cols(df, btl_num_col):
         Bottle DataFrame containing a defined rosette bottle number
     btl_num_col : String
         String of bottle column to be reassigned
-    
+
     Returns
     -------
     df : Pandas DataFrame
@@ -404,10 +404,49 @@ def load_hy_file(path_to_hyfile):
     df : Pandas DataFrame
         The bottle file without the lead/end rows, comments, or units
     """
-    
+
     df = pd.read_csv(path_to_hyfile, comment="#", skiprows=[0])
-    df = df.drop(df.index[0])   #   Drop the units
-    df = df[df["EXPOCODE"] != "END_DATA"]   #   Drop the final row
+    df = df.drop(df.index[0])  #   Drop the units
+    df = df[df["EXPOCODE"] != "END_DATA"]  #   Drop the final row
+    return df
+
+
+def merge_hy1(
+    df1,
+    df2,
+):
+    """
+    Merges two hy1 files, returning the combined Pandas DataFrame.
+    If the hy1 file has not been loaded yet, use load_hy_file.
+
+    Inputs
+    -------
+    df1 : Pandas DataFrame
+        First hy1 file for concatination
+    df2 : Pandas DataFrame
+        Second hy1 file for concatination
+
+    Returns
+    df: Pandas DataFrame
+        Merged bottle file as a DataFrame
+    """
+
+    if set(df1.columns) != set(df2.columns):
+        print("Bottle file columns do not match. Concatenating with NaNs.")
+
+    df = pd.concat([df1, df2], axis=0, ignore_index=True)  #   Staple df2 onto there
+
+    sorting_cols = {"STNNBR", "CASTNO", "SAMPNO"}
+    if sorting_cols.issubset(df):
+        if df[list(sorting_cols)].isna().any().any():
+            print("NaNs found in station/cast/sample number. Check source files.")
+
+        else:
+            df = df.sort_values(
+                by=["STNNBR", "CASTNO", "SAMPNO"],
+                ascending=[True, True, False],
+                ignore_index=True,
+            )
     return df
 
 
@@ -462,7 +501,7 @@ def export_report_data(df):
     df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
     df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
-    df[cruise_report_cols].to_csv("data/scratch_folder/report_data.csv", index=False)
+    df[cruise_report_cols].to_csv("data/report_data.csv", index=False)
 
     return
 
