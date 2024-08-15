@@ -28,6 +28,9 @@ USERCONFIG = 'ctdcal/cfg.yaml'
 user_cfg = load_user_config(validate_file(USERCONFIG))
 FLAGFILE = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
 
+# TODO: abstract parts of this to a separate file
+# TODO: following above, make parts reusable?
+
 # load continuous CTD data and make into a dict (only ~20MB)
 file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
 ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
@@ -53,7 +56,7 @@ btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
 # update with old handcoded flags if file exists
 if FLAGFILE.exists():
     salt_flags_manual = get_node(FLAGFILE, 'salt')
-    salt_flags_manual_df = pd.DataFrame.from_dict(salt_flags_manual, dtype={'value': int})
+    salt_flags_manual_df = pd.DataFrame.from_dict(salt_flags_manual)
     salt_flags_manual_df = salt_flags_manual_df.rename(columns={"value": "New Flag", "cast_id": "SSSCC", "bottle_num": "SAMPNO", "notes": "Comments"})
 
     # there's gotta be a better way... but this is good enough for now
@@ -156,6 +159,13 @@ src_plot_upcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
+# fig = figure(
+#     plot_height=800,
+#     plot_width=400,
+#     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
+#     tools="pan,box_zoom,wheel_zoom,box_select,reset",
+#     y_axis_label="Pressure (dbar)",
+# )
 fig = figure(
     height=800,
     width=400,
@@ -342,7 +352,8 @@ def save_data():
 
     # save it
     salt = df_node_to_BottleFlags(df_out)
-    save_node(FLAGFILE, salt, 'salt')
+    flagfile = validate_file(FLAGFILE, create=True)
+    save_node(flagfile, salt, 'salt', create_new=True)
 
 
 def exit_bokeh():

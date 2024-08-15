@@ -85,3 +85,19 @@ class TestBottleFlagWrangling:
         # Test bad node
         with pytest.raises(NodeNotFoundError):
             save_node(fname, spam, 'limburger')
+        save_node(fname, spam, 'Cheddar', create_new=True)
+        with open(fname, 'r') as f:
+            flags = BottleFlags.fromJSON(f.read())
+        assert 'Cheddar' in flags
+        # Test no preexisting file
+        new_fname = Path(tmp_path, 'sample_new.json')
+        assert new_fname.exists() is False
+        with pytest.raises(FileNotFoundError):
+            save_node(new_fname, spam, 'spam')
+        # Test new empty file
+        empty_fname = Path(tmp_path, 'sample_empty.json')
+        empty_fname.touch()
+        save_node(empty_fname, spam, 'spam', create_new=True)
+        with open(empty_fname, 'r') as f:
+            flags = BottleFlags.fromJSON(f.read())
+        assert 'spam' in flags

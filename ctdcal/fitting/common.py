@@ -10,6 +10,8 @@ import json
 
 from munch import Munch
 
+from ctdcal.common import validate_file
+
 
 class BottleFlags(Munch):
     """
@@ -76,10 +78,15 @@ def get_node(fname, label):
         return BottleFlags(flags[label])
 
 
-def save_node(fname, node, label):
+def save_node(fname, node, label, create_new=False):
     with open(fname, 'r') as f:
-        flags = BottleFlags.fromJSON(f.read())
-    if label in flags:
+        buf = f.read()
+    if buf == '':
+        # File exists but is empty
+        flags = BottleFlags()
+    else:
+        flags = BottleFlags.fromJSON(buf)
+    if label in flags or create_new is True:
         flags[label] = node
     else:
         raise NodeNotFoundError("The node '%s' was not found in %s" % (label, fname))
