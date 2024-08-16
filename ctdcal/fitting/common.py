@@ -75,7 +75,10 @@ def df_node_to_BottleFlags(df):
 def get_node(fname, label):
     with open(fname, 'r') as f:
         flags = json.load(f)
-        return BottleFlags(flags[label])
+        if label in flags:
+            return BottleFlags(flags[label])
+        else:
+            raise NodeNotFoundError
 
 
 def save_node(fname, node, label, create_new=False):

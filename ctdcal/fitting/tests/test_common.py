@@ -66,8 +66,12 @@ class TestBottleFlagWrangling:
         assert spam.sausage[0] == 'C'
 
     def test_get_node(self, sample_data):
+        # Test good node
         node = get_node(sample_data, 'spam')
         assert node.sausage[0] == 'C'
+        # Test bad node
+        with pytest.raises(NodeNotFoundError):
+            node = get_node(sample_data, 'cheese')
 
     def test_save_node(self, sample_data, tmp_path):
         fname = Path(tmp_path, 'sample_copy.json')

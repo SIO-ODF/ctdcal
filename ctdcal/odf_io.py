@@ -12,16 +12,16 @@ import numpy as np
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
+from ctdcal.common import validate_file
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
+def _salt_loader(filename, flag_file=None):
     """
     Load raw file into salt and reference DataFrames.
     """
-
     csv_opts = dict(delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True")
     if isinstance(filename, (str, Path)):
         with open(filename, newline="") as f:
@@ -70,13 +70,13 @@ def _salt_loader(filename, flag_file="tools/salt_flags_handcoded.csv"):
     # (unconfirmed but * appears to indicate a lot of things from LabView code:
     # large spread in values, long time between samples, manual override, etc.)
     flagged = saltDF["EndTime"].str.contains("*", regex=False)
-    if flagged.any():
+    if flagged.any() and flag_file is not None:
         # remove asterisks from EndTime and flag samples
         log.debug(f"Found * in {ssscc} salt file, flagging value(s) as questionable")
         saltDF["EndTime"] = saltDF["EndTime"].str.strip("*")
         questionable = pd.DataFrame()
-        questionable["SAMPNO"] = saltDF.loc[flagged, "SAMPNO"].astype(int)
-        questionable.insert(0, "SSSCC", ssscc)
+        questionable["bottle_num"] = saltDF.loc[flagged, "SAMPNO"].astype(int)
+        questionable["cast_id"] = ssscc
         questionable["diff"] = np.nan
         questionable["salinity_flag"] = 3
         questionable["comments"] = "Auto-flagged by processing function (had * in row)"
@@ -136,7 +136,7 @@ def _salt_exporter(
             stn_cast_salts.to_csv(outfile, index=False)
 
 
-def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
+def process_salts(ssscc_list, user_cfg, salt_dir=cfg.dirs["salt"]):
     """
     Master salt processing function. Load in salt files for given station/cast list,
     calculate salinity, and export to .csv files.
@@ -145,17 +145,21 @@ def process_salts(ssscc_list, salt_dir=cfg.dirs["salt"]):
     ----------
     ssscc_list : list of str
         List of stations to process
+    user_cfg : Munch object
+        User-specified parameters
     salt_dir : str, optional
         Path to folder containing raw salt files (defaults to data/salt/)
 
     """
+    flag_file = validate_file(Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man), create=True)
+
     for ssscc in ssscc_list:
         if (Path(salt_dir) / f"{ssscc}_salts.csv").exists():
             log.info(f"{ssscc}_salts.csv already exists in {salt_dir}... skipping")
             continue
         else:
             try:
-                saltDF, refDF = _salt_loader(Path(salt_dir) / ssscc)
+                saltDF, refDF = _salt_loader(Path(salt_dir) / ssscc, flag_file=flag_file)
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue

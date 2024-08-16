@@ -53,7 +53,7 @@ def odf_process_all():
     convert.make_btl_mean(ssscc_list)
 
     # generate salt .csv files
-    odf_io.process_salts(ssscc_list)
+    odf_io.process_salts(ssscc_list, user_cfg)
 
     # generate reftemp .csv files
     process_bottle.process_reft(ssscc_list)

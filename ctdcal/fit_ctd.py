@@ -12,7 +12,7 @@ import pandas as pd
 import yaml
 from scipy.ndimage import shift
 
-from ctdcal.fitting.common import get_node
+from ctdcal.fitting.common import get_node, NodeNotFoundError
 from . import convert as convert
 from . import ctd_plots as ctd_plots
 from . import flagging as flagging
@@ -527,9 +527,18 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
 
     # merge in handcoded salt flags
     flag_file = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+    salt_flags_manual = None
     if flag_file.exists():
-        salt_flags_manual = get_node(flag_file, ref_node)
-        salt_flags_manual_df = pd.DataFrame.from_dict(salt_flags_manual, dtype={'value': int})
+        try:
+            salt_flags_manual = get_node(flag_file, ref_node)
+        except NodeNotFoundError:
+            log.info("No previously flagged values for %s found in flag file." % ref_node)
+    else:
+        log.info("No pre-existing flag file found.")
+
+    if salt_flags_manual is not None:
+        log.info("Merging previously flagged values for %s." % ref_node)
+        salt_flags_manual_df = pd.DataFrame.from_dict(salt_flags_manual)
         salt_flags_manual_df = salt_flags_manual_df.rename(
             columns={"cast_id": "SSSCC", "bottle_num": "btl_fire_num", "value": "SALNTY_FLAG_W"}
         ).drop(columns=["notes"])
