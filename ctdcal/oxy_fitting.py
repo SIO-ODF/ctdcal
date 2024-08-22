@@ -668,6 +668,10 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
         Continuous CTD data
     ssscc_list : list of str
         List of stations to process
+    user_cfg : Munch dict
+        Dictionary of user configuration parameters
+    ref_node : str
+        Name of reference parameter
 
     Returns
     -------
@@ -738,31 +742,19 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
         try:
             oxy_flags_manual = get_node(flag_file, ref_node)
         except NodeNotFoundError:
-            print("No previously flagged values for %s found in flag file." % ref_node)
+            log.info("No previously flagged values for %s found in flag file." % ref_node)
     else:
-        print("No pre-existing flag file found.")
+        log.info("No pre-existing flag file found.")
 
     if oxy_flags_manual is not None:
-        print("Merging previously flagged values for %s." % ref_node)
+        log.info("Merging previously flagged values for %s." % ref_node)
         oxy_flags_manual_df = pd.DataFrame.from_dict(oxy_flags_manual)
         oxy_flags_manual_df = oxy_flags_manual_df.rename(
             columns={"cast_id": "SSSCC", "bottle_num": "btl_fire_num", "value": "OXYGEN_FLAG_W"}
         )
-        # print(oxy_flags_manual_df)
-        # print(btl_df[['OXYGEN_FLAG_W']])
         btl_df.set_index(['SSSCC', 'btl_fire_num'], inplace=True)
         btl_df.update(oxy_flags_manual_df.set_index(['SSSCC', 'btl_fire_num']))
         btl_df.reset_index(inplace=True)
-
-    # if Path("data/oxygen/manual_oxy_flags.csv").exists():
-    #     manual_flags = pd.read_csv(
-    #         "data/oxygen/manual_oxy_flags.csv", dtype={"SSSCC": str}
-    #     )
-    #     for _, flags in manual_flags.iterrows():
-    #         df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
-    #             btl_df["btl_fire_num"] == flags["SAMPNO"]
-    #         )
-    #         btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
 
     return True
 

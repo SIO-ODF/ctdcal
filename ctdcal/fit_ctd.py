@@ -508,9 +508,9 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
     time_df : DataFrame
         Continuous CTD data
     user_cfg : Munch object
-        User-specified parameters
+        Dictionary of user configuration parameters
     ref_node : str
-        Reference salt node name
+        Name of reference parameter
 
     Returns
     --------

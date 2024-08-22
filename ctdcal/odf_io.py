@@ -146,7 +146,7 @@ def process_salts(ssscc_list, user_cfg, salt_dir=cfg.dirs["salt"]):
     ssscc_list : list of str
         List of stations to process
     user_cfg : Munch object
-        User-specified parameters
+        Dictionary of user configuration parameters
     salt_dir : str, optional
         Path to folder containing raw salt files (defaults to data/salt/)
 
