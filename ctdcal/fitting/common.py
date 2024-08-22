@@ -10,8 +10,6 @@ import json
 
 from munch import Munch
 
-from ctdcal.common import validate_file
-
 
 class BottleFlags(Munch):
     """
@@ -40,8 +38,13 @@ class BottleFlags(Munch):
             self[k].append(v)
 
     def save(self, fname):
+        """
+        Export the flags to a JSON file.
+
+        Pretty printing may be removed or made optional in future updates.
+        """
         with open(fname, 'w') as f:
-            f.write(self.toJSON())
+            f.write(self.toJSON(indent=4))
 
 
 class NodeNotFoundError(Exception):

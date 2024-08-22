@@ -80,7 +80,7 @@ def odf_process_all():
     btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all, user_cfg, 'salt')
 
     # calculate params needs for oxy/rinko calibration
-    oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
+    oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list, user_cfg, 'oxygen')
 
     # calibrate oxygen against reference
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
