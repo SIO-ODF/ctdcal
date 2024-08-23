@@ -13,12 +13,13 @@ import pandas as pd
 
 from ctdcal import get_ctdcal_config
 from ctdcal.common import validate_file
+from ctdcal.fitting.common import df_node_to_BottleFlags, save_node, get_node, NodeNotFoundError
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(filename, flag_file=None):
+def _salt_loader(filename, user_cfg):
     """
     Load raw file into salt and reference DataFrames.
     """
@@ -70,17 +71,17 @@ def _salt_loader(filename, flag_file=None):
     # (unconfirmed but * appears to indicate a lot of things from LabView code:
     # large spread in values, long time between samples, manual override, etc.)
     flagged = saltDF["EndTime"].str.contains("*", regex=False)
-    if flagged.any() and flag_file is not None:
+    questionable = None
+    if flagged.any():
         # remove asterisks from EndTime and flag samples
         log.debug(f"Found * in {ssscc} salt file, flagging value(s) as questionable")
         saltDF["EndTime"] = saltDF["EndTime"].str.strip("*")
+        # construct flagged dataframe
         questionable = pd.DataFrame()
         questionable["bottle_num"] = saltDF.loc[flagged, "SAMPNO"].astype(int)
-        questionable["cast_id"] = ssscc
-        questionable["diff"] = np.nan
-        questionable["salinity_flag"] = 3
-        questionable["comments"] = "Auto-flagged by processing function (had * in row)"
-        questionable.to_csv(flag_file, mode="a+", index=False, header=None)
+        questionable["cast_id"] = [str(s).zfill(3)[-3:] + str(c).zfill(2) for s, c in zip(saltDF.loc[flagged, "STNNBR"], saltDF.loc[flagged, "CASTNO"])]
+        questionable["value"] = 3
+        questionable["notes"] = "Auto-flagged by processing function (had * in row)"
 
     # add time (in seconds) needed for autosal drift removal step
     saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"], format="%H:%M:%S")
@@ -92,7 +93,7 @@ def _salt_loader(filename, flag_file=None):
     ].astype(float)
     saltDF = saltDF[saltDF["autosalSAMPNO"] != "worm"].astype(cols)  # force dtypes
 
-    return saltDF, refDF
+    return saltDF, refDF, questionable
 
 
 def remove_autosal_drift(saltDF, refDF):
@@ -151,15 +152,14 @@ def process_salts(ssscc_list, user_cfg, salt_dir=cfg.dirs["salt"]):
         Path to folder containing raw salt files (defaults to data/salt/)
 
     """
-    flag_file = validate_file(Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man), create=True)
-
+    flags_df = None
     for ssscc in ssscc_list:
         if (Path(salt_dir) / f"{ssscc}_salts.csv").exists():
             log.info(f"{ssscc}_salts.csv already exists in {salt_dir}... skipping")
             continue
         else:
             try:
-                saltDF, refDF = _salt_loader(Path(salt_dir) / ssscc, flag_file=flag_file)
+                saltDF, refDF, questionable = _salt_loader(Path(salt_dir) / ssscc, user_cfg)
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue
@@ -168,6 +168,28 @@ def process_salts(ssscc_list, user_cfg, salt_dir=cfg.dirs["salt"]):
                 (saltDF["CRavg"] / 2.0), saltDF["BathTEMP"]
             )  # .round(4)
             _salt_exporter(saltDF, salt_dir)
+
+            # compile flags
+            if questionable is not None:
+                if flags_df is None:
+                    flags_df = questionable
+                else:
+                    flags_df = pd.concat([flags_df, questionable], ignore_index=True)
+
+
+
+    # save flags
+    if flags_df is not None:
+        flag_path = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+        flag_file = validate_file(flag_path, create=True)
+        try:
+            salt = pd.DataFrame.from_dict(get_node(flag_file, 'salt'))
+        except NodeNotFoundError:
+            salt = None
+        flags_df = pd.concat([flags_df, salt], ignore_index=True)
+        new_flags = df_node_to_BottleFlags(flags_df)
+        save_node(flag_file, new_flags, 'salt', create_new=True)
+
 
 def print_progress_bar(
     iteration,
