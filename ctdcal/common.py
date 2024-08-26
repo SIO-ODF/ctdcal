@@ -1,10 +1,5 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
-:package: ctdcal.common
-:file: ctdcal/common.py
-:author: Allen Smith
-:brief: Classes, definitions and utilities for all ctdcal modules
+Classes, definitions and utilities for all ctdcal modules
 """
 from pathlib import Path
 import yaml
@@ -17,25 +12,41 @@ from munch import munchify
 
 # Configuration
 def load_user_config(cfgfile):
+    """
+    Load user-defined parameters from a configuration file. Return a Munch
+    object (dictionary).
+
+    Parameters
+    ----------
+    cfgfile : str or Path-like
+        Path to the configuration file.
+
+    Returns
+    -------
+    Munch object
+    """
     with open(cfgfile, 'r') as f:
         cfg = yaml.safe_load(f)
         return munchify(cfg)
 
+
 # Input Validation
 def validate_dir(pathname, create=False):
     """
-    Test if a directory exists, and optionally create it if it does not. Raises
+    Test if a directory exists, and optionally create it if it does not. Raise
     an exception if the directory does not exist, cannot be created, or is not
-    a directory.
+    a directory. Return the validated path.
 
     Parameters
     ----------
-    pathname - (str, PathLike) directory to validate
-    create - (bool) create the directory if true
+    pathname : str or PathLike
+        Directory to validate.
+    create : bool
+        If true, create the directory if it does not exist. Default is false.
 
     Returns
     -------
-    Path object for the validated directory
+    Path object
     """
     p = Path(pathname)
     if create is True:
@@ -51,18 +62,20 @@ def validate_dir(pathname, create=False):
 
 def validate_file(pathname, create=False):
     """
-    Test if a file exists, and optionally create it if it does not. Raises
+    Test if a file exists, and optionally create it if it does not. Raise
     an exception if the file does not exist, cannot be created, or is not
-    a file.
+    a file. Return the validated path.
 
     Parameters
     ----------
-    pathname - (str, PathLike) filename to validate
-    create - (bool) create the file if true
+    pathname : str or Path-like
+        Filename to validate.
+    create : bool
+        If true, create the file if it does not exist. Default is false.
 
     Returns
     -------
-    Path object for the validated file
+    Path object
     """
     p = Path(pathname)
     if create is True:

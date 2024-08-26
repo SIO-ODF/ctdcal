@@ -6,6 +6,7 @@ import yaml
 
 from ctdcal.common import load_user_config, validate_dir, validate_file
 
+
 class TestUserConfig:
     """
     Tests and fixtures for working with user configurations.
@@ -22,8 +23,7 @@ class TestUserConfig:
         cfg = load_user_config(tmp_cfg)
         assert cfg.cheese.limburger == 1
         # Test bad cfgfile
-        # TODO: Test for invalid file. This might require knowing all the expected
-        #   fields, which is not finalized yet.
+        # TODO: Test for invalid file?
 
 
 class TestPathValidation:
@@ -53,12 +53,12 @@ class TestPathValidation:
 
         # Test that bad dir is created
         test_dir = tmp_dir / p / 'egg'
-        assert test_dir.is_dir() == False
+        assert test_dir.is_dir() is False
         assert validate_dir(test_dir, create=True).is_dir()
 
         # Test for path exists but is not a dir
         samename = tmp_dir / p / 'cheese'
-        assert samename.exists() == False
+        assert samename.exists() is False
         samename.touch()
         with pytest.raises(FileExistsError):
             validate_dir(samename, create=False)
@@ -82,12 +82,12 @@ class TestPathValidation:
 
         # Test that non-existent file is created
         tmp_file = tmp_dir / 'spam' / 'egg.file'
-        assert tmp_file.is_file() == False
+        assert tmp_file.is_file() is False
         assert validate_file(tmp_file, create=True).is_file()
 
         # Test that filename exists but is not a file
         samename = tmp_dir / 'spam' / 'egg'
-        assert samename.exists() == False
+        assert samename.exists() is False
         samename.mkdir(parents=True)
         with pytest.raises(FileExistsError):
             validate_file(samename, create=False)

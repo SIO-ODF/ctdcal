@@ -668,8 +668,8 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
         Continuous CTD data
     ssscc_list : list of str
         List of stations to process
-    user_cfg : Munch dict
-        Dictionary of user configuration parameters
+    user_cfg : Munch object
+        Munch dictionary of user-defined parameters
     ref_node : str
         Name of reference parameter
 

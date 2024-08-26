@@ -19,7 +19,7 @@ cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(filename, user_cfg):
+def _salt_loader(filename):
     """
     Load raw file into salt and reference DataFrames.
     """
@@ -159,7 +159,7 @@ def process_salts(ssscc_list, user_cfg, salt_dir=cfg.dirs["salt"]):
             continue
         else:
             try:
-                saltDF, refDF, questionable = _salt_loader(Path(salt_dir) / ssscc, user_cfg)
+                saltDF, refDF, questionable = _salt_loader(Path(salt_dir) / ssscc)
             except FileNotFoundError:
                 log.warning(f"Salt file for cast {ssscc} does not exist... skipping")
                 continue

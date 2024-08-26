@@ -34,7 +34,7 @@ class TestBottleFlags:
         # Test existing key
         flags.spam.update_node(egg='lovely spam')
         assert 'lovely spam' in flags.spam.egg
-        # Test nonexisting key
+        # Test non-existing key
         with pytest.raises(KeyError):
             flags.spam.update_node(cheese='cheddar')
 
