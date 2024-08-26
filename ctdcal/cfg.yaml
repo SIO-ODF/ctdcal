@@ -1,0 +1,9 @@
+# Example user configuration file
+#
+# To use, call ctdcal.common.load_user_config(<this file>)
+
+# Data Directory:
+datadir: "data"
+
+# Manual bottle flags filename (JSON)
+bottleflags_man: "bottle_flags_manual.json"

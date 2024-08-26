@@ -13,10 +13,15 @@ from .. import (
     process_ctd,
     rinko,
 )
+from ctdcal.common import load_user_config, validate_file
 
 import logging
 
+
 log = logging.getLogger(__name__)
+
+USERCONFIG = 'ctdcal/cfg.yaml'
+user_cfg = load_user_config(validate_file(USERCONFIG))
 
 
 def odf_process_all():
@@ -48,7 +53,7 @@ def odf_process_all():
     convert.make_btl_mean(ssscc_list)
 
     # generate salt .csv files
-    odf_io.process_salts(ssscc_list)
+    odf_io.process_salts(ssscc_list, user_cfg)
 
     # generate reftemp .csv files
     process_bottle.process_reft(ssscc_list)
@@ -71,11 +76,11 @@ def odf_process_all():
     # calibrate temperature against reference
     fit_ctd.calibrate_temp(btl_data_all, time_data_all)
 
-    # calibrate temperature against reference
-    btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all)
+    # calibrate conductivity against reference
+    btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all, user_cfg, 'salt')
 
     # calculate params needs for oxy/rinko calibration
-    oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list)
+    oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list, user_cfg, 'oxygen')
 
     # calibrate oxygen against reference
     oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
@@ -86,7 +91,7 @@ def odf_process_all():
     #####
 
     # export files for making cruise report figs
-    process_bottle.export_report_data(btl_data_all)
+    # process_bottle.export_report_data(btl_data_all)
 
     # export to Exchange format
     process_ctd.export_ct1(time_data_all, ssscc_list)

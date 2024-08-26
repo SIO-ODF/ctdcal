@@ -17,6 +17,7 @@ from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
+from ctdcal.fitting.common import get_node, NodeNotFoundError
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -41,11 +42,13 @@ def load_winkler_oxy(oxy_file):
 
     with open(oxy_file, newline="") as f:
         oxyF = csv.reader(
-            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True"
+            f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True
         )
         oxy_array = []
         for row in oxyF:
-            if len(row) > 9:
+            if row[0].startswith('#'):
+                continue
+            elif len(row) > 9:
                 row = row[:9]
             oxy_array.append(row)
 
@@ -482,6 +485,7 @@ def match_sigmas(
     btl_oxy,
     btl_tmp,
     btl_SA,
+    btl_idx,
     ctd_os,
     ctd_prs,
     ctd_tmp,
@@ -495,7 +499,7 @@ def match_sigmas(
 
     # Construct Dataframe from bottle and ctd values for merging
     btl_data = pd.DataFrame(
-        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA}
+        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA}, index=btl_idx
     )
     time_data = pd.DataFrame(
         data={
@@ -651,7 +655,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     return cfw_coefs, df
 
 
-def prepare_oxy(btl_df, time_df, ssscc_list):
+def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
     """
     Calculate oxygen-related variables needed for calibration:
     sigma, oxygen solubility (OS), and bottle oxygen
@@ -664,6 +668,10 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         Continuous CTD data
     ssscc_list : list of str
         List of stations to process
+    user_cfg : Munch object
+        Munch dictionary of user-defined parameters
+    ref_node : str
+        Name of reference parameter
 
     Returns
     -------
@@ -726,16 +734,27 @@ def prepare_oxy(btl_df, time_df, ssscc_list):
         btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
     )
     btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["refO"]])
+
     # Load manual OXYGEN flags
-    if Path("data/oxygen/manual_oxy_flags.csv").exists():
-        manual_flags = pd.read_csv(
-            "data/oxygen/manual_oxy_flags.csv", dtype={"SSSCC": str}
+    flag_file = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+    oxy_flags_manual = None
+    if flag_file.exists():
+        try:
+            oxy_flags_manual = get_node(flag_file, ref_node)
+        except NodeNotFoundError:
+            log.info("No previously flagged values for %s found in flag file." % ref_node)
+    else:
+        log.info("No pre-existing flag file found.")
+
+    if oxy_flags_manual is not None:
+        log.info("Merging previously flagged values for %s." % ref_node)
+        oxy_flags_manual_df = pd.DataFrame.from_dict(oxy_flags_manual)
+        oxy_flags_manual_df = oxy_flags_manual_df.rename(
+            columns={"cast_id": "SSSCC", "bottle_num": "btl_fire_num", "value": "OXYGEN_FLAG_W"}
         )
-        for _, flags in manual_flags.iterrows():
-            df_row = (btl_df["SSSCC"] == flags["SSSCC"]) & (
-                btl_df["btl_fire_num"] == flags["SAMPNO"]
-            )
-            btl_df.loc[df_row, "OXYGEN_FLAG_W"] = flags["Flag"]
+        btl_df.set_index(['SSSCC', 'btl_fire_num'], inplace=True)
+        btl_df.update(oxy_flags_manual_df.set_index(['SSSCC', 'btl_fire_num']))
+        btl_df.reset_index(inplace=True)
 
     return True
 
@@ -773,6 +792,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_dict = {}
     all_sbe43_fit = pd.DataFrame()
 
+    btl_df.set_index('master_index', inplace=True)
+
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
     for ssscc in ssscc_list:
@@ -788,6 +809,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             btl_data[cfg.column["refO"]],
             btl_data["CTDTMP1"],
             btl_data["SA"],
+            btl_data.index,
             time_data["OS"],
             time_data[cfg.column["p"]],
             time_data[cfg.column["t1"]],
@@ -804,7 +826,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         log.info(ssscc + " density matching done")
 
     # Only fit using OXYGEN flagged good (2)
-    all_sbe43_merged = all_sbe43_merged[btl_df["OXYGEN_FLAG_W"] == 2].copy()
+    all_sbe43_merged = all_sbe43_merged.loc[btl_df["OXYGEN_FLAG_W"] == 2].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
     (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")

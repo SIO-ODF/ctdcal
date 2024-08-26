@@ -260,11 +260,11 @@ def raw_ctd_filter(df=None, window="triangle", win_size=24, parameters=None):
     if parameters is not None:
         for p in parameters:
             if window == "boxcar":
-                win = sig.boxcar(win_size)
+                win = sig.windows.boxcar(win_size)
             elif window == "hanning":
-                win = sig.hann(win_size)
+                win = sig.windows.hann(win_size)
             elif window == "triangle":
-                win = sig.triang(win_size)
+                win = sig.windows.triang(win_size)
             filter_df[p] = sig.convolve(filter_df[p], win, mode="same") / np.sum(win)
 
     return filter_df

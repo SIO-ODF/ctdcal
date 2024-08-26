@@ -12,6 +12,7 @@ import pandas as pd
 import yaml
 from scipy.ndimage import shift
 
+from ctdcal.fitting.common import get_node, NodeNotFoundError
 from . import convert as convert
 from . import ctd_plots as ctd_plots
 from . import flagging as flagging
@@ -496,7 +497,7 @@ def calibrate_temp(btl_df, time_df):
     return True
 
 
-def calibrate_cond(btl_df, time_df):
+def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
     """
     Least-squares fit CTD conductivity data against bottle salts.
 
@@ -506,6 +507,10 @@ def calibrate_cond(btl_df, time_df):
         CTD data at bottle stops
     time_df : DataFrame
         Continuous CTD data
+    user_cfg : Munch object
+        Dictionary of user configuration parameters
+    ref_node : str
+        Name of reference parameter
 
     Returns
     --------
@@ -521,15 +526,23 @@ def calibrate_cond(btl_df, time_df):
     )
 
     # merge in handcoded salt flags
-    salt_file = "tools/salt_flags_handcoded.csv"  # abstract to config.py
-    if Path(salt_file).exists():
-        handcoded_salts = pd.read_csv(
-            salt_file, dtype={"SSSCC": str, "salinity_flag": int}
-        )
-        handcoded_salts = handcoded_salts.rename(
-            columns={"SAMPNO": "btl_fire_num", "salinity_flag": "SALNTY_FLAG_W"}
-        ).drop(columns=["diff", "Comments"])
-        btl_df = btl_df.merge(handcoded_salts, on=["SSSCC", "btl_fire_num"], how="left")
+    flag_file = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+    salt_flags_manual = None
+    if flag_file.exists():
+        try:
+            salt_flags_manual = get_node(flag_file, ref_node)
+        except NodeNotFoundError:
+            log.info("No previously flagged values for %s found in flag file." % ref_node)
+    else:
+        log.info("No pre-existing flag file found.")
+
+    if salt_flags_manual is not None:
+        log.info("Merging previously flagged values for %s." % ref_node)
+        salt_flags_manual_df = pd.DataFrame.from_dict(salt_flags_manual)
+        salt_flags_manual_df = salt_flags_manual_df.rename(
+            columns={"cast_id": "SSSCC", "bottle_num": "btl_fire_num", "value": "SALNTY_FLAG_W"}
+        ).drop(columns=["notes"])
+        btl_df = btl_df.merge(salt_flags_manual_df, on=["SSSCC", "btl_fire_num"], how="left")
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
             btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
         )

@@ -20,8 +20,16 @@ from bokeh.models import (
 from bokeh.plotting import figure
 
 from ctdcal import get_ctdcal_config, io
+from ctdcal.common import load_user_config, validate_file
+from ctdcal.fitting.common import get_node, df_node_to_BottleFlags, save_node
 
 cfg = get_ctdcal_config()
+USERCONFIG = 'ctdcal/cfg.yaml'
+user_cfg = load_user_config(validate_file(USERCONFIG))
+FLAGFILE = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+
+# TODO: abstract parts of this to a separate file
+# TODO: following above, make parts reusable?
 
 # load continuous CTD data and make into a dict (only ~20MB)
 file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
@@ -46,13 +54,13 @@ btl_data["Comments"] = ""
 btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
 
 # update with old handcoded flags if file exists
-if (handcoded_file := Path(cfg.dirs["salt"]) / "salt_flags_handcoded.csv").exists():
-    handcodes = pd.read_csv(handcoded_file, dtype={"SSSCC": str}, keep_default_na=False)
-    handcodes = handcodes.rename(columns={"salinity_flag": "New Flag"}).drop(
-        columns="diff"
-    )
+if FLAGFILE.exists():
+    salt_flags_manual = get_node(FLAGFILE, 'salt')
+    salt_flags_manual_df = pd.DataFrame.from_dict(salt_flags_manual)
+    salt_flags_manual_df = salt_flags_manual_df.rename(columns={"value": "New Flag", "cast_id": "SSSCC", "bottle_num": "SAMPNO", "notes": "Comments"})
+
     # there's gotta be a better way... but this is good enough for now
-    btl_data = btl_data.merge(handcodes, on=["SSSCC", "SAMPNO"], how="left")
+    btl_data = btl_data.merge(salt_flags_manual_df, on=["SSSCC", "SAMPNO"], how="left")
     merge_rows = ~btl_data["New Flag_y"].isnull() | ~btl_data["Comments_y"].isnull()
     btl_data.loc[merge_rows, "New Flag_x"] = btl_data.loc[merge_rows, "New Flag_y"]
     btl_data.loc[merge_rows, "Comments_x"] = btl_data.loc[merge_rows, "Comments_y"]
@@ -151,9 +159,16 @@ src_plot_upcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
+# fig = figure(
+#     plot_height=800,
+#     plot_width=400,
+#     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
+#     tools="pan,box_zoom,wheel_zoom,box_select,reset",
+#     y_axis_label="Pressure (dbar)",
+# )
 fig = figure(
-    plot_height=800,
-    plot_width=400,
+    height=800,
+    width=400,
     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
     y_axis_label="Pressure (dbar)",
@@ -191,7 +206,7 @@ upcast_sal = fig.triangle(
     source=src_plot_upcast,
     legend_label="Upcast CTD sample",
 )
-fig.select(BoxSelectTool).select_every_mousemove = False
+fig.select(BoxSelectTool).continuous = False
 fig.y_range.flipped = True  # invert y-axis
 fig.legend.location = "bottom_right"
 fig.legend.border_line_width = 3
@@ -331,12 +346,14 @@ def save_data():
     df_out = pd.DataFrame.from_dict(src_table_changes.data)
 
     # minor changes to columns/names/etc.
-    df_out = df_out.rename(columns={"flag_new": "salinity_flag"}).drop(
-        columns="flag_old"
+    df_out = df_out.rename(columns={"flag_new": "value", "SSSCC": "cast_id", "SAMPNO": "bottle_num", "Comments": "notes"}).drop(
+        columns=["flag_old", "diff"]
     )
 
     # save it
-    df_out.to_csv(handcoded_file, index=None)
+    salt = df_node_to_BottleFlags(df_out)
+    flagfile = validate_file(FLAGFILE, create=True)
+    save_node(flagfile, salt, 'salt', create_new=True)
 
 
 def exit_bokeh():
