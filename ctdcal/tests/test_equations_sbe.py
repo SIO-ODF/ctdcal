@@ -275,3 +275,62 @@ def test_seapoint_fluor():
     # error saying which keys are missing from coef dict
     with pytest.raises(KeyError, match="Offset"):
         eqs.seapoint_fluor(volts, make_coefs(coefs[:-1]))
+
+def test_sbe_flntu_chl(caplog):
+    volts = np.concatenate((np.zeros(10), np.array([1, 2, 3, 4, 5])))
+    coefs = {'ScaleFactor':11, 'DarkCounts':0.079}
+
+    chl = eqs.sbe_flntu_chl(volts, coefs)
+
+    #   Test hand-calculated values with example coefs
+    assert all(chl[0:10] == -0.869)
+    assert chl[-1] == 54.131 
+
+    # check there are no warnings if volts are float with no zeroes
+    no_warn = eqs.sbe_flntu_chl(np.ones(len(volts)), make_coefs(coefs, value=1))
+    assert len(caplog.records) == 0
+    assert all(no_warn == 0)
+
+    # check voltages outside 0-5V are replaced with NaNs
+    bad_range = eqs.sbe_flntu_chl(np.arange(-1, 7), make_coefs(coefs, value=1))
+    assert "sbe_flntu_chl" in caplog.records[-1].message
+    assert "outside of 0-5V" in caplog.records[-1].message
+    assert np.isnan(bad_range[0])
+    assert np.isnan(bad_range[-1])
+    assert bad_range[1] == -1
+    assert not all(np.isnan(bad_range[1:-1]))
+
+    # error saying which keys are missing from coef dict
+    with pytest.raises(KeyError, match="DarkCounts"):
+        eqs.sbe_flntu_chl(volts, {"ScaleFactor":1, "dark_counts":1})
+        assert "dictionary missing keys" in caplog.records[-1].message
+
+def test_sbe_flntu_ntu(caplog):
+    #   Practically identical to sbe_flntu_chl
+    volts = np.concatenate((np.zeros(10), np.array([1, 2, 3, 4, 5])))
+    coefs = {'ScaleFactor':5, 'DarkCounts':0.050}
+
+    ntu = eqs.sbe_flntu_ntu(volts, coefs)
+
+    #   Test hand-calculated values with example coefs
+    assert all(ntu[0:10] == -0.25)
+    assert ntu[-1] == 24.75
+
+    # check there are no warnings if volts are float with no zeroes
+    no_warn = eqs.sbe_flntu_ntu(np.ones(len(volts)), make_coefs(coefs, value=1))
+    assert len(caplog.records) == 0
+    assert all(no_warn == 0)
+
+    # check voltages outside 0-5V are replaced with NaNs
+    bad_range = eqs.sbe_flntu_ntu(np.arange(-1, 7), make_coefs(coefs, value=1))
+    assert "sbe_flntu_ntu" in caplog.records[-1].message
+    assert "outside of 0-5V" in caplog.records[-1].message
+    assert np.isnan(bad_range[0])
+    assert np.isnan(bad_range[-1])
+    assert bad_range[1] == -1
+    assert not all(np.isnan(bad_range[1:-1]))
+
+    # error saying which keys are missing from coef dict
+    with pytest.raises(KeyError, match="DarkCounts"):
+        eqs.sbe_flntu_ntu(volts, {"ScaleFactor":1, "dark_counts":1})
+        assert "dictionary missing keys" in caplog.records[-1].message
