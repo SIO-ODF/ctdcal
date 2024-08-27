@@ -13,13 +13,18 @@ import pandas as pd
 
 from ctdcal import get_ctdcal_config
 from ctdcal.common import validate_file
-from ctdcal.fitting.common import df_node_to_BottleFlags, save_node, get_node, NodeNotFoundError
+from ctdcal.fitting.common import (
+    NodeNotFoundError,
+    df_node_to_BottleFlags,
+    get_node,
+    save_node,
+)
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def _salt_loader(filename):
+def _salt_loader(filename, flag_file = Path(cfg.dirs['flags']+"bottleflags_auto.csv")):
     """
     Load raw file into salt and reference DataFrames.
     """
@@ -82,6 +87,7 @@ def _salt_loader(filename):
         questionable["cast_id"] = [str(s).zfill(3)[-3:] + str(c).zfill(2) for s, c in zip(saltDF.loc[flagged, "STNNBR"], saltDF.loc[flagged, "CASTNO"])]
         questionable["value"] = 3
         questionable["notes"] = "Auto-flagged by processing function (had * in row)"
+        questionable.to_csv(flag_file)
 
     # add time (in seconds) needed for autosal drift removal step
     saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"], format="%H:%M:%S")
@@ -137,7 +143,7 @@ def _salt_exporter(
             stn_cast_salts.to_csv(outfile, index=False)
 
 
-def process_salts(ssscc_list, user_cfg, salt_dir=cfg.dirs["salt"]):
+def process_salts(ssscc_list, user_cfg=None, salt_dir=cfg.dirs["salt"]):
     """
     Master salt processing function. Load in salt files for given station/cast list,
     calculate salinity, and export to .csv files.
@@ -180,7 +186,10 @@ def process_salts(ssscc_list, user_cfg, salt_dir=cfg.dirs["salt"]):
 
     # save flags
     if flags_df is not None:
-        flag_path = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+        if user_cfg is not None:
+            flag_path = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+        else:   #   No user_cfg, use get_ctdcal_config
+            flag_path = Path(cfg.dirs('flags'), "bottleflags_man.csv")
         flag_file = validate_file(flag_path, create=True)
         try:
             salt = pd.DataFrame.from_dict(get_node(flag_file, 'salt'))

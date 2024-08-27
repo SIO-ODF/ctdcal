@@ -77,7 +77,7 @@ def make_salt_file(stn=1, cast=1, comment=None, flag=False, to_file=None):
 def test_salt_loader(caplog, tmp_path):
     # check salt file loads in correctly
     salt_file = make_salt_file()
-    saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
+    saltDF, refDF, questionable = odf_io._salt_loader(io.StringIO(salt_file))
 
     assert saltDF.shape == (10, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
@@ -86,6 +86,7 @@ def test_salt_loader(caplog, tmp_path):
     assert check_type(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]], int)
     assert all(saltDF.index == np.arange(1, 11))
     assert saltDF["Reading3"].isna().sum() == 5
+    assert questionable is None
 
     assert refDF.shape == (2, 2)
     assert all(refDF.dtypes == float)
@@ -94,7 +95,7 @@ def test_salt_loader(caplog, tmp_path):
     # check commented lines are ignored ("bottles" 1, 4, 10)
     salt_file = make_salt_file(comment="#")
     with caplog.at_level(logging.DEBUG):
-        saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file))
+        saltDF, refDF, questionable = odf_io._salt_loader(io.StringIO(salt_file))
         assert "(#, x)" in caplog.messages[0]
         assert "test_odf_io" in caplog.messages[0]
     assert saltDF.shape == (7, 14)
@@ -113,13 +114,14 @@ def test_salt_loader(caplog, tmp_path):
     salt_file = make_salt_file(flag=True)
     with caplog.at_level(logging.DEBUG):
         f_out = io.StringIO()
-        saltDF, refDF = odf_io._salt_loader(io.StringIO(salt_file), flag_file=f_out)
+        saltDF, refDF, questionable = odf_io._salt_loader(io.StringIO(salt_file), flag_file=f_out)
+        assert questionable is not None
         flagged = f_out.getvalue().split("\n")
         assert "Found * in test_odf_io" in caplog.messages[1]
-        assert "test_odf_io,1,,3,Auto-flagged" in flagged[0]
-        assert "test_odf_io,4,,3,Auto-flagged" in flagged[1]
-        assert "test_odf_io,10,,3,Auto-flagged" in flagged[2]
-        assert flagged[3] == ""
+        assert "1,1,00101,3,Auto-flagged" in flagged[1]
+        assert "4,4,00101,3,Auto-flagged" in flagged[2]
+        assert "10,10,00101,3,Auto-flagged" in flagged[3]
+        assert flagged[4] == ""
     assert saltDF.shape == (10, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
     assert check_type(saltDF[["CRavg", "Reading1", "Reading2", "Reading3"]], float)
@@ -137,7 +139,7 @@ def test_salt_loader(caplog, tmp_path):
     d.mkdir()
     fake_file = d / "90909"
     fake_file.write_text("\n1 2 3 4 5 6 7 00:01:00 00:02:00 10 11") #   0001 06 13 24 1.99187   13 5427 16:31:39  16:32:16  02 1.99186 1.99188
-    saltDF, refDF = odf_io._salt_loader(fake_file)
+    saltDF, refDF, questionable = odf_io._salt_loader(fake_file)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
     assert check_type(saltDF[["CRavg", "Reading1"]], float)
     assert check_type(saltDF[["STNNBR", "CASTNO", "SAMPNO", "autosalSAMPNO"]], int)
