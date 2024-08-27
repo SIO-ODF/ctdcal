@@ -431,14 +431,14 @@ def sbe_flntu_chl(volts, coefs, decimals = 4):
     SBE equation for converting SeaBird fluorometer and nepholometric turbidity
     combo sensor's chlorophyll and CDOM fluorometer.
     SensorID: 19
-    Example coefs: {'ScaleFactor':11, 'DarkCounts':0.079}
+    Example coefs: {'ScaleFactor':11, 'DarkVoltage':0.079}
 
     Paramters
     ----------
     volts : array-like
         Raw voltage
     coefs : dict
-        Dictionary of calibration coefficients (ScaleFactor, DarkCounts)
+        Dictionary of calibration coefficients (ScaleFactor, Vblank)
 
     Returns
     -------
@@ -447,12 +447,12 @@ def sbe_flntu_chl(volts, coefs, decimals = 4):
     
     Notes:
     ------
-    ScaleFactor is usually given in volts, whereas DarkCounts are in μg/l/V in
+    ScaleFactor is usually given in volts, whereas Vblank are in μg/l/V in
     analogue calculations.
     """
-    _check_coefs(coefs, ["ScaleFactor", "DarkCounts"])
+    _check_coefs(coefs, ["ScaleFactor", "Vblank"])
     volts = _check_volts(volts)
-    chl = np.around((volts - coefs["DarkCounts"]) * coefs["ScaleFactor"], decimals)
+    chl = np.around((volts - coefs["Vblank"]) * coefs["ScaleFactor"], decimals)
 
     return chl
 
@@ -462,14 +462,14 @@ def sbe_flntu_ntu(volts, coefs, decimals = 4):
     SBE equation for converting SeaBird fluorometer and nepholometric turbidity
     combo sensor's turbidity channel.
     SensorID: 67
-    Example coefs: {'ScaleFactor':5, 'DarkCounts':0.05}
+    Example coefs: {'ScaleFactor':5, 'DarkVoltage':0.05}
 
     Paramters
     ----------
     volts : array-like
         Raw voltage
     coefs : dict
-        Dictionary of calibration coefficients (ScaleFactor, DarkCounts)
+        Dictionary of calibration coefficients (ScaleFactor, DarkVoltage)
 
     Returns
     -------
@@ -478,13 +478,13 @@ def sbe_flntu_ntu(volts, coefs, decimals = 4):
     
     Notes:
     ------
-    ScaleFactor is usually given in volts, whereas DarkCounts are in NTU/V in
+    ScaleFactor is usually given in volts, whereas DarkVoltage are in NTU/V in
     analogue calculations.
     Future release may factor this into sbe_flntu_chl (same equation)
     """
 
-    _check_coefs(coefs, ["ScaleFactor", "DarkCounts"])
+    _check_coefs(coefs, ["ScaleFactor", "DarkVoltage"])
     volts = _check_volts(volts)
-    turb = np.around((volts - coefs["DarkCounts"]) * coefs["ScaleFactor"], decimals)
+    turb = np.around((volts - coefs["DarkVoltage"]) * coefs["ScaleFactor"], decimals)
 
     return turb

@@ -278,7 +278,7 @@ def test_seapoint_fluor():
 
 def test_sbe_flntu_chl(caplog):
     volts = np.concatenate((np.zeros(10), np.array([1, 2, 3, 4, 5])))
-    coefs = {'ScaleFactor':11, 'DarkCounts':0.079}
+    coefs = {'ScaleFactor':11, 'Vblank':0.079}
 
     chl = eqs.sbe_flntu_chl(volts, coefs)
 
@@ -301,14 +301,14 @@ def test_sbe_flntu_chl(caplog):
     assert not all(np.isnan(bad_range[1:-1]))
 
     # error saying which keys are missing from coef dict
-    with pytest.raises(KeyError, match="DarkCounts"):
+    with pytest.raises(KeyError, match="Vblank"):
         eqs.sbe_flntu_chl(volts, {"ScaleFactor":1, "dark_counts":1})
         assert "dictionary missing keys" in caplog.records[-1].message
 
 def test_sbe_flntu_ntu(caplog):
     #   Practically identical to sbe_flntu_chl
     volts = np.concatenate((np.zeros(10), np.array([1, 2, 3, 4, 5])))
-    coefs = {'ScaleFactor':5, 'DarkCounts':0.050}
+    coefs = {'ScaleFactor':5, 'DarkVoltage':0.050}
 
     ntu = eqs.sbe_flntu_ntu(volts, coefs)
 
@@ -331,6 +331,6 @@ def test_sbe_flntu_ntu(caplog):
     assert not all(np.isnan(bad_range[1:-1]))
 
     # error saying which keys are missing from coef dict
-    with pytest.raises(KeyError, match="DarkCounts"):
+    with pytest.raises(KeyError, match="DarkVoltage"):
         eqs.sbe_flntu_ntu(volts, {"ScaleFactor":1, "dark_counts":1})
         assert "dictionary missing keys" in caplog.records[-1].message
