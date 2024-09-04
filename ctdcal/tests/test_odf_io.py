@@ -86,7 +86,7 @@ def test_salt_loader(caplog, tmp_path):
     assert check_type(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]], int)
     assert all(saltDF.index == np.arange(1, 11))
     assert saltDF["Reading3"].isna().sum() == 5
-    assert questionable is None
+    assert q is None
 
     assert refDF.shape == (2, 2)
     assert all(refDF.dtypes == float)
