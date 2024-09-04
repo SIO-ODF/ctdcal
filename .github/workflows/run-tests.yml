@@ -37,8 +37,9 @@ jobs:
         run: |
           pytest -v --cov-report xml --cov=ctdcal ctdcal/tests/
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.1.5
+        uses: codecov/codecov-action@v4
         with:
           fail_ci_if_error: false
           flags: pytest
           files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }} # required
