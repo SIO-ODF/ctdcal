@@ -26,7 +26,9 @@ log = logging.getLogger(__name__)
 
 def _salt_loader(filename):
     """
-    Load raw file into salt and reference DataFrames.
+    Load raw ODF salt file into salt, reference, and flagged DataFrames.
+
+    ODF salt files have a header of configuration information, including the K15 and run date.
     """
     csv_opts = dict(delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace="True")
     if isinstance(filename, (str, Path)):
@@ -42,6 +44,16 @@ def _salt_loader(filename):
         raise NotImplementedError(
             "Salt loader only able to read in str, Path, or StringIO classes"
         )
+
+    #   Check on the header
+    date = pd.to_datetime(saltArray[0][-1])
+    k15  = float(saltArray[0][8])
+    if ((date < pd.Timestamp('1985-01-01')) | (date > pd.Timestamp.today())):
+        #   Check on the run date - should this be ± a few weeks to confirm that the analyst's computer is set up right?
+        log.warning(f"Salt file for {ssscc} has an erroneous timestamp in the header.")
+    if ((int(saltArray[0][-2]) < 0) | int(saltArray[0][-2]) > 1000):
+        #   Standardization dial ranges from 0 - 1000
+        log.warning(f"Salt file for {ssscc} has an erroneous standardization dial in the header.")
 
     del saltArray[0]  # remove file header
     saltDF = pd.DataFrame.from_records(saltArray)
@@ -64,6 +76,8 @@ def _salt_loader(filename):
     # add as many "Reading#"s as needed
     for ii in range(0, len(saltDF.columns) - len(cols)):
         cols["Reading{}".format(ii + 1)] = float
+    if "Reading6" in cols:
+        log.warning("More than 5 readings found in salts file - check columns of source.")
     saltDF.columns = list(cols.keys())  # name columns
 
     # check for commented out lines
@@ -71,6 +85,16 @@ def _salt_loader(filename):
     if commented.any():
         log.debug(f"Found comment character (#, x) in {ssscc} salt file, ignoring line")
         saltDF = saltDF[~commented]
+    if saltDF["autosalSAMPNO"].value_counts().get('worm',0) != 2:
+        #   Confirm 2-point standardization
+        log.warning(f"Suspect number of standards found in salts file {ssscc}. Confirm standardizations.")    
+    checkvals = saltDF[saltDF.autosalSAMPNO == "worm"].CRavg.astype(float)
+    if ((checkvals >= 1.0001 * 2 * k15) & (checkvals <= 0.9999 * 2 * k15)).any():
+        #   Check the worm values rel. to batch K15 - within 1/100 %
+        log.warning(f"Standards in raw salt file {ssscc} are >0.01 % off from expected K15 value.")
+    if any((saltDF['BathTEMP'].astype(float) < 17.5) | (saltDF['BathTEMP'].astype(float) > 33.5)):
+        #   Check bath temperature
+        log.warning(f"Raw salt file for {ssscc} contains bath temperatures outside of operational ranges.")
 
     # check end time for * and code questionable
     # (unconfirmed but * appears to indicate a lot of things from LabView code:
@@ -113,6 +137,18 @@ def remove_autosal_drift(saltDF, refDF):
     else:
         # find rate of drift
         diff = refDF.diff(axis="index").dropna()
+
+        if any(abs(diff["CRavg"] > 0.0001)):
+            #   Warn analyst that the standard drifted by a lot (precise to within 5 decimal places)
+            log.warning(f"Salt run at station {saltDF["STNNBR"].iloc[0]} had a CR drift in excess of 0.0001.")
+        if any(diff["IndexTime"] > 43200):
+            #   Warn analyst that over 12 hours passed between standardizations
+            log.warning(f"Salt run at station {saltDF["STNNBR"].iloc[0]} had >12 hours between standardizations.")
+        if any(saltDF["IndexTime"].diff().sum() > (diff["IndexTime"])):
+            #   Warn analyst that standardization and sample timestamps may not be aligned
+            #   Standards should always bookend the samples
+            log.warning(f"Salt run at station {saltDF["STNNBR"].iloc[0]} has misaligned standards and samples.")
+
         time_coef = (diff["CRavg"] / diff["IndexTime"]).iloc[0]
 
         # apply offset as a linear function of time
@@ -131,6 +167,9 @@ def _salt_exporter(
     multiple stations and/or casts are included in a single raw salt file.
     """
     stations = saltDF[stn_col].unique()
+    if len(stations) > 1:
+        log.info("Multiple stations found in salt source file. Writing out .CSVs seperately.")
+
     for station in stations:
         stn_salts = saltDF[saltDF[stn_col] == station]
         casts = stn_salts[cast_col].unique()
