@@ -21,7 +21,7 @@ from bokeh.plotting import figure
 
 from ctdcal import get_ctdcal_config, io
 from ctdcal.common import load_user_config, validate_file
-from ctdcal.fitting.common import get_node, df_node_to_BottleFlags, save_node
+from ctdcal.fitting.common import df_node_to_BottleFlags, get_node, save_node
 
 cfg = get_ctdcal_config()
 USERCONFIG = 'ctdcal/cfg.yaml'
@@ -48,10 +48,25 @@ btl_data = io.load_exchange_btl(fname).replace(-999, np.nan)
 btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"
 ].apply(lambda x: f"{x:02d}")
+
+#   Create salinity residuals
 btl_data["Residual"] = btl_data["SALNTY"] - btl_data["CTDSAL"]
 btl_data[["CTDPRS", "Residual"]] = btl_data[["CTDPRS", "Residual"]].round(4)
 btl_data["Comments"] = ""
 btl_data["New Flag"] = btl_data["SALNTY_FLAG_W"].copy()
+
+#   Temperature
+btl_data["t_res"] = (btl_data["REFTMP"] - btl_data["CTDTMP"]).round(4)
+btl_data["New T Flag"] = btl_data["REFTMP_FLAG_W"].copy()
+
+#   Aaaand oxygen
+if "OXYGEN" not in btl_data.columns:
+    btl_data["OXYGEN"] = np.nan
+    btl_data["OXYGEN_FLAG_W"] = 9
+btl_data["o_res"] = (btl_data["OXYGEN"] - btl_data["CTDOXY"]).round(4)
+btl_data["New O Flag"] = btl_data["OXYGEN_FLAG_W"].copy()
+
+deltas_d = {"CTDSAL": "Residual", "CTDTMP": "t_res", "CTDOXY": "o_res"}
 
 # update with old handcoded flags if file exists
 if FLAGFILE.exists():
@@ -96,7 +111,9 @@ ref_param = Select(
     value=ref_dict[parameter.value],
     disabled=True,
 )
+
 station = Select(title="Station", options=ssscc_list, value=ssscc_list[0])
+
 # explanation of flags:
 # https://cchdo.github.io/hdo-assets/documentation/manuals/pdf/90_1/chap4.pdf
 flag_list = MultiSelect(
@@ -159,15 +176,8 @@ src_plot_upcast = ColumnDataSource(data=dict(x=[], y=[]))
 src_plot_btl = ColumnDataSource(data=dict(x=[], y=[]))
 
 # set up plots
-# fig = figure(
-#     plot_height=800,
-#     plot_width=400,
-#     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
-#     tools="pan,box_zoom,wheel_zoom,box_select,reset",
-#     y_axis_label="Pressure (dbar)",
-# )
 fig = figure(
-    height=800,
+    height=900,
     width=400,
     title="{} vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
@@ -215,8 +225,39 @@ btl_sal.nonselection_glyph.line_alpha = 0.2
 ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 
-# define callback functions
+threshes = {"CTDSAL":np.array([0.002, 0.005, 0.010, 0.020]),
+            "CTDTMP":np.array([0.002, 0.005, 0.010, 0.020]),
+            "CTDOXY":np.array([0.625, 1.250, 2.500, 5.000])}
 
+#   Residuals plot
+src_plot_btl_del = ColumnDataSource(data=dict(x=[], y=[]))
+fig2 = figure(
+    height=900,
+    width=400,
+    title="{} residual vs CTDPRS [Station {}]".format(parameter.value, station.value),
+    tools="pan,box_zoom,wheel_zoom,box_select,reset",
+    # y_axis_label="Pressure (dbar)",
+    y_range=fig.y_range
+)
+# thresh = np.array([0.002, 0.005, 0.010, 0.020])
+thresh = threshes[parameter.value]
+p_range = np.array([6000, 2000, 1000, 500])
+thresh = np.append(thresh, thresh[-1])
+p_range = np.append(p_range, 0)
+btl_sal2 = fig2.asterisk(
+    "x",
+    "y",
+    size=12,
+    line_width=1.5,
+    color="#0033CC",
+    source=src_plot_btl_del,
+)
+fig2.step(thresh, p_range)
+fig2.step(-thresh, p_range)
+fig2.select(BoxSelectTool).continuous = False
+fig2.y_range.flipped = True  # invert y-axis
+
+# define callback functions
 
 def update_selectors():
 
@@ -227,16 +268,21 @@ def update_selectors():
         btl_data["SSSCC"] == station.value
     )
 
-    ref_param.value = ref_dict[parameter.value]
-
     # update table data
     current_table = btl_data[table_rows].reset_index()
+
+    # print("Parameter: ", parameter.value, current_table[parameter.value][0])
+    ref_param.value = ref_dict[parameter.value]
+    # print("Reference parameter: ", ref_param.value, current_table[ref_param.value][0])
+
     src_table.data = {  # this causes edit_flag() to execute
         "SSSCC": current_table["SSSCC"],
         "SAMPNO": current_table["SAMPNO"],
         "CTDPRS": current_table["CTDPRS"],
-        parameter.value: current_table[parameter.value],
-        ref_param.value: current_table[ref_param.value],
+        "t_res": current_table["t_res"],
+        "o_res": current_table["o_res"],
+        "CTD Param": current_table[parameter.value].round(4),
+        "Reference": current_table[ref_param.value].round(4),
         "diff": current_table["Residual"],
         "flag": current_table["New Flag"],
         "Comments": current_table["Comments"],
@@ -259,10 +305,17 @@ def update_selectors():
         "x": btl_data.loc[btl_rows, ref_param.value],
         "y": btl_data.loc[btl_rows, "CTDPRS"],
     }
+    src_plot_btl_del.data = {
+        "x": btl_data.loc[btl_rows, deltas_d[parameter.value]],
+        "y": btl_data.loc[btl_rows, "CTDPRS"],
+    }
 
     # update plot labels/axlims
     fig.title.text = "{} vs CTDPRS [Station {}]".format(parameter.value, station.value)
     fig.xaxis.axis_label = parameter.value
+
+    fig2.title.text = "{} Residual".format(parameter.value)
+    fig2.xaxis.axis_label = parameter.value
 
     # deselect all datapoints
     btl_sal.data_source.selected.indices = []
@@ -390,18 +443,22 @@ btl_sal.data_source.selected.on_change("indices", selected_from_plot)
 
 # build data tables
 columns = []
-fields = ["SSSCC", "SAMPNO", "CTDPRS", "CTDSAL", "SALNTY", "diff", "flag", "Comments"]
+fields = ["SSSCC", "SAMPNO", "CTDPRS", "CTD Param", 
+          "Reference", "t_res", "diff", "o_res", "flag", "Comments"]
+ref_dict
 titles = [
     "SSSCC",
     "Bottle",
     "CTDPRS",
-    "CTDSAL",
-    "SALNTY",
-    "Residual",
+    "CTD Param",
+    "Reference",
+    "t_res",
+    "s_res",
+    "o_res",
     "Flag",
     "Comments",
 ]
-widths = [50, 40, 65, 65, 65, 65, 15, 200]
+widths = [50, 40, 65, 65, 65, 65, 65, 65, 15, 200]
 for (field, title, width) in zip(fields, titles, widths):
     if field == "flag":
         strfmt_in = {"text_align": "center", "font_style": "bold"}
@@ -444,7 +501,8 @@ data_table = DataTable(
     source=src_table,
     columns=columns,
     index_width=20,
-    width=565 + 50 + 20,  # sum of col widths + fudge factor + idx width
+    #   width is originally 565 + 50 + 20 = 635
+    width=565 + 150 + 20,  # sum of col widths + fudge factor + idx width
     height=600,
     editable=True,
     fit_columns=False,
@@ -461,7 +519,7 @@ data_table_changed = DataTable(
     sortable=False,
 )
 data_table_title = Div(text="""<b>All Station Data:</b>""", width=200, height=15)
-data_table_changed_title = Div(text="""<b>Flagged Data:</b>""", width=200, height=15)
+data_table_changed_title = Div(text="""<b>Flagged Salinity Data:</b>""", width=200, height=15)
 
 controls = column(
     parameter,
@@ -483,7 +541,7 @@ tables = column(
     data_table_title, data_table, data_table_changed_title, data_table_changed
 )
 
-curdoc().add_root(row(controls, tables, fig))
+curdoc().add_root(row(controls, tables, fig, fig2))
 curdoc().title = "CTDO Data Flagging Tool"
 
 update_selectors()
