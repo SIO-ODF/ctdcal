@@ -71,6 +71,8 @@ class Cast(object):
         Filter processed CTD data using one of three window types (boxcar,
         hann, triangle).
 
+        Previously was 'raw_ctd_filter' in ctdcal.process_ctd.
+
         Parameters
         ----------
         data : array-like
@@ -135,6 +137,8 @@ class Cast(object):
         """
         Collect cast details for export (see Notes).
 
+        Previously was 'cast_details' in ctdcal.process_ctd.
+
         Notes
         -----
         The following variables are returned in an array:
@@ -185,7 +189,8 @@ class Cast(object):
         data : DataFrame
             Cast data.
         threshold : float
-            Maximum salinity value to determine when cast is not in the water.
+            Maximum conductivity value to determine when cast is not in the water,
+            in source conductivity units.
 
         Returns
         -------

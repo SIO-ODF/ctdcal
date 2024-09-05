@@ -205,39 +205,3 @@ def test_load_exchange_ctd(caplog, tmp_path, monkeypatch):
     # check error on recursive .zip
     with pytest.raises(ZipImportError, match="Recursive .zip files"):
         io.load_exchange_ctd(tmp_path / "level0.zip")
-
-
-def test_write_pressure_details(tmp_path):
-    f_path = tmp_path / "prs_log.csv"
-
-    # check file is created if it doesn't exist
-    assert not (f_path).exists()
-    io.write_pressure_details("00101", f_path, "00:00:01", "00:04:01")
-    assert (f_path).exists()
-
-    # check only new data are appended (not another header)
-    io.write_pressure_details("00201", f_path, "00:05:01", "00:09:01")
-    with open(f_path, "rb") as f:
-        contents = f.readlines()
-        assert len(contents) == 3
-        assert b"SSSCC" in contents[0]
-        assert b"00101" in contents[1]
-        assert b"00201" in contents[2]
-
-
-def test_write_cast_details(tmp_path):
-    f_path = tmp_path / "cast.csv"
-
-    # check file is created if it doesn't exist
-    assert not f_path.exists()
-    io.write_cast_details("00101", f_path, 1.0, 2.0, 3.0, 0.0, 100.0, 5.0, -70.0, 170.0)
-    assert f_path.exists()
-
-    # check only new data are appended (not another header)
-    io.write_cast_details("00201", f_path, 2.0, 3.0, 4.0, 0.0, 99.0, 6.0, -70.0, 170.0)
-    with open(f_path, "rb") as f:
-        contents = f.readlines()
-        assert len(contents) == 3
-        assert b"SSSCC" in contents[0]
-        assert b"00101" in contents[1]
-        assert b"00201" in contents[2]

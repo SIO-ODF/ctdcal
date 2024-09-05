@@ -156,11 +156,12 @@ def hex_to_ctd(ssscc_list):
 
 def make_time_files(casts, user_cfg):
     """
-    Make continuous time.pkl files from converted files in hex_to_ctd.
+    Make continuous time-series files from processed cast data.
 
-    Data have a generic roll filter applied. Columns to filter are defined in the config.
-    
-    The time on deck, the soak, and the upcast are removed to provide a continuous downcast.
+    Each cast has a smoothing filter applied. Filter parameters and columns
+    to filter are from user-specified configurations.
+
+    The time on deck, the soak, and the upcast are trimmed to provide a continuous downcast.
     
     Parameters
     ----------
@@ -186,56 +187,26 @@ def make_time_files(casts, user_cfg):
             # 20 sec @ 24Hz). TODO: This can be moved to user cfg.yaml to
             #   accommodate configurable windows and different CTDs.
             cast.trim_soak(cast.downcast, 480)
+            # save pkl file
+            cast.trimmed.to_pickle(cfg.dirs["time"] + cast_id + "_time.pkl")
+
+            # AS: 2024-09-05 - leaving this here for reference. Despiking is currently
+            # TBD for cast_tools post processing...
+            #
+            # Remove any pressure spikes
+            # bad_rows = converted_df["CTDPRS"].abs() > 6500
+            # if bad_rows.any():
+            #     log.debug(f"{cast_id}: {bad_rows.sum()} bad pressure points removed.")
+            # converted_df.loc[bad_rows, :] = np.nan
+            # converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
             cast_details_all = pd.concat([cast_details_all, cast.get_details()])
             p_offsets_all = pd.concat([p_offsets_all,
-                                       [cast.cast_id, cast.get_pressure_offsets(cast.proc)]])
-
-
-            # Trim to times when rosette is in water
-            trimmed_df = process_ctd.remove_on_deck(
-                converted_df,
-                cast_id,
-                log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
-            )
-
-            # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
-
-            # if not c1_col in raw_data.dtype.names:
-            #     print('c1_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
-            # if not c2_col in raw_data.dtype.names:
-            #     print('c2_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
-            # if not dopl_col in raw_data.dtype.names:
-            #     print('do_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
-
-            # Remove any pressure spikes
-            bad_rows = converted_df["CTDPRS"].abs() > 6500
-            if bad_rows.any():
-                log.debug(f"{cast_id}: {bad_rows.sum()} bad pressure points removed.")
-            converted_df.loc[bad_rows, :] = np.nan
-            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
-
-            # Filter data
-            filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df,
-                window="triangle",
-                parameters=cfg.filter_cols,
-            )
-
-            # Trim to downcast
-            cast_data = process_ctd.cast_details(
-                filter_data,
-                cast_id,
-                log_file=cfg.dirs["logs"] + "cast_details.csv",
-            )
-
-            cast_data.to_pickle(cfg.dirs["time"] + cast_id + "_time.pkl")
-
+                                       [cast.cast_id,
+                                        cast.get_pressure_offsets(cast.proc, 20)]])
+    log.info("Saving deck pressures and cast details.")
+    cast_details_all.to_csv(cfg.dirs["logs"] + "cast_details.csv")
+    p_offsets_all.to_csv(cfg.dirs["logs"] + "ondeck_pressure.csv")
 
 def make_btl_mean(ssscc_list):
     """
