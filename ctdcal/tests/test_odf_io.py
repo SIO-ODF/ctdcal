@@ -61,7 +61,7 @@ def make_salt_file(stn=1, cast=1, comment=None, flag=False, to_file=None):
         salts["EndTime"] = salts["EndTime"] + rng.choice(["", "*"], 12, p=[0.8, 0.2])
 
     # final formatting, remove blank Reading3 cells to match Autosal
-    header = "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408"
+    header = "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408 01/01/2000"
     string_df = salts.to_string(
         header=False, index=False, float_format="{:.5f}".format, na_rep=""
     )
@@ -133,7 +133,7 @@ def test_salt_loader(caplog, tmp_path):
     d = tmp_path / "salt"
     d.mkdir()
     fake_file = d / "90909"
-    fake_file.write_text("\n1 2 3 4 5 6 7 00:01:00 00:02:00 10 11")  #   0001 06 13 24 1.99187   13 5427 16:31:39  16:32:16  02 1.99186 1.99188
+    fake_file.write_text("12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408 01/01/2000\n1 2 3 4 5 6 7 00:01:00 00:02:00 10 11")
     saltDF, refDF, q = odf_io._salt_loader(fake_file)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
     assert check_type(saltDF[["CRavg", "Reading1"]], float)
