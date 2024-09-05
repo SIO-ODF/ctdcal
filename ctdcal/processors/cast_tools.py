@@ -130,3 +130,113 @@ class Cast(object):
 
         soak_end = local_min_vals.index[-1]
         self.trimmed = self.downcast.loc[soak_end:]
+
+    def get_details(self):
+        """
+        Collect cast details for export (see Notes).
+
+        Notes
+        -----
+        The following variables are returned in an array:
+        cast_id : cast identifier
+        start_time : Time at start of cast (in unix epoch time)
+        end_time : Time at end of cast (in unix epoch time)
+        bottom_time : Time at bottom of cast (in unix epoch time)
+        start_pressure : Pressure at which cast started
+        max_pressure : Bottom of the cast pressure
+        latitude : Latitude at bottom of cast
+        longitude : Longitude at bottom of cast
+        altimeter_bottom : Altimeter reading at bottom of cast
+
+        Returns
+        -------
+        DataFrame
+        """
+        if self.p_col is None:
+            raise AttributeError("Pressure column 'p_col' attribute is not set")
+        if self.trimmed is None:
+            raise AttributeError("'trimmed' attribute is not set.")
+        data = pd.DataFrame()
+        data['cast_id'] = [self.cast_id]
+        best_full_cast = self.filtered if self.filtered is not None else self.proc
+        # TODO: the below uses all very odf/go-ship/seabird-specific column labels
+        #   which should ultimately be replaced with standardized names.
+        data['start_time'] = [float(self.trimmed["scan_datetime"].head(1))]
+        p_max_ind = best_full_cast[self.p_col].argmax()
+        data['bottom_time'] = [float(best_full_cast["scan_datetime"][p_max_ind])]
+        data['end_time'] = [float(best_full_cast["scan_datetime"].tail(1))]
+        data['start_pressure'] = [float(np.around(self.trimmed[self.p_col].head(1), 4))]
+        data['max_pressure'] = [float(np.around(self.trimmed[self.p_col].max(), 4))]
+        if 'ALT' in self.proc.columns:
+            data['altimeter_bottom'] = [float(np.around(best_full_cast["ALT"][p_max_ind], 4))]
+        if all(col in self.proc.columns for col in ['GPSLAT', 'GPSLON']):
+            data['latitude'] = [float(np.around(best_full_cast["GPSLAT"][p_max_ind], 4))]
+            data['longitude'] = [float(np.around(best_full_cast["GPSLON"][p_max_ind], 4))]
+        return data
+
+    def get_pressure_offsets(self, data, threshold):
+        """
+        Get starting and ending on-deck pressure averages for the cast.
+
+        Previously was 'remove_on_deck' in ctdcal.process_ctd.
+
+        Parameters
+        ----------
+        data : DataFrame
+            Cast data.
+        threshold : float
+            Maximum salinity value to determine when cast is not in the water.
+
+        Returns
+        -------
+        float, float
+        """
+        # TODO: review algorithm for soundness and reliability, see if we can
+        #     use pressure or something other than salinity, remove reliance
+        #     on WOCE colnames and fixed sample frequency
+
+        # Frequency
+        freq = 24
+        # Half minute
+        time_delay = freq * 30  # time to let CTD pressure reading settle/sit on deck
+        # split dataframe into upcast/downcast
+        downcast = data.iloc[: (data[self.p_col].argmax() + 1)]
+        upcast = data.iloc[(data[self.p_col].argmax() + 1):]
+        # Search each half of df for minimum conductivity
+        # threshold to identify when rosette is out of water
+        start_df = downcast.loc[
+            (downcast['CTDCOND1'] < threshold)
+            & (downcast['CTDCOND2'] < threshold),
+            self.p_col,
+        ]
+        end_df = upcast.loc[
+            (upcast['CTDCOND1'] < threshold)
+            & (upcast['CTDCOND2'] < threshold),
+            self.p_col,
+        ]
+        # Evaluate starting and ending pressures
+        start_samples = len(start_df)
+        if start_samples > time_delay:
+            start_p = np.average(start_df.iloc[(freq * 2): (start_samples - time_delay)])
+        else:
+            start_seconds = start_samples / freq
+            log.warning(
+                    f"{self.cast_id}: Only {start_seconds:0.1f} seconds of start pressure averaged."
+            )
+            start_p = np.average(start_df.iloc[(freq * 2):start_samples])
+        end_samples = len(end_df)
+        if end_samples > time_delay:
+            end_p = np.average(end_df.iloc[time_delay:])
+        else:
+            end_seconds = end_samples / freq
+            log.warning(
+                    f"{self.cast_id}: Only {end_seconds:0.1f} seconds of end pressure averaged."
+            )
+            end_p = np.average(end_df)  # just average whatever there is
+        # Warn if failures
+        if len(start_df) == 0:
+            log.warning("Failed to find starting deck pressure.")
+        if len(end_df) == 0:
+            log.warning("Failed to find ending deck pressure.")
+
+        return start_p, end_p

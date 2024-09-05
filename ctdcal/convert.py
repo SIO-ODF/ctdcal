@@ -14,6 +14,7 @@ from . import get_ctdcal_config
 from . import process_bottle as btl
 from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
+from ctdcal.processors.cast_tools import Cast
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -153,7 +154,7 @@ def hex_to_ctd(ssscc_list):
     return True
 
 
-def make_time_files(ssscc_list):
+def make_time_files(casts, user_cfg):
     """
     Make continuous time.pkl files from converted files in hex_to_ctd.
 
@@ -163,29 +164,37 @@ def make_time_files(ssscc_list):
     
     Parameters
     ----------
-    ssscc_list : list of str
-        List of stations/hex files to convert
-
-    Returns
-    -------
-    .PKL file of continuous, filtered downcast data.
+    casts : list of str
+        List of cast ids to process.
+    user_cfg : Munch object
+        Dictionary of user configuration parameters.
     """
     log.info("Generating time.pkl files")
-    for ssscc in ssscc_list:
-        if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
-            converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+    cast_details_all = pd.DataFrame()
+    p_offsets_all = pd.DataFrame()
 
-            # Remove any pressure spikes
-            bad_rows = converted_df["CTDPRS"].abs() > 6500
-            if bad_rows.any():
-                log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
-            converted_df.loc[bad_rows, :] = np.nan
-            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+    for cast_id in casts:
+        if not Path(cfg.dirs["time"] + cast_id + "_time.pkl").exists():
+            cast = Cast(cast_id, user_cfg.datadir)
+            cast.p_col = 'CTDPRS'
+            # Filter uses a window size of 48 hardcoded here (equal to
+            # 2 sec @ 24Hz). TODO: This can be moved to user cfg.yaml to
+            #   accommodate configurable windows and different CTDs.
+            cast.filter(cast.proc, win_size=48, win_type='hann', cols=cfg.filter_cols)
+            cast.parse_downcast(cast.filtered)
+            # Trim soak uses a window size of 480 hardcoded here (equal to
+            # 20 sec @ 24Hz). TODO: This can be moved to user cfg.yaml to
+            #   accommodate configurable windows and different CTDs.
+            cast.trim_soak(cast.downcast, 480)
+            cast_details_all = pd.concat([cast_details_all, cast.get_details()])
+            p_offsets_all = pd.concat([p_offsets_all,
+                                       [cast.cast_id, cast.get_pressure_offsets(cast.proc)]])
+
 
             # Trim to times when rosette is in water
             trimmed_df = process_ctd.remove_on_deck(
                 converted_df,
-                ssscc,
+                cast_id,
                 log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
             )
 
@@ -204,6 +213,13 @@ def make_time_files(ssscc_list):
             # else:
             #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
 
+            # Remove any pressure spikes
+            bad_rows = converted_df["CTDPRS"].abs() > 6500
+            if bad_rows.any():
+                log.debug(f"{cast_id}: {bad_rows.sum()} bad pressure points removed.")
+            converted_df.loc[bad_rows, :] = np.nan
+            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
             # Filter data
             filter_data = process_ctd.raw_ctd_filter(
                 trimmed_df,
@@ -214,11 +230,11 @@ def make_time_files(ssscc_list):
             # Trim to downcast
             cast_data = process_ctd.cast_details(
                 filter_data,
-                ssscc,
+                cast_id,
                 log_file=cfg.dirs["logs"] + "cast_details.csv",
             )
 
-            cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
+            cast_data.to_pickle(cfg.dirs["time"] + cast_id + "_time.pkl")
 
 
 def make_btl_mean(ssscc_list):

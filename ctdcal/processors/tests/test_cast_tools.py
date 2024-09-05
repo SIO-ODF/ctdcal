@@ -3,6 +3,7 @@ Unit tests for ctdcal.processors.cast_tools
 """
 from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -14,6 +15,12 @@ class TestCast:
     def tmp_df(self, tmp_path):
         data = {'spam': [1, 2, 3, 2, 1, 2, 3, 4, 5, 4, 3, 2, 1]}
         return pd.DataFrame(data=data)
+
+    @pytest.fixture
+    def rnd_df(self):
+        cols = ['scan_datetime', 'P', 'GPSLAT', 'GPSLON', 'ALT']
+        data = np.random.randint(10, size=[4, 5])
+        return pd.DataFrame(data, columns=cols)
 
     def test_load_cast(self, tmp_df):
         # test happy path
@@ -60,3 +67,27 @@ class TestCast:
         cast.parse_downcast(cast.proc)
         cast.trim_soak(cast.downcast, 3, max_soak=2)
         assert type(cast.trimmed) == pd.DataFrame
+
+    def test_get_details(self, rnd_df):
+        with patch('pandas.read_pickle', return_value=rnd_df):
+            cast = Cast('spam', 'fake_dir')
+            # test p_col not set
+            with pytest.raises(AttributeError):
+                cast.get_details()
+        # test downcast not parsed and trimmed
+        cast.p_col = 'P'
+        with pytest.raises(AttributeError):
+            cast.get_details()
+        # test happy path
+        cast.trimmed = cast.proc
+        spam = cast.get_details()
+        assert spam.size == 9
+        # test no altimeter
+        cast.proc.drop('ALT', axis=1)
+        cast.trimmed = cast.proc
+        spam = cast.get_details()
+        assert 'ALT' not in spam.columns
+        # test incomplete gps
+        cast.proc.drop('GPSLAT', axis=1)
+        spam = cast.get_details()
+        assert 'GPSLON' not in spam.columns
