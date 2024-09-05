@@ -175,7 +175,8 @@ def make_time_files(casts, user_cfg):
     p_offsets_all = pd.DataFrame()
 
     for cast_id in casts:
-        if not Path(cfg.dirs["time"] + cast_id + "_time.pkl").exists():
+        time_file = Path(user_cfg.datadir, 'time/%s_time.pkl' % cast_id)
+        if not time_file.exists():
             cast = Cast(cast_id, user_cfg.datadir)
             cast.p_col = 'CTDPRS'
             # Filter uses a window size of 48 hardcoded here (equal to
@@ -188,7 +189,7 @@ def make_time_files(casts, user_cfg):
             #   accommodate configurable windows and different CTDs.
             cast.trim_soak(cast.downcast, 480)
             # save pkl file
-            cast.trimmed.to_pickle(cfg.dirs["time"] + cast_id + "_time.pkl")
+            cast.trimmed.to_pickle(time_file)
 
             # AS: 2024-09-05 - leaving this here for reference. Despiking is currently
             # TBD for cast_tools post processing...
@@ -205,8 +206,8 @@ def make_time_files(casts, user_cfg):
                                        [cast.cast_id,
                                         cast.get_pressure_offsets(cast.proc, 20)]])
     log.info("Saving deck pressures and cast details.")
-    cast_details_all.to_csv(cfg.dirs["logs"] + "cast_details.csv")
-    p_offsets_all.to_csv(cfg.dirs["logs"] + "ondeck_pressure.csv")
+    cast_details_all.to_csv(Path(user_cfg.datadir, 'logs/cast_details.csv'))
+    p_offsets_all.to_csv(Path(user_cfg.datadir, 'logs/ondeck_pressure.csv'))
 
 def make_btl_mean(ssscc_list):
     """
