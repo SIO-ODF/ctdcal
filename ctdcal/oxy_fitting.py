@@ -13,11 +13,12 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from ctdcal.fitting.common import NodeNotFoundError, get_node
+
 from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
-from ctdcal.fitting.common import get_node, NodeNotFoundError
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -25,7 +26,10 @@ log = logging.getLogger(__name__)
 
 def load_winkler_oxy(oxy_file):
     """
-    Load Winkler oxygen titration data file.
+    Load ODF Winkler oxygen raw titration data file.
+
+    Files are generated from ODF LabVIEW software, generating a file named
+    with the current run's first SSSCC.
 
     Parameters
     ----------
@@ -40,6 +44,7 @@ def load_winkler_oxy(oxy_file):
         List of oxygen parameters used in titration
     """
 
+    ssscc = oxy_file.stem
     with open(oxy_file, newline="") as f:
         oxyF = csv.reader(
             f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True
@@ -48,11 +53,21 @@ def load_winkler_oxy(oxy_file):
         for row in oxyF:
             if row[0].startswith('#'):
                 continue
+            elif "ABORT" in row:
+                log.warning(f"Aborted value found in oxy file for {ssscc} Skipping.")
+                continue
             elif len(row) > 9:
                 row = row[:9]
             oxy_array.append(row)
 
     params = oxy_array.pop(0)  # save file header info for later (Winkler values)
+    if params in oxy_array:
+        #   Check for duplicate standardizations. Check with analyst to see which standard to keep.
+        log.warning(f"Raw Winkler contains duplicate standardization in {ssscc}")
+    elif any(len(row[0]) > 4 for row in oxy_array):
+        #   Check for cases where the ODF software is writing out a standard line (Winkler writes out 4 chars for station)
+        log.warning(f"Raw Winkler contains abnormal row in {ssscc}")
+
     cols = OrderedDict(
         [
             ("STNNO_OXY", int),
@@ -67,9 +82,29 @@ def load_winkler_oxy(oxy_file):
         ]
     )
 
-    df = pd.DataFrame(oxy_array, columns=cols.keys()).astype(cols)
+    df = pd.DataFrame(oxy_array, columns=cols.keys()).astype(cols)  #   Force dtypes and build dataframe
+    if df["BOTTLENO_OXY"].value_counts().get(99, 0) != 1:
+        #   Multiple "dummy" data present
+        log.warning(f"Multiple dummy lines in raw titration file {ssscc}")
     df = df[df["BOTTLENO_OXY"] != 99]  # remove "Dummy Data"
-    df = df[df["TITR_VOL"] > 0]  # remove "ABORTED DATA"
+
+    if not df[df['TITR_VOL'] <= 0].empty:
+        #   Check if titration volumes are all positive
+        log.warning(f"Non-positive entries found for titration volume in {ssscc}")
+    if any(df.duplicated):
+        #   Check for duplicates
+        log.warning(f"Raw Winkler contains duplicate values in {ssscc}")
+    if len(df["CASTNO_OXY"].value_counts()) != 1:
+        #   Check if there are multiple casts in the file
+        log.warning(f"Multiple casts reported in {ssscc}")
+    elif len(df["STNNO_OXY"].value_counts()) != 1:
+        #   Check if there are multiple stations in the file
+        log.warning(f"Multiple stations reported in {ssscc}")
+    if any((df["END_VOLTS"] < 0) | df["END_VOLTS"] > 5):
+        #   Scale from 0-5 V
+        log.warning(f"Titration file has erroneous voltage reported in {ssscc}")
+
+    df = df[df["TITR_VOL"] > 0]  # remove "ABORTED DATA" or otherwise bad points
     df = df.sort_values("BOTTLENO_OXY").reset_index(drop=True)
     df["FLASKNO"] = df["FLASKNO"].astype(str)
 
