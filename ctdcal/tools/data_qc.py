@@ -24,9 +24,9 @@ from ctdcal.common import load_user_config, validate_file
 from ctdcal.fitting.common import df_node_to_BottleFlags, get_node, save_node
 
 cfg = get_ctdcal_config()
-USERCONFIG = 'ctdcal/cfg.yaml'
+USERCONFIG = "ctdcal/cfg.yaml"
 user_cfg = load_user_config(validate_file(USERCONFIG))
-FLAGFILE = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+FLAGFILE = Path(user_cfg.datadir, "flag", user_cfg.bottleflags_man)
 
 # TODO: abstract parts of this to a separate file
 # TODO: following above, make parts reusable?
@@ -70,9 +70,16 @@ deltas_d = {"CTDSAL": "Residual", "CTDTMP": "t_res", "CTDOXY": "o_res"}
 
 # update with old handcoded flags if file exists
 if FLAGFILE.exists():
-    salt_flags_manual = get_node(FLAGFILE, 'salt')
+    salt_flags_manual = get_node(FLAGFILE, "salt")
     salt_flags_manual_df = pd.DataFrame.from_dict(salt_flags_manual)
-    salt_flags_manual_df = salt_flags_manual_df.rename(columns={"value": "New Flag", "cast_id": "SSSCC", "bottle_num": "SAMPNO", "notes": "Comments"})
+    salt_flags_manual_df = salt_flags_manual_df.rename(
+        columns={
+            "value": "New Flag",
+            "cast_id": "SSSCC",
+            "bottle_num": "SAMPNO",
+            "notes": "Comments",
+        }
+    )
 
     # there's gotta be a better way... but this is good enough for now
     btl_data = btl_data.merge(salt_flags_manual_df, on=["SSSCC", "SAMPNO"], how="left")
@@ -225,9 +232,11 @@ btl_sal.nonselection_glyph.line_alpha = 0.2
 ctd_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on select
 
-threshes = {"CTDSAL":np.array([0.002, 0.005, 0.010, 0.020]),
-            "CTDTMP":np.array([0.002, 0.005, 0.010, 0.020]),
-            "CTDOXY":np.array([0.625, 1.250, 2.500, 5.000])}
+threshes = {
+    "CTDSAL": np.array([0.002, 0.005, 0.010, 0.020]),
+    "CTDTMP": np.array([0.002, 0.005, 0.010, 0.020]),
+    "CTDOXY": np.array([0.625, 1.250, 2.500, 5.000]),
+}
 
 #   Residuals plot
 src_plot_btl_del = ColumnDataSource(data=dict(x=[], y=[]))
@@ -237,7 +246,7 @@ fig2 = figure(
     title="{} residual vs CTDPRS [Station {}]".format(parameter.value, station.value),
     tools="pan,box_zoom,wheel_zoom,box_select,reset",
     # y_axis_label="Pressure (dbar)",
-    y_range=fig.y_range
+    y_range=fig.y_range,
 )
 # thresh = np.array([0.002, 0.005, 0.010, 0.020])
 thresh = threshes[parameter.value]
@@ -258,6 +267,7 @@ fig2.select(BoxSelectTool).continuous = False
 fig2.y_range.flipped = True  # invert y-axis
 
 # define callback functions
+
 
 def update_selectors():
 
@@ -399,14 +409,19 @@ def save_data():
     df_out = pd.DataFrame.from_dict(src_table_changes.data)
 
     # minor changes to columns/names/etc.
-    df_out = df_out.rename(columns={"flag_new": "value", "SSSCC": "cast_id", "SAMPNO": "bottle_num", "Comments": "notes"}).drop(
-        columns=["flag_old", "diff"]
-    )
+    df_out = df_out.rename(
+        columns={
+            "flag_new": "value",
+            "SSSCC": "cast_id",
+            "SAMPNO": "bottle_num",
+            "Comments": "notes",
+        }
+    ).drop(columns=["flag_old", "diff"])
 
     # save it
     salt = df_node_to_BottleFlags(df_out)
     flagfile = validate_file(FLAGFILE, create=True)
-    save_node(flagfile, salt, 'salt', create_new=True)
+    save_node(flagfile, salt, "salt", create_new=True)
 
 
 def exit_bokeh():
@@ -443,8 +458,18 @@ btl_sal.data_source.selected.on_change("indices", selected_from_plot)
 
 # build data tables
 columns = []
-fields = ["SSSCC", "SAMPNO", "CTDPRS", "CTD Param", 
-          "Reference", "t_res", "diff", "o_res", "flag", "Comments"]
+fields = [
+    "SSSCC",
+    "SAMPNO",
+    "CTDPRS",
+    "CTD Param",
+    "Reference",
+    "t_res",
+    "diff",
+    "o_res",
+    "flag",
+    "Comments",
+]
 ref_dict
 titles = [
     "SSSCC",
@@ -459,7 +484,7 @@ titles = [
     "Comments",
 ]
 widths = [50, 40, 65, 65, 65, 65, 65, 65, 15, 200]
-for (field, title, width) in zip(fields, titles, widths):
+for field, title, width in zip(fields, titles, widths):
     if field == "flag":
         strfmt_in = {"text_align": "center", "font_style": "bold"}
     elif field == "Comments":
@@ -479,7 +504,7 @@ columns_changed = []
 fields = ["SSSCC", "SAMPNO", "diff", "flag_old", "flag_new", "Comments"]
 titles = ["SSSCC", "Bottle", "Residual", "Old", "New", "Comments"]
 widths = [50, 40, 65, 15, 15, 375]
-for (field, title, width) in zip(fields, titles, widths):
+for field, title, width in zip(fields, titles, widths):
     if field == "flag_old":
         strfmt_in = {"text_align": "center", "font_style": "bold"}
     elif field == "flag_new":
@@ -519,7 +544,9 @@ data_table_changed = DataTable(
     sortable=False,
 )
 data_table_title = Div(text="""<b>All Station Data:</b>""", width=200, height=15)
-data_table_changed_title = Div(text="""<b>Flagged Salinity Data:</b>""", width=200, height=15)
+data_table_changed_title = Div(
+    text="""<b>Flagged Salinity Data:</b>""", width=200, height=15
+)
 
 controls = column(
     parameter,
