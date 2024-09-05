@@ -51,7 +51,7 @@ def load_winkler_oxy(oxy_file):
         )
         oxy_array = []
         for row in oxyF:
-            if row[0].startswith('#'):
+            if row[0].startswith("#"):
                 continue
             elif "ABORT" in row:
                 log.warning(f"Aborted value found in oxy file for {ssscc} Skipping.")
@@ -82,13 +82,15 @@ def load_winkler_oxy(oxy_file):
         ]
     )
 
-    df = pd.DataFrame(oxy_array, columns=cols.keys()).astype(cols)  #   Force dtypes and build dataframe
+    df = pd.DataFrame(oxy_array, columns=cols.keys()).astype(
+        cols
+    )  #   Force dtypes and build dataframe
     if df["BOTTLENO_OXY"].value_counts().get(99, 0) != 1:
         #   Multiple "dummy" data present
         log.warning(f"Multiple dummy lines in raw titration file {ssscc}")
     df = df[df["BOTTLENO_OXY"] != 99]  # remove "Dummy Data"
 
-    if not df[df['TITR_VOL'] <= 0].empty:
+    if not df[df["TITR_VOL"] <= 0].empty:
         #   Check if titration volumes are all positive
         log.warning(f"Non-positive entries found for titration volume in {ssscc}")
     if any(df.duplicated):
@@ -510,7 +512,7 @@ def PMEL_oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
 
     residuals = np.sum(
         (weights * (refoxy - _PMEL_oxy_eq(coefs, inputs)) ** 2)
-    ) / np.sum(weights ** 2)
+    ) / np.sum(weights**2)
 
     return residuals
 
@@ -534,7 +536,8 @@ def match_sigmas(
 
     # Construct Dataframe from bottle and ctd values for merging
     btl_data = pd.DataFrame(
-        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA}, index=btl_idx
+        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA},
+        index=btl_idx,
     )
     time_data = pd.DataFrame(
         data={
@@ -771,13 +774,15 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
     btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["refO"]])
 
     # Load manual OXYGEN flags
-    flag_file = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+    flag_file = Path(user_cfg.datadir, "flag", user_cfg.bottleflags_man)
     oxy_flags_manual = None
     if flag_file.exists():
         try:
             oxy_flags_manual = get_node(flag_file, ref_node)
         except NodeNotFoundError:
-            log.info("No previously flagged values for %s found in flag file." % ref_node)
+            log.info(
+                "No previously flagged values for %s found in flag file." % ref_node
+            )
     else:
         log.info("No pre-existing flag file found.")
 
@@ -785,10 +790,14 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
         log.info("Merging previously flagged values for %s." % ref_node)
         oxy_flags_manual_df = pd.DataFrame.from_dict(oxy_flags_manual)
         oxy_flags_manual_df = oxy_flags_manual_df.rename(
-            columns={"cast_id": "SSSCC", "bottle_num": "btl_fire_num", "value": "OXYGEN_FLAG_W"}
+            columns={
+                "cast_id": "SSSCC",
+                "bottle_num": "btl_fire_num",
+                "value": "OXYGEN_FLAG_W",
+            }
         )
-        btl_df.set_index(['SSSCC', 'btl_fire_num'], inplace=True)
-        btl_df.update(oxy_flags_manual_df.set_index(['SSSCC', 'btl_fire_num']))
+        btl_df.set_index(["SSSCC", "btl_fire_num"], inplace=True)
+        btl_df.update(oxy_flags_manual_df.set_index(["SSSCC", "btl_fire_num"]))
         btl_df.reset_index(inplace=True)
 
     return True
@@ -827,7 +836,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_dict = {}
     all_sbe43_fit = pd.DataFrame()
 
-    btl_df.set_index('master_index', inplace=True)
+    btl_df.set_index("master_index", inplace=True)
 
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
@@ -853,9 +862,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             time_data["scan_datetime"],
         )
         sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
-        btl_df.loc[
-            btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]
-        ] = sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
+        btl_df.loc[btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]] = (
+            sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
+        )
         sbe43_merged["SSSCC"] = ssscc
         all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
         log.info(ssscc + " density matching done")
