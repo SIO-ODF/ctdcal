@@ -140,14 +140,14 @@ def remove_autosal_drift(saltDF, refDF):
 
         if any(abs(diff["CRavg"] > 0.0001)):
             #   Warn analyst that the standard drifted by a lot (precise to within 5 decimal places)
-            log.warning(f"Salt run at station {saltDF["STNNBR"].iloc[0]} had a CR drift in excess of 0.0001.")
+            log.warning(f"Salt run at station {saltDF['STNNBR'].iloc[0]} had a CR drift in excess of 0.0001.")
         if any(diff["IndexTime"] > 43200):
             #   Warn analyst that over 12 hours passed between standardizations
-            log.warning(f"Salt run at station {saltDF["STNNBR"].iloc[0]} had >12 hours between standardizations.")
+            log.warning(f"Salt run at station {saltDF['STNNBR'].iloc[0]} had >12 hours between standardizations.")
         if any(saltDF["IndexTime"].diff().sum() > (diff["IndexTime"])):
             #   Warn analyst that standardization and sample timestamps may not be aligned
             #   Standards should always bookend the samples
-            log.warning(f"Salt run at station {saltDF["STNNBR"].iloc[0]} has misaligned standards and samples.")
+            log.warning(f"Salt run at station {saltDF['STNNBR'].iloc[0]} has misaligned standards and samples.")
 
         time_coef = (diff["CRavg"] / diff["IndexTime"]).iloc[0]
 
