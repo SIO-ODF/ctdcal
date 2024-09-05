@@ -545,7 +545,7 @@ data_table_changed = DataTable(
 )
 data_table_title = Div(text="""<b>All Station Data:</b>""", width=200, height=15)
 data_table_changed_title = Div(
-    text="""<b>Flagged Salinity Data:</b>""", width=200, height=15
+    text="""<b>Flagged Data:</b>""", width=200, height=15
 )
 
 controls = column(
