@@ -226,7 +226,7 @@ def process_salts(ssscc_list, user_cfg=None, salt_dir=cfg.dirs["salt"]):
     if flags_df is not None:
         if user_cfg is not None:
             flag_path = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
-        else:   #   No user_cfg, use get_ctdcal_config
+        else:   #   No user_cfg, use get_ctdcal_config TODO: Remember to remove all the old cfg calls
             flag_path = Path(cfg.dirs('flags'), "bottleflags_man.csv")
         flag_file = validate_file(flag_path, create=True)
         try:
