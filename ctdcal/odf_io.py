@@ -111,8 +111,6 @@ def _salt_loader(filename):
         questionable["cast_id"] = [str(s).zfill(3)[-3:] + str(c).zfill(2) for s, c in zip(saltDF.loc[flagged, "STNNBR"], saltDF.loc[flagged, "CASTNO"])]
         questionable["value"] = 3
         questionable["notes"] = "Auto-flagged by processing function (had * in row)"
-        #   flag_file = Path(cfg.dirs['flags']+"bottleflags_auto.csv"   #   Autoflagging
-        # questionable.to_csv(flag_file)
 
     # add time (in seconds) needed for autosal drift removal step
     saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"], format="%H:%M:%S")
@@ -228,7 +226,7 @@ def process_salts(ssscc_list, user_cfg=None, salt_dir=cfg.dirs["salt"]):
     if flags_df is not None:
         if user_cfg is not None:
             flag_path = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
-        else:   #   No user_cfg, use get_ctdcal_config
+        else:   #   No user_cfg, use get_ctdcal_config TODO: Remember to remove all the old cfg calls
             flag_path = Path(cfg.dirs('flags'), "bottleflags_man.csv")
         flag_file = validate_file(flag_path, create=True)
         try:
