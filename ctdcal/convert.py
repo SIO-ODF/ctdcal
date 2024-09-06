@@ -179,15 +179,17 @@ def make_time_files(casts, user_cfg):
         if not time_file.exists():
             cast = Cast(cast_id, user_cfg.datadir)
             cast.p_col = 'CTDPRS'
-            # Filter uses a window size of 48 hardcoded here (equal to
-            # 2 sec @ 24Hz). TODO: This can be moved to user cfg.yaml to
-            #   accommodate configurable windows and different CTDs.
-            cast.filter(cast.proc, win_size=48, win_type='hann', cols=cfg.filter_cols)
+            # Apply smoothing filter
+            cast.filter(cast.proc,
+                        win_size=(user_cfg.filter_win * user_cfg.freq),
+                        win_type=user_cfg.filter_type,
+                        cols=user_cfg.filter_cols)
+            # Parse the downcast from the full cast
             cast.parse_downcast(cast.filtered)
-            # Trim soak uses a window size of 480 hardcoded here (equal to
-            # 20 sec @ 24Hz). TODO: This can be moved to user cfg.yaml to
-            #   accommodate configurable windows and different CTDs.
-            cast.trim_soak(cast.downcast, 480)
+            # Trim the soak period from the downcast
+            cast.trim_soak(cast.downcast,
+                           (user_cfg.soak_win * user_cfg.freq),
+                           user_cfg.soak_threshold)
             # save pkl file
             cast.trimmed.to_pickle(time_file)
 
@@ -204,7 +206,9 @@ def make_time_files(casts, user_cfg):
             cast_details_all = pd.concat([cast_details_all, cast.get_details()])
             p_offsets_all = pd.concat([p_offsets_all,
                                        [cast.cast_id,
-                                        cast.get_pressure_offsets(cast.proc, 20)]])
+                                        cast.get_pressure_offsets(cast.proc, user_cfg.cond_threshold)]])
+
+    # Wrap up...
     log.info("Saving deck pressures and cast details.")
     cast_details_all.to_csv(Path(user_cfg.datadir, 'logs/cast_details.csv'))
     p_offsets_all.to_csv(Path(user_cfg.datadir, 'logs/ondeck_pressure.csv'))

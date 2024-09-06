@@ -180,7 +180,10 @@ class Cast(object):
 
     def get_pressure_offsets(self, data, threshold):
         """
-        Get starting and ending on-deck pressure averages for the cast.
+        Get starting and ending on-deck pressure averages for the cast. A
+        conductivity threshold is used to determine when the instrument
+        is in or out of the water. A default conductivity threshold is
+        set in the user configuration file.
 
         Previously was 'remove_on_deck' in ctdcal.process_ctd.
 
