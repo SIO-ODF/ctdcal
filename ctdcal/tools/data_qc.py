@@ -335,6 +335,15 @@ def update_selectors():
     fig.y_range = Range1d(max_y + 0.05 * max_y, 0)
     fig2.y_range = fig.y_range
 
+    # Reset the x-axes when plots refresh
+    max_x_fig = ctd_data.loc[ctd_rows, parameter.value].max()
+    min_x_fig = ctd_data.loc[ctd_rows, parameter.value].min()
+    fig.x_range = Range1d(min_x_fig, max_x_fig)
+
+    max_x_fig2 = max(btl_data.loc[btl_rows, deltas_d[parameter.value]].max(), 0.025)
+    min_x_fig2 = min(btl_data.loc[btl_rows, deltas_d[parameter.value]].min(), -0.025)
+    fig2.x_range = Range1d(min_x_fig2, max_x_fig2)
+
     # deselect all datapoints
     btl_sal.data_source.selected.indices = []
     src_table.selected.indices = []
