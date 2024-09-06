@@ -111,8 +111,6 @@ def _salt_loader(filename):
         questionable["cast_id"] = [str(s).zfill(3)[-3:] + str(c).zfill(2) for s, c in zip(saltDF.loc[flagged, "STNNBR"], saltDF.loc[flagged, "CASTNO"])]
         questionable["value"] = 3
         questionable["notes"] = "Auto-flagged by processing function (had * in row)"
-        #   flag_file = Path(cfg.dirs['flags']+"bottleflags_auto.csv"   #   Autoflagging
-        # questionable.to_csv(flag_file)
 
     # add time (in seconds) needed for autosal drift removal step
     saltDF["IndexTime"] = pd.to_datetime(saltDF["EndTime"], format="%H:%M:%S")
