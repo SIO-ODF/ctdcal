@@ -12,6 +12,7 @@ from bokeh.models import (
     DataTable,
     Div,
     MultiSelect,
+    Range1d,
     Select,
     StringFormatter,
     TableColumn,
@@ -224,6 +225,7 @@ upcast_sal = fig.triangle(
     legend_label="Upcast CTD sample",
 )
 fig.select(BoxSelectTool).continuous = False
+# fig.y_range = Range1d(max_y_value, 0)
 fig.y_range.flipped = True  # invert y-axis
 fig.legend.location = "bottom_right"
 fig.legend.border_line_width = 3
@@ -235,7 +237,7 @@ upcast_sal.nonselection_glyph.fill_alpha = 1  # makes CTDSAL *not* change on sel
 threshes = {
     "CTDSAL": np.array([0.002, 0.005, 0.010, 0.020]),
     "CTDTMP": np.array([0.002, 0.005, 0.010, 0.020]),
-    "CTDOXY": np.array([0.625, 1.250, 2.500, 5.000]),
+    "CTDOXY": np.array([0.625, 1.250, 2.500, 5.000]),   #   Not advised to follow this - biology happens
 }
 
 #   Residuals plot
@@ -264,7 +266,8 @@ btl_sal2 = fig2.asterisk(
 fig2.step(thresh, p_range)
 fig2.step(-thresh, p_range)
 fig2.select(BoxSelectTool).continuous = False
-fig2.y_range.flipped = True  # invert y-axis
+fig2.y_range = fig.y_range
+# fig2.y_range.flipped = True  # invert y-axis
 
 # define callback functions
 
@@ -326,6 +329,11 @@ def update_selectors():
 
     fig2.title.text = "{} Residual".format(parameter.value)
     fig2.xaxis.axis_label = parameter.value
+
+    # Set the y-range from 0 to the maximum value
+    max_y = ctd_data.loc[ctd_rows, "CTDPRS"].max()
+    fig.y_range = Range1d(max_y + 0.05 * max_y, 0)
+    fig2.y_range = fig.y_range
 
     # deselect all datapoints
     btl_sal.data_source.selected.indices = []
