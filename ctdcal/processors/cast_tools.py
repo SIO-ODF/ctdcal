@@ -48,7 +48,7 @@ class Cast(object):
         """
         Read the processed data into a dataframe.
         """
-        f = Path(self.datadir, 'processed/%s.pkl' % self.cast_id)
+        f = Path(self.datadir, 'converted/%s.pkl' % self.cast_id)
         self.proc = pd.read_pickle(f)
 
     def parse_downcast(self, data):
@@ -248,4 +248,8 @@ class Cast(object):
         if len(end_df) == 0:
             log.warning("Failed to find ending deck pressure.")
 
-        return start_p, end_p
+        df = pd.DataFrame()
+        df['cast_id'] = [self.cast_id]
+        df['pressure_start'] = [start_p]
+        df['pressure_end'] = [end_p]
+        return df

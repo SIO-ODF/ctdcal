@@ -238,10 +238,10 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
     """
     p_log = pd.read_csv(
         cfg.dirs["logs"] + "ondeck_pressure.csv",
-        dtype={"SSSCC": str},
+        dtype={"cast_id": str},
         na_values="Started in Water",
     )
-    p_offset = _get_pressure_offset(p_log.ondeck_start_p, p_log.ondeck_end_p)
+    p_offset = _get_pressure_offset(p_log['pressure_start'], p_log['pressure_end'])
     df[p_col] += p_offset
     df[p_col + "_FLAG_W"] = 2
 

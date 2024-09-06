@@ -15,6 +15,7 @@ from . import process_bottle as btl
 from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
 from ctdcal.processors.cast_tools import Cast
+from .common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -171,12 +172,26 @@ def make_time_files(casts, user_cfg):
         Dictionary of user configuration parameters.
     """
     log.info("Generating time.pkl files")
-    cast_details_all = pd.DataFrame()
-    p_offsets_all = pd.DataFrame()
+    # validate time directory
+    time_dir = validate_dir(Path(user_cfg.datadir, 'time'), create=True)
+    # groundwork for writing any new details or offsets
+    details_file = Path(user_cfg.datadir, 'logs/cast_details.csv')
+    offsets_file = Path(user_cfg.datadir, 'logs/ondeck_pressure.csv')
+    new_casts = False
+    if details_file.exists():
+        cast_details_all = pd.read_csv(details_file, dtype='str')
+    else:
+        cast_details_all = pd.DataFrame()
+    if offsets_file.exists():
+        p_offsets_all = pd.read_csv(offsets_file, dtype='str')
+    else:
+        p_offsets_all = pd.DataFrame()
 
+    # process new casts one by one
     for cast_id in casts:
-        time_file = Path(user_cfg.datadir, 'time/%s_time.pkl' % cast_id)
+        time_file = Path(time_dir, '%s_time.pkl' % cast_id)
         if not time_file.exists():
+            new_casts = True
             cast = Cast(cast_id, user_cfg.datadir)
             cast.p_col = 'CTDPRS'
             # Apply smoothing filter
@@ -203,17 +218,21 @@ def make_time_files(casts, user_cfg):
             # converted_df.loc[bad_rows, :] = np.nan
             # converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
-            cast_details_all = pd.concat([cast_details_all, cast.get_details()])
-            p_offsets_all = pd.concat([p_offsets_all,
-                                       [cast.cast_id,
-                                        cast.get_pressure_offsets(cast.proc,
-                                                                  user_cfg.cond_threshold,
-                                                                  user_cfg.freq)]])
+            cast_details_all = (pd.concat([cast_details_all, cast.get_details()])
+                                .drop_duplicates(['cast_id'], keep='last')
+                                .sort_values(by=['cast_id']))
+            p_offsets_all = (pd.concat([p_offsets_all,
+                                       cast.get_pressure_offsets(cast.proc,
+                                                                 user_cfg.cond_threshold,
+                                                                 user_cfg.freq)])
+                             .drop_duplicates(['cast_id'], keep='last')
+                             .sort_values(by=['cast_id']))
 
     # Wrap up...
-    log.info("Saving deck pressures and cast details.")
-    cast_details_all.to_csv(Path(user_cfg.datadir, 'logs/cast_details.csv'))
-    p_offsets_all.to_csv(Path(user_cfg.datadir, 'logs/ondeck_pressure.csv'))
+    if new_casts is True:
+        log.info("Saving deck pressures and cast details.")
+        cast_details_all.to_csv(Path(user_cfg.datadir, 'logs/cast_details.csv'), index=False)
+        p_offsets_all.to_csv(Path(user_cfg.datadir, 'logs/ondeck_pressure.csv'), index=False)
 
 def make_btl_mean(ssscc_list):
     """

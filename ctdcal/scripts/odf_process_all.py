@@ -66,6 +66,10 @@ def odf_process_all():
     btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
 
     # process pressure offset
+    # TODO: these functions return an updated dataframe, which we aren't
+    #   assigning or reassigning to anything. Instead we rely on the updates
+    #   to the data in the other module occuring in this one too (they
+    #   indeed seem to). But is this a safe assumption?
     process_ctd.apply_pressure_offset(btl_data_all)
     process_ctd.apply_pressure_offset(time_data_all)
 
