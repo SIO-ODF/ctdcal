@@ -204,6 +204,7 @@ class Cast(object):
         #     on WOCE colnames and fixed sample frequency
 
         # Frequency
+        # TODO: pass time delay (or freq) parameter from caller
         freq = 24
         # Half minute
         time_delay = freq * 30  # time to let CTD pressure reading settle/sit on deck

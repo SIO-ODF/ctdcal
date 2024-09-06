@@ -92,3 +92,7 @@ class TestCast:
         cast.proc.drop('GPSLAT', axis=1)
         spam = cast.get_details()
         assert 'GPSLON' not in spam.columns
+
+    # def test_get_pressure_offsets(self):
+    #     # TODO: write this when get_pressure_offsets is updated
+    #     assert False
