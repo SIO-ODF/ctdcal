@@ -393,6 +393,10 @@ def apply_flag():
         "diff": current_table["Residual"],
         "flag": current_table["New Flag"],
         "Comments": current_table["Comments"],
+        "CTD Param": current_table[parameter.value].round(4),
+        "Reference": current_table[ref_param.value].round(4),
+        "o_res": current_table["o_res"],
+        "t_res": current_table["t_res"],
     }
 
 
@@ -415,6 +419,10 @@ def apply_comment():
         "diff": current_table["Residual"],
         "flag": current_table["New Flag"],
         "Comments": current_table["Comments"],
+        "CTD Param": current_table[parameter.value].round(4),
+        "Reference": current_table[ref_param.value].round(4),
+        "o_res": current_table["o_res"],
+        "t_res": current_table["t_res"],
     }
 
 
