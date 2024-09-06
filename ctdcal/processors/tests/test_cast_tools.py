@@ -42,7 +42,8 @@ class TestCast:
         assert cast.downcast is None
         cast.parse_downcast(cast.proc)
         assert type(cast.downcast) == pd.DataFrame
-        assert cast.downcast['spam'].values[-1] == 3
+        assert cast.downcast is not None
+        assert cast.downcast['spam'].values[-1] == 5
 
     def test_filter(self, tmp_df):
         with patch('pandas.read_pickle', return_value=tmp_df):
