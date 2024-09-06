@@ -206,7 +206,9 @@ def make_time_files(casts, user_cfg):
             cast_details_all = pd.concat([cast_details_all, cast.get_details()])
             p_offsets_all = pd.concat([p_offsets_all,
                                        [cast.cast_id,
-                                        cast.get_pressure_offsets(cast.proc, user_cfg.cond_threshold)]])
+                                        cast.get_pressure_offsets(cast.proc,
+                                                                  user_cfg.cond_threshold,
+                                                                  user_cfg.freq)]])
 
     # Wrap up...
     log.info("Saving deck pressures and cast details.")

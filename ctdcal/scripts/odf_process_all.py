@@ -3,10 +3,9 @@ Process all CTD and bottle data using ODF routines.
 """
 
 # import needed ctdcal modules
-from .. import (
+from ctdcal import (
     convert,
     fit_ctd,
-    get_ctdcal_config,
     odf_io,
     oxy_fitting,
     process_bottle,
@@ -47,7 +46,7 @@ def odf_process_all():
     convert.hex_to_ctd(ssscc_list)
 
     # process time files
-    convert.make_time_files(ssscc_list)
+    convert.make_time_files(ssscc_list, user_cfg)
 
     # process bottle file
     convert.make_btl_mean(ssscc_list)

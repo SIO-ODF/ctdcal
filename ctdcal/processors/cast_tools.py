@@ -118,7 +118,8 @@ class Cast(object):
 
         # Adapted from: https://stackoverflow.com/questions/48023982/pandas-finding-local-max-and-min
         # Find local peaks
-        local_min_vals = data.loc[data[self.p_col] == data[self.p_col].rolling(win_size, center=True).min(), [self.p_col]]
+        local_min_vals = data.loc[data[self.p_col] == data[self.p_col].rolling(win_size, center=True).min(),
+                                  [self.p_col]]
 
         # apply max_soak threshold to filter false positives...
         i = local_min_vals.index[-1]
@@ -178,7 +179,7 @@ class Cast(object):
             data['longitude'] = [float(np.around(best_full_cast["GPSLON"][p_max_ind], 4))]
         return data
 
-    def get_pressure_offsets(self, data, threshold):
+    def get_pressure_offsets(self, data, threshold, sample_freq):
         """
         Get starting and ending on-deck pressure averages for the cast. A
         conductivity threshold is used to determine when the instrument
@@ -194,6 +195,8 @@ class Cast(object):
         threshold : float
             Maximum conductivity value to determine when cast is not in the water,
             in source conductivity units.
+        sample_freq : int
+            Instrument sample frequency in Hz
 
         Returns
         -------
@@ -201,13 +204,10 @@ class Cast(object):
         """
         # TODO: review algorithm for soundness and reliability, see if we can
         #     use pressure or something other than salinity, remove reliance
-        #     on WOCE colnames and fixed sample frequency
+        #     on WOCE colnames
 
-        # Frequency
-        # TODO: pass time delay (or freq) parameter from caller
-        freq = 24
         # Half minute
-        time_delay = freq * 30  # time to let CTD pressure reading settle/sit on deck
+        time_delay = sample_freq * 30  # time to let CTD pressure reading settle/sit on deck
         # split dataframe into upcast/downcast
         downcast = data.iloc[: (data[self.p_col].argmax() + 1)]
         upcast = data.iloc[(data[self.p_col].argmax() + 1):]
@@ -226,18 +226,18 @@ class Cast(object):
         # Evaluate starting and ending pressures
         start_samples = len(start_df)
         if start_samples > time_delay:
-            start_p = np.average(start_df.iloc[(freq * 2): (start_samples - time_delay)])
+            start_p = np.average(start_df.iloc[(sample_freq * 2): (start_samples - time_delay)])
         else:
-            start_seconds = start_samples / freq
+            start_seconds = start_samples / sample_freq
             log.warning(
                     f"{self.cast_id}: Only {start_seconds:0.1f} seconds of start pressure averaged."
             )
-            start_p = np.average(start_df.iloc[(freq * 2):start_samples])
+            start_p = np.average(start_df.iloc[(sample_freq * 2):start_samples])
         end_samples = len(end_df)
         if end_samples > time_delay:
             end_p = np.average(end_df.iloc[time_delay:])
         else:
-            end_seconds = end_samples / freq
+            end_seconds = end_samples / sample_freq
             log.warning(
                     f"{self.cast_id}: Only {end_seconds:0.1f} seconds of end pressure averaged."
             )
