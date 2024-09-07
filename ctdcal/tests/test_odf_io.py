@@ -39,7 +39,9 @@ def make_salt_file(stn=1, cast=1, comment=None, flag=False, to_file=None):
     salts.insert(2, "SAMPNO", [f"{x:02.0f}" for x in salts.index])
     salts.insert(4, "CRavg", np.linspace(1.95, 1.98, 12)[::-1])
     salts.insert(5, "autosalSAMPNO", salts["SAMPNO"].astype(int))
-    salts["autosalSAMPNO"] = salts["autosalSAMPNO"].astype(object)  #   Change dtype for integers and strings
+    salts["autosalSAMPNO"] = salts["autosalSAMPNO"].astype(
+        object
+    )  #   Change dtype for integers and strings
     salts.loc[[0, 11], "autosalSAMPNO"] = "worm"
     times = pd.date_range(start="18:32:04", end="19:36:03", periods=24)
     salts["StartTime"] = times[::2].strftime("%H:%M:%S")
@@ -61,7 +63,9 @@ def make_salt_file(stn=1, cast=1, comment=None, flag=False, to_file=None):
         salts["EndTime"] = salts["EndTime"] + rng.choice(["", "*"], 12, p=[0.8, 0.2])
 
     # final formatting, remove blank Reading3 cells to match Autosal
-    header = "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408"
+    header = (
+        "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408 01/01/2000"
+    )
     string_df = salts.to_string(
         header=False, index=False, float_format="{:.5f}".format, na_rep=""
     )
@@ -86,6 +90,7 @@ def test_salt_loader(caplog, tmp_path):
     assert check_type(saltDF[["BathTEMP", "Unknown", "Attempts", "IndexTime"]], int)
     assert all(saltDF.index == np.arange(1, 11))
     assert saltDF["Reading3"].isna().sum() == 5
+    assert q is None
 
     assert refDF.shape == (2, 2)
     assert all(refDF.dtypes == float)
@@ -114,7 +119,7 @@ def test_salt_loader(caplog, tmp_path):
     with caplog.at_level(logging.DEBUG):
         saltDF, refDF, flagged = odf_io._salt_loader(io.StringIO(salt_file))
         assert "Found * in test_odf_io" in caplog.messages[1]
-        assert "flagged" in flagged.at[1, 'notes']
+        assert "flagged" in flagged.at[1, "notes"]
         assert len(flagged) == 3
     assert saltDF.shape == (10, 14)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
@@ -132,7 +137,9 @@ def test_salt_loader(caplog, tmp_path):
     d = tmp_path / "salt"
     d.mkdir()
     fake_file = d / "90909"
-    fake_file.write_text("\n1 2 3 4 5 6 7 00:01:00 00:02:00 10 11")  #   0001 06 13 24 1.99187   13 5427 16:31:39  16:32:16  02 1.99186 1.99188
+    fake_file.write_text(
+        "12-345 operator: ABC box: S batch: P678 k15: 0.91011 std dial 408 01/01/2000\n1 2 3 4 5 6 7 00:01:00 00:02:00 10 11"
+    )
     saltDF, refDF, q = odf_io._salt_loader(fake_file)
     assert all(saltDF[["StartTime", "EndTime"]].dtypes == object)
     assert check_type(saltDF[["CRavg", "Reading1"]], float)
@@ -241,9 +248,11 @@ def test_process_salts(tmp_path, caplog):
         expected_output = "\rProgress |###-------| 30.0% Complete"
 
         # Redirect stdout to mock_stdout
-        with patch('sys.stdout', io.StringIO()):
+        with patch("sys.stdout", io.StringIO()):
             # Call function
-            odf_io.print_progress_bar(iteration, total, prefix, suffix, decimals, length, fill, printEnd)
+            odf_io.print_progress_bar(
+                iteration, total, prefix, suffix, decimals, length, fill, printEnd
+            )
 
         # Get value from mock_stdout
         actual_output = io.StringIO().getvalue()

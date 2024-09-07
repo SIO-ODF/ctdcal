@@ -13,11 +13,12 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from ctdcal.fitting.common import NodeNotFoundError, get_node
+
 from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
-from ctdcal.fitting.common import get_node, NodeNotFoundError
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -25,7 +26,10 @@ log = logging.getLogger(__name__)
 
 def load_winkler_oxy(oxy_file):
     """
-    Load Winkler oxygen titration data file.
+    Load ODF Winkler oxygen raw titration data file.
+
+    Files are generated from ODF LabVIEW software, generating a file named
+    with the current run's first SSSCC.
 
     Parameters
     ----------
@@ -40,19 +44,30 @@ def load_winkler_oxy(oxy_file):
         List of oxygen parameters used in titration
     """
 
+    ssscc = oxy_file.stem
     with open(oxy_file, newline="") as f:
         oxyF = csv.reader(
             f, delimiter=" ", quoting=csv.QUOTE_NONE, skipinitialspace=True
         )
         oxy_array = []
         for row in oxyF:
-            if row[0].startswith('#'):
+            if row[0].startswith("#"):
+                continue
+            elif "ABORT" in row:
+                log.warning(f"Aborted value found in oxy file for {ssscc} Skipping.")
                 continue
             elif len(row) > 9:
                 row = row[:9]
             oxy_array.append(row)
 
     params = oxy_array.pop(0)  # save file header info for later (Winkler values)
+    if params in oxy_array:
+        #   Check for duplicate standardizations. Check with analyst to see which standard to keep.
+        log.warning(f"Raw Winkler contains duplicate standardization in {ssscc}")
+    elif any(len(row[0]) > 4 for row in oxy_array):
+        #   Check for cases where the ODF software is writing out a standard line (Winkler writes out 4 chars for station)
+        log.warning(f"Raw Winkler contains abnormal row in {ssscc}")
+
     cols = OrderedDict(
         [
             ("STNNO_OXY", int),
@@ -67,9 +82,31 @@ def load_winkler_oxy(oxy_file):
         ]
     )
 
-    df = pd.DataFrame(oxy_array, columns=cols.keys()).astype(cols)
+    df = pd.DataFrame(oxy_array, columns=cols.keys()).astype(
+        cols
+    )  #   Force dtypes and build dataframe
+    if df["BOTTLENO_OXY"].value_counts().get(99, 0) != 1:
+        #   Multiple "dummy" data present
+        log.warning(f"Multiple dummy lines in raw titration file {ssscc}")
     df = df[df["BOTTLENO_OXY"] != 99]  # remove "Dummy Data"
-    df = df[df["TITR_VOL"] > 0]  # remove "ABORTED DATA"
+
+    if not df[df["TITR_VOL"] <= 0].empty:
+        #   Check if titration volumes are all positive
+        log.warning(f"Non-positive entries found for titration volume in {ssscc}")
+    if any(df.duplicated):
+        #   Check for duplicates
+        log.warning(f"Raw Winkler contains duplicate values in {ssscc}")
+    if len(df["CASTNO_OXY"].value_counts()) != 1:
+        #   Check if there are multiple casts in the file
+        log.warning(f"Multiple casts reported in {ssscc}")
+    elif len(df["STNNO_OXY"].value_counts()) != 1:
+        #   Check if there are multiple stations in the file
+        log.warning(f"Multiple stations reported in {ssscc}")
+    if any((df["END_VOLTS"] < 0) | df["END_VOLTS"] > 5):
+        #   Scale from 0-5 V
+        log.warning(f"Titration file has erroneous voltage reported in {ssscc}")
+
+    df = df[df["TITR_VOL"] > 0]  # remove "ABORTED DATA" or otherwise bad points
     df = df.sort_values("BOTTLENO_OXY").reset_index(drop=True)
     df["FLASKNO"] = df["FLASKNO"].astype(str)
 
@@ -475,7 +512,7 @@ def PMEL_oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
 
     residuals = np.sum(
         (weights * (refoxy - _PMEL_oxy_eq(coefs, inputs)) ** 2)
-    ) / np.sum(weights ** 2)
+    ) / np.sum(weights**2)
 
     return residuals
 
@@ -499,7 +536,8 @@ def match_sigmas(
 
     # Construct Dataframe from bottle and ctd values for merging
     btl_data = pd.DataFrame(
-        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA}, index=btl_idx
+        data={"CTDPRS": btl_prs, "REFOXY": btl_oxy, "CTDTMP": btl_tmp, "SA": btl_SA},
+        index=btl_idx,
     )
     time_data = pd.DataFrame(
         data={
@@ -736,13 +774,15 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
     btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df[cfg.column["refO"]])
 
     # Load manual OXYGEN flags
-    flag_file = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+    flag_file = Path(user_cfg.datadir, "flag", user_cfg.bottleflags_man)
     oxy_flags_manual = None
     if flag_file.exists():
         try:
             oxy_flags_manual = get_node(flag_file, ref_node)
         except NodeNotFoundError:
-            log.info("No previously flagged values for %s found in flag file." % ref_node)
+            log.info(
+                "No previously flagged values for %s found in flag file." % ref_node
+            )
     else:
         log.info("No pre-existing flag file found.")
 
@@ -750,10 +790,14 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
         log.info("Merging previously flagged values for %s." % ref_node)
         oxy_flags_manual_df = pd.DataFrame.from_dict(oxy_flags_manual)
         oxy_flags_manual_df = oxy_flags_manual_df.rename(
-            columns={"cast_id": "SSSCC", "bottle_num": "btl_fire_num", "value": "OXYGEN_FLAG_W"}
+            columns={
+                "cast_id": "SSSCC",
+                "bottle_num": "btl_fire_num",
+                "value": "OXYGEN_FLAG_W",
+            }
         )
-        btl_df.set_index(['SSSCC', 'btl_fire_num'], inplace=True)
-        btl_df.update(oxy_flags_manual_df.set_index(['SSSCC', 'btl_fire_num']))
+        btl_df.set_index(["SSSCC", "btl_fire_num"], inplace=True)
+        btl_df.update(oxy_flags_manual_df.set_index(["SSSCC", "btl_fire_num"]))
         btl_df.reset_index(inplace=True)
 
     return True
@@ -792,7 +836,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_dict = {}
     all_sbe43_fit = pd.DataFrame()
 
-    btl_df.set_index('master_index', inplace=True)
+    btl_df.set_index("master_index", inplace=True)
 
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
@@ -818,9 +862,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             time_data["scan_datetime"],
         )
         sbe43_merged = sbe43_merged.reindex(btl_data.index)  # add nan rows back in
-        btl_df.loc[
-            btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]
-        ] = sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
+        btl_df.loc[btl_df["SSSCC"] == ssscc, ["CTDOXYVOLTS", "dv_dt", "OS"]] = (
+            sbe43_merged[["CTDOXYVOLTS", "dv_dt", "OS"]]
+        )
         sbe43_merged["SSSCC"] = ssscc
         all_sbe43_merged = pd.concat([all_sbe43_merged, sbe43_merged])
         log.info(ssscc + " density matching done")

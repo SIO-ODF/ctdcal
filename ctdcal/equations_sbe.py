@@ -424,3 +424,67 @@ def seapoint_fluor(volts, coefs, decimals=6):
     fluoro = np.around(volts, decimals)
 
     return fluoro
+
+
+def sbe_flntu_chl(volts, coefs, decimals = 4):
+    """
+    SBE equation for converting SeaBird fluorometer and nepholometric turbidity
+    combo sensor's chlorophyll and CDOM fluorometer.
+    SensorID: 19
+    Example coefs: {'ScaleFactor':11, 'DarkVoltage':0.079}
+
+    Paramters
+    ----------
+    volts : array-like
+        Raw voltage
+    coefs : dict
+        Dictionary of calibration coefficients (ScaleFactor, Vblank)
+
+    Returns
+    -------
+    chl : array-like
+        Converted chlorophyll concentration in μg/l
+    
+    Notes:
+    ------
+    ScaleFactor is usually given in volts, whereas Vblank are in μg/l/V in
+    analogue calculations.
+    """
+    _check_coefs(coefs, ["ScaleFactor", "Vblank"])
+    volts = _check_volts(volts)
+    chl = np.around((volts - coefs["Vblank"]) * coefs["ScaleFactor"], decimals)
+
+    return chl
+
+
+def sbe_flntu_ntu(volts, coefs, decimals = 4): 
+    """
+    SBE equation for converting SeaBird fluorometer and nepholometric turbidity
+    combo sensor's turbidity channel.
+    SensorID: 67
+    Example coefs: {'ScaleFactor':5, 'DarkVoltage':0.05}
+
+    Paramters
+    ----------
+    volts : array-like
+        Raw voltage
+    coefs : dict
+        Dictionary of calibration coefficients (ScaleFactor, DarkVoltage)
+
+    Returns
+    -------
+    turb : array-like
+        Converted turbidity (units expressed in NTU)
+    
+    Notes:
+    ------
+    ScaleFactor is usually given in volts, whereas DarkVoltage are in NTU/V in
+    analogue calculations.
+    Future release may factor this into sbe_flntu_chl (same equation)
+    """
+
+    _check_coefs(coefs, ["ScaleFactor", "DarkVoltage"])
+    volts = _check_volts(volts)
+    turb = np.around((volts - coefs["DarkVoltage"]) * coefs["ScaleFactor"], decimals)
+
+    return turb
