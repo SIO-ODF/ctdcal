@@ -114,7 +114,7 @@ class Cast(object):
         if self.downcast is None:
             raise AttributeError("'downcast' attribute is not set.")
         if win_size < 0:
-            win_size = 0  # n must be positive or zero
+            win_size = 0  # must be positive or zero
 
         # Adapted from: https://stackoverflow.com/questions/48023982/pandas-finding-local-max-and-min
         # Find local peaks

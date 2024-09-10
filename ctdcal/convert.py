@@ -220,6 +220,7 @@ def make_time_files(casts, datadir, user_cfg):
             # converted_df.loc[bad_rows, :] = np.nan
             # converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
+            # Merge in new details and offsets values
             cast_details_all = (pd.concat([cast_details_all, cast.get_details()])
                                 .drop_duplicates(['cast_id'], keep='last')
                                 .sort_values(by=['cast_id']))
