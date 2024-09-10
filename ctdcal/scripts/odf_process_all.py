@@ -46,7 +46,7 @@ def odf_process_all():
     convert.hex_to_ctd(ssscc_list)
 
     # process time files
-    convert.make_time_files(ssscc_list, user_cfg)
+    convert.make_time_files(ssscc_list, user_cfg.datadir, user_cfg)
 
     # process bottle file
     convert.make_btl_mean(ssscc_list)
@@ -67,9 +67,9 @@ def odf_process_all():
 
     # process pressure offset
     # TODO: these functions return an updated dataframe, which we aren't
-    #   assigning or reassigning to anything. Instead we rely on the updates
-    #   to the data in the other module occuring in this one too (they
-    #   indeed seem to). But is this a safe assumption?
+    #   assigning or reassigning to anything. Instead we trust that the
+    #   updates which happen in the other module are visible by this one
+    #   too (they  indeed seem to be). Is this a safe assumption?
     process_ctd.apply_pressure_offset(btl_data_all)
     process_ctd.apply_pressure_offset(time_data_all)
 

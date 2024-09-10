@@ -155,7 +155,7 @@ def hex_to_ctd(ssscc_list):
     return True
 
 
-def make_time_files(casts, user_cfg):
+def make_time_files(casts, datadir, user_cfg):
     """
     Make continuous time-series files from processed cast data.
 
@@ -168,15 +168,17 @@ def make_time_files(casts, user_cfg):
     ----------
     casts : list of str
         List of cast ids to process.
+    datadir : str or Path-like
+        Top-level of user data directory
     user_cfg : Munch object
         Dictionary of user configuration parameters.
     """
     log.info("Generating time.pkl files")
     # validate time directory
-    time_dir = validate_dir(Path(user_cfg.datadir, 'time'), create=True)
+    time_dir = validate_dir(Path(datadir, 'time'), create=True)
     # groundwork for writing any new details or offsets
-    details_file = Path(user_cfg.datadir, 'logs/cast_details.csv')
-    offsets_file = Path(user_cfg.datadir, 'logs/ondeck_pressure.csv')
+    details_file = Path(datadir, 'logs/cast_details.csv')
+    offsets_file = Path(datadir, 'logs/ondeck_pressure.csv')
     new_casts = False
     if details_file.exists():
         cast_details_all = pd.read_csv(details_file, dtype='str')
@@ -192,7 +194,7 @@ def make_time_files(casts, user_cfg):
         time_file = Path(time_dir, '%s_time.pkl' % cast_id)
         if not time_file.exists():
             new_casts = True
-            cast = Cast(cast_id, user_cfg.datadir)
+            cast = Cast(cast_id, datadir)
             cast.p_col = 'CTDPRS'
             # Apply smoothing filter
             cast.filter(cast.proc,
@@ -231,8 +233,8 @@ def make_time_files(casts, user_cfg):
     # Wrap up...
     if new_casts is True:
         log.info("Saving deck pressures and cast details.")
-        cast_details_all.to_csv(Path(user_cfg.datadir, 'logs/cast_details.csv'), index=False)
-        p_offsets_all.to_csv(Path(user_cfg.datadir, 'logs/ondeck_pressure.csv'), index=False)
+        cast_details_all.to_csv(Path(datadir, 'logs/cast_details.csv'), index=False)
+        p_offsets_all.to_csv(Path(datadir, 'logs/ondeck_pressure.csv'), index=False)
 
 def make_btl_mean(ssscc_list):
     """
