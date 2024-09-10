@@ -93,7 +93,7 @@ def load_winkler_oxy(oxy_file):
     if not df[df["TITR_VOL"] <= 0].empty:
         #   Check if titration volumes are all positive
         log.warning(f"Non-positive entries found for titration volume in {ssscc}")
-    if any(df.duplicated):
+    if any(df.duplicated()):
         #   Check for duplicates
         log.warning(f"Raw Winkler contains duplicate values in {ssscc}")
     if len(df["CASTNO_OXY"].value_counts()) != 1:
