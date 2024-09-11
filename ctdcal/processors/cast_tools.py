@@ -33,6 +33,8 @@ class Cast(object):
         Filtered cast data.
     trimmed : DataFrame
         Upcast data trimmed of initial soak data.
+    ondeck_trimmed : DataFrame
+        Full cast data trimmed of on-deck intervals.
     """
     def __init__(self, cast_id, datadir):
         self.cast_id = cast_id
@@ -42,6 +44,7 @@ class Cast(object):
         self.downcast = None
         self.filtered = None
         self.trimmed = None
+        self.ondeck_trimmed = None
         self.load_cast()
 
     def load_cast(self):
@@ -253,3 +256,33 @@ class Cast(object):
         df['pressure_start'] = [start_p]
         df['pressure_end'] = [end_p]
         return df
+
+    def trim_ondeck(self, data, threshold):
+        """
+        Trims end of casts based on a conductivity threshold. Legacy functionality.
+
+        Parameters
+        ----------
+        data : DataFrame
+            Cast data.
+        threshold : int
+            Maximum conductivity value to determine when cast is not in the water,
+            in source conductivity units.
+        """
+        # split dataframe into upcast/downcast
+        # split dataframe into upcast/downcast
+        downcast = data.iloc[: (data[self.p_col].argmax() + 1)]
+        upcast = data.iloc[(data[self.p_col].argmax() + 1):]
+        # Search each half of df for minimum conductivity
+        # threshold to identify when rosette is out of water
+        start_df = downcast.loc[
+            (downcast['CTDCOND1'] < threshold)
+            & (downcast['CTDCOND2'] < threshold),
+            self.p_col,
+        ]
+        end_df = upcast.loc[
+            (upcast['CTDCOND1'] < threshold)
+            & (upcast['CTDCOND2'] < threshold),
+            self.p_col,
+        ]
+        self.ondeck_trimmed = data.iloc[start_df.index.max() : end_df.index.min()].copy()
