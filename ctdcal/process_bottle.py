@@ -222,7 +222,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
-        oxy_file = cfg.dirs["oxygen"] + ssscc
+        oxy_file = Path(cfg.dirs["oxygen"] + ssscc)
         try:
             oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
             if len(oxy_data) > 36:
