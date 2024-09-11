@@ -3,10 +3,9 @@ Process all CTD and bottle data using ODF routines.
 """
 
 # import needed ctdcal modules
-from .. import (
+from ctdcal import (
     convert,
     fit_ctd,
-    get_ctdcal_config,
     odf_io,
     oxy_fitting,
     process_bottle,
@@ -47,7 +46,7 @@ def odf_process_all():
     convert.hex_to_ctd(ssscc_list)
 
     # process time files
-    convert.make_time_files(ssscc_list)
+    convert.make_time_files(ssscc_list, user_cfg.datadir, user_cfg)
 
     # process bottle file
     convert.make_btl_mean(ssscc_list)
@@ -67,6 +66,10 @@ def odf_process_all():
     btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
 
     # process pressure offset
+    # TODO: these functions return an updated dataframe, which we aren't
+    #   assigning or reassigning to anything. Instead we trust that the
+    #   updates which happen in the other module are visible by this one
+    #   too (they  indeed seem to be). Is this a safe assumption?
     process_ctd.apply_pressure_offset(btl_data_all)
     process_ctd.apply_pressure_offset(time_data_all)
 

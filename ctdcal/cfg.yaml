@@ -2,8 +2,61 @@
 #
 # To use, call ctdcal.common.load_user_config(<this file>)
 
-# Data Directory:
-datadir: "data"
+# Application Settings
+# --------------------
+# CTDCAL uses these settings to find and process your data. Change
+# them as desired to suit your needs.
 
-# Manual bottle flags filename (JSON)
-bottleflags_man: "bottle_flags_manual.json"
+# Data Directory: str
+#   Path to your data directory. Absolute (UNIX-style) paths
+#   are recommended.
+datadir: "data"
+#datadir: "/Users/ctdcaluser/data/mycruise"
+
+# Manual bottle flags filename (JSON): str
+bottleflags_man: bottle_flags_manual.json
+
+# Instrument Specifications
+# -------------------------
+# CTDCAL uses these parameters when it needs a specification
+# specific to your instrument or instrument type. The defaults
+# are for a Sea Bird 9/11. Change these if you are using a
+# different model CTD. To use CTDCAL with multiple instruments
+# of different types, it is recommended to use a different
+# configuration file (this file) for each.
+
+# Sample frequency (Hz): int
+freq: 24
+
+# Advanced Settings
+# -----------------
+# These settings are provided for fine-tuning of specific CTDCAL
+# features. These should not normally need to change.
+
+# Conductivity threshold (in cast units): int or float
+#   Used to determine if the instrument is operating in the water
+cond_threshold: 20
+# Soak threshold (in pressure units): int or float
+#   The deepest depth at which the pre-cast soak may occur
+soak_threshold: 20
+# Soak rolling average window (seconds): int
+soak_win: 20
+# Filter window (seconds): int
+#   Used by the cast smoothing filter
+filter_win: 2
+# Filter type: boxcar, hann, triangle
+filter_type: hann
+# Columns to filter:
+filter_cols:
+  - CTDPRS
+  - CTDTMP1
+  - CTDTMP2
+  - CTDCOND1
+  - CTDCOND2
+  - CTDSAL
+  - U_DEF_poly1
+#  - FREE1
+  - CTDOXYVOLTS
+#  - REFTMP
+#  - GPSLAT
+#  - GPSLON

@@ -14,6 +14,8 @@ from . import get_ctdcal_config
 from . import process_bottle as btl
 from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
+from ctdcal.processors.cast_tools import Cast
+from .common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -153,73 +155,87 @@ def hex_to_ctd(ssscc_list):
     return True
 
 
-def make_time_files(ssscc_list):
+def make_time_files(casts, datadir, user_cfg):
     """
-    Make continuous time.pkl files from converted files in hex_to_ctd.
+    Make continuous time-series files from processed cast data.
 
-    Data have a generic roll filter applied. Columns to filter are defined in the config.
-    
-    The time on deck, the soak, and the upcast are removed to provide a continuous downcast.
+    Each cast has a smoothing filter applied. Filter parameters and columns
+    to filter are from user-specified configurations.
+
+    The time on deck, the soak, and the upcast are trimmed to provide a continuous downcast.
     
     Parameters
     ----------
-    ssscc_list : list of str
-        List of stations/hex files to convert
-
-    Returns
-    -------
-    .PKL file of continuous, filtered downcast data.
+    casts : list of str
+        List of cast ids to process.
+    datadir : str or Path-like
+        Top-level of user data directory
+    user_cfg : Munch object
+        Dictionary of user configuration parameters.
     """
     log.info("Generating time.pkl files")
-    for ssscc in ssscc_list:
-        if not Path(cfg.dirs["time"] + ssscc + "_time.pkl").exists():
-            converted_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+    # validate time directory
+    time_dir = validate_dir(Path(datadir, 'time'), create=True)
+    # groundwork for writing any new details or offsets
+    details_file = Path(datadir, 'logs/cast_details.csv')
+    offsets_file = Path(datadir, 'logs/ondeck_pressure.csv')
+    new_casts = False
+    if details_file.exists():
+        cast_details_all = pd.read_csv(details_file, dtype='str')
+    else:
+        cast_details_all = pd.DataFrame()
+    if offsets_file.exists():
+        p_offsets_all = pd.read_csv(offsets_file, dtype='str')
+    else:
+        p_offsets_all = pd.DataFrame()
 
+    # process new casts one by one
+    for cast_id in casts:
+        time_file = Path(time_dir, '%s_time.pkl' % cast_id)
+        if not time_file.exists():
+            new_casts = True
+            cast = Cast(cast_id, datadir)
+            cast.p_col = 'CTDPRS'
+            # Apply smoothing filter
+            cast.filter(cast.proc,
+                        win_size=(user_cfg.filter_win * user_cfg.freq),
+                        win_type=user_cfg.filter_type,
+                        cols=user_cfg.filter_cols)
+            # Parse the downcast from the full cast
+            cast.parse_downcast(cast.filtered)
+            # Trim the soak period from the downcast
+            cast.trim_soak(cast.downcast,
+                           (user_cfg.soak_win * user_cfg.freq),
+                           user_cfg.soak_threshold)
+            # save pkl file
+            cast.trimmed.to_pickle(time_file)
+
+            # AS: 2024-09-05 - leaving this here for reference. Despiking is currently
+            # TBD for cast_tools post processing...
+            #
             # Remove any pressure spikes
-            bad_rows = converted_df["CTDPRS"].abs() > 6500
-            if bad_rows.any():
-                log.debug(f"{ssscc}: {bad_rows.sum()} bad pressure points removed.")
-            converted_df.loc[bad_rows, :] = np.nan
-            converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+            # bad_rows = converted_df["CTDPRS"].abs() > 6500
+            # if bad_rows.any():
+            #     log.debug(f"{cast_id}: {bad_rows.sum()} bad pressure points removed.")
+            # converted_df.loc[bad_rows, :] = np.nan
+            # converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
 
-            # Trim to times when rosette is in water
-            trimmed_df = process_ctd.remove_on_deck(
-                converted_df,
-                ssscc,
-                log_file=cfg.dirs["logs"] + "ondeck_pressure.csv",
-            )
+            # Merge in new details and offsets values
+            cast_details_all = (pd.concat([cast_details_all, cast.get_details()])
+                                .drop_duplicates(['cast_id'], keep='last')
+                                .sort_values(by=['cast_id']))
+            p_offsets_all = (pd.concat([p_offsets_all,
+                                       cast.get_pressure_offsets(cast.proc,
+                                                                 user_cfg.cond_threshold,
+                                                                 user_cfg.freq)])
+                             .drop_duplicates(['cast_id'], keep='last')
+                             .sort_values(by=['cast_id']))
 
-            # align_cols = [cfg.column[x] for x in ["c1", "c2"]]  # "dopl" -> "CTDOXY1"
-
-            # if not c1_col in raw_data.dtype.names:
-            #     print('c1_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, c1_col, float(tc1_align))
-            # if not c2_col in raw_data.dtype.names:
-            #     print('c2_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, c2_col, float(tc2_align))
-            # if not dopl_col in raw_data.dtype.names:
-            #     print('do_col data not found, skipping')
-            # else:
-            #     raw_data = process_ctd.ctd_align(raw_data, dopl_col, float(do_align))
-
-            # Filter data
-            filter_data = process_ctd.raw_ctd_filter(
-                trimmed_df,
-                window="triangle",
-                parameters=cfg.filter_cols,
-            )
-
-            # Trim to downcast
-            cast_data = process_ctd.cast_details(
-                filter_data,
-                ssscc,
-                log_file=cfg.dirs["logs"] + "cast_details.csv",
-            )
-
-            cast_data.to_pickle(cfg.dirs["time"] + ssscc + "_time.pkl")
-
+    # Wrap up...
+    if new_casts is True:
+        log.info("Saving deck pressures and cast details.")
+        cast_details_all.to_csv(Path(datadir, 'logs/cast_details.csv'), index=False)
+        p_offsets_all.to_csv(Path(datadir, 'logs/ondeck_pressure.csv'), index=False)
 
 def make_btl_mean(ssscc_list):
     """
