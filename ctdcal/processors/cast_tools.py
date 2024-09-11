@@ -200,7 +200,7 @@ class Cast(object):
 
         Returns
         -------
-        float, float
+        DataFrame
         """
         # TODO: review algorithm for soundness and reliability, see if we can
         #     use pressure or something other than salinity, remove reliance
