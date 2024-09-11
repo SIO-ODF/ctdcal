@@ -12,11 +12,12 @@
 # ctdcal project
 
 The ctdcal project is a library primarily designed to process data from CTD casts and calibrate
-them against Niskin bottle samples.
+them against Niskin bottle samples. This project is currently a work in progress and not yet
+in public production.
 
-In the future, parts of the ctdcal library will be split off into additional packages,
-such as an "ocean sensors" package with Python implementations of conversion routines
-for in-situ sensors used for ocean measurement.
+A final public release is planned for 2025.
+
+To contribute or try using ctdcal for yourself, feel free to install it and reach a member of the [SIO-ODF group](https://github.com/orgs/SIO-ODF/people)!
 
 ---
 
