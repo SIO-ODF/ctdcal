@@ -1,4 +1,4 @@
-Copyright (c) 2021, The ODP working group and contributors
+Copyright (c) 2017-2024, The SIO-ODF working group and contributors.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
