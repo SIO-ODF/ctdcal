@@ -1,7 +1,31 @@
 # Change Log
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## v0.1.4b (unreleased)
+## v0.1.5b (2022-09-11)
+
+### Added
+* Unit tests for RINKO module
+* Added API entries for modules and functions with missing descriptions
+* Implemented new style of flagging file for all CTO discrete analyses
+* Began consolidation of settings and configuations into a single file
+* Additional method for soak detection in `cast_tools`
+* Added support for SeaBird turbidity and CDOM fluorometers
+* Added numerous warnings in case of discrete file abnormalities
+* Support to merge multiple `.hy1` bottle files
+* Param-vs-param and TS plots
+
+### Changed
+* Functionality and depreciation update for Python 3.11 (previously 3.8/3.9)
+* Updated CodeCOV functionality to no longer error out
+* Adjusted a number of pytest unit tests
+* Fixed bugs in oxygen fitting
+* Improved the QC tool
+
+### Removed
+* Numerous `TODO` markers, itemizing into [Github issues](https://github.com/SIO-ODF/ctdcal/issues)
+* Scratch folder
+
+## v0.1.4b (2022-11-23)
 
 ### Added
 * Logging messages of all levels are now logged to `ctdcal.log` file
