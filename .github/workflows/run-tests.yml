@@ -35,7 +35,7 @@ jobs:
           mypy -v --config-file pyproject.toml
       - name: Run pytest
         run: |
-          pytest -v --cov-report xml --cov=ctdcal ctdcal/tests/
+          pytest -v --cov-report xml --cov=ctdcal
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
