@@ -73,3 +73,11 @@ htmlcov/*
 
 __pycache__/
 ctdcal/_version.py
+
+# Branch temps #
+################
+
+data_old/
+SBE-profile-data/
+Cruise-Report_CE17007_CR_P-Croot_A02_GOSHIP.pdf
+SBE-profile-data-20241004T215946Z-001.zip
