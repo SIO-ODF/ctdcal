@@ -406,13 +406,26 @@ def make_depth_log(time_df, threshold=80):
     return True
 
 
-def make_ssscc_list(fname="data/ssscc.csv"):
+def make_ssscc_list(fname="data/ssscc.csv", prefix=None):
     """
     Attempt to automatically generate list of station/casts from raw files.
     """
     raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
     ssscc_list = sorted([f.stem for f in raw_files])
-    pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
+
+    if prefix=="CE17007_":
+        #   Remove prefixes and get into SSSCC format
+        #   There was an issue with station 23. Looks like it was done on the third cast.
+        #   Seems like for the scope of this project, we're assuming the rest of the stations
+        #   only had one cast.
+        modified_list = [
+            (entry.replace("CE17007_", "").replace("c", "03") if "c" in entry 
+            else entry.replace("CE17007_", "") + "01")
+            for entry in ssscc_list
+        ]
+        pd.Series(modified_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
+    else:
+        pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
 
     return ssscc_list
 

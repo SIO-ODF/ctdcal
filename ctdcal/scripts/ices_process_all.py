@@ -47,11 +47,11 @@ def ices_process_basic():
     #####
 
     # load station/cast list from file
-    # try:
-    #     ssscc_list = process_ctd.get_ssscc_list()
-    # except FileNotFoundError:
-    #     log.info("No ssscc.csv file found, generating from .hex file list")
-    #     ssscc_list = process_ctd.make_ssscc_list()
+    try:
+        ssscc_list = process_ctd.get_ssscc_list()
+    except FileNotFoundError:
+        log.info("No ssscc.csv file found, generating from .hex file list")
+        ssscc_list = process_ctd.make_ssscc_list(prefix="CE17007_")
 
     # convert raw .hex files
     # convert.hex_to_ctd(ssscc_list)
