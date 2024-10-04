@@ -9,13 +9,13 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import equations_sbe as sbe_eq
-from . import get_ctdcal_config
-from . import process_bottle as btl
-from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
+from ctdcal import equations_sbe as sbe_eq
+from ctdcal import get_ctdcal_config
+from ctdcal import process_bottle as btl
+from ctdcal import process_ctd as process_ctd
+from ctdcal import sbe_reader as sbe_rd
+from ctdcal.common import validate_dir
 from ctdcal.processors.cast_tools import Cast
-from .common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -127,10 +127,18 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    #   ICES some sort of fluorometer
+    "21": {
+        "short_name":"CTD_FLUOR",
+        "long_name":"FluoroWetlabWetstarSensor",
+        "units":"0-5VDC",
+        "type":"float64",
+    }
+
 }
 
 
-def hex_to_ctd(ssscc_list):
+def hex_to_ctd(ssscc_list, prefix = None):
     """
     Convert raw CTD data and export to .pkl files.
 
@@ -144,13 +152,27 @@ def hex_to_ctd(ssscc_list):
 
     """
     log.info("Converting .hex files")
-    for ssscc in ssscc_list:
-        if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
-            hexFile = cfg.dirs["raw"] + ssscc + ".hex"
-            xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
-            sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
-            converted_df = convertFromSBEReader(sbeReader, ssscc)
-            converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+    #   Probably a bad (weird?) approach, but we want the converted files to use SSSCC format
+    if prefix == "CE17007_":
+        print("If you can read this, then we're going into the prefix files and converting the hexes.")
+        modified_list = [
+            "CE17007_" + (entry[:-2] + "c" if entry.endswith("03") else entry[:-2])
+            for entry in ssscc_list]
+        for ssscc, mod in zip(ssscc_list, modified_list):
+            if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
+                hexFile = cfg.dirs["raw"] + mod + ".hex"
+                xmlconFile = cfg.dirs["raw"] + mod + ".XMLCON"
+                sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
+                converted_df = convertFromSBEReader(sbeReader, ssscc)
+                converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+    else:
+        for ssscc in ssscc_list:
+            if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
+                hexFile = cfg.dirs["raw"] + ssscc + ".hex"
+                xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
+                sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
+                converted_df = convertFromSBEReader(sbeReader, ssscc)
+                converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
 
     return True
 
