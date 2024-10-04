@@ -88,7 +88,7 @@ def import_data():
 @click.option(
     "-g",
     "--group",
-    type=click.Choice(["ODF", "PMEL"], case_sensitive=False),
+    type=click.Choice(["ODF", "PMEL", "ices"], case_sensitive=False),
     default="ODF",
 )
 # @click.option(
@@ -108,6 +108,10 @@ def process(group):
     elif group == "PMEL":
         # pmel_process()
         raise NotImplementedError
+    elif group == "ices":
+        from .scripts.ices_process_all import ices_process_basic
+        log.info("Starting ICES data processing run...")
+        ices_process_basic()
 
 
 @cli.command()
