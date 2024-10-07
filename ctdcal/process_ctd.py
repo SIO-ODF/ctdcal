@@ -11,7 +11,7 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import get_ctdcal_config, oxy_fitting
+from ctdcal import get_ctdcal_config, oxy_fitting
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -415,11 +415,13 @@ def make_ssscc_list(fname="data/ssscc.csv", prefix=None):
 
     if prefix=="CE17007_":
         #   Remove prefixes and get into SSSCC format
-        #   There was an issue with station 23. Looks like it was done on the third cast.
-        #   Seems like for the scope of this project, we're assuming the rest of the stations
-        #   only had one cast.
+        #   The following stations are MIA:
+        #   011, 015, 016, 017, 018, 019, 024, 030
+        #   032, 034, 036, 038, 067
+        #   The only CTD data included with a known cast issue is 023c, assuming cast 2
+        #   All other CTD data that is included is assumed to be cast 1 (as not otherwise documented)
         modified_list = [
-            (entry.replace("CE17007_", "").replace("c", "03") if "c" in entry 
+            (entry.replace("CE17007_", "").replace("c", "02") if "c" in entry 
             else entry.replace("CE17007_", "") + "01")
             for entry in ssscc_list
         ]
