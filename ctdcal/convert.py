@@ -156,7 +156,7 @@ def hex_to_ctd(ssscc_list, prefix = None):
     if prefix == "CE17007_":
         print("If you can read this, then we're going into the prefix files and converting the hexes.")
         modified_list = [
-            "CE17007_" + (entry[:-2] + "c" if entry.endswith("03") else entry[:-2])
+            "CE17007_" + (entry[:-2] + "c" if entry.endswith("02") else entry[:-2])
             for entry in ssscc_list]
         for ssscc, mod in zip(ssscc_list, modified_list):
             if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
