@@ -658,3 +658,109 @@ def export_ct1(df, ssscc_list):
             f.write("\n")
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")
+
+def export_ct_as_cnv(df):
+    """
+    Export continuous CTD data as .CNV file(s), as done during SBE data processing.
+    Developed with ICES formatting (45CE20170427) in mind:
+    * Append cast .hdr file to beginning of file with line prefix * or **, *end* goes right before the data
+    * Create sensor name and span for cast
+    * Append cast .xmlcon, reformatted 
+    * Append data table, tab delimited
+        The following parameters need to be calculated:
+        * Time, NMEA (seconds): timeQ
+        * Time, Elapsed (seconds): timeS
+        * Depth, salt water (m): depSM
+        * Practical Sal2 (PSU)
+        * Sigma-theta1, 2 (kg/m^3)
+        * Chen-Millero sound velocity (m/s), svCM
+        Leave non-alt aux sensors in V, as typically done for ODF
+
+    Parameters
+    ----------
+    df : DataFrame
+        Continuous CTD data
+
+    Returns
+    -------
+
+    Notes
+    -----
+    
+    """
+    #   Derive missing parameters
+    df["timeS: Time, Elapsed [seconds]"] = df["nmea_datetime"] - df["nmea_datetime"].iloc[0] #   timeS, must be done cast-by-cast
+    df["depSM: Depth [salt water, m]"] = -gsw.z_from_p(df["CTDPRS"],df["GPSLAT"])   #   depth in SeaWater (opposite of height)
+    df["CTDSAL2"] = gsw.SP_from_C(df['CTDCOND2'],df['CTDTMP2'],df['CTDPRS'])    #   s2
+    #   SA, CT for sigma0
+    df["sa1"] = gsw.SA_from_SP(df.CTDSAL, df.CTDPRS, df.GPSLON, df.GPSLAT)
+    df["sa2"] = gsw.SA_from_SP(df.CTDSAL2, df.CTDPRS, df.GPSLON, df.GPSLAT)
+    df["ct1"] = gsw.CT_from_t(df.sa1, df.CTDTMP1, df.CTDPRS)
+    df["ct2"] = gsw.CT_from_t(df.sa2, df.CTDTMP2, df.CTDPRS)
+    df["sigma-薜0: Density [sigma-theta, kg/m^3]"] = gsw.sigma0(df.sa1,df.ct1)
+    df["sigma-蕷1: Density, 2 [sigma-theta, kg/m^3]"] = gsw.sigma0(df.sa2,df.ct2)
+    #   Chen-Millero suggested by SBE from 1993 - known to have EOS-80 inconsistency.
+    #   TEOS-10 uses Roquet et al. 2015 for best, general sound speed equation
+    df["sv: Sound Velocity [Roquet et al. 2015, m/s]"] = gsw.sound_speed(df.sa1,df.ct1,df.CTDPRS)
+
+    #   At the end, cond needs to be in S/m (not mS/cm): 100/1000 conversion factor
+    df["c0S/m: Conductivity [S/m]"] = df["CTDCOND1"] / 10
+    df["c1S/m: Conductivity, 2 [S/m]"] = df["CTDCOND2"] / 10
+    df['timeQ: Time, NMEA [seconds]'] = df['nmea_datetime'] #   Copy this column, rather than renaming, for use in SSSCC loop
+
+    #   Rename all the columns to something reminescent of the .cnv file
+    df = df.rename(columns={
+        'CTDTMP1':'t090C: Temperature [ITS-90, deg C]',
+        'CTDTMP2':'t190C: Temperature, 2 [ITS-90, deg C]',
+        'CTDPRS':'prDM: Pressure, Digiquartz [db]',
+        'CTDSAL':'sal00: Salinity, Practical [PSU]',    
+        'CTDSAL2':'sal11: Salinity, Practical, 2 [PSU]',
+        'CTDOXY1':'sbeox0ML/L: Oxygen, SBE 43 [ml/l], WS = 2',
+        'CTDOXYVOLTS':'sbeox0V: Oxygen raw, SBE 43 [V]',
+        'CTD_FLUOR':'fluorV: Fluorometer volts [V]',    #   Returning as volts
+        'TURBIDITY':'turbV: Turbidity volts [V]',
+        'CTDXMISS':'CstarV: Transmissometer volts [V]',
+        'ALT':'altM: Altimeter [m]',
+        'REF_PAR': 'sparV: SPAR, Biospherical/Licor [V]', #   ODF almost never has to work with this and doesn't have an equation
+        # 'nmea_datetime':'timeQ: Time, NMEA [seconds]'
+    })
+
+    #   Now order everything as listed in the .CNV
+    keep_cols = [
+        'timeQ: Time, NMEA [seconds]',
+        'timeS: Time, Elapsed [seconds]',
+        'depSM: Depth [salt water, m]',
+        'prDM: Pressure, Digiquartz [db]',
+        't090C: Temperature [ITS-90, deg C]',
+        't190C: Temperature, 2 [ITS-90, deg C]',
+        'c0S/m: Conductivity [S/m]',
+        'c1S/m: Conductivity, 2 [S/m]',
+        'sal00: Salinity, Practical [PSU]',
+        'sal11: Salinity, Practical, 2 [PSU]',
+        'sbeox0V: Oxygen raw, SBE 43 [V]',
+        'fluorV: Fluorometer volts [V]',
+        'CstarV: Transmissometer volts [V]',
+        'turbV: Turbidity volts [V]',
+        'sparV: SPAR, Biospherical/Licor [V]',
+        'altM: Altimeter [m]',
+        'sal00: Salinity, Practical [PSU]',
+        'sal11: Salinity, Practical, 2 [PSU]',
+        'sbeox0ML/L: Oxygen, SBE 43 [ml/l], WS = 2',
+        'sv: Sound Velocity [Roquet et al. 2015, m/s]',
+        'sigma-薜0: Density [sigma-theta, kg/m^3]',
+        'sigma-蕷1: Density, 2 [sigma-theta, kg/m^3]',
+    ]
+
+    final_df = df[keep_cols]
+    spans = {col: (final_df[col].min(), final_df[col].max()) for col in keep_cols}
+
+    for ssscc in df.SSSCC.unique():
+        #   Get the amount of time that has incremented on each cast
+        #   Pressure average the cast data
+        #   Calculate the cast spans (seems like that is what SeaBird does)
+        #   Append the .hdr
+        #   Build the alternative .XMLCON
+        #   Tab-seperated data
+        #   Writeout complete .CNV for the cast
+        
+        pass
