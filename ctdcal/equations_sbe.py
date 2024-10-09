@@ -176,6 +176,7 @@ def sbe9(freq, t_probe, coefs, decimals=4):
         * (1 - (coefs["D1"] + coefs["D2"] * t_probe) * w)
         - 14.7
     )
+    p_dbar = coefs['Slope'] * p_dbar + coefs['Offset']
     return np.around(p_dbar, decimals)
 
 

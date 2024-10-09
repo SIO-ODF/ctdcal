@@ -406,32 +406,33 @@ def make_depth_log(time_df, threshold=80):
     return True
 
 
-def make_ssscc_list(fname="data/ssscc.csv"):
+def make_ssscc_list(datadir, inst):
     """
     Attempt to automatically generate list of station/casts from raw files.
     """
-    raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
+    fname = Path(datadir, 'ssscc.csv')
+    raw_files = Path(datadir, 'raw', inst).glob("*.hex")
     ssscc_list = sorted([f.stem for f in raw_files])
     pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
 
     return ssscc_list
 
 
-def get_ssscc_list(fname="data/ssscc.csv"):
+def get_ssscc_list(datadir):
     """
     Load a list of casts from a file.
 
     Parameters
     ----------
-    fname : path_like
-        Input file. Type is anything that can be interpreted by Python as a
-        path, such as a string or a Pathlib object.
+    datadir : str, Path-like
+        Top level of data directory
 
     Returns
     -------
     list
         Cast names or identifiers, as a list of strings.
     """
+    fname = Path(datadir, 'ssscc.csv')
     ssscc_list = []
     with open(fname, "r") as lines:
         for line in lines:

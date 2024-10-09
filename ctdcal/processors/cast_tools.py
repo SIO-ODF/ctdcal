@@ -21,7 +21,7 @@ class Cast(object):
     ----------
     cast_id : str
         Cast identifier.
-    datadir : str or Path-like
+    cnvdir : str or Path-like
         Data directory.
     p_col : str
         Name of pressure column.
@@ -35,23 +35,26 @@ class Cast(object):
         Upcast data trimmed of initial soak data.
     ondeck_trimmed : DataFrame
         Full cast data trimmed of on-deck intervals.
+    roll_filtered : DataFrame
+        Downcast or upcast data with roll filter applied.
     """
-    def __init__(self, cast_id, datadir):
+    def __init__(self, cast_id, cnvdir):
         self.cast_id = cast_id
-        self.datadir = datadir
+        self.cnvdir = cnvdir
         self.p_col = None
         self.proc = None
         self.downcast = None
         self.filtered = None
         self.trimmed = None
         self.ondeck_trimmed = None
+        self.roll_filtered = None
         self.load_cast()
 
     def load_cast(self):
         """
         Read the processed data into a dataframe.
         """
-        f = Path(self.datadir, 'converted/%s.pkl' % self.cast_id)
+        f = Path(self.cnvdir, '%s.pkl' % self.cast_id)
         self.proc = pd.read_pickle(f)
 
     def parse_downcast(self, data):
@@ -286,3 +289,23 @@ class Cast(object):
             self.p_col,
         ]
         self.ondeck_trimmed = data.iloc[start_df.index.max() : end_df.index.min()].copy()
+
+    def roll_filter(self, data, direction="down"):
+        """
+        Filter out heaving in CTD data due to ship rolls.
+
+        Parameters
+        ----------
+        data : DataFrame
+            CTD data
+        direction : str, optional
+            Direction of cast (i.e. "down" or "up" cast)
+        """
+        if direction == "down":
+            monotonic_sequence = data[self.p_col].expanding().max()
+        elif direction == "up":
+            monotonic_sequence = data[self.p_col].expanding().min()
+        else:
+            raise ValueError("direction must be one of (up, down)")
+
+        self.roll_filtered = data[data[self.p_col] == monotonic_sequence]
