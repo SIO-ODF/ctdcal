@@ -111,7 +111,7 @@ def ices_process_basic():
     #####
 
     #   ICES requires submissions as .CNV file, which has not been historically supported by ODF
-    process_ctd.export_ct_as_cnv(time_data_all)
+    process_ctd.export_ct_as_cnv(time_data_all, user_cfg)
 
     # export files for making cruise report figs
     # process_bottle.export_report_data(btl_data_all)

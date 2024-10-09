@@ -659,7 +659,7 @@ def export_ct1(df, ssscc_list):
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")
 
-def export_ct_as_cnv(df):
+def export_ct_as_cnv(df, user_cfg):
     """
     Export continuous CTD data as .CNV file(s), as done during SBE data processing.
     Developed with ICES formatting (45CE20170427) in mind:
@@ -689,7 +689,6 @@ def export_ct_as_cnv(df):
     
     """
     #   Derive missing parameters
-    df["timeS: Time, Elapsed [seconds]"] = df["nmea_datetime"] - df["nmea_datetime"].iloc[0] #   timeS, must be done cast-by-cast
     df["depSM: Depth [salt water, m]"] = -gsw.z_from_p(df["CTDPRS"],df["GPSLAT"])   #   depth in SeaWater (opposite of height)
     df["CTDSAL2"] = gsw.SP_from_C(df['CTDCOND2'],df['CTDTMP2'],df['CTDPRS'])    #   s2
     #   SA, CT for sigma0
@@ -743,24 +742,49 @@ def export_ct_as_cnv(df):
         'turbV: Turbidity volts [V]',
         'sparV: SPAR, Biospherical/Licor [V]',
         'altM: Altimeter [m]',
-        'sal00: Salinity, Practical [PSU]',
-        'sal11: Salinity, Practical, 2 [PSU]',
         'sbeox0ML/L: Oxygen, SBE 43 [ml/l], WS = 2',
         'sv: Sound Velocity [Roquet et al. 2015, m/s]',
         'sigma-薜0: Density [sigma-theta, kg/m^3]',
         'sigma-蕷1: Density, 2 [sigma-theta, kg/m^3]',
     ]
 
-    final_df = df[keep_cols]
-    spans = {col: (final_df[col].min(), final_df[col].max()) for col in keep_cols}
-
     for ssscc in df.SSSCC.unique():
+        ssscc_df = df[df["SSSCC"] == ssscc].copy()
         #   Get the amount of time that has incremented on each cast
+        ssscc_df["timeS: Time, Elapsed [seconds]"] = ssscc_df["nmea_datetime"] - ssscc_df["nmea_datetime"].iloc[0] #   timeS, must be done cast-by-cast
         #   Pressure average the cast data
+        #   Don't do the filter?
+        df_binned = binning_df(ssscc_df, p_column='prDM: Pressure, Digiquartz [db]', bin_size=1)
+        #   Backfilling - don't do this, since depth would need to be recalculated
+        # fill_rows = df_binned['prDM: Pressure, Digiquartz [db]'].isna()
+        # df_binned.loc[fill_rows, 'prDM: Pressure, Digiquartz [db]'] = df_binned[fill_rows].index.to_numpy()
+        # df_binned.bfill(inplace=True)
+        #   It's unclear what SBE's flag column is for. Keeping the flagging out of this.
+
         #   Calculate the cast spans (seems like that is what SeaBird does)
-        #   Append the .hdr
-        #   Build the alternative .XMLCON
-        #   Tab-seperated data
-        #   Writeout complete .CNV for the cast
-        
-        pass
+        final_df = df_binned[keep_cols].dropna(how="all").round(4)    #   Drop all the unneeded columns and rearrange the column order.
+        spans = {col: (final_df[col].min(), final_df[col].max()) for col in keep_cols}
+        #   Open the header to append
+        if ssscc == "02302":
+            fname = ssscc[0:3] + "c"
+        else:
+            fname = ssscc[0:3]
+        with open(user_cfg.datadir + '/raw/CE17007_' + fname + ".hdr","r") as f:
+            header_orig = f.read().replace("*END*\n","")
+        #   Write out the .CNV ascii file
+        with open(user_cfg.datadir + '/converted/CE17007_' + fname + ".cnv", 'w') as cnv:
+            cnv.write(header_orig)
+            cnv.write("* Processing by the SIO Oceanographic Data Facility using CTDCAL v0.1.5b.\n")
+            cnv.write("* File exported prior to calibration fitting, filtering, flagging, or other adjustments.\n")
+            cnv.write("* Pressure readings not filtered at the surface are not backfilled.\n")
+            cnv.write("* This data product is built to emulate SBE products, with some alterations for simplicity.\n")
+            for i in range(len(spans)-1):    #   Column names first
+                cnv.write(f"# name {i} = {list(spans.items())[i][0]}\n")
+            for i in range(len(spans)-1):
+                cnv.write(f"# span {i} = \t{list(spans.items())[i][1][0]},\t{list(spans.items())[i][1][1]}\n")
+            cnv.write("*END*\n")
+            #   Build the alternative .XMLCON -> Not necessary
+
+            #   Tab-seperated data
+            final_df.to_csv(cnv, sep='\t', header=False, index=False)
+
