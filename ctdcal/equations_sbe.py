@@ -157,6 +157,7 @@ def sbe9(freq, t_probe, coefs, decimals=4):
             ["T1", "T2", "T3", "T4", "T5"]
             + ["C1", "C2", "C3"]
             + ["D1", "D2"]
+            + ["Slope", "Offset"]   #   ALS caught this
             + ["AD590M", "AD590B"]
         ),
     )
@@ -176,6 +177,7 @@ def sbe9(freq, t_probe, coefs, decimals=4):
         * (1 - (coefs["D1"] + coefs["D2"] * t_probe) * w)
         - 14.7
     )
+    p_dbar = coefs["Slope"] * p_dbar + coefs["Offset"]  #   ALS caught this
     return np.around(p_dbar, decimals)
 
 
