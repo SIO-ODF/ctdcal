@@ -90,8 +90,8 @@ short_lookup = {
         "type": "float64",
     },
     "21": {
-        "short_name": "TURBIDITY",
-        "long_name": "A Turbidity instrument",
+        "short_name": "CTD_FLUOR",
+        "long_name": "A fluorometer instrument",
         "units": "0-5VDC",
         "type": "float64",
     },

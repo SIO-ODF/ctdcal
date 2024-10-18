@@ -32,6 +32,9 @@ def main():
     #####
     # Step 3: export data
     #####
+    # load in all bottle and time data into DataFrame
+    time_data_all = process_ctd.load_all_ctd_files(ssscc_list, cfg.datadir, INST)
+    process_ctd.export_ct_as_cnv(time_data_all, cfg.datadir, INST)
 
 
 

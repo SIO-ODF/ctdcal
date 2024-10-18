@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from . import get_ctdcal_config, oxy_fitting
+from .common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -442,7 +443,7 @@ def get_ssscc_list(datadir):
     return ssscc_list
 
 
-def load_all_ctd_files(ssscc_list):
+def load_all_ctd_files(ssscc_list, datadir, inst):
     """
     Load CTD files for station/cast list and merge into a dataframe.
 
@@ -460,12 +461,12 @@ def load_all_ctd_files(ssscc_list):
     df_list = []
     for ssscc in ssscc_list:
         log.info("Loading TIME data for station: " + ssscc + "...")
-        time_file = cfg.dirs["time"] + ssscc + "_time.pkl"
+        time_file = Path(datadir, 'time', inst, '%s_time.pkl' % ssscc)
         time_data = pd.read_pickle(time_file)
         time_data["SSSCC"] = str(ssscc)
-        time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
-            time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
-        )
+        # time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
+        #     time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
+        # )
         df_list.append(time_data)
         # print("** Finished TIME data station: " + ssscc + " **")
     df_data_all = pd.concat(df_list, axis=0, sort=False)
@@ -644,3 +645,139 @@ def export_ct1(df, ssscc_list):
             f.write("\n")
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")
+
+
+def export_ct_as_cnv(df, datadir, inst):
+    """
+    Export continuous CTD data as .CNV file(s), as done during SBE data processing.
+    Developed with ICES formatting (45CE20170427) in mind:
+    * Append cast .hdr file to beginning of file with line prefix * or **, *end* goes right before the data
+    * Create sensor name and span for cast
+    * Append cast .xmlcon, reformatted
+    * Append data table, tab delimited
+        The following parameters need to be calculated:
+        * Time, NMEA (seconds): timeQ
+        * Time, Elapsed (seconds): timeS
+        * Depth, salt water (m): depSM
+        * Practical Sal2 (PSU)
+        * Sigma-theta1, 2 (kg/m^3)
+        * Chen-Millero sound velocity (m/s), svCM
+        Leave non-alt aux sensors in V, as typically done for ODF
+
+    Parameters
+    ----------
+    df : DataFrame
+        Continuous CTD data
+
+    Returns
+    -------
+
+    Notes
+    -----
+
+    """
+    cnv_dir = validate_dir(Path(datadir, 'export', inst), create=True)
+    #   Derive missing parameters
+    df["depSM: Depth [salt water, m]"] = -gsw.z_from_p(df["CTDPRS"],
+                                                       df["GPSLAT"])  # depth in SeaWater (opposite of height)
+    df["CTDSAL2"] = gsw.SP_from_C(df['CTDCOND2'], df['CTDTMP2'], df['CTDPRS'])  # s2
+    #   SA, CT for sigma0
+    df["sa1"] = gsw.SA_from_SP(df.CTDSAL, df.CTDPRS, df.GPSLON, df.GPSLAT)
+    df["sa2"] = gsw.SA_from_SP(df.CTDSAL2, df.CTDPRS, df.GPSLON, df.GPSLAT)
+    df["ct1"] = gsw.CT_from_t(df.sa1, df.CTDTMP1, df.CTDPRS)
+    df["ct2"] = gsw.CT_from_t(df.sa2, df.CTDTMP2, df.CTDPRS)
+    df["sigma-theta00: Density [sigma-theta, kg/m^3]"] = gsw.sigma0(df.sa1, df.ct1)
+    df["sigma-theta11: Density, 2 [sigma-theta, kg/m^3]"] = gsw.sigma0(df.sa2, df.ct2)
+    #   Chen-Millero suggested by SBE from 1993 - known to have EOS-80 inconsistency.
+    #   TEOS-10 uses Roquet et al. 2015 for best, general sound speed equation
+    df["sv: Sound Velocity [Roquet et al. 2015, m/s]"] = gsw.sound_speed(df.sa1, df.ct1, df.CTDPRS)
+
+    #   At the end, cond needs to be in S/m (not mS/cm): 100/1000 conversion factor
+    df["c0S/m: Conductivity [S/m]"] = df["CTDCOND1"] / 10
+    df["c1S/m: Conductivity, 2 [S/m]"] = df["CTDCOND2"] / 10
+    df['timeQ: Time, NMEA [seconds]'] = df[
+        'nmea_datetime']  # Copy this column, rather than renaming, for use in SSSCC loop
+
+    #   Rename all the columns to something reminescent of the .cnv file
+    df = df.rename(columns={
+            'CTDTMP1': 't090C: Temperature [ITS-90, deg C]',
+            'CTDTMP2': 't190C: Temperature, 2 [ITS-90, deg C]',
+            'CTDPRS': 'prDM: Pressure, Digiquartz [db]',
+            'CTDSAL': 'sal00: Salinity, Practical [PSU]',
+            'CTDSAL2': 'sal11: Salinity, Practical, 2 [PSU]',
+            'CTDOXY1': 'sbeox0ML/L: Oxygen, SBE 43 [ml/l], WS = 2',
+            'CTDOXYVOLTS': 'sbeox0V: Oxygen raw, SBE 43 [V]',
+            'CTD_FLUOR': 'fluorV: Fluorometer volts [V]',  # Returning as volts
+            'TURBIDITY': 'turbV: Turbidity volts [V]',
+            'CTDXMISS': 'CstarV: Transmissometer volts [V]',
+            'ALT': 'altM: Altimeter [m]',
+            'REF_PAR': 'sparV: SPAR, Biospherical/Licor [V]',
+            # ODF almost never has to work with this and doesn't have an equation
+            # 'nmea_datetime':'timeQ: Time, NMEA [seconds]'
+    })
+
+    #   Now order everything as listed in the .CNV
+    keep_cols = [
+            'timeQ: Time, NMEA [seconds]',
+            'timeS: Time, Elapsed [seconds]',
+            'depSM: Depth [salt water, m]',
+            'prDM: Pressure, Digiquartz [db]',
+            't090C: Temperature [ITS-90, deg C]',
+            't190C: Temperature, 2 [ITS-90, deg C]',
+            'c0S/m: Conductivity [S/m]',
+            'c1S/m: Conductivity, 2 [S/m]',
+            'sal00: Salinity, Practical [PSU]',
+            'sal11: Salinity, Practical, 2 [PSU]',
+            'sbeox0V: Oxygen raw, SBE 43 [V]',
+            'fluorV: Fluorometer volts [V]',
+            'CstarV: Transmissometer volts [V]',
+            'turbV: Turbidity volts [V]',
+            'sparV: SPAR, Biospherical/Licor [V]',
+            'altM: Altimeter [m]',
+            'sbeox0ML/L: Oxygen, SBE 43 [ml/l], WS = 2',
+            'sv: Sound Velocity [Roquet et al. 2015, m/s]',
+            'sigma-theta00: Density [sigma-theta, kg/m^3]',
+            'sigma-theta11: Density, 2 [sigma-theta, kg/m^3]',
+    ]
+
+    for ssscc in df.SSSCC.unique():
+        ssscc_df = df[df["SSSCC"] == ssscc].copy()
+        #   Get the amount of time that has incremented on each cast
+        ssscc_df["timeS: Time, Elapsed [seconds]"] = ssscc_df["nmea_datetime"] - ssscc_df["nmea_datetime"].iloc[
+            0]  # timeS, must be done cast-by-cast
+        #   Pressure average the cast data
+        #   Don't do the filter?
+        df_binned = binning_df(ssscc_df, p_column='prDM: Pressure, Digiquartz [db]', bin_size=1)
+        #   Backfilling - don't do this, since depth would need to be recalculated
+        # fill_rows = df_binned['prDM: Pressure, Digiquartz [db]'].isna()
+        # df_binned.loc[fill_rows, 'prDM: Pressure, Digiquartz [db]'] = df_binned[fill_rows].index.to_numpy()
+        # df_binned.bfill(inplace=True)
+        #   It's unclear what SBE's flag column is for. Keeping the flagging out of this.
+
+        #   Calculate the cast spans (seems like that is what SeaBird does)
+        final_df = df_binned[keep_cols].dropna(how="all").round(
+            4)  # Drop all the unneeded columns and rearrange the column order.
+        spans = {col: (final_df[col].min(), final_df[col].max()) for col in keep_cols}
+        #   Open the header to append
+        # if ssscc == "02302":
+        #     fname = ssscc[0:3] + "c"
+        # else:
+        #     fname = ssscc[0:3]
+        with open('%s/raw/%s/%s.hdr' % (datadir, inst, ssscc), 'r') as f:
+            header_orig = f.read().replace("*END*\n", "")
+        #   Write out the .CNV ascii file
+        with open('%s/%s.cnv' % (cnv_dir, ssscc), 'w') as cnv:
+            cnv.write(header_orig)
+            cnv.write("* Processing by the [Participant 15]\n")
+            cnv.write("* File exported prior to calibration fitting, filtering, flagging, or other adjustments.\n")
+            cnv.write("* Pressure readings not filtered at the surface are not backfilled.\n")
+            cnv.write("* This data product is built to emulate SBE products, with some alterations for simplicity.\n")
+            for i in range(len(spans) - 1):  # Column names first
+                cnv.write(f"# name {i} = {list(spans.items())[i][0]}\n")
+            for i in range(len(spans) - 1):
+                cnv.write(f"# span {i} = \t{list(spans.items())[i][1][0]},\t{list(spans.items())[i][1][1]}\n")
+            cnv.write("*END*\n")
+            #   Build the alternative .XMLCON -> Not necessary
+
+            #   Tab-seperated data
+            final_df.to_csv(cnv, sep='\t', header=False, index=False)
