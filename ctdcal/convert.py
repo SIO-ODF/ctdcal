@@ -10,14 +10,12 @@ import numpy as np
 import pandas as pd
 
 from . import equations_sbe as sbe_eq
-from . import get_ctdcal_config
 from . import process_bottle as btl
-from . import process_ctd as process_ctd
 from . import sbe_reader as sbe_rd
 from ctdcal.processors.cast_tools import Cast
-from .common import validate_dir
+from ctdcal.common import validate_dir
 
-cfg = get_ctdcal_config()
+# cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 # lookup table for sensor data
@@ -91,6 +89,12 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    "21": {
+        "short_name": "CTD_FLUOR",
+        "long_name": "A fluorometer instrument",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
     "42": {
         "short_name": "PAR",
         "long_name": "PAR/Irradiance, Biospherical/Licor",
@@ -130,7 +134,7 @@ short_lookup = {
 }
 
 
-def hex_to_ctd(ssscc_list):
+def hex_to_ctd(ssscc_list, inst, cfg):
     """
     Convert raw CTD data and export to .pkl files.
 
@@ -145,17 +149,19 @@ def hex_to_ctd(ssscc_list):
     """
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
-        if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
-            hexFile = cfg.dirs["raw"] + ssscc + ".hex"
-            xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
+        rawdir = Path(cfg.datadir, 'raw', inst)
+        cnvdir = validate_dir(Path(cfg.datadir, 'converted', inst), create=True)
+        if not Path(cnvdir, "%s.pkl" % ssscc).exists():
+            hexFile = Path(rawdir, "%s.hex" % ssscc)
+            xmlconFile = Path(rawdir, "%s.XMLCON" % ssscc)
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader, ssscc)
-            converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+            converted_df.to_pickle(Path(cnvdir, "%s.pkl" % ssscc))
 
     return True
 
 
-def make_time_files(casts, datadir, user_cfg):
+def make_time_files(casts, datadir, inst, user_cfg):
     """
     Make continuous time-series files from processed cast data.
 
@@ -175,10 +181,12 @@ def make_time_files(casts, datadir, user_cfg):
     """
     log.info("Generating time.pkl files")
     # validate time directory
-    time_dir = validate_dir(Path(datadir, 'time'), create=True)
+    time_dir = validate_dir(Path(datadir, 'time', inst), create=True)
+    log_dir = validate_dir(Path(datadir, 'logs', inst), create=True)
+    cnv_dir = Path(datadir, 'converted', inst)
     # groundwork for writing any new details or offsets
-    details_file = Path(datadir, 'logs/cast_details.csv')
-    offsets_file = Path(datadir, 'logs/ondeck_pressure.csv')
+    details_file = Path(log_dir, 'cast_details.csv')
+    offsets_file = Path(log_dir, 'ondeck_pressure.csv')
     new_casts = False
     if details_file.exists():
         cast_details_all = pd.read_csv(details_file, dtype='str')
@@ -194,7 +202,7 @@ def make_time_files(casts, datadir, user_cfg):
         time_file = Path(time_dir, '%s_time.pkl' % cast_id)
         if not time_file.exists():
             new_casts = True
-            cast = Cast(cast_id, datadir)
+            cast = Cast(cast_id, cnv_dir)
             cast.p_col = 'CTDPRS'
             # Apply smoothing filter
             cast.filter(cast.proc,
@@ -237,7 +245,7 @@ def make_time_files(casts, datadir, user_cfg):
         cast_details_all.to_csv(Path(datadir, 'logs/cast_details.csv'), index=False)
         p_offsets_all.to_csv(Path(datadir, 'logs/ondeck_pressure.csv'), index=False)
 
-def make_btl_mean(ssscc_list):
+def make_btl_mean(ssscc_list, inst, cfg):
     """
     Create "bottle mean" files from continuous CTD data averaged at the bottle stops.
 
@@ -253,8 +261,10 @@ def make_btl_mean(ssscc_list):
     """
     log.info("Generating btl_mean.pkl files")
     for ssscc in ssscc_list:
-        if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
-            imported_df = pd.read_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+        cnvdir = Path(cfg.datadir, 'converted', inst)
+        btldir = Path(cfg.datadir, 'bottle', inst)
+        if not Path(btldir, "%s_btl_mean.pkl" % ssscc).exists():
+            imported_df = pd.read_pickle(Path(cnvdir, "%s.pkl" % ssscc))
             bottle_df = btl.retrieveBottleData(imported_df)
             mean_df = btl.bottle_mean(bottle_df)
 
