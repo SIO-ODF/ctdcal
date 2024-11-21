@@ -24,6 +24,27 @@ BOTTLE_FIRE_COL = "btl_fire"
 BOTTLE_FIRE_NUM_COL = "btl_fire_num"
 
 
+def _get_bottle_order_from_bl_file(bl_file):
+    """
+    Helper function to get bottle firing order from the Sea Bird .bl file, which
+    is the best source when bottles have been fired non-sequentially.
+
+    :param ssscc: string - station/cast identifier
+    :return: pandas dataframe object
+    """
+    btl_fire_order = [0]
+    btl_fire_num = [0]
+    with open(bl_file, 'r') as bl:
+        for line in bl:
+            line = line.split(',')
+            try:
+                int(line[0])
+            except ValueError:
+                continue
+            btl_fire_order.append(int(line[0]))  # index of first bottle fired
+            btl_fire_num.append(int(line[1]))  # number of first bottle fired
+    return pd.DataFrame(btl_fire_num, index=btl_fire_order, columns=['btl_fire_num'])
+
 def retrieveBottleDataFromFile(converted_file):
     """
     Retrieve the bottle data from a converted file.
@@ -33,12 +54,13 @@ def retrieveBottleDataFromFile(converted_file):
     return retrieveBottleData(converted_df)
 
 
-def retrieveBottleData(converted_df):
+def retrieveBottleData(converted_df, bl_file):
     """
     Retrieve the bottle data from a dataframe created from a converted file.
 
     Looks for changes in the BOTTLE_FIRE_COL column, ready to be averaged in making the CTD bottle file.
     """
+    bl = _get_bottle_order_from_bl_file(bl_file)
     if BOTTLE_FIRE_COL in converted_df.columns:
         converted_df[BOTTLE_FIRE_NUM_COL] = (
             (
@@ -52,12 +74,12 @@ def retrieveBottleData(converted_df):
             .cumsum()
         )
         # converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL] == False)).astype(int).cumsum()
+        converted_df[BOTTLE_FIRE_NUM_COL] = bl.loc[converted_df[BOTTLE_FIRE_NUM_COL]].values
         return converted_df.loc[converted_df[BOTTLE_FIRE_COL]]
         # return converted_df
     else:
         log.error("Bottle fire column:", BOTTLE_FIRE_COL, "not found")
-
-    return pd.DataFrame()  # empty dataframe
+        return pd.DataFrame()  # empty dataframe
 
 
 def bottle_mean(btl_df):

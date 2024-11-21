@@ -9,9 +9,9 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import equations_sbe as sbe_eq
-from . import process_bottle as btl
-from . import sbe_reader as sbe_rd
+from ctdcal import equations_sbe as sbe_eq
+from ctdcal import process_bottle as btl
+from ctdcal import sbe_reader as sbe_rd
 from ctdcal.processors.cast_tools import Cast
 from ctdcal.common import validate_dir
 
@@ -260,16 +260,23 @@ def make_btl_mean(ssscc_list, inst, cfg):
         bottle averaging of mean has finished successfully
     """
     log.info("Generating btl_mean.pkl files")
+    # validate bottle directory
+    btl_dir = validate_dir(Path(cfg.datadir, 'bottle', inst), create=True)
+    log_dir = validate_dir(Path(cfg.datadir, 'logs', inst), create=True)
+    cnv_dir = Path(cfg.datadir, 'converted', inst)
+    raw_dir = Path(cfg.datadir, 'raw', inst)
     for ssscc in ssscc_list:
-        cnvdir = Path(cfg.datadir, 'converted', inst)
-        btldir = Path(cfg.datadir, 'bottle', inst)
-        if not Path(btldir, "%s_btl_mean.pkl" % ssscc).exists():
-            imported_df = pd.read_pickle(Path(cnvdir, "%s.pkl" % ssscc))
-            bottle_df = btl.retrieveBottleData(imported_df)
-            mean_df = btl.bottle_mean(bottle_df)
+        btl_file = Path(btl_dir, "%s_btl_mean.pkl" % ssscc)
+        if not btl_file.exists():
+            imported_df = pd.read_pickle(Path(cnv_dir, "%s.pkl" % ssscc))
+            bl_file = Path(raw_dir, "%s.bl" % ssscc)
+            bottle_df = btl.retrieveBottleData(imported_df, bl_file)
+            # mean_df = btl.bottle_mean(bottle_df)
+            mean_df = bottle_df.groupby('btl_fire_num', as_index=False).mean()
+            mean_df.to_pickle(btl_file)
 
             # export bottom bottle time/lat/lon info
-            fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
+            fname = Path(cfg.datadir, 'logs', 'bottom_bottle_details.csv')
             datetime_col = "nmea_datetime"
             if datetime_col not in mean_df.columns:
                 log.debug(
@@ -284,7 +291,6 @@ def make_btl_mean(ssscc_list, inst, cfg):
             with open(fname, "a") as f:
                 bot_df.to_csv(f, mode="a", header=add_header, index=False)
 
-            mean_df.to_pickle(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
 
