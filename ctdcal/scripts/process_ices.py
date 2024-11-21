@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from ctdcal import (
     convert,
-    process_ctd,
+    process_ctd, process_bottle,
 )
 from ctdcal.common import load_user_config, validate_file
 
@@ -36,6 +36,9 @@ def main():
 
     # make bottle files
     convert.make_btl_mean(ssscc_list, INST, cfg)
+
+    # generate reftemp .csv files
+    process_bottle.process_reft(ssscc_list, cfg.datadir, 'reft')
 
 if __name__ == "__main__":
     main()

@@ -16,6 +16,7 @@ import pandas as pd
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import oxy_fitting as oxy_fitting
+from ctdcal.common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -312,7 +313,7 @@ def load_all_btl_files(ssscc_list, cols=None):
     return df_data_all
 
 
-def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
+def _reft_loader(ssscc, search_dir):
     """
     Loads SBE35.cap files and assembles into a dataframe.
 
@@ -320,7 +321,7 @@ def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
     ----------
     ssscc : str
         Station to load .CAP file for
-    reft_dir : str, pathlib Path
+    search_dir : str, pathlib Path
         Path to the reft folder 
 
     Returns
@@ -329,9 +330,9 @@ def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
         DataFrame of .CAP file with headers
 
     """
-    # semi-flexible search for reft file (in the form of *ssscc.cap)
+    # semi-flexible search for reft file (in the form of *ssscc.cap OR .txt)
     try:
-        reft_path = sorted(Path(reft_dir).glob(f"*{ssscc}.cap"))[0]
+        reft_path = sorted(Path(search_dir).glob(f"*{ssscc}.[ct][ax][pt]"))[0]
     except IndexError:
         raise FileNotFoundError
 
@@ -413,7 +414,7 @@ def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
     return reftDF
 
 
-def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
+def process_reft(ssscc_list, data_dir, inst):
     """
     SBE35 reference thermometer processing function. Load in .cap files for given
     station/cast list, perform basic flagging, and export to .csv files.
@@ -422,15 +423,18 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
     -------
     ssscc_list : list of str
         List of stations to process
-    reft_dir : str, optional
+    raw_dir : str, optional
         Path to folder containing raw salt files (defaults to data/reft/)
 
     """
+    raw_dir = Path(data_dir, 'raw', inst)
+    out_dir = validate_dir(Path(data_dir, 'converted', inst), create=True)
     for ssscc in ssscc_list:
-        if not Path(reft_dir + ssscc + "_reft.csv").exists():
+        fname = Path(out_dir, "%s_reft.csv" % ssscc)
+        if not fname.exists():
             try:
-                reftDF = _reft_loader(ssscc, reft_dir)
-                reftDF.to_csv(reft_dir + ssscc + "_reft.csv", index=False)
+                reftDF = _reft_loader(ssscc, raw_dir)
+                reftDF.to_csv(fname, index=False)
             except FileNotFoundError:
                 log.warning(
                     "refT file for cast " + ssscc + " does not exist... skipping"
