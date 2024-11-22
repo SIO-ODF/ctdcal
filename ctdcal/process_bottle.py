@@ -152,10 +152,12 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
     Loads salt_file to dataframe and reindexes to match bottle data dataframe
     """
     salt_data = pd.read_csv(
-        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"]
+        salt_file, usecols=["SAMPNO", "SALNTY"]
     )
     salt_data.set_index(index_name)
-    salt_data["SSSCC_SALT"] = Path(salt_file).stem.split("_")[0]
+    # TODO instead of adding this col here, (and fussing with string manipulation),
+    #  just return the df as is and let the calling function handle it
+    salt_data["SSSCC_SALT"] = Path(salt_file).stem.replace('_salts', '')
     salt_data.rename(columns={"SAMPNO": "SAMPNO_SALT"}, inplace=True)
 
     return salt_data
@@ -239,7 +241,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             )
             refc_data = pd.DataFrame(
                 index=btl_data.index,
-                columns=["CRavg", "BathTEMP", "BTLCOND"],
+                columns=["SALNTY", "BTLCOND"],
                 dtype=float,
             )
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)

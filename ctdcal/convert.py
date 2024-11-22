@@ -561,6 +561,31 @@ def to_temperature(raw, manufacturer, sensor, coefs):
             pass
 
 
+def sal_to_cond(sal, ref_t, btl_p):
+    """
+    Convert salinity to conductivity using GSW conversion routines.
+
+    Parameters
+    ----------
+    sal : float
+        practical salinity
+    ref_t : float
+        CTD temperature, deg C
+    btl_p : float
+        CTD pressure, dbar
+
+    Returns
+    -------
+    float
+    """
+    cond = gsw.C_from_SP(sal, ref_t, btl_p)
+
+    # ignore RunTimeWarning from (np.nan <= 1)
+    with np.errstate(invalid="ignore"):
+        cond[cond <= 1] = np.nan
+
+    return cond
+
 def CR_to_cond(cr, bath_t, ref_t, btl_p):
     """
     Convert AutoSal double conductivity ratio (CR) to conductivity using

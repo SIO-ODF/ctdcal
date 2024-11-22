@@ -517,10 +517,9 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
 
     """
     log.info("Calibrating conductivity")
-    # calculate BTLCOND values from autosal data
-    btl_df[cfg.column["refC"]] = convert.CR_to_cond(
-        btl_df["CRavg"],
-        btl_df["BathTEMP"],
+    # calculate BTLCOND values from lab salinity
+    btl_df[cfg.column["refC"]] = convert.sal_to_cond(
+        btl_df["SALNTY"],
         btl_df[cfg.column["t1"]],
         btl_df[cfg.column["p"]],
     )
