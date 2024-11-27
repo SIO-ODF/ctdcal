@@ -8,11 +8,12 @@ import pandas as pd
 
 from ctdcal.common import validate_dir
 
-
-def parse_salinity(infile, datadir, inst, cast_list, cast_id_col="Cast", btlnum_col="Bottle Number", sal_col="Salinity"):
-    outdir = validate_dir(Path(datadir, 'converted', inst), create=True)
-    data = pd.read_excel(infile, usecols=[cast_id_col, btlnum_col, sal_col])
-    data.rename(columns={btlnum_col: "SAMPNO", sal_col: "SALNTY"}, inplace=True)
+def parse_discrete(infile, cnvdir, name, cast_list, colname, export_colname, cast_id_col="Cast", btlnum_col="Bottle Number"):
+    outdir = validate_dir(Path(cnvdir), create=True)
+    data = pd.read_excel(infile, usecols=[cast_id_col, btlnum_col, colname])
+    data.rename(columns={btlnum_col: "SAMPNO", colname: export_colname}, inplace=True)
     for cast_id in cast_list:
-        outfile = Path(outdir, '%s_salts.csv' % cast_id)
-        data.loc[(data[cast_id_col] == cast_id) & (data['SALNTY'].notnull())].to_csv(outfile, columns=["SAMPNO", "SALNTY"], index=False)
+        outfile = Path(outdir, '%s_%s.csv' % (cast_id, name))
+        outdata = data.loc[(data[cast_id_col] == cast_id) & (data[export_colname].notnull())]
+        if len(outdata) > 0:
+            outdata.to_csv(outfile, columns=["SAMPNO", export_colname], index=False)

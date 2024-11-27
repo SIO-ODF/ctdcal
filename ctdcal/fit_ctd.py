@@ -18,17 +18,18 @@ from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
+from .common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
 
-def load_fit_yaml(fname=f"{cfg.dirs['logs']}fit_coefs.yaml", to_object=False):
+def load_fit_yaml(fname, to_object=False):
     """Load polynomial fit order information from .yaml file."""
 
     if not Path(fname).exists():
         log.warning("Warning: Coefficients fit order YAML does not exist. Generating from scratch...")
-        generate_yaml()
+        generate_yaml(fname)
 
     with open(fname, "r") as f:
         ymlfile = yaml.safe_load(f)
@@ -38,7 +39,7 @@ def load_fit_yaml(fname=f"{cfg.dirs['logs']}fit_coefs.yaml", to_object=False):
     else:
         return ymlfile
 
-def generate_yaml(fname="fit_coefs.yaml", outdir=cfg.dirs['logs']):
+def generate_yaml(fname):
     """
     Create a default coeff. yaml file.
     """
@@ -76,7 +77,7 @@ def generate_yaml(fname="fit_coefs.yaml", outdir=cfg.dirs['logs']):
     }
 
     # Write the data to a YAML file
-    with open(outdir + fname, 'w') as file:
+    with open(fname, 'w') as file:
         yaml.dump(data, file, default_flow_style=False)
 
 def write_fit_yaml():
@@ -360,7 +361,7 @@ def apply_polyfit(y, y_coefs, *args):
     return fitted_y
 
 
-def calibrate_temp(btl_df, time_df):
+def calibrate_temp(btl_df, time_df, datadir, inst, cast_list):
     """
     Least-squares fit CTD temperature data against reference data.
 
@@ -376,19 +377,20 @@ def calibrate_temp(btl_df, time_df):
 
     """
     log.info("Calibrating temperature")
-    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_t*.csv"))
+    fit_dir = validate_dir(Path(datadir, 'fit', inst), create=True)
+    fit_groups_dir = Path(datadir, 'fit_groups', inst)
+    validate_dir(fit_groups_dir, create=True)
+    ssscc_subsets = sorted(fit_groups_dir.glob("ssscc_t*.csv"))
     if not ssscc_subsets:  # if no t-segments exists, write one from full list
         log.debug(
             "No CTDTMP grouping file found... creating ssscc_t1.csv with all casts"
         )
-        if not Path(cfg.dirs["ssscc"]).exists():
-            Path(cfg.dirs["ssscc"]).mkdir()
-        ssscc_list = process_ctd.get_ssscc_list()
-        ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_t1.csv")]
-        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
+        ssscc_subsets = [Path(fit_groups_dir, "ssscc_t1.csv")]
+        pd.Series(cast_list).to_csv(ssscc_subsets[0], header=None, index=False)
 
-    fit_yaml = load_fit_yaml()  # load fit polynomial order
-    for tN in ["t1", "t2"]:
+    fit_yaml = load_fit_yaml(Path(fit_groups_dir, 'fit_coeffs.yml'))  # load fit polynomial order
+    for tN in ['CTDTMP1', 'CTDTMP2']:
+        fig_dir = validate_dir(Path(datadir, 'fig', 'inst', tN), create=True)
         T_flag, T_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:
             # 0) load ssscc subset to be fit together
@@ -402,12 +404,12 @@ def calibrate_temp(btl_df, time_df):
             # 1) plot pre-fit residual
             f_stem = f.stem  # get "ssscc_t*" from path
             ctd_plots._intermediate_residual_plot(
-                btl_df.loc[btl_rows, cfg.column["refT"]]
-                - btl_df.loc[btl_rows, cfg.column[tN]],
-                btl_df.loc[btl_rows, cfg.column["p"]],
+                btl_df.loc[btl_rows, "REFTMP"]
+                - btl_df.loc[btl_rows, tN],
+                btl_df.loc[btl_rows, "CTDPRS"],
                 btl_df.loc[btl_rows, "SSSCC"],
                 xlabel=f"{tN.upper()} Residual (T90 C)",
-                f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}_prefit.pdf",
+                f_out=Path(fig_dir, f"{tN}residual_{f_stem}_prefit.pdf"),
             )
 
             # 2) prepare data for fitting
@@ -415,16 +417,16 @@ def calibrate_temp(btl_df, time_df):
             # left here for future debugging (if necessary)
             df_good, df_bad = _prepare_fit_data(
                 btl_df[good_rows],
-                cfg.column[tN],
-                cfg.column["refT"],
+                tN,
+                "REFTMP",
                 zRange=fit_yaml[tN][f_stem]["zRange"],
             )
             ctd_plots._intermediate_residual_plot(
                 df_good["Diff"],
-                df_good[cfg.column["p"]],
+                df_good["CTDPRS"],
                 df_good["SSSCC"],
                 xlabel=f"{tN.upper()} Residual (T90 C)",
-                f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}_fit_data.pdf",
+                f_out=Path(fig_dir, f"{tN}residual_{f_stem}_fit_data.pdf"),
             )
 
             # 3) calculate fit coefs
@@ -432,31 +434,31 @@ def calibrate_temp(btl_df, time_df):
             T_order = fit_yaml[tN][f_stem]["T_order"]
             coef_dict = multivariate_fit(
                 df_good["Diff"],
-                (df_good[cfg.column["p"]], P_order),
-                (df_good[cfg.column[tN]], T_order),
+                (df_good["CTDPRS"], P_order),
+                (df_good[tN], T_order),
                 coef_names=["cp", "ct"],
             )
 
             # 4) apply fit
             P_coefs = tuple(coef_dict[f"cp{n}"] for n in np.arange(1, P_order + 1))
             T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1))
-            btl_df.loc[btl_rows, cfg.column[tN]] = apply_polyfit(
-                btl_df.loc[btl_rows, cfg.column[tN]],
+            btl_df.loc[btl_rows, tN] = apply_polyfit(
+                btl_df.loc[btl_rows, tN],
                 (coef_dict["c0"],) + T_coefs,
-                (btl_df.loc[btl_rows, cfg.column["p"]], P_coefs),
+                (btl_df.loc[btl_rows, "CTDPRS"], P_coefs),
             )
-            time_df.loc[time_rows, cfg.column[tN]] = apply_polyfit(
-                time_df.loc[time_rows, cfg.column[tN]],
+            time_df.loc[time_rows, tN] = apply_polyfit(
+                time_df.loc[time_rows, tN],
                 (coef_dict["c0"],) + T_coefs,
-                (time_df.loc[time_rows, cfg.column["p"]], P_coefs),
+                (time_df.loc[time_rows, "CTDPRS"], P_coefs),
             )
 
             # 4.5) flag CTDTMP and make residual plots
             df_ques, df_bad = _flag_btl_data(
                 btl_df[btl_rows],
-                param=cfg.column[tN],
-                ref=cfg.column["refT"],
-                f_out=f"{cfg.fig_dirs[tN]}residual_{f_stem}.pdf",
+                param=tN,
+                ref="REFTMP",
+                f_out=Path(f"{tN}residual_{f_stem}.pdf"),
             )
 
             # 5) handle quality flags
@@ -474,22 +476,22 @@ def calibrate_temp(btl_df, time_df):
 
         # one more fig with all cuts
         ctd_plots._intermediate_residual_plot(
-            btl_df[cfg.column["refT"]] - btl_df[cfg.column[tN]],
-            btl_df[cfg.column["p"]],
+            btl_df["REFTMP"] - btl_df[tN],
+            btl_df["CTDPRS"],
             btl_df["SSSCC"],
             xlabel=f"{tN.upper()} Residual (T90 C)",
             show_thresh=True,
-            f_out=f"{cfg.fig_dirs[tN]}residual_all_postfit.pdf",
+            f_out=Path(fig_dir, "residual_all_postfit.pdf"),
         )
 
         # export temp quality flags
-        T_flag.sort_index().to_csv(f"{cfg.dirs['logs']}qual_flag_{tN}.csv", index=False)
+        T_flag.sort_index().to_csv(Path(fit_dir, f"qual_flag_{tN}.csv"), index=False)
 
         # export temp fit params (formated to 5 sig figs, scientific notation)
         T_fit_coefs[coef_names] = T_fit_coefs[coef_names].applymap(
             lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
         )
-        T_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{tN}.csv", index=False)
+        T_fit_coefs.to_csv(Path(fit_dir, f"fit_coef_{tN}.csv"), index=False)
 
     # flag temperature data
     time_df["CTDTMP_FLAG_W"] = 2

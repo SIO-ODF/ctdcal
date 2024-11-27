@@ -335,7 +335,7 @@ def _get_pressure_offset(start_vals, end_vals):
     return p_off
 
 
-def apply_pressure_offset(df, p_col="CTDPRS"):
+def apply_pressure_offset(df, datadir, p_col="CTDPRS"):
     """
     Calculate pressure offset using deck pressure log and apply it to the data.
     Pressure flag column is added with value 2, indicating the data are calibrated.
@@ -353,19 +353,21 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
         DataFrame containing updated pressure values and a new flag column
 
     """
+    logfile = Path(datadir, 'logs', 'ondeck_pressure.csv')
     p_log = pd.read_csv(
-        cfg.dirs["logs"] + "ondeck_pressure.csv",
+        logfile,
         dtype={"cast_id": str},
         na_values="Started in Water",
     )
     p_offset = _get_pressure_offset(p_log['pressure_start'], p_log['pressure_end'])
+    print('Average pressure offset is: %s' % p_offset)
     df[p_col] += p_offset
     df[p_col + "_FLAG_W"] = 2
 
     return df
 
 
-def make_depth_log(time_df, threshold=80):
+def make_depth_log(time_df, datadir, threshold=80):
     """
     Create depth log file from maximum depth of each station/cast in time DataFrame.
     If rosette does not get within the threshold distance of the bottom, returns NaN.
@@ -401,7 +403,7 @@ def make_depth_log(time_df, threshold=80):
         .astype(int)
     )
     bottom_df[["SSSCC", "DEPTH"]].to_csv(
-        cfg.dirs["logs"] + "depth_log.csv", index=False
+        Path(datadir, 'logs', "depth_log.csv"), index=False
     )
 
     return True

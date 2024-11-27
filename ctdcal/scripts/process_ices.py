@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import logging
+from pathlib import Path
+
 from ctdcal import (
     convert,
     process_ctd, process_bottle,
 )
 from ctdcal.common import load_user_config, validate_file
+from ctdcal.fit_ctd import calibrate_temp
 
-import logging
-
-from ctdcal.parsers.all_bottle_xlsx import parse_salinity
+from ctdcal.parsers.all_bottle_xlsx import parse_discrete
 
 log = logging.getLogger(__name__)
 
@@ -25,27 +27,54 @@ def main():
     except FileNotFoundError:
         log.info("No ssscc.csv file found, generating from .hex file list")
         ssscc_list = process_ctd.make_ssscc_list(cfg.datadir, INST)
+    print('Station list loaded.')
 
     # convert raw .hex files
     convert.hex_to_ctd(ssscc_list, INST, cfg)
+    print('All HEX files converted.')
 
     # process time files
     convert.make_time_files(ssscc_list, cfg.datadir, INST, cfg)
+    print('All time files created.')
 
     # export "Stage 1" data
     # load in all bottle and time data into DataFrame
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list, cfg.datadir, INST)
-    process_ctd.export_ct_as_cnv(time_data_all, cfg.datadir, INST)
+    # process_ctd.export_ct_as_cnv(time_data_all, cfg.datadir, INST)
+    print('All stage 1 data exported.')
 
     # make bottle files
     convert.make_btl_mean(ssscc_list, INST, cfg)
+    print('All bottle files created.')
 
     # generate reftemp .csv files
     process_bottle.process_reft(ssscc_list, cfg.datadir, 'reft')
+    print('All refT data parsed.')
 
     # parse bottle data excel file into salt csv files
-    parse_salinity(BOTTLEDATAFILE, cfg.datadir, 'salt', ssscc_list, cast_id_col='Cast', btlnum_col='Niskin', sal_col='Bench Salinity')
+    parse_discrete(BOTTLEDATAFILE, Path(cfg.datadir, 'converted', 'salt'), 'salt', ssscc_list,
+                   'Bench Salinity', 'SALNTY', cast_id_col='Cast', btlnum_col='Niskin')
+    print('All bottle salinity data parsed.')
 
+    # parse bottle data excel file into oxygen csv files
+    parse_discrete(BOTTLEDATAFILE, Path(cfg.datadir, 'converted', 'oxygen'), 'oxygen', ssscc_list,
+                   'Winkler DO umol/kg', 'OXYGEN', cast_id_col='Cast', btlnum_col='Niskin')
+    print('All bottle oxygen data parsed.')
+
+    # load all bottle data
+    btl_data_all = process_bottle.load_all_btl_files(ssscc_list, cfg.datadir, INST, 'reft', 'salt', 'oxygen', )
+    print('All bottle data loaded.')
+    print('Found %s samples.' % len(btl_data_all))
+
+    # calculate and apply average pressure offset
+    process_ctd.apply_pressure_offset(btl_data_all, cfg.datadir)
+    process_ctd.apply_pressure_offset(time_data_all, cfg.datadir)
+
+    # create cast depth log file
+    process_ctd.make_depth_log(time_data_all, cfg.datadir)
+
+    # calibrate temperature against reference
+    calibrate_temp(btl_data_all, time_data_all, cfg.datadir, INST, ssscc_list)
 
 if __name__ == "__main__":
     main()

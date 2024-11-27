@@ -121,7 +121,7 @@ def bottle_median(btl_df):
     return output
 
 
-def _load_btl_data(btl_file, cols=None):
+def _load_btl_data(btl_file, cast_id, cols=None):
     """
     Loads "bottle mean" CTD data from .pkl file. Function will return all data unless
     cols is specified (as a list of column names)
@@ -130,24 +130,24 @@ def _load_btl_data(btl_file, cols=None):
     btl_data = pd.read_pickle(btl_file)
     if cols is not None:
         btl_data = btl_data[cols]
-    btl_data["SSSCC"] = Path(btl_file).stem.split("_")[0]
+    btl_data["SSSCC"] = cast_id
 
     return btl_data
 
 
-def _load_reft_data(reft_file, index_name="btl_fire_num"):
+def _load_reft_data(reft_file, cast_id, index_name="btl_fire_num"):
     """
     Loads reft_file to dataframe and reindexes to match bottle data dataframe
     """
     reft_data = pd.read_csv(reft_file, usecols=["btl_fire_num", "T90", "REFTMP_FLAG_W"])
     reft_data.set_index(index_name)
-    reft_data["SSSCC_TEMP"] = Path(reft_file).stem.split("_")[0]
+    reft_data["SSSCC_TEMP"] = cast_id
     reft_data["REFTMP"] = reft_data["T90"]
 
     return reft_data
 
 
-def _load_salt_data(salt_file, index_name="SAMPNO"):
+def _load_salt_data(salt_file, cast_id, index_name="SAMPNO"):
     """
     Loads salt_file to dataframe and reindexes to match bottle data dataframe
     """
@@ -155,23 +155,18 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
         salt_file, usecols=["SAMPNO", "SALNTY"]
     )
     salt_data.set_index(index_name)
-    # TODO instead of adding this col here, (and fussing with string manipulation),
-    #  just return the df as is and let the calling function handle it
-    salt_data["SSSCC_SALT"] = Path(salt_file).stem.replace('_salts', '')
+    salt_data["SSSCC_SALT"] = cast_id
     salt_data.rename(columns={"SAMPNO": "SAMPNO_SALT"}, inplace=True)
 
     return salt_data
 
 
-def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
+def _add_btl_bottom_data(df, cast, datadir, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
     """
     Adds lat/lon, date, and time to dataframe based on the values in the bottom_bottle_details.csv
     """
-    cast_details = pd.read_csv(
-        # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.dirs["logs"] + "bottom_bottle_details.csv",
-        dtype={"SSSCC": str},
-    )
+    bbdfile = Path(datadir, 'logs', 'bottom_bottle_details.csv')
+    cast_details = pd.read_csv(bbdfile)
     cast_details = cast_details[cast_details["SSSCC"] == cast]
     # df[lat_col] = np.round(cast_details["latitude"].iat[0], decimals)
     # df[lon_col] = np.round(cast_details["longitude"].iat[0], decimals)
@@ -186,7 +181,7 @@ def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", deci
     return df
 
 
-def load_all_btl_files(ssscc_list, cols=None):
+def load_all_btl_files(ssscc_list, datadir, inst, reft, salt, oxy, cols=None):
     """
     Load bottle and secondary (e.g. reference temperature, bottle salts, bottle oxygen)
     files for station/cast list and merge into a dataframe.
@@ -208,13 +203,13 @@ def load_all_btl_files(ssscc_list, cols=None):
 
     for ssscc in ssscc_list:
         log.info("Loading BTL data for station: " + ssscc + "...")
-        btl_file = cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl"
-        btl_data = _load_btl_data(btl_file, cols)
+        btl_file = Path(datadir, 'bottle', inst, "%s_btl_mean.pkl" % ssscc)
+        btl_data = _load_btl_data(btl_file, ssscc, cols)
 
         ### load REFT data
-        reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
+        reft_file = Path(datadir, 'converted', reft, "%s_reft.csv" % ssscc)
         try:
-            reft_data = _load_reft_data(reft_file)
+            reft_data = _load_reft_data(reft_file, ssscc)
             if len(reft_data) > 36:
                 log.error(f"len(reft_data) > 36 for {ssscc}, check reftmp file")
         except FileNotFoundError:
@@ -228,9 +223,9 @@ def load_all_btl_files(ssscc_list, cols=None):
             reft_data["SSSCC_TEMP"] = ssscc
 
         ### load REFC data
-        refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
+        refc_file = Path(datadir, 'converted', salt, "%s_salts.csv" % ssscc)
         try:
-            refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
+            refc_data = _load_salt_data(refc_file, ssscc, index_name="SAMPNO")
             if len(refc_data) > 36:
                 log.error(f"len(refc_data) > 36 for {ssscc}, check autosal file")
         except FileNotFoundError:
@@ -247,32 +242,39 @@ def load_all_btl_files(ssscc_list, cols=None):
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
-        oxy_file = Path(cfg.dirs["oxygen"] + ssscc)
-        try:
-            oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
-            if len(oxy_data) > 36:
-                log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
-        except FileNotFoundError:
-            log.warning(
-                "Missing (or misnamed) REFO Data Station: "
-                + ssscc
-                + "...filling with NaNs"
-            )
-            oxy_data = pd.DataFrame(
-                index=btl_data.index,
-                columns=[
-                    "FLASKNO",
-                    "TITR_VOL",
-                    "TITR_TEMP",
-                    "DRAW_TEMP",
-                    "TITR_TIME",
-                    "END_VOLTS",
-                ],
-                dtype=float,
-            )
-            oxy_data["STNNO_OXY"] = ssscc[:3]
-            oxy_data["CASTNO_OXY"] = ssscc[3:]
-            oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
+        oxy_file = Path(datadir, 'converted', oxy, '%s_oxygen.csv' % ssscc)
+        if oxy_file.exists():
+            # Added to use non-odf oxy data from an excel sheet and a generic parser
+            oxy_data = pd.read_csv(oxy_file, usecols=["SAMPNO", "OXYGEN"])
+            oxy_data['SSSCC_OXY'] = ssscc
+            oxy_data.rename(columns={'SAMPNO': 'BOTTLENO_OXY'}, inplace=True)
+        else:
+            oxy_file = Path(cfg.dirs["oxygen"] + ssscc)
+            try:
+                oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
+                if len(oxy_data) > 36:
+                    log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
+            except FileNotFoundError:
+                log.warning(
+                    "Missing (or misnamed) REFO Data Station: "
+                    + ssscc
+                    + "...filling with NaNs"
+                )
+                oxy_data = pd.DataFrame(
+                    index=btl_data.index,
+                    columns=[
+                        "FLASKNO",
+                        "TITR_VOL",
+                        "TITR_TEMP",
+                        "DRAW_TEMP",
+                        "TITR_TIME",
+                        "END_VOLTS",
+                    ],
+                    dtype=float,
+                )
+                oxy_data["STNNO_OXY"] = ssscc[:3]
+                oxy_data["CASTNO_OXY"] = ssscc[3:]
+                oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
 
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
@@ -296,7 +298,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             log.error(f"len(btl_data) for {ssscc} > 36, check bottle file")
 
         # Add bottom of cast information (date,time,lat,lon,etc.)
-        btl_data = _add_btl_bottom_data(btl_data, ssscc)
+        btl_data = _add_btl_bottom_data(btl_data, ssscc, datadir)
 
         # Merge cast into df_data_all
         try:
