@@ -177,15 +177,16 @@ def _flag_btl_data(
     df_bad = df[df["Flag"] == 4].copy()
 
     if f_out is not None:
-        if param == cfg.column["t1"]:
+        if param == 'CTDTMP1':
             xlabel = "T1 Residual (T90 C)"
-        elif param == cfg.column["t2"]:
+        elif param == 'CTDTMP2':
             xlabel = "T2 Residual (T90 C)"
-        elif param == cfg.column["c1"]:
+        elif param == "CTDCOND1":
             xlabel = "C1 Residual (mS/cm)"
-        elif param == cfg.column["c2"]:
+        elif param == 'CTDCOND2':
             xlabel = "C2 Residual (mS/cm)"
-        f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
+        f_out = Path(str(f_out).replace(".pdf", "_postfit.pdf"))
+        # f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
         ctd_plots._intermediate_residual_plot(
             df["Diff"],
             df[prs],
@@ -194,7 +195,8 @@ def _flag_btl_data(
             xlabel=xlabel,
             f_out=f_out,
         )
-        f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
+        f_out = Path(str(f_out).replace(".pdf", "_flag2.pdf"))
+        # f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
         ctd_plots._intermediate_residual_plot(
             df_good["Diff"],
             df_good[prs],
@@ -458,7 +460,7 @@ def calibrate_temp(btl_df, time_df, datadir, inst, cast_list):
                 btl_df[btl_rows],
                 param=tN,
                 ref="REFTMP",
-                f_out=Path(f"{tN}residual_{f_stem}.pdf"),
+                f_out=Path(fig_dir, f"{tN}residual_{f_stem}.pdf"),
             )
 
             # 5) handle quality flags
@@ -481,7 +483,7 @@ def calibrate_temp(btl_df, time_df, datadir, inst, cast_list):
             btl_df["SSSCC"],
             xlabel=f"{tN.upper()} Residual (T90 C)",
             show_thresh=True,
-            f_out=Path(fig_dir, "residual_all_postfit.pdf"),
+            f_out=Path(fig_dir, f"{tN}residual_all_postfit.pdf"),
         )
 
         # export temp quality flags

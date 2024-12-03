@@ -166,7 +166,7 @@ def _add_btl_bottom_data(df, cast, datadir, lat_col="LATITUDE", lon_col="LONGITU
     Adds lat/lon, date, and time to dataframe based on the values in the bottom_bottle_details.csv
     """
     bbdfile = Path(datadir, 'logs', 'bottom_bottle_details.csv')
-    cast_details = pd.read_csv(bbdfile)
+    cast_details = pd.read_csv(bbdfile, dtype={'SSSCC': str})
     cast_details = cast_details[cast_details["SSSCC"] == cast]
     # df[lat_col] = np.round(cast_details["latitude"].iat[0], decimals)
     # df[lon_col] = np.round(cast_details["longitude"].iat[0], decimals)
@@ -278,7 +278,8 @@ def load_all_btl_files(ssscc_list, datadir, inst, reft, salt, oxy, cols=None):
 
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
-        btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
+        # btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
+        btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="left")
         btl_data = pd.merge(
             btl_data,
             refc_data,
