@@ -501,7 +501,7 @@ def calibrate_temp(btl_df, time_df, datadir, inst, cast_list):
     return True
 
 
-def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
+def calibrate_cond(btl_df, time_df, datadir, inst, ref, cast_list, bottleflags_man):
     """
     Least-squares fit CTD conductivity data against bottle salts.
 
@@ -521,26 +521,37 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
 
     """
     log.info("Calibrating conductivity")
+    fit_dir = validate_dir(Path(datadir, 'fit', inst), create=True)
+    fit_groups_dir = Path(datadir, 'fit_groups', inst)
+    validate_dir(fit_groups_dir, create=True)
+    ssscc_subsets = sorted(fit_groups_dir.glob("ssscc_c*.csv"))
     # calculate BTLCOND values from lab salinity
-    btl_df[cfg.column["refC"]] = convert.sal_to_cond(
+    if not ssscc_subsets:  # if no c-segments exists, write one from full list
+        log.debug(
+                "No CTDCOND grouping file found... creating ssscc_c1.csv with all casts"
+        )
+        ssscc_subsets = [Path(fit_groups_dir, "ssscc_c1.csv")]
+        pd.Series(cast_list).to_csv(ssscc_subsets[0], header=None, index=False)
+
+    btl_df["BTLCOND"] = convert.sal_to_cond(
         btl_df["SALNTY"],
-        btl_df[cfg.column["t1"]],
-        btl_df[cfg.column["p"]],
+        btl_df["CTDTMP1"],
+        btl_df["CTDPRS"],
     )
 
     # merge in handcoded salt flags
-    flag_file = Path(user_cfg.datadir, 'flag', user_cfg.bottleflags_man)
+    flag_file = Path(datadir, 'flag', bottleflags_man)
     salt_flags_manual = None
     if flag_file.exists():
         try:
-            salt_flags_manual = get_node(flag_file, ref_node)
+            salt_flags_manual = get_node(flag_file, ref)
         except NodeNotFoundError:
-            log.info("No previously flagged values for %s found in flag file." % ref_node)
+            log.info("No previously flagged values for %s found in flag file." % ref)
     else:
         log.info("No pre-existing flag file found.")
 
     if salt_flags_manual is not None:
-        log.info("Merging previously flagged values for %s." % ref_node)
+        log.info("Merging previously flagged values for %s." % ref)
         salt_flags_manual_df = pd.DataFrame.from_dict(salt_flags_manual)
         salt_flags_manual_df = salt_flags_manual_df.rename(
             columns={"cast_id": "SSSCC", "bottle_num": "btl_fire_num", "value": "SALNTY_FLAG_W"}
@@ -552,17 +563,9 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
     else:
         btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
 
-    ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
-    if not ssscc_subsets:  # if no c-segments exists, write one from full list
-        log.debug(
-            "No CTDCOND grouping file found... creating ssscc_c1.csv with all casts"
-        )
-        ssscc_list = process_ctd.get_ssscc_list()
-        ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_c1.csv")]
-        pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
-
-    fit_yaml = load_fit_yaml()  # load fit polynomial order
-    for cN, tN in zip(["c1", "c2"], ["t1", "t2"]):
+    fit_yaml = load_fit_yaml(Path(fit_groups_dir, 'fit_coeffs.yml'))  # load fit polynomial order
+    for cN, tN in zip(['CTDCOND1', 'CTDCOND2'], ['CTDTMP1', 'CTDTMP2']):
+        fig_dir = validate_dir(Path(datadir, 'fig', 'inst', cN), create=True)
         C_flag, C_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:
             # 0) grab ssscc chunk to fit
@@ -576,12 +579,12 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
             # 1) plot pre-fit residual
             f_stem = f.stem  # get "ssscc_c*" from path
             ctd_plots._intermediate_residual_plot(
-                btl_df.loc[btl_rows, cfg.column["refC"]]
-                - btl_df.loc[btl_rows, cfg.column[cN]],
-                btl_df.loc[btl_rows, cfg.column["p"]],
+                btl_df.loc[btl_rows, 'BTLCOND']
+                - btl_df.loc[btl_rows, cN],
+                btl_df.loc[btl_rows, 'CTDPRS'],
                 btl_df.loc[btl_rows, "SSSCC"],
                 xlabel=f"{cN.upper()} Residual (mS/cm)",
-                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_prefit.pdf",
+                f_out=Path(fig_dir, f"{cN}residual_{f_stem}_prefit.pdf"),
             )
 
             # 2) prepare data for fitting
@@ -589,16 +592,16 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
             # but is left here for future debugging (if necessary)
             df_good, df_bad = _prepare_fit_data(
                 btl_df[good_rows],
-                cfg.column[cN],
-                cfg.column["refC"],
+                cN,
+                'BTLCOND',
                 zRange=fit_yaml[cN][f_stem]["zRange"],
             )
             ctd_plots._intermediate_residual_plot(
                 df_good["Diff"],
-                df_good[cfg.column["p"]],
+                df_good['CTDPRS'],
                 df_good["SSSCC"],
                 xlabel=f"{cN.upper()} Residual (mS/cm)",
-                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}_fit_data.pdf",
+                f_out=Path(fig_dir, f"{cN}residual_{f_stem}_fit_data.pdf"),
             )
 
             # 3) calculate fit coefs
@@ -607,9 +610,9 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
             C_order = fit_yaml[cN][f_stem]["C_order"]
             coef_dict = multivariate_fit(
                 df_good["Diff"],
-                (df_good[cfg.column["p"]], P_order),
-                (df_good[cfg.column[tN]], T_order),
-                (df_good[cfg.column[cN]], C_order),
+                (df_good['CTDPRS'], P_order),
+                (df_good[tN], T_order),
+                (df_good[cN], C_order),
                 coef_names=["cp", "ct", "cc"],
             )
 
@@ -617,25 +620,25 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
             P_coefs = tuple(coef_dict[f"cp{n}"] for n in np.arange(1, P_order + 1))
             T_coefs = tuple(coef_dict[f"ct{n}"] for n in np.arange(1, T_order + 1))
             C_coefs = tuple(coef_dict[f"cc{n}"] for n in np.arange(1, C_order + 1))
-            btl_df.loc[btl_rows, cfg.column[cN]] = apply_polyfit(
-                btl_df.loc[btl_rows, cfg.column[cN]],
+            btl_df.loc[btl_rows, cN] = apply_polyfit(
+                btl_df.loc[btl_rows, cN],
                 (coef_dict["c0"],) + C_coefs,
-                (btl_df.loc[btl_rows, cfg.column["p"]], P_coefs),
-                (btl_df.loc[btl_rows, cfg.column[tN]], T_coefs),
+                (btl_df.loc[btl_rows, 'CTDPRS'], P_coefs),
+                (btl_df.loc[btl_rows, tN], T_coefs),
             )
-            time_df.loc[time_rows, cfg.column[cN]] = apply_polyfit(
-                time_df.loc[time_rows, cfg.column[cN]],
+            time_df.loc[time_rows, cN] = apply_polyfit(
+                time_df.loc[time_rows, cN],
                 (coef_dict["c0"],) + C_coefs,
-                (time_df.loc[time_rows, cfg.column["p"]], P_coefs),
-                (time_df.loc[time_rows, cfg.column[tN]], T_coefs),
+                (time_df.loc[time_rows, 'CTDPRS'], P_coefs),
+                (time_df.loc[time_rows, tN], T_coefs),
             )
 
             # 4.5) flag CTDCOND and make residual plots
             df_ques, df_bad = _flag_btl_data(
                 btl_df[btl_rows],
-                param=cfg.column[cN],
-                ref=cfg.column["refC"],
-                f_out=f"{cfg.fig_dirs[cN]}residual_{f_stem}.pdf",
+                param=cN,
+                ref='BTLCOND',
+                f_out=Path(fig_dir, f"{cN}residual_{f_stem}.pdf"),
             )
 
             # 5) handle quality flags
@@ -653,46 +656,46 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
 
         # one more fig with all cuts
         ctd_plots._intermediate_residual_plot(
-            btl_df[cfg.column["refC"]] - btl_df[cfg.column[cN]],
-            btl_df[cfg.column["p"]],
+            btl_df['BTLCOND'] - btl_df[cN],
+            btl_df['CTDPRS'],
             btl_df["SSSCC"],
             xlabel=f"{cN.upper()} Residual (mS/cm)",
             show_thresh=True,
-            f_out=f"{cfg.fig_dirs[cN]}residual_all_postfit.pdf",
+            f_out=Path(fig_dir, f"{cN}residual_all_postfit.pdf"),
         )
 
         # export cond quality flags
-        C_flag.sort_index().to_csv(f"{cfg.dirs['logs']}qual_flag_{cN}.csv", index=False)
+        C_flag.sort_index().to_csv(Path(fit_dir, f"qual_flag_{cN}.csv"), index=False)
 
         # export cond fit params
         C_fit_coefs[coef_names] = C_fit_coefs[coef_names].applymap(
             lambda x: np.format_float_scientific(x, precision=4, exp_digits=1)
         )
-        C_fit_coefs.to_csv(cfg.dirs["logs"] + f"fit_coef_{cN}.csv", index=False)
+        C_fit_coefs.to_csv(Path(fit_dir, f"fit_coef_{cN}.csv"), index=False)
 
     # recalculate salinity with calibrated C/T
-    time_df[cfg.column["sal"]] = gsw.SP_from_C(
-        time_df[cfg.column["c1"]],
-        time_df[cfg.column["t1"]],
-        time_df[cfg.column["p"]],
+    time_df['CTDSAL'] = gsw.SP_from_C(
+        time_df['CTDCOND1'],
+        time_df['CTDTMP1'],
+        time_df['CTDPRS'],
     )
-    btl_df[cfg.column["sal"]] = gsw.SP_from_C(
-        btl_df[cfg.column["c1"]],
-        btl_df[cfg.column["t1"]],
-        btl_df[cfg.column["p"]],
+    btl_df['CTDSAL'] = gsw.SP_from_C(
+        btl_df['CTDCOND1'],
+        btl_df['CTDTMP1'],
+        btl_df['CTDPRS'],
     )
 
     # flag salinity data
-    time_df[cfg.column["sal"] + "_FLAG_W"] = 2
-    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.by_residual(
-        btl_df[cfg.column["sal"]],
+    time_df['CTDSAL_FLAG_W'] = 2
+    btl_df['CTDSAL_FLAG_W'] = flagging.by_residual(
+        btl_df['CTDSAL'],
         btl_df["SALNTY"],
-        btl_df[cfg.column["p"]],
+        btl_df['CTDPRS'],
     )
     bad_rows = btl_df["SALNTY_FLAG_W"].isin([3, 4])
-    btl_df.loc[bad_rows, cfg.column["sal"] + "_FLAG_W"] = 2  # bad salts not used for QC
-    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.nan_values(
-        btl_df[cfg.column["sal"]], old_flags=btl_df[cfg.column["sal"] + "_FLAG_W"]
+    btl_df.loc[bad_rows, 'CTDSAL_FLAG_W'] = 2  # bad salts not used for QC
+    btl_df["CTDSAL_FLAG_W"] = flagging.nan_values(
+        btl_df['CTDSAL'], old_flags=btl_df["CTDSAL_FLAG_W"]
     )
 
     return btl_df, time_df

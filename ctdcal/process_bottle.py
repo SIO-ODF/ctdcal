@@ -223,7 +223,7 @@ def load_all_btl_files(ssscc_list, datadir, inst, reft, salt, oxy, cols=None):
             reft_data["SSSCC_TEMP"] = ssscc
 
         ### load REFC data
-        refc_file = Path(datadir, 'converted', salt, "%s_salts.csv" % ssscc)
+        refc_file = Path(datadir, 'converted', salt, "%s_salt.csv" % ssscc)
         try:
             refc_data = _load_salt_data(refc_file, ssscc, index_name="SAMPNO")
             if len(refc_data) > 36:

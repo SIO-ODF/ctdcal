@@ -8,7 +8,7 @@ from ctdcal import (
     process_ctd, process_bottle,
 )
 from ctdcal.common import load_user_config, validate_file
-from ctdcal.fit_ctd import calibrate_temp
+from ctdcal.fit_ctd import calibrate_temp, calibrate_cond
 
 from ctdcal.parsers.all_bottle_xlsx import parse_discrete
 
@@ -75,6 +75,9 @@ def main():
 
     # calibrate temperature against reference
     calibrate_temp(btl_data_all, time_data_all, cfg.datadir, INST, ssscc_list)
+
+    # calibrate conductivity against reference
+    btl_data_all, time_data_all = calibrate_cond(btl_data_all, time_data_all, cfg.datadir, INST, 'salt', ssscc_list, cfg.bottleflags_man)
 
 if __name__ == "__main__":
     main()
