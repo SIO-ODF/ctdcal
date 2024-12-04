@@ -3,9 +3,9 @@
 # this is an example to fill with your own values
 
 # Cruise specifics
-expocode: "325020210316"
-section_id: "A20"
-ctd_serial: 914
+expocode: "45CE20170427"
+section_id: "A02"
+ctd_serial: "xxx"
 
 # CTD output variables/units
 ctd_outputs:

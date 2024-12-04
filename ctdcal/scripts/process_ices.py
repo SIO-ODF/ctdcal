@@ -11,6 +11,8 @@ from ctdcal.common import load_user_config, validate_file
 from ctdcal.fit_ctd import calibrate_temp, calibrate_cond
 
 from ctdcal.parsers.all_bottle_xlsx import parse_discrete
+from ctdcal.process_bottle import export_hy1
+from ctdcal.process_ctd import export_ct1
 
 log = logging.getLogger(__name__)
 
@@ -69,15 +71,27 @@ def main():
     # calculate and apply average pressure offset
     process_ctd.apply_pressure_offset(btl_data_all, cfg.datadir)
     process_ctd.apply_pressure_offset(time_data_all, cfg.datadir)
+    print('Pressure offsets applied')
 
     # create cast depth log file
     process_ctd.make_depth_log(time_data_all, cfg.datadir)
+    print('Depth log saved.')
 
     # calibrate temperature against reference
     calibrate_temp(btl_data_all, time_data_all, cfg.datadir, INST, ssscc_list)
+    print('Temperature fitting complete.')
 
     # calibrate conductivity against reference
     btl_data_all, time_data_all = calibrate_cond(btl_data_all, time_data_all, cfg.datadir, INST, 'salt', ssscc_list, cfg.bottleflags_man)
+    print('Conductivity fitting complete.')
+
+    # OXY FIT HERE
+
+    # export to Exchange format
+    print('Exporting to exchange...')
+    export_ct1(time_data_all, cfg.datadir, INST, ssscc_list)
+    export_hy1(btl_data_all, cfg.datadir, INST)
+
 
 if __name__ == "__main__":
     main()

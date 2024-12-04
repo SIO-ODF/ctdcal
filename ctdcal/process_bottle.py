@@ -585,7 +585,7 @@ def export_report_data(df):
     return
 
 
-def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
+def export_hy1(df, datadir, inst, org="ODF"):
     """
     Write out the exchange-lite formatted hy1 bottle file.
 
@@ -607,7 +607,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     btl_columns = {
         "EXPOCODE": "",
         "SECT_ID": "",
-        "STNNBR": "",
+        # "STNNBR": "",
         "CASTNO": "",
         "SAMPNO": "",
         "BTLNBR": "",
@@ -629,8 +629,8 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         # "CTDRINKO_FLAG_W": "",
         "CTDOXY": "UMOL/KG",
         "CTDOXY_FLAG_W": "",
-        "OXYGEN": "UMOL/KG",
-        "OXYGEN_FLAG_W": "",
+        # "OXYGEN": "UMOL/KG",
+        # "OXYGEN_FLAG_W": "",
         "REFTMP": "ITS-90",
         "REFTMP_FLAG_W": "",
     }
@@ -642,19 +642,19 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     btl_data["EXPOCODE"] = cfg.expocode
     btl_data["SECT_ID"] = cfg.section_id
-    btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
-    btl_data["CASTNO"] = [int(x[3:]) for x in btl_data["SSSCC"]]
+    # btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
+    btl_data["CASTNO"] = btl_data["SSSCC"].astype(str)
     btl_data["SAMPNO"] = btl_data["btl_fire_num"].astype(int)
     btl_data = add_btlnbr_cols(btl_data, btl_num_col="btl_fire_num")
 
     # sort by decreasing sample number (increasing pressure) and reindex
     btl_data = btl_data.sort_values(
-        by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
+        by=["SAMPNO"], ascending=[True], ignore_index=True
     )
 
     # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+    # btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+    # btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
@@ -664,10 +664,10 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     # add depth
     depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        Path(datadir, "logs", "depth_log.csv"), dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     manual_depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+        Path(datadir, "logs", "manual_depth_log.csv"), dtype={"SSSCC": str}
     )
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
@@ -698,7 +698,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org
-    with open(out_dir + cfg.expocode + "_hy1.csv", mode="w+") as f:
+    with open(Path(datadir, "export", inst, "%s_hy1.csv" % cfg.expocode), mode="w+") as f:
         f.write("BOTTLE, %s\n" % (time_stamp))
         f.write(",".join(btl_columns.keys()) + "\n")
         f.write(",".join(btl_columns.values()) + "\n")

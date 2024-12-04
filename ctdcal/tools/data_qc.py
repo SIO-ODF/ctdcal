@@ -24,31 +24,31 @@ from ctdcal import get_ctdcal_config, io
 from ctdcal.common import load_user_config, validate_file
 from ctdcal.fitting.common import df_node_to_BottleFlags, get_node, save_node
 
-cfg = get_ctdcal_config()
-USERCONFIG = "ctdcal/cfg.yaml"
+# cfg = get_ctdcal_config()
+USERCONFIG = '/Users/als026/data/ices/ices.yaml'
 user_cfg = load_user_config(validate_file(USERCONFIG))
-FLAGFILE = Path(user_cfg.datadir, "flag", user_cfg.bottleflags_man)
+INST = 'ctd'
+FLAGFILE = Path(user_cfg.datadir, "fit", user_cfg.bottleflags_man)
 
 # TODO: abstract parts of this to a separate file
 # TODO: following above, make parts reusable?
 
 # load continuous CTD data and make into a dict (only ~20MB)
-file_list = sorted(Path(cfg.dirs["pressure"]).glob("*ct1.csv"))
-ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
+file_list = sorted(Path(user_cfg.datadir, 'export', INST).glob("*ct1.csv"))
+ssscc_list = [ssscc.stem[:-4] for ssscc in file_list]
 ctd_data = []
 for f in file_list:
     print(f"Loading {f}")
     header, df = io.load_exchange_ctd(f)
-    df["SSSCC"] = header["STNNBR"].zfill(3) + header["CASTNO"].zfill(2)
+    df["SSSCC"] = header["CASTNO"]
+    # df["SSSCC"] = header["STNNBR"].zfill(3) + header["CASTNO"].zfill(2)
     ctd_data.append(df)
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
 # load bottle file
-fname = list(Path(cfg.dirs["pressure"]).glob("*hy1.csv"))[0]
+fname = list(Path(user_cfg.datadir, 'export', INST).glob("*hy1.csv"))[0]
 btl_data = io.load_exchange_btl(fname).replace(-999, np.nan)
-btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
-    "CASTNO"
-].apply(lambda x: f"{x:02d}")
+btl_data["SSSCC"] = btl_data["CASTNO"]
 
 #   Create salinity residuals
 btl_data["Residual"] = btl_data["SALNTY"] - btl_data["CTDSAL"]

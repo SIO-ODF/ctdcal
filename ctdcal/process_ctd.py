@@ -519,7 +519,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list):
+def export_ct1(df, datadir, inst, ssscc_list):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -569,20 +569,20 @@ def export_ct1(df, ssscc_list):
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(
         # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.dirs["logs"] + "bottom_bottle_details.csv",
+        Path(datadir, "logs", "bottom_bottle_details.csv"),
         dtype={"SSSCC": str},
     )
     depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        Path(datadir, "logs", "depth_log.csv"), dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     try:
         manual_depth_df = pd.read_csv(
-            cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+            Path(datadir, "logs", "manual_depth_log.csv"), dtype={"SSSCC": str}
         )
     except FileNotFoundError:
         log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
-        manual_depth_df.to_csv(cfg.dirs["logs"] + "manual_depth_log.csv", index=False)
+        manual_depth_df.to_csv(Path(datadir, "logs", "manual_depth_log.csv"), index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
@@ -592,9 +592,9 @@ def export_ct1(df, ssscc_list):
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
         # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
-        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        # print(f"Using Rinko as CTDOXY for {ssscc}")
+        # time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+        # time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
@@ -623,7 +623,7 @@ def export_ct1(df, ssscc_list):
         now = datetime.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d")  # %H:%M")
         file_datetime = file_datetime + "ODFSIO"
-        with open(f"{cfg.dirs['pressure']}{ssscc}_ct1.csv", "w+") as f:
+        with open(Path(datadir, "export", inst, f"{ssscc}_ct1.csv"), "w+") as f:
             # put in logic to check columns?
             # number_headers should be calculated, not defined
             ctd_header = (  # this is ugly but prevents tabs before label
@@ -631,8 +631,8 @@ def export_ct1(df, ssscc_list):
                 f"NUMBER_HEADERS = 11\n"
                 f"EXPOCODE = {cfg.expocode}\n"
                 f"SECT_ID = {cfg.section_id}\n"
-                f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
-                f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
+                # f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
+                f"CASTNO = {ssscc}\n"  # CASTNO = CC
                 f"DATE = {b_datetime[0]}\n"
                 f"TIME = {b_datetime[1]}\n"
                 f"LATITUDE = {btm_lat:.4f}\n"
