@@ -10,7 +10,7 @@ from ctdcal.common import validate_dir
 
 def parse_discrete(infile, cnvdir, name, cast_list, colname, export_colname, cast_id_col="Cast", btlnum_col="Bottle Number"):
     outdir = validate_dir(Path(cnvdir), create=True)
-    data = pd.read_excel(infile, usecols=[cast_id_col, btlnum_col, colname], dtype={cast_id_col: str})
+    data = pd.read_excel(infile, usecols=[cast_id_col, btlnum_col, colname], dtype={cast_id_col: str}, na_values=['-999'])
     data.rename(columns={btlnum_col: "SAMPNO", colname: export_colname}, inplace=True)
     for cast_id in cast_list:
         outfile = Path(outdir, '%s_%s.csv' % (cast_id, name))

@@ -392,7 +392,7 @@ def calibrate_temp(btl_df, time_df, datadir, inst, cast_list):
 
     fit_yaml = load_fit_yaml(Path(fit_groups_dir, 'fit_coeffs.yml'))  # load fit polynomial order
     for tN in ['CTDTMP1', 'CTDTMP2']:
-        fig_dir = validate_dir(Path(datadir, 'fig', 'inst', tN), create=True)
+        fig_dir = validate_dir(Path(datadir, 'fig', inst, tN), create=True)
         T_flag, T_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:
             # 0) load ssscc subset to be fit together
@@ -565,7 +565,7 @@ def calibrate_cond(btl_df, time_df, datadir, inst, ref, cast_list, bottleflags_m
 
     fit_yaml = load_fit_yaml(Path(fit_groups_dir, 'fit_coeffs.yml'))  # load fit polynomial order
     for cN, tN in zip(['CTDCOND1', 'CTDCOND2'], ['CTDTMP1', 'CTDTMP2']):
-        fig_dir = validate_dir(Path(datadir, 'fig', 'inst', cN), create=True)
+        fig_dir = validate_dir(Path(datadir, 'fig', inst, cN), create=True)
         C_flag, C_fit_coefs = pd.DataFrame(), pd.DataFrame()
         for f in ssscc_subsets:
             # 0) grab ssscc chunk to fit
