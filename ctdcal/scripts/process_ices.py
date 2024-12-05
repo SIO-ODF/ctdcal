@@ -9,6 +9,7 @@ from ctdcal import (
 )
 from ctdcal.common import load_user_config, validate_file
 from ctdcal.fit_ctd import calibrate_temp, calibrate_cond
+from ctdcal.oxy_fitting import prepare_oxy_ices, calibrate_oxy
 
 from ctdcal.parsers.all_bottle_xlsx import parse_discrete
 from ctdcal.process_bottle import export_hy1
@@ -86,6 +87,9 @@ def main():
     print('Conductivity fitting complete.')
 
     # OXY FIT HERE
+    prepare_oxy_ices(btl_data_all, time_data_all, cfg.datadir, INST, 'oxygen', cfg.bottleflags_man)
+    calibrate_oxy(btl_data_all, time_data_all, cfg.datadir, INST, 'oxygen', ssscc_list)
+    print('Oxygen fitting complete.')
 
     # export to Exchange format
     print('Exporting to exchange...')

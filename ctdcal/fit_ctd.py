@@ -540,7 +540,7 @@ def calibrate_cond(btl_df, time_df, datadir, inst, ref, cast_list, bottleflags_m
     )
 
     # merge in handcoded salt flags
-    flag_file = Path(datadir, 'fit', bottleflags_man)
+    flag_file = Path(datadir, 'fit', inst, bottleflags_man)
     salt_flags_manual = None
     if flag_file.exists():
         try:

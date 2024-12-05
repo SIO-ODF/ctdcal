@@ -19,6 +19,7 @@ from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
+from .common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -410,15 +411,15 @@ def calculate_dV_dt(oxy_volts, time, nan_replace=True):
     return dV_dt  # filtered_dvdt
 
 
-def _get_sbe_coef(idx=0):
+def _get_sbe_coef(datadir, inst, idx=0):
     """
     Get SBE oxygen coefficients from raw .xmlcon files.
     Defaults to using first station in ssscc.csv file.
 
     Returns the following tuple of coefficients: Soc, offset, Tau20, Tcor, E
     """
-    station = process_ctd.get_ssscc_list()[idx]
-    xmlfile = cfg.dirs["raw"] + station + ".XMLCON"
+    station = process_ctd.get_ssscc_list(datadir)[idx]
+    xmlfile = Path(datadir, 'raw', inst, "%s.XMLCON" % station)
 
     tree = ET.parse(xmlfile)
     root_eq0 = tree.find(".//CalibrationCoefficients[@equation='0']")  # Owens-Millard
@@ -518,6 +519,8 @@ def PMEL_oxy_weighted_residual(coefs, weights, inputs, refoxy, L_norm=2):
 
 
 def match_sigmas(
+    datadir,
+    inst,
     btl_prs,
     btl_oxy,
     btl_tmp,
@@ -599,7 +602,7 @@ def match_sigmas(
             )
 
     # Apply coef and calculate CTDOXY
-    sbe_coef0 = _get_sbe_coef()  # initial coefficient guess
+    sbe_coef0 = _get_sbe_coef(datadir, inst)  # initial coefficient guess
     merged_df["CTDOXY"] = _PMEL_oxy_eq(
         sbe_coef0,
         (
@@ -614,13 +617,13 @@ def match_sigmas(
     return merged_df
 
 
-def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
+def sbe43_oxy_fit(datadir, inst, fig_dir, merged_df, sbe_coef0=None, f_suffix=None):
     """
     Fit weighted oxygen data following match_sigmas with the option for initial coefficients.
     """
 
     # Plot data to be fit together
-    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit.pdf"
+    f_out = Path(fig_dir, f"sbe43_residual{f_suffix}_prefit.pdf")
     ctd_plots._intermediate_residual_plot(
         merged_df["REFOXY"] - merged_df["CTDOXY"],
         merged_df["CTDPRS"],
@@ -633,7 +636,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     bad_df = pd.DataFrame()  # initialize DF for questionable values
 
     if sbe_coef0 is None:
-        sbe_coef0 = _get_sbe_coef()  # load initial coefficient guess
+        sbe_coef0 = _get_sbe_coef(datadir, inst)  # load initial coefficient guess
 
     # Curve fit (weighted)
     weights = calculate_weights(merged_df["CTDPRS"])
@@ -676,7 +679,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
 
     # intermediate plots to diagnose data chunks goodness
     if f_suffix is not None:
-        f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}.pdf"
+        f_out = Path(fig_dir, f"sbe43_residual{f_suffix}.pdf")
         ctd_plots._intermediate_residual_plot(
             merged_df["residual"],
             merged_df["CTDPRS"],
@@ -691,6 +694,116 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     df = pd.concat([merged_df, bad_df])
 
     return cfw_coefs, df
+
+
+def prepare_oxy_ices(btl_df, time_df, datadir, inst, ref, bottleflags_man):
+    """
+    Calculate oxygen-related variables needed for calibration:
+    sigma, oxygen solubility (OS), and bottle oxygen
+
+    Parameters
+    ----------
+    btl_df : DataFrame
+        CTD data at bottle stops
+    time_df : DataFrame
+        Continuous CTD data
+    ssscc_list : list of str
+        List of stations to process
+    user_cfg : Munch object
+        Munch dictionary of user-defined parameters
+    ref_node : str
+        Name of reference parameter
+
+    Returns
+    -------
+
+    """
+    # Calculate SA and CT
+    btl_df["SA"] = gsw.SA_from_SP(
+        btl_df['CTDSAL'],
+        btl_df['CTDPRS'],
+        btl_df['GPSLON'],
+        btl_df['GPSLAT'],
+    )
+    btl_df["CT"] = gsw.CT_from_t(
+        btl_df["SA"],
+        btl_df['CTDTMP1'],  # oxygen sensor is on primary line (ie t1)
+        btl_df['CTDPRS'],
+    )
+    time_df["SA"] = gsw.SA_from_SP(
+        time_df['CTDSAL'],
+        time_df['CTDPRS'],
+        time_df['GPSLON'],
+        time_df['GPSLAT'],
+    )
+    time_df["CT"] = gsw.CT_from_t(
+        time_df["SA"],
+        time_df['CTDTMP1'],  # oxygen sensor is on primary line (ie t1)
+        time_df['CTDPRS'],
+    )
+
+    # calculate sigma
+    btl_df["sigma_btl"] = gsw.sigma0(btl_df["SA"], btl_df["CT"])
+    time_df["sigma_btl"] = gsw.sigma0(time_df["SA"], time_df["CT"])
+
+    # Calculate oxygen solubility in µmol/kg
+    btl_df["OS"] = gsw.O2sol(
+        btl_df["SA"],
+        btl_df["CT"],
+        btl_df['CTDPRS'],
+        btl_df['GPSLON'],
+        btl_df['GPSLAT'],
+    )
+    time_df["OS"] = gsw.O2sol(
+        time_df["SA"],
+        time_df["CT"],
+        time_df['CTDPRS'],
+        time_df['GPSLON'],
+        time_df['GPSLAT'],
+    )
+    # Convert CTDOXY units
+    btl_df["CTDOXY"] = oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
+    # Calculate bottle oxygen
+    # btl_df[cfg.column["refO"]] = calculate_bottle_oxygen(
+    #     ssscc_list,
+    #     btl_df["SSSCC"],
+    #     btl_df["TITR_VOL"],
+    #     btl_df["TITR_TEMP"],
+    #     btl_df["FLASKNO"],
+    # )
+    # btl_df[cfg.column["refO"]] = oxy_ml_to_umolkg(
+    #     btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
+    # )
+    btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df['OXYGEN'])
+
+    # Load manual OXYGEN flags
+    flag_file = Path(datadir, 'fit', inst, bottleflags_man)
+    oxy_flags_manual = None
+    if flag_file.exists():
+        try:
+            oxy_flags_manual = get_node(flag_file, ref)
+        except NodeNotFoundError:
+            log.info(
+                "No previously flagged values for %s found in flag file." % ref
+            )
+    else:
+        log.info("No pre-existing flag file found.")
+
+    if oxy_flags_manual is not None:
+        log.info("Merging previously flagged values for %s." % ref)
+        oxy_flags_manual_df = pd.DataFrame.from_dict(oxy_flags_manual)
+        oxy_flags_manual_df = oxy_flags_manual_df.rename(
+            columns={
+                "cast_id": "SSSCC",
+                "bottle_num": "btl_fire_num",
+                "value": "OXYGEN_FLAG_W",
+            }
+        )
+        btl_df.set_index(["SSSCC", "btl_fire_num"], inplace=True)
+        btl_df.update(oxy_flags_manual_df.set_index(["SSSCC", "btl_fire_num"]))
+        btl_df.reset_index(inplace=True)
+
+    return True
 
 
 def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
@@ -803,7 +916,7 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
     return True
 
 
-def calibrate_oxy(btl_df, time_df, ssscc_list):
+def calibrate_oxy(btl_df, time_df, datadir, inst, ref, cast_list):
     """
     Non-linear least squares fit chemical sensor oxygen against bottle oxygen.
 
@@ -822,7 +935,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     """
     log.info("Calibrating oxygen (SBE43)")
     # Plot all pre fit data
-    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit.pdf"
+    fig_dir = validate_dir(Path(datadir, 'fig', inst, ref), create=True)
+    f_out = Path(fig_dir, "sbe43_residual_all_prefit.pdf")
     ctd_plots._intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
@@ -840,7 +954,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     btl_df["dv_dt"] = np.nan  # initialize column
     # Density match time/btl oxy dataframes
-    for ssscc in ssscc_list:
+    for ssscc in cast_list:
         time_data = time_df[time_df["SSSCC"] == ssscc].copy()
         btl_data = btl_df[btl_df["SSSCC"] == ssscc].copy()
         # can't calibrate without bottle oxygen ("OXYGEN")
@@ -849,14 +963,15 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
             log.warning(ssscc + " skipped, all oxy data is NaN")
             continue
         sbe43_merged = match_sigmas(
-            btl_data[cfg.column["p"]],
-            btl_data[cfg.column["refO"]],
+            datadir, inst,
+            btl_data['CTDPRS'],
+            btl_data['OXYGEN'],
             btl_data["CTDTMP1"],
             btl_data["SA"],
             btl_data.index,
             time_data["OS"],
-            time_data[cfg.column["p"]],
-            time_data[cfg.column["t1"]],
+            time_data['CTDPRS'],
+            time_data['CTDTMP1'],
             time_data["SA"],
             time_data[cfg.column["oxyvolts"]],
             time_data["scan_datetime"],
@@ -873,12 +988,13 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     all_sbe43_merged = all_sbe43_merged.loc[btl_df["OXYGEN_FLAG_W"] == 2].copy()
 
     # Fit ALL oxygen stations together to get initial coefficient guess
-    (sbe_coef0, _) = sbe43_oxy_fit(all_sbe43_merged, f_suffix="_ox0")
+    (sbe_coef0, _) = sbe43_oxy_fit(datadir, inst, fig_dir, all_sbe43_merged, f_suffix="_ox0")
     sbe43_dict["ox0"] = sbe_coef0
 
     # Fit each cast individually
-    for ssscc in ssscc_list:
+    for ssscc in cast_list:
         sbe_coef, sbe_df = sbe43_oxy_fit(
+            datadir, inst, fig_dir,
             all_sbe43_merged.loc[all_sbe43_merged["SSSCC"] == ssscc].copy(),
             sbe_coef0=sbe_coef0,
             f_suffix=f"_{ssscc}",
@@ -891,7 +1007,8 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # apply coefs
     time_df["CTDOXY"] = np.nan
-    for ssscc in ssscc_list:
+    for ssscc in cast_list:
+        print("Finishing cast %s oxy fitting..." % ssscc)
         if np.isnan(sbe43_dict[ssscc]).all():
             log.warning(
                 f"{ssscc} missing oxy data, leaving nan values and flagging as 9"
@@ -903,9 +1020,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         btl_df.loc[btl_rows, "CTDOXY"] = _PMEL_oxy_eq(
             sbe43_dict[ssscc],
             (
-                btl_df.loc[btl_rows, cfg.column["oxyvolts"]],
-                btl_df.loc[btl_rows, cfg.column["p"]],
-                btl_df.loc[btl_rows, cfg.column["t1"]],
+                btl_df.loc[btl_rows, 'CTDOXYVOLTS'],
+                btl_df.loc[btl_rows, 'CTDPRS'],
+                btl_df.loc[btl_rows, 'CTDTMP1'],
                 btl_df.loc[btl_rows, "dv_dt"],
                 btl_df.loc[btl_rows, "OS"],
             ),
@@ -914,9 +1031,9 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         time_df.loc[time_rows, "CTDOXY"] = _PMEL_oxy_eq(
             sbe43_dict[ssscc],
             (
-                time_df.loc[time_rows, cfg.column["oxyvolts"]],
-                time_df.loc[time_rows, cfg.column["p"]],
-                time_df.loc[time_rows, cfg.column["t1"]],
+                time_df.loc[time_rows, 'CTDOXYVOLTS'],
+                time_df.loc[time_rows, 'CTDPRS'],
+                time_df.loc[time_rows, 'CTDTMP1'],
                 time_df.loc[time_rows, "dv_dt"],
                 time_df.loc[time_rows, "OS"],
             ),
@@ -930,7 +1047,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
 
     # Plot all post fit data
-    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit.pdf"
+    f_out = Path(fig_dir, "sbe43_residual_all_postfit.pdf")
     ctd_plots._intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
@@ -939,7 +1056,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         f_out=f_out,
         xlim=(-10, 10),
     )
-    f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit_flag2.pdf"
+    f_out = Path(fig_dir, "sbe43_residual_all_postfit_flag2.pdf")
     flag2 = btl_df["CTDOXY_FLAG_W"] == 2
     ctd_plots._intermediate_residual_plot(
         btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDOXY"],
@@ -954,6 +1071,6 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     sbe43_coefs = pd.DataFrame.from_dict(
         sbe43_dict, orient="index", columns=["Soc", "Voffset", "Tau20", "Tcorr", "E"]
     ).applymap(lambda x: np.format_float_scientific(x, precision=4, exp_digits=1))
-    sbe43_coefs.to_csv(cfg.dirs["logs"] + "sbe43_coefs.csv")
+    sbe43_coefs.to_csv(Path(datadir, 'fit', inst, "sbe43_coefs.csv"))
 
     return True

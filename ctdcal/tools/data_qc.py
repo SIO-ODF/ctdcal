@@ -28,7 +28,7 @@ from ctdcal.fitting.common import df_node_to_BottleFlags, get_node, save_node
 USERCONFIG = '/Users/als026/data/ices/ices.yaml'
 user_cfg = load_user_config(validate_file(USERCONFIG))
 INST = 'ctd'
-FLAGFILE = Path(user_cfg.datadir, "fit", user_cfg.bottleflags_man)
+FLAGFILE = Path(user_cfg.datadir, "fit", INST, user_cfg.bottleflags_man)
 
 # TODO: abstract parts of this to a separate file
 # TODO: following above, make parts reusable?

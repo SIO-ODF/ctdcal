@@ -466,9 +466,9 @@ def load_all_ctd_files(ssscc_list, datadir, inst):
         time_file = Path(datadir, 'time', inst, '%s_time.pkl' % ssscc)
         time_data = pd.read_pickle(time_file)
         time_data["SSSCC"] = str(ssscc)
-        # time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
-        #     time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
-        # )
+        time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
+            time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
+        )
         df_list.append(time_data)
         # print("** Finished TIME data station: " + ssscc + " **")
     df_data_all = pd.concat(df_list, axis=0, sort=False)
