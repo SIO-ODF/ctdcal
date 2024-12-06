@@ -529,7 +529,7 @@ def merge_hy1(
     return df
 
 
-def export_report_data(df):
+def export_report_data(df, datadir, inst):
     """
     Write out the data used for report generation as a csv.
 
@@ -539,10 +539,11 @@ def export_report_data(df):
         Fit bottle data
 
     """
-    df["STNNBR"] = [int(x[0:3]) for x in df["SSSCC"]]
+    outdir = validate_dir(Path(datadir, 'report', inst), create=True)
+    df["CAST"] = df["SSSCC"]
     df["CTDPRS"] = df["CTDPRS"].round(1)
     cruise_report_cols = [
-        "STNNBR",
+        "CAST",
         "CTDPRS",
         "CTDTMP1",
         "CTDTMP1_FLAG_W",
@@ -559,8 +560,8 @@ def export_report_data(df):
         "SALNTY",
         "CTDOXY",
         "CTDOXY_FLAG_W",
-        "CTDRINKO",
-        "CTDRINKO_FLAG_W",
+        # "CTDRINKO",
+        # "CTDRINKO_FLAG_W",
         "OXYGEN",
     ]
 
@@ -578,9 +579,9 @@ def export_report_data(df):
         df["CTDCOND2"], df["BTLCOND"], df["CTDPRS"]
     )
     df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
-    df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
+    # df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
-    df[cruise_report_cols].to_csv("data/report_data.csv", index=False)
+    df[cruise_report_cols].to_csv(Path(outdir, "report_data.csv"), index=False)
 
     return
 
@@ -629,8 +630,8 @@ def export_hy1(df, datadir, inst, org="ODF"):
         # "CTDRINKO_FLAG_W": "",
         "CTDOXY": "UMOL/KG",
         "CTDOXY_FLAG_W": "",
-        # "OXYGEN": "UMOL/KG",
-        # "OXYGEN_FLAG_W": "",
+        "OXYGEN": "UMOL/KG",
+        "OXYGEN_FLAG_W": "",
         "REFTMP": "ITS-90",
         "REFTMP_FLAG_W": "",
     }
@@ -649,7 +650,7 @@ def export_hy1(df, datadir, inst, org="ODF"):
 
     # sort by decreasing sample number (increasing pressure) and reindex
     btl_data = btl_data.sort_values(
-        by=["SAMPNO"], ascending=[True], ignore_index=True
+        by=["CASTNO", "SAMPNO"], ascending=[True, True], ignore_index=True
     )
 
     # switch oxygen primary sensor to rinko

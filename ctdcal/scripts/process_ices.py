@@ -12,7 +12,7 @@ from ctdcal.fit_ctd import calibrate_temp, calibrate_cond
 from ctdcal.oxy_fitting import prepare_oxy_ices, calibrate_oxy
 
 from ctdcal.parsers.all_bottle_xlsx import parse_discrete
-from ctdcal.process_bottle import export_hy1
+from ctdcal.process_bottle import export_hy1, export_report_data
 from ctdcal.process_ctd import export_ct1
 
 log = logging.getLogger(__name__)
@@ -96,6 +96,8 @@ def main():
     export_ct1(time_data_all, cfg.datadir, INST, ssscc_list)
     export_hy1(btl_data_all, cfg.datadir, INST)
 
+    # export files for making cruise report figs
+    export_report_data(btl_data_all, cfg.datadir, INST)
 
 if __name__ == "__main__":
     main()
