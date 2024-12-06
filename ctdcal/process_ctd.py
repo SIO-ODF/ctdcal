@@ -544,6 +544,7 @@ def export_ct1(df, datadir, inst, ssscc_list):
     # initial flagging (some of this should be moved)
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
+    df["CTDTURB_FLAG_W"] = 1
     # df["CTDBACKSCATTER_FLAG_W"] = 1
 
     # rename outputs as defined in user_settings.yaml

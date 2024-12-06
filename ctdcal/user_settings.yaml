@@ -30,3 +30,6 @@ ctd_outputs:
     CTDFLUOR:
         sensor: CTDFLUOR1
         units: 0-5VDC
+    CTDTURB:
+        sensor: CTDTURB1
+        units: 0-5VDC
