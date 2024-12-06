@@ -710,8 +710,8 @@ def export_ct_as_cnv(df, datadir, inst):
             'CTDSAL2': 'sal11: Salinity, Practical, 2 [PSU]',
             'CTDOXY1': 'sbeox0ML/L: Oxygen, SBE 43 [ml/l], WS = 2',
             'CTDOXYVOLTS': 'sbeox0V: Oxygen raw, SBE 43 [V]',
-            'CTD_FLUOR': 'fluorV: Fluorometer volts [V]',  # Returning as volts
-            'TURBIDITY': 'turbV: Turbidity volts [V]',
+            'CTDFLUOR': 'fluorV: Fluorometer volts [V]',  # Returning as volts
+            'CTDTURB': 'turbV: Turbidity volts [V]',
             'CTDXMISS': 'CstarV: Transmissometer volts [V]',
             'ALT': 'altM: Altimeter [m]',
             'REF_PAR': 'sparV: SPAR, Biospherical/Licor [V]',

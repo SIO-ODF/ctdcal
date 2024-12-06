@@ -764,15 +764,15 @@ def prepare_oxy_ices(btl_df, time_df, datadir, inst, ref, bottleflags_man):
     # Convert CTDOXY units
     btl_df["CTDOXY"] = oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
     # Calculate bottle oxygen
-    # btl_df[cfg.column["refO"]] = calculate_bottle_oxygen(
+    # BTLDF[cfg.column["refO"]] = calculate_bottle_oxygen(
     #     ssscc_list,
-    #     btl_df["SSSCC"],
-    #     btl_df["TITR_VOL"],
-    #     btl_df["TITR_TEMP"],
-    #     btl_df["FLASKNO"],
+    #     BTLDF["SSSCC"],
+    #     BTLDF["TITR_VOL"],
+    #     BTLDF["TITR_TEMP"],
+    #     BTLDF["FLASKNO"],
     # )
-    # btl_df[cfg.column["refO"]] = oxy_ml_to_umolkg(
-    #     btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
+    # BTLDF[cfg.column["refO"]] = oxy_ml_to_umolkg(
+    #     BTLDF[cfg.column["refO"]], BTLDF["sigma_btl"]
     # )
     btl_df["OXYGEN_FLAG_W"] = flagging.nan_values(btl_df['OXYGEN'])
 
