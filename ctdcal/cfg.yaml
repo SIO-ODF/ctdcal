@@ -10,7 +10,7 @@
 # Data Directory: str
 #   Path to your data directory. Absolute (UNIX-style) paths
 #   are recommended.
-datadir: "data"
+datadir: "/Users/als026/data/ices"
 #datadir: "/Users/ctdcaluser/data/mycruise"
 
 # Manual bottle flags filename (JSON): str

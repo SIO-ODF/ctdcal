@@ -16,6 +16,7 @@ import pandas as pd
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import oxy_fitting as oxy_fitting
+from ctdcal.common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -23,6 +24,27 @@ log = logging.getLogger(__name__)
 BOTTLE_FIRE_COL = "btl_fire"
 BOTTLE_FIRE_NUM_COL = "btl_fire_num"
 
+
+def _get_bottle_order_from_bl_file(bl_file):
+    """
+    Helper function to get bottle firing order from the Sea Bird .bl file, which
+    is the best source when bottles have been fired non-sequentially.
+
+    :param ssscc: string - station/cast identifier
+    :return: pandas dataframe object
+    """
+    btl_fire_order = [0]
+    btl_fire_num = [0]
+    with open(bl_file, 'r') as bl:
+        for line in bl:
+            line = line.split(',')
+            try:
+                int(line[0])
+            except ValueError:
+                continue
+            btl_fire_order.append(int(line[0]))  # index of first bottle fired
+            btl_fire_num.append(int(line[1]))  # number of first bottle fired
+    return pd.DataFrame(btl_fire_num, index=btl_fire_order, columns=['btl_fire_num'])
 
 def retrieveBottleDataFromFile(converted_file):
     """
@@ -33,12 +55,13 @@ def retrieveBottleDataFromFile(converted_file):
     return retrieveBottleData(converted_df)
 
 
-def retrieveBottleData(converted_df):
+def retrieveBottleData(converted_df, bl_file):
     """
     Retrieve the bottle data from a dataframe created from a converted file.
 
     Looks for changes in the BOTTLE_FIRE_COL column, ready to be averaged in making the CTD bottle file.
     """
+    bl = _get_bottle_order_from_bl_file(bl_file)
     if BOTTLE_FIRE_COL in converted_df.columns:
         converted_df[BOTTLE_FIRE_NUM_COL] = (
             (
@@ -52,12 +75,12 @@ def retrieveBottleData(converted_df):
             .cumsum()
         )
         # converted_df['bottle_fire_num'] = ((converted_df[BOTTLE_FIRE_COL] == False)).astype(int).cumsum()
+        converted_df[BOTTLE_FIRE_NUM_COL] = bl.loc[converted_df[BOTTLE_FIRE_NUM_COL]].values
         return converted_df.loc[converted_df[BOTTLE_FIRE_COL]]
         # return converted_df
     else:
         log.error("Bottle fire column:", BOTTLE_FIRE_COL, "not found")
-
-    return pd.DataFrame()  # empty dataframe
+        return pd.DataFrame()  # empty dataframe
 
 
 def bottle_mean(btl_df):
@@ -98,7 +121,7 @@ def bottle_median(btl_df):
     return output
 
 
-def _load_btl_data(btl_file, cols=None):
+def _load_btl_data(btl_file, cast_id, cols=None):
     """
     Loads "bottle mean" CTD data from .pkl file. Function will return all data unless
     cols is specified (as a list of column names)
@@ -107,46 +130,43 @@ def _load_btl_data(btl_file, cols=None):
     btl_data = pd.read_pickle(btl_file)
     if cols is not None:
         btl_data = btl_data[cols]
-    btl_data["SSSCC"] = Path(btl_file).stem.split("_")[0]
+    btl_data["SSSCC"] = cast_id
 
     return btl_data
 
 
-def _load_reft_data(reft_file, index_name="btl_fire_num"):
+def _load_reft_data(reft_file, cast_id, index_name="btl_fire_num"):
     """
     Loads reft_file to dataframe and reindexes to match bottle data dataframe
     """
     reft_data = pd.read_csv(reft_file, usecols=["btl_fire_num", "T90", "REFTMP_FLAG_W"])
     reft_data.set_index(index_name)
-    reft_data["SSSCC_TEMP"] = Path(reft_file).stem.split("_")[0]
+    reft_data["SSSCC_TEMP"] = cast_id
     reft_data["REFTMP"] = reft_data["T90"]
 
     return reft_data
 
 
-def _load_salt_data(salt_file, index_name="SAMPNO"):
+def _load_salt_data(salt_file, cast_id, index_name="SAMPNO"):
     """
     Loads salt_file to dataframe and reindexes to match bottle data dataframe
     """
     salt_data = pd.read_csv(
-        salt_file, usecols=["SAMPNO", "SALNTY", "BathTEMP", "CRavg"]
+        salt_file, usecols=["SAMPNO", "SALNTY"]
     )
     salt_data.set_index(index_name)
-    salt_data["SSSCC_SALT"] = Path(salt_file).stem.split("_")[0]
+    salt_data["SSSCC_SALT"] = cast_id
     salt_data.rename(columns={"SAMPNO": "SAMPNO_SALT"}, inplace=True)
 
     return salt_data
 
 
-def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
+def _add_btl_bottom_data(df, cast, datadir, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
     """
     Adds lat/lon, date, and time to dataframe based on the values in the bottom_bottle_details.csv
     """
-    cast_details = pd.read_csv(
-        # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.dirs["logs"] + "bottom_bottle_details.csv",
-        dtype={"SSSCC": str},
-    )
+    bbdfile = Path(datadir, 'logs', 'bottom_bottle_details.csv')
+    cast_details = pd.read_csv(bbdfile, dtype={'SSSCC': str})
     cast_details = cast_details[cast_details["SSSCC"] == cast]
     # df[lat_col] = np.round(cast_details["latitude"].iat[0], decimals)
     # df[lon_col] = np.round(cast_details["longitude"].iat[0], decimals)
@@ -161,7 +181,7 @@ def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", deci
     return df
 
 
-def load_all_btl_files(ssscc_list, cols=None):
+def load_all_btl_files(ssscc_list, datadir, inst, reft, salt, oxy, cols=None):
     """
     Load bottle and secondary (e.g. reference temperature, bottle salts, bottle oxygen)
     files for station/cast list and merge into a dataframe.
@@ -183,13 +203,13 @@ def load_all_btl_files(ssscc_list, cols=None):
 
     for ssscc in ssscc_list:
         log.info("Loading BTL data for station: " + ssscc + "...")
-        btl_file = cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl"
-        btl_data = _load_btl_data(btl_file, cols)
+        btl_file = Path(datadir, 'bottle', inst, "%s_btl_mean.pkl" % ssscc)
+        btl_data = _load_btl_data(btl_file, ssscc, cols)
 
         ### load REFT data
-        reft_file = cfg.dirs["reft"] + ssscc + "_reft.csv"
+        reft_file = Path(datadir, 'converted', reft, "%s_reft.csv" % ssscc)
         try:
-            reft_data = _load_reft_data(reft_file)
+            reft_data = _load_reft_data(reft_file, ssscc)
             if len(reft_data) > 36:
                 log.error(f"len(reft_data) > 36 for {ssscc}, check reftmp file")
         except FileNotFoundError:
@@ -203,9 +223,9 @@ def load_all_btl_files(ssscc_list, cols=None):
             reft_data["SSSCC_TEMP"] = ssscc
 
         ### load REFC data
-        refc_file = cfg.dirs["salt"] + ssscc + "_salts.csv"
+        refc_file = Path(datadir, 'converted', salt, "%s_salt.csv" % ssscc)
         try:
-            refc_data = _load_salt_data(refc_file, index_name="SAMPNO")
+            refc_data = _load_salt_data(refc_file, ssscc, index_name="SAMPNO")
             if len(refc_data) > 36:
                 log.error(f"len(refc_data) > 36 for {ssscc}, check autosal file")
         except FileNotFoundError:
@@ -216,42 +236,50 @@ def load_all_btl_files(ssscc_list, cols=None):
             )
             refc_data = pd.DataFrame(
                 index=btl_data.index,
-                columns=["CRavg", "BathTEMP", "BTLCOND"],
+                columns=["SALNTY", "BTLCOND"],
                 dtype=float,
             )
             refc_data["SAMPNO_SALT"] = btl_data["btl_fire_num"].astype(int)
 
         ### load OXY data
-        oxy_file = Path(cfg.dirs["oxygen"] + ssscc)
-        try:
-            oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
-            if len(oxy_data) > 36:
-                log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
-        except FileNotFoundError:
-            log.warning(
-                "Missing (or misnamed) REFO Data Station: "
-                + ssscc
-                + "...filling with NaNs"
-            )
-            oxy_data = pd.DataFrame(
-                index=btl_data.index,
-                columns=[
-                    "FLASKNO",
-                    "TITR_VOL",
-                    "TITR_TEMP",
-                    "DRAW_TEMP",
-                    "TITR_TIME",
-                    "END_VOLTS",
-                ],
-                dtype=float,
-            )
-            oxy_data["STNNO_OXY"] = ssscc[:3]
-            oxy_data["CASTNO_OXY"] = ssscc[3:]
-            oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
+        oxy_file = Path(datadir, 'converted', oxy, '%s_oxygen.csv' % ssscc)
+        if oxy_file.exists():
+            # Added to use non-odf oxy data from an excel sheet and a generic parser
+            oxy_data = pd.read_csv(oxy_file, usecols=["SAMPNO", "OXYGEN"])
+            oxy_data['SSSCC_OXY'] = ssscc
+            oxy_data.rename(columns={'SAMPNO': 'BOTTLENO_OXY'}, inplace=True)
+        else:
+            oxy_file = Path(cfg.dirs["oxygen"] + ssscc)
+            try:
+                oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
+                if len(oxy_data) > 36:
+                    log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
+            except FileNotFoundError:
+                log.warning(
+                    "Missing (or misnamed) REFO Data Station: "
+                    + ssscc
+                    + "...filling with NaNs"
+                )
+                oxy_data = pd.DataFrame(
+                    index=btl_data.index,
+                    columns=[
+                        "FLASKNO",
+                        "TITR_VOL",
+                        "TITR_TEMP",
+                        "DRAW_TEMP",
+                        "TITR_TIME",
+                        "END_VOLTS",
+                    ],
+                    dtype=float,
+                )
+                oxy_data["STNNO_OXY"] = ssscc[:3]
+                oxy_data["CASTNO_OXY"] = ssscc[3:]
+                oxy_data["BOTTLENO_OXY"] = btl_data["btl_fire_num"].astype(int)
 
         ### clean up dataframe
         # Horizontally concat DFs to have all data in one DF
-        btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
+        # btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="outer")
+        btl_data = pd.merge(btl_data, reft_data, on="btl_fire_num", how="left")
         btl_data = pd.merge(
             btl_data,
             refc_data,
@@ -271,7 +299,7 @@ def load_all_btl_files(ssscc_list, cols=None):
             log.error(f"len(btl_data) for {ssscc} > 36, check bottle file")
 
         # Add bottom of cast information (date,time,lat,lon,etc.)
-        btl_data = _add_btl_bottom_data(btl_data, ssscc)
+        btl_data = _add_btl_bottom_data(btl_data, ssscc, datadir)
 
         # Merge cast into df_data_all
         try:
@@ -290,7 +318,7 @@ def load_all_btl_files(ssscc_list, cols=None):
     return df_data_all
 
 
-def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
+def _reft_loader(ssscc, search_dir):
     """
     Loads SBE35.cap files and assembles into a dataframe.
 
@@ -298,7 +326,7 @@ def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
     ----------
     ssscc : str
         Station to load .CAP file for
-    reft_dir : str, pathlib Path
+    search_dir : str, pathlib Path
         Path to the reft folder 
 
     Returns
@@ -307,9 +335,9 @@ def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
         DataFrame of .CAP file with headers
 
     """
-    # semi-flexible search for reft file (in the form of *ssscc.cap)
+    # semi-flexible search for reft file (in the form of *ssscc.cap OR .txt)
     try:
-        reft_path = sorted(Path(reft_dir).glob(f"*{ssscc}.cap"))[0]
+        reft_path = sorted(Path(search_dir).glob(f"*{ssscc}.[ct][ax][pt]"))[0]
     except IndexError:
         raise FileNotFoundError
 
@@ -391,7 +419,7 @@ def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
     return reftDF
 
 
-def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
+def process_reft(ssscc_list, data_dir, inst):
     """
     SBE35 reference thermometer processing function. Load in .cap files for given
     station/cast list, perform basic flagging, and export to .csv files.
@@ -400,15 +428,18 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
     -------
     ssscc_list : list of str
         List of stations to process
-    reft_dir : str, optional
+    raw_dir : str, optional
         Path to folder containing raw salt files (defaults to data/reft/)
 
     """
+    raw_dir = Path(data_dir, 'raw', inst)
+    out_dir = validate_dir(Path(data_dir, 'converted', inst), create=True)
     for ssscc in ssscc_list:
-        if not Path(reft_dir + ssscc + "_reft.csv").exists():
+        fname = Path(out_dir, "%s_reft.csv" % ssscc)
+        if not fname.exists():
             try:
-                reftDF = _reft_loader(ssscc, reft_dir)
-                reftDF.to_csv(reft_dir + ssscc + "_reft.csv", index=False)
+                reftDF = _reft_loader(ssscc, raw_dir)
+                reftDF.to_csv(fname, index=False)
             except FileNotFoundError:
                 log.warning(
                     "refT file for cast " + ssscc + " does not exist... skipping"
@@ -498,7 +529,7 @@ def merge_hy1(
     return df
 
 
-def export_report_data(df):
+def export_report_data(df, datadir, inst):
     """
     Write out the data used for report generation as a csv.
 
@@ -508,10 +539,11 @@ def export_report_data(df):
         Fit bottle data
 
     """
-    df["STNNBR"] = [int(x[0:3]) for x in df["SSSCC"]]
+    outdir = validate_dir(Path(datadir, 'report', inst), create=True)
+    df["CAST"] = df["SSSCC"]
     df["CTDPRS"] = df["CTDPRS"].round(1)
     cruise_report_cols = [
-        "STNNBR",
+        "CAST",
         "CTDPRS",
         "CTDTMP1",
         "CTDTMP1_FLAG_W",
@@ -528,8 +560,8 @@ def export_report_data(df):
         "SALNTY",
         "CTDOXY",
         "CTDOXY_FLAG_W",
-        "CTDRINKO",
-        "CTDRINKO_FLAG_W",
+        # "CTDRINKO",
+        # "CTDRINKO_FLAG_W",
         "OXYGEN",
     ]
 
@@ -547,14 +579,14 @@ def export_report_data(df):
         df["CTDCOND2"], df["BTLCOND"], df["CTDPRS"]
     )
     df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
-    df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
+    # df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
-    df[cruise_report_cols].to_csv("data/report_data.csv", index=False)
+    df[cruise_report_cols].to_csv(Path(outdir, "report_data.csv"), index=False)
 
     return
 
 
-def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
+def export_hy1(df, datadir, inst, org="ODF"):
     """
     Write out the exchange-lite formatted hy1 bottle file.
 
@@ -576,7 +608,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     btl_columns = {
         "EXPOCODE": "",
         "SECT_ID": "",
-        "STNNBR": "",
+        # "STNNBR": "",
         "CASTNO": "",
         "SAMPNO": "",
         "BTLNBR": "",
@@ -611,19 +643,19 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     btl_data["EXPOCODE"] = cfg.expocode
     btl_data["SECT_ID"] = cfg.section_id
-    btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
-    btl_data["CASTNO"] = [int(x[3:]) for x in btl_data["SSSCC"]]
+    # btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
+    btl_data["CASTNO"] = btl_data["SSSCC"].astype(str)
     btl_data["SAMPNO"] = btl_data["btl_fire_num"].astype(int)
     btl_data = add_btlnbr_cols(btl_data, btl_num_col="btl_fire_num")
 
     # sort by decreasing sample number (increasing pressure) and reindex
     btl_data = btl_data.sort_values(
-        by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
+        by=["CASTNO", "SAMPNO"], ascending=[True, True], ignore_index=True
     )
 
     # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+    # btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+    # btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
@@ -633,10 +665,10 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     # add depth
     depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        Path(datadir, "logs", "depth_log.csv"), dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     manual_depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+        Path(datadir, "logs", "manual_depth_log.csv"), dtype={"SSSCC": str}
     )
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
@@ -667,7 +699,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org
-    with open(out_dir + cfg.expocode + "_hy1.csv", mode="w+") as f:
+    with open(Path(datadir, "export", inst, "%s_hy1.csv" % cfg.expocode), mode="w+") as f:
         f.write("BOTTLE, %s\n" % (time_stamp))
         f.write(",".join(btl_columns.keys()) + "\n")
         f.write(",".join(btl_columns.values()) + "\n")

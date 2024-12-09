@@ -9,9 +9,9 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from . import equations_sbe as sbe_eq
-from . import process_bottle as btl
-from . import sbe_reader as sbe_rd
+from ctdcal import equations_sbe as sbe_eq
+from ctdcal import process_bottle as btl
+from ctdcal import sbe_reader as sbe_rd
 from ctdcal.processors.cast_tools import Cast
 from ctdcal.common import validate_dir
 
@@ -46,12 +46,12 @@ short_lookup = {
         "type": "float64",
     },
     # '38':{'short_name': 'CTDOXYVOLTS', 'long_name':'SBE 43 Oxygen Volts', 'units': '0-5VDC', 'type':'float64'},
-    "11": {
-        "short_name": "FLUOR",
-        "long_name": "Seapoint Fluorometer",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
+    # "11": {
+    #     "short_name": "FLUOR",
+    #     "long_name": "Seapoint Fluorometer",
+    #     "units": "0-5VDC",
+    #     "type": "float64",
+    # },
     "27": {"short_name": "FREE", "long_name": "empty", "units": "NA", "type": "NA"},
     "0": {
         "short_name": "ALT",
@@ -65,72 +65,72 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
-    "61": {
-        "short_name": "U_DEF_poly",
-        "long_name": "user defined, polynomial",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "80": {
-        "short_name": "U_DEF_e",
-        "long_name": "user defined, exponential",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
+    # "61": {
+    #     "short_name": "U_DEF_poly",
+    #     "long_name": "user defined, polynomial",
+    #     "units": "0-5VDC",
+    #     "type": "float64",
+    # },
+    # "80": {
+    #     "short_name": "U_DEF_e",
+    #     "long_name": "user defined, exponential",
+    #     "units": "0-5VDC",
+    #     "type": "float64",
+    # },
     "1000": {
         "short_name": "CTDSAL",
         "long_name": "Salinity (C1 T1)",
         "units": "PSU",
         "type": "float64",
     },
-    "20": {
-        "short_name": "CTDFLUOR",
-        "long_name": "WetlabECO_AFL_FL_Sensor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
+    # "20": {
+    #     "short_name": "CTDFLUOR",
+    #     "long_name": "WetlabECO_AFL_FL_Sensor",
+    #     "units": "0-5VDC",
+    #     "type": "float64",
+    # },
     "21": {
-        "short_name": "CTD_FLUOR",
+        "short_name": "CTDFLUOR",
         "long_name": "A fluorometer instrument",
         "units": "0-5VDC",
         "type": "float64",
     },
-    "42": {
-        "short_name": "PAR",
-        "long_name": "PAR/Irradiance, Biospherical/Licor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
+    # "42": {
+    #     "short_name": "PAR",
+    #     "long_name": "PAR/Irradiance, Biospherical/Licor",
+    #     "units": "0-5VDC",
+    #     "type": "float64",
+    # },
     "51": {
         "short_name": "REF_PAR",
         "long_name": "Surface PAR/Irradiance, Biospherical/Licor",
         "units": "0-5VDC",
         "type": "float64",
     },
-    "70": {
-        "short_name": "CTDBACKSCATTER",
-        "long_name": "WetlabECO_BB_Sensor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
-    "13": {
-        "short_name": "CTDFLUOR",
-        "long_name": "FluoroSeatechWetlabsFLF_Sensor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
+    # "70": {
+    #     "short_name": "CTDBACKSCATTER",
+    #     "long_name": "WetlabECO_BB_Sensor",
+    #     "units": "0-5VDC",
+    #     "type": "float64",
+    # },
+    # "13": {
+    #     "short_name": "CTDFLUOR",
+    #     "long_name": "FluoroSeatechWetlabsFLF_Sensor",
+    #     "units": "0-5VDC",
+    #     "type": "float64",
+    # },
     "67": {
-        "short_name": "TURBIDITY",
+        "short_name": "CTDTURB",
         "long_name": "Turbidity Meter",
         "units": "0-5VDC",
         "type": "float64",
     },
-    "19": {
-        "short_name": "FLUOR_CDOM",
-        "long_name": "FluoroWetlabCDOM_Sensor",
-        "units": "0-5VDC",
-        "type": "float64",
-    },
+    # "19": {
+    #     "short_name": "FLUOR_CDOM",
+    #     "long_name": "FluoroWetlabCDOM_Sensor",
+    #     "units": "0-5VDC",
+    #     "type": "float64",
+    # },
 }
 
 
@@ -260,16 +260,23 @@ def make_btl_mean(ssscc_list, inst, cfg):
         bottle averaging of mean has finished successfully
     """
     log.info("Generating btl_mean.pkl files")
+    # validate bottle directory
+    btl_dir = validate_dir(Path(cfg.datadir, 'bottle', inst), create=True)
+    log_dir = validate_dir(Path(cfg.datadir, 'logs', inst), create=True)
+    cnv_dir = Path(cfg.datadir, 'converted', inst)
+    raw_dir = Path(cfg.datadir, 'raw', inst)
     for ssscc in ssscc_list:
-        cnvdir = Path(cfg.datadir, 'converted', inst)
-        btldir = Path(cfg.datadir, 'bottle', inst)
-        if not Path(btldir, "%s_btl_mean.pkl" % ssscc).exists():
-            imported_df = pd.read_pickle(Path(cnvdir, "%s.pkl" % ssscc))
-            bottle_df = btl.retrieveBottleData(imported_df)
-            mean_df = btl.bottle_mean(bottle_df)
+        btl_file = Path(btl_dir, "%s_btl_mean.pkl" % ssscc)
+        if not btl_file.exists():
+            imported_df = pd.read_pickle(Path(cnv_dir, "%s.pkl" % ssscc))
+            bl_file = Path(raw_dir, "%s.bl" % ssscc)
+            bottle_df = btl.retrieveBottleData(imported_df, bl_file)
+            # mean_df = btl.bottle_mean(bottle_df)
+            mean_df = bottle_df.groupby('btl_fire_num', as_index=False).mean()
+            mean_df.to_pickle(btl_file)
 
             # export bottom bottle time/lat/lon info
-            fname = cfg.dirs["logs"] + "bottom_bottle_details.csv"
+            fname = Path(cfg.datadir, 'logs', 'bottom_bottle_details.csv')
             datetime_col = "nmea_datetime"
             if datetime_col not in mean_df.columns:
                 log.debug(
@@ -284,7 +291,6 @@ def make_btl_mean(ssscc_list, inst, cfg):
             with open(fname, "a") as f:
                 bot_df.to_csv(f, mode="a", header=add_header, index=False)
 
-            mean_df.to_pickle(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl")
 
     return True
 
@@ -554,6 +560,31 @@ def to_temperature(raw, manufacturer, sensor, coefs):
         elif sensor.lower() == "concerto":
             pass
 
+
+def sal_to_cond(sal, ref_t, btl_p):
+    """
+    Convert salinity to conductivity using GSW conversion routines.
+
+    Parameters
+    ----------
+    sal : float
+        practical salinity
+    ref_t : float
+        CTD temperature, deg C
+    btl_p : float
+        CTD pressure, dbar
+
+    Returns
+    -------
+    float
+    """
+    cond = gsw.C_from_SP(sal, ref_t, btl_p)
+
+    # ignore RunTimeWarning from (np.nan <= 1)
+    with np.errstate(invalid="ignore"):
+        cond[cond <= 1] = np.nan
+
+    return cond
 
 def CR_to_cond(cr, bath_t, ref_t, btl_p):
     """

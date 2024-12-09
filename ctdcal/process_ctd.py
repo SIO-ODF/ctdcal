@@ -335,7 +335,7 @@ def _get_pressure_offset(start_vals, end_vals):
     return p_off
 
 
-def apply_pressure_offset(df, p_col="CTDPRS"):
+def apply_pressure_offset(df, datadir, p_col="CTDPRS"):
     """
     Calculate pressure offset using deck pressure log and apply it to the data.
     Pressure flag column is added with value 2, indicating the data are calibrated.
@@ -353,19 +353,21 @@ def apply_pressure_offset(df, p_col="CTDPRS"):
         DataFrame containing updated pressure values and a new flag column
 
     """
+    logfile = Path(datadir, 'logs', 'ondeck_pressure.csv')
     p_log = pd.read_csv(
-        cfg.dirs["logs"] + "ondeck_pressure.csv",
+        logfile,
         dtype={"cast_id": str},
         na_values="Started in Water",
     )
     p_offset = _get_pressure_offset(p_log['pressure_start'], p_log['pressure_end'])
+    print('Average pressure offset is: %s' % p_offset)
     df[p_col] += p_offset
     df[p_col + "_FLAG_W"] = 2
 
     return df
 
 
-def make_depth_log(time_df, threshold=80):
+def make_depth_log(time_df, datadir, threshold=80):
     """
     Create depth log file from maximum depth of each station/cast in time DataFrame.
     If rosette does not get within the threshold distance of the bottom, returns NaN.
@@ -401,7 +403,7 @@ def make_depth_log(time_df, threshold=80):
         .astype(int)
     )
     bottom_df[["SSSCC", "DEPTH"]].to_csv(
-        cfg.dirs["logs"] + "depth_log.csv", index=False
+        Path(datadir, 'logs', "depth_log.csv"), index=False
     )
 
     return True
@@ -464,9 +466,9 @@ def load_all_ctd_files(ssscc_list, datadir, inst):
         time_file = Path(datadir, 'time', inst, '%s_time.pkl' % ssscc)
         time_data = pd.read_pickle(time_file)
         time_data["SSSCC"] = str(ssscc)
-        # time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
-        #     time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
-        # )
+        time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
+            time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
+        )
         df_list.append(time_data)
         # print("** Finished TIME data station: " + ssscc + " **")
     df_data_all = pd.concat(df_list, axis=0, sort=False)
@@ -517,7 +519,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list):
+def export_ct1(df, datadir, inst, ssscc_list):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -542,6 +544,7 @@ def export_ct1(df, ssscc_list):
     # initial flagging (some of this should be moved)
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
+    df["CTDTURB_FLAG_W"] = 1
     # df["CTDBACKSCATTER_FLAG_W"] = 1
 
     # rename outputs as defined in user_settings.yaml
@@ -567,20 +570,20 @@ def export_ct1(df, ssscc_list):
     df["SSSCC"] = df["SSSCC"].astype(str).copy()
     cast_details = pd.read_csv(
         # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.dirs["logs"] + "bottom_bottle_details.csv",
+        Path(datadir, "logs", "bottom_bottle_details.csv"),
         dtype={"SSSCC": str},
     )
     depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        Path(datadir, "logs", "depth_log.csv"), dtype={"SSSCC": str}, na_values=-999
     ).dropna()
     try:
         manual_depth_df = pd.read_csv(
-            cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+            Path(datadir, "logs", "manual_depth_log.csv"), dtype={"SSSCC": str}
         )
     except FileNotFoundError:
         log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
-        manual_depth_df.to_csv(cfg.dirs["logs"] + "manual_depth_log.csv", index=False)
+        manual_depth_df.to_csv(Path(datadir, "logs", "manual_depth_log.csv"), index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
     full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
 
@@ -590,9 +593,9 @@ def export_ct1(df, ssscc_list):
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
         # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
-        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        # print(f"Using Rinko as CTDOXY for {ssscc}")
+        # time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+        # time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[cfg.ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
@@ -621,7 +624,7 @@ def export_ct1(df, ssscc_list):
         now = datetime.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d")  # %H:%M")
         file_datetime = file_datetime + "ODFSIO"
-        with open(f"{cfg.dirs['pressure']}{ssscc}_ct1.csv", "w+") as f:
+        with open(Path(datadir, "export", inst, f"{ssscc}_ct1.csv"), "w+") as f:
             # put in logic to check columns?
             # number_headers should be calculated, not defined
             ctd_header = (  # this is ugly but prevents tabs before label
@@ -629,8 +632,8 @@ def export_ct1(df, ssscc_list):
                 f"NUMBER_HEADERS = 11\n"
                 f"EXPOCODE = {cfg.expocode}\n"
                 f"SECT_ID = {cfg.section_id}\n"
-                f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
-                f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
+                # f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
+                f"CASTNO = {ssscc}\n"  # CASTNO = CC
                 f"DATE = {b_datetime[0]}\n"
                 f"TIME = {b_datetime[1]}\n"
                 f"LATITUDE = {btm_lat:.4f}\n"
@@ -707,8 +710,8 @@ def export_ct_as_cnv(df, datadir, inst):
             'CTDSAL2': 'sal11: Salinity, Practical, 2 [PSU]',
             'CTDOXY1': 'sbeox0ML/L: Oxygen, SBE 43 [ml/l], WS = 2',
             'CTDOXYVOLTS': 'sbeox0V: Oxygen raw, SBE 43 [V]',
-            'CTD_FLUOR': 'fluorV: Fluorometer volts [V]',  # Returning as volts
-            'TURBIDITY': 'turbV: Turbidity volts [V]',
+            'CTDFLUOR': 'fluorV: Fluorometer volts [V]',  # Returning as volts
+            'CTDTURB': 'turbV: Turbidity volts [V]',
             'CTDXMISS': 'CstarV: Transmissometer volts [V]',
             'ALT': 'altM: Altimeter [m]',
             'REF_PAR': 'sparV: SPAR, Biospherical/Licor [V]',
