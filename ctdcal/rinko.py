@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import ctd_plots, flagging, get_ctdcal_config, oxy_fitting, process_ctd
+from . import flagging, get_ctdcal_config, oxy_fitting, process_ctd
+from ctdcal.plotting.plot_fit import _intermediate_residual_plot
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -290,7 +291,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Plot all post fit data
     f_out = f"{cfg.fig_dirs['rinko']}rinko_residual_all_postfit.pdf"
-    ctd_plots._intermediate_residual_plot(
+    _intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDRINKO"],
         btl_df["CTDPRS"],
         btl_df["SSSCC"],
@@ -300,7 +301,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
     f_out = f"{cfg.fig_dirs['rinko']}rinko_residual_all_postfit_flag2.pdf"
     flag2 = btl_df["CTDRINKO_FLAG_W"] == 2
-    ctd_plots._intermediate_residual_plot(
+    _intermediate_residual_plot(
         btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDRINKO"],
         btl_df.loc[flag2, "CTDPRS"],
         btl_df.loc[flag2, "SSSCC"],
@@ -411,7 +412,7 @@ def rinko_oxy_fit(
     # intermediate plots to diagnose data chunks goodness
     if f_suffix is not None:
         f_out = f"{cfg.fig_dirs['rinko']}rinko_residual{f_suffix}.pdf"
-        ctd_plots._intermediate_residual_plot(
+        _intermediate_residual_plot(
             btl_df["residual"],
             btl_df["CTDPRS"],
             btl_df["SSSCC"],

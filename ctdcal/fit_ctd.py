@@ -13,11 +13,11 @@ import yaml
 from scipy.ndimage import shift
 
 from ctdcal.fitting.common import get_node, NodeNotFoundError
-from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
 from ctdcal.processors.functions_salt import CR_to_cond
+from ctdcal.plotting.plot_fit import _intermediate_residual_plot
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -185,7 +185,7 @@ def _flag_btl_data(
         elif param == cfg.column["c2"]:
             xlabel = "C2 Residual (mS/cm)"
         f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
-        ctd_plots._intermediate_residual_plot(
+        _intermediate_residual_plot(
             df["Diff"],
             df[prs],
             df["SSSCC"],
@@ -194,7 +194,7 @@ def _flag_btl_data(
             f_out=f_out,
         )
         f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
-        ctd_plots._intermediate_residual_plot(
+        _intermediate_residual_plot(
             df_good["Diff"],
             df_good[prs],
             df_good["SSSCC"],
@@ -401,7 +401,7 @@ def calibrate_temp(btl_df, time_df):
 
             # 1) plot pre-fit residual
             f_stem = f.stem  # get "ssscc_t*" from path
-            ctd_plots._intermediate_residual_plot(
+            _intermediate_residual_plot(
                 btl_df.loc[btl_rows, cfg.column["refT"]]
                 - btl_df.loc[btl_rows, cfg.column[tN]],
                 btl_df.loc[btl_rows, cfg.column["p"]],
@@ -419,7 +419,7 @@ def calibrate_temp(btl_df, time_df):
                 cfg.column["refT"],
                 zRange=fit_yaml[tN][f_stem]["zRange"],
             )
-            ctd_plots._intermediate_residual_plot(
+            _intermediate_residual_plot(
                 df_good["Diff"],
                 df_good[cfg.column["p"]],
                 df_good["SSSCC"],
@@ -473,7 +473,7 @@ def calibrate_temp(btl_df, time_df):
             T_fit_coefs = pd.concat([T_fit_coefs, coef_df])
 
         # one more fig with all cuts
-        ctd_plots._intermediate_residual_plot(
+        _intermediate_residual_plot(
             btl_df[cfg.column["refT"]] - btl_df[cfg.column[tN]],
             btl_df[cfg.column["p"]],
             btl_df["SSSCC"],
@@ -572,7 +572,7 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
 
             # 1) plot pre-fit residual
             f_stem = f.stem  # get "ssscc_c*" from path
-            ctd_plots._intermediate_residual_plot(
+            _intermediate_residual_plot(
                 btl_df.loc[btl_rows, cfg.column["refC"]]
                 - btl_df.loc[btl_rows, cfg.column[cN]],
                 btl_df.loc[btl_rows, cfg.column["p"]],
@@ -590,7 +590,7 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
                 cfg.column["refC"],
                 zRange=fit_yaml[cN][f_stem]["zRange"],
             )
-            ctd_plots._intermediate_residual_plot(
+            _intermediate_residual_plot(
                 df_good["Diff"],
                 df_good[cfg.column["p"]],
                 df_good["SSSCC"],
@@ -649,7 +649,7 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
             C_fit_coefs = pd.concat([C_fit_coefs, coef_df])
 
         # one more fig with all cuts
-        ctd_plots._intermediate_residual_plot(
+        _intermediate_residual_plot(
             btl_df[cfg.column["refC"]] - btl_df[cfg.column[cN]],
             btl_df[cfg.column["p"]],
             btl_df["SSSCC"],

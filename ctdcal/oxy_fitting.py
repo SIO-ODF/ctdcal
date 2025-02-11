@@ -15,10 +15,10 @@ import scipy
 
 from ctdcal.fitting.common import NodeNotFoundError, get_node
 
-from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
+from ctdcal.plotting.plot_fit import _intermediate_residual_plot
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -621,7 +621,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
 
     # Plot data to be fit together
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}_prefit.pdf"
-    ctd_plots._intermediate_residual_plot(
+    _intermediate_residual_plot(
         merged_df["REFOXY"] - merged_df["CTDOXY"],
         merged_df["CTDPRS"],
         merged_df["SSSCC"],
@@ -677,7 +677,7 @@ def sbe43_oxy_fit(merged_df, sbe_coef0=None, f_suffix=None):
     # intermediate plots to diagnose data chunks goodness
     if f_suffix is not None:
         f_out = f"{cfg.fig_dirs['ox']}sbe43_residual{f_suffix}.pdf"
-        ctd_plots._intermediate_residual_plot(
+        _intermediate_residual_plot(
             merged_df["residual"],
             merged_df["CTDPRS"],
             merged_df["SSSCC"],
@@ -823,7 +823,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     log.info("Calibrating oxygen (SBE43)")
     # Plot all pre fit data
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_prefit.pdf"
-    ctd_plots._intermediate_residual_plot(
+    _intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
         btl_df["SSSCC"],
@@ -931,7 +931,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
 
     # Plot all post fit data
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit.pdf"
-    ctd_plots._intermediate_residual_plot(
+    _intermediate_residual_plot(
         btl_df["OXYGEN"] - btl_df["CTDOXY"],
         btl_df["CTDPRS"],
         btl_df["SSSCC"],
@@ -941,7 +941,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
     )
     f_out = f"{cfg.fig_dirs['ox']}sbe43_residual_all_postfit_flag2.pdf"
     flag2 = btl_df["CTDOXY_FLAG_W"] == 2
-    ctd_plots._intermediate_residual_plot(
+    _intermediate_residual_plot(
         btl_df.loc[flag2, "OXYGEN"] - btl_df.loc[flag2, "CTDOXY"],
         btl_df.loc[flag2, "CTDPRS"],
         btl_df.loc[flag2, "SSSCC"],
