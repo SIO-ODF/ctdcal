@@ -4,7 +4,6 @@ Process all CTD and bottle data using ODF routines.
 
 # import needed ctdcal modules
 from ctdcal import (
-    convert,
     fit_ctd,
     odf_io,
     oxy_fitting,
@@ -16,6 +15,9 @@ from ctdcal.common import load_user_config, validate_file
 
 import logging
 
+from ctdcal.processors.cast_tools import make_time_files
+from ctdcal.processors.convert_legacy import hex_to_ctd
+from ctdcal.processors.proc_bottle import make_btl_mean
 
 log = logging.getLogger(__name__)
 
@@ -43,13 +45,13 @@ def odf_process_all():
         ssscc_list = process_ctd.make_ssscc_list()
 
     # convert raw .hex files
-    convert.hex_to_ctd(ssscc_list)
+    hex_to_ctd(ssscc_list)
 
     # process time files
-    convert.make_time_files(ssscc_list, user_cfg.datadir, user_cfg)
+    make_time_files(ssscc_list, user_cfg.datadir, user_cfg)
 
     # process bottle file
-    convert.make_btl_mean(ssscc_list)
+    make_btl_mean(ssscc_list)
 
     # generate salt .csv files
     odf_io.process_salts(ssscc_list, user_cfg)

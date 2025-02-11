@@ -13,11 +13,11 @@ import yaml
 from scipy.ndimage import shift
 
 from ctdcal.fitting.common import get_node, NodeNotFoundError
-from . import convert as convert
 from . import ctd_plots as ctd_plots
 from . import flagging as flagging
 from . import get_ctdcal_config
 from . import process_ctd as process_ctd
+from ctdcal.processors.functions_salt import CR_to_cond
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -518,7 +518,7 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
     """
     log.info("Calibrating conductivity")
     # calculate BTLCOND values from autosal data
-    btl_df[cfg.column["refC"]] = convert.CR_to_cond(
+    btl_df[cfg.column["refC"]] = CR_to_cond(
         btl_df["CRavg"],
         btl_df["BathTEMP"],
         btl_df[cfg.column["t1"]],
