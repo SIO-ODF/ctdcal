@@ -9,16 +9,13 @@ import logging
 from pathlib import Path
 
 import gsw
-import numpy as np
 import pandas as pd
 
-from . import equations_sbe as sbe_eq
-from . import get_ctdcal_config
-from . import process_bottle as btl
-from . import process_ctd as process_ctd
-from . import sbe_reader as sbe_rd
-from ctdcal.processors.cast_tools import Cast
-from .common import validate_dir
+from ctdcal.processors import functions_ctd as sbe_eq
+from ctdcal.processors import functions_oxy as oxy_eq
+from ctdcal.processors import functions_aux as aux_eq
+from ctdcal import get_ctdcal_config
+from ctdcal import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -323,10 +320,10 @@ def convertFromSBEReader(sbeReader, ssscc):
         ### Oxygen block
         elif meta["sensor_id"] == "38":
             log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
-            V_corrected = sbe_eq.sbe43_hysteresis_voltage(
+            V_corrected = oxy_eq.sbe43_hysteresis_voltage(
                 raw_df[meta["column"]], p_array, coefs
             )
-            converted_df[col] = sbe_eq.sbe43(
+            converted_df[col] = oxy_eq.sbe43(
                 V_corrected,
                 p_array,
                 t_array,
@@ -340,7 +337,7 @@ def convertFromSBEReader(sbeReader, ssscc):
         ### Fluorometer Seapoint block
         elif meta["sensor_id"] == "11":
             log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
-            converted_df[col] = sbe_eq.seapoint_fluoro(raw_df[meta["column"]], coefs)
+            converted_df[col] = aux_eq.seapoint_fluoro(raw_df[meta["column"]], coefs)
 
         ### Salinity block
         elif meta["sensor_id"] == "1000":
@@ -350,7 +347,7 @@ def convertFromSBEReader(sbeReader, ssscc):
         ### Altimeter block
         elif meta["sensor_id"] == "0":
             log.info(f"Processing Sensor ID: {meta['sensor_id']}, {sensor_name}")
-            converted_df[col] = sbe_eq.sbe_altimeter(raw_df[meta["column"]], coefs)
+            converted_df[col] = aux_eq.sbe_altimeter(raw_df[meta["column"]], coefs)
 
         ### Rinko block
         elif meta["sensor_id"] == "61":
@@ -358,7 +355,7 @@ def convertFromSBEReader(sbeReader, ssscc):
                 log.info("Processing Rinko O2")
                 # hysteresis correct then pass through voltage (see Uchida, 2010)
                 coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
-                converted_df[col] = sbe_eq.sbe43_hysteresis_voltage(
+                converted_df[col] = oxy_eq.sbe43_hysteresis_voltage(
                     raw_df[meta["column"]],
                     p_array,
                     coefs,
