@@ -13,7 +13,7 @@ import pandas as pd
 
 from ctdcal import get_ctdcal_config
 from ctdcal.common import validate_file
-from ctdcal.fitting.common import (
+from ctdcal.fitting.fit_common import (
     NodeNotFoundError,
     df_node_to_BottleFlags,
     get_node,

@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from . import flagging, get_ctdcal_config, oxy_fitting, process_ctd
+from . import get_ctdcal_config, oxy_fitting, process_ctd
+from ctdcal.flagging import flag_common as flagging
 from ctdcal.plotting.plot_fit import _intermediate_residual_plot
 
 cfg = get_ctdcal_config()

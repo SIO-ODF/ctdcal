@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import flagging as flagging
+from ctdcal.flagging import flag_common as flagging
 from . import get_ctdcal_config
 from . import oxy_fitting as oxy_fitting
 

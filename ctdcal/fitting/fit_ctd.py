@@ -1,209 +1,23 @@
 """
 A module for fitting CTD discrete/bottle and continuous data.
 """
-
-#!/usr/bin/env python
 import logging
 from pathlib import Path
 
 import gsw
 import numpy as np
 import pandas as pd
-import yaml
-from scipy.ndimage import shift
 
-from ctdcal.fitting.common import get_node, NodeNotFoundError
-from . import flagging as flagging
-from . import get_ctdcal_config
-from . import process_ctd as process_ctd
+from ctdcal.fitting.fit_common import get_node, NodeNotFoundError, multivariate_fit, apply_polyfit
+from ctdcal import get_ctdcal_config
+from ctdcal import process_ctd as process_ctd
 from ctdcal.processors.functions_salt import CR_to_cond
 from ctdcal.plotting.plot_fit import _intermediate_residual_plot
+from ctdcal.fitting.fit_legacy import load_fit_yaml
+from ctdcal.flagging.flag_common import _flag_btl_data, outliers, nan_values, by_residual
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
-
-
-def load_fit_yaml(fname=f"{cfg.dirs['logs']}fit_coefs.yaml", to_object=False):
-    """Load polynomial fit order information from .yaml file."""
-
-    if not Path(fname).exists():
-        log.warning("Warning: Coefficients fit order YAML does not exist. Generating from scratch...")
-        generate_yaml()
-
-    with open(fname, "r") as f:
-        ymlfile = yaml.safe_load(f)
-
-    if to_object:
-        return type("ymlfile", (object,), ymlfile)
-    else:
-        return ymlfile
-
-def generate_yaml(fname="fit_coefs.yaml", outdir=cfg.dirs['logs']):
-    """
-    Create a default coeff. yaml file.
-    """
-    data = {
-        't1': {
-            'ssscc_t1': {
-                'P_order': 1,
-                'T_order': 0,
-                'zRange': "1000:6000"
-            }
-        },
-        'c1': {
-            'ssscc_c1': {
-                'P_order': 1,
-                'T_order': 0,
-                'C_order': 0,
-                'zRange': "1000:6000"
-            }
-        },
-        't2': {
-            'ssscc_t1': {
-                'P_order': 1,
-                'T_order': 0,
-                'zRange': "1000:6000"
-            }
-        },
-        'c2': {
-            'ssscc_c1': {
-                'P_order': 1,
-                'T_order': 0,
-                'C_order': 0,
-                'zRange': "1000:6000"
-            }
-        }
-    }
-
-    # Write the data to a YAML file
-    with open(outdir + fname, 'w') as file:
-        yaml.dump(data, file, default_flow_style=False)
-
-def write_fit_yaml():
-    """For future use with automated fitting routine(s).
-    i.e., iterate to find best fit parameters, save to file"""
-    pass
-
-
-def cell_therm_mass_corr(temp, cond, sample_int=1 / 24, alpha=0.03, beta=1 / 7):
-    """Correct conductivity signal for effects of cell thermal mass.
-
-    Parameters
-    ----------
-    temp : array-like
-        CTD temperature [degC]
-    cond : array-like
-        CTD conductivity [mS/cm]
-    sample_int : float, optional
-        CTD sample interval [seconds]
-    alpha : float, optional
-        Thermal anomaly amplitude
-    beta : float, optional
-        Thermal anomaly time constant
-
-    Returns
-    -------
-    cond_corr : array-like
-        Corrected CTD conductivity [mS/cm]
-
-    Notes
-    -----
-    See Sea-Bird Seasoft V2 manual (Section 6, page 93) for equation information.
-    Default alpha/beta values taken from Seasoft manual (page 92).
-    c.f. "Thermal Inertia of Conductivity Cells: Theory" (Lueck 1990) for more info
-    https://doi.org/10.1175/1520-0426(1990)007<0741:TIOCCT>2.0.CO;2
-    """
-    a = 2 * alpha / (sample_int * beta + 2)
-    b = 1 - (2 * a / alpha)
-    dc_dT = 0.1 * (1 + 0.006 * (temp - 20))
-    dT = np.insert(np.diff(temp), 0, 0)  # forward diff reduces len by 1
-
-    def calculate_CTM(b, CTM_0, a, dc_dT, dT):
-        """Return CTM in units of [S/m]"""
-        CTM = -1.0 * b * CTM_0 + a * (dc_dT) * dT
-        return CTM
-
-    CTM = calculate_CTM(b, 0, a, dc_dT, dT)
-    CTM = calculate_CTM(b, shift(CTM, 1, order=0), a, dc_dT, dT)
-    CTM = np.nan_to_num(CTM) * 10.0  # [S/m] to [mS/cm]
-    cond_corr = cond + CTM
-
-    return cond_corr
-
-
-def _flag_btl_data(
-    df,
-    param=None,
-    ref=None,
-    thresh=[0.002, 0.005, 0.010, 0.020],
-    f_out=None,
-):
-    """
-    Flag CTD "btl" data against reference measurement (e.g. SBE35, bottle salts).
-
-    Parameters
-    ----------
-    df : DataFrame,
-        DataFrame containing btl data
-    param : str
-        Name of parameter to calibrate (e.g. "CTDCOND1", "CTDTMP2")
-    ref : str
-        Name of reference parameter to calibrate against (e.g. "BTLCOND", "T90")
-    thresh : list of float, optional
-        Maximum acceptable residual for each pressure range
-    f_out : str, optional
-        Path and filename to save residual vs. pressure plots
-
-    Returns
-    -------
-    df_ques : DataFrame
-        Data flagged as questionable (flag 3s)
-    df_bad : DataFrame
-        Data flagged as bad (flag 4s)
-
-    """
-    prs = cfg.column["p"]
-
-    # Remove extreme outliers and code bad
-    df = df.reset_index(drop=True)
-    df["Diff"] = df[ref] - df[param]
-    df["Flag"] = flagging.outliers(df["Diff"])
-
-    # Find values that are above the threshold and code questionable
-    df["Flag"] = flagging.by_residual(df[param], df[ref], df[prs], old_flags=df["Flag"])
-    df_good = df[df["Flag"] == 2].copy()
-    df_ques = df[df["Flag"] == 3].copy()
-    df_bad = df[df["Flag"] == 4].copy()
-
-    if f_out is not None:
-        if param == cfg.column["t1"]:
-            xlabel = "T1 Residual (T90 C)"
-        elif param == cfg.column["t2"]:
-            xlabel = "T2 Residual (T90 C)"
-        elif param == cfg.column["c1"]:
-            xlabel = "C1 Residual (mS/cm)"
-        elif param == cfg.column["c2"]:
-            xlabel = "C2 Residual (mS/cm)"
-        f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
-        _intermediate_residual_plot(
-            df["Diff"],
-            df[prs],
-            df["SSSCC"],
-            show_thresh=True,
-            xlabel=xlabel,
-            f_out=f_out,
-        )
-        f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
-        _intermediate_residual_plot(
-            df_good["Diff"],
-            df_good[prs],
-            df_good["SSSCC"],
-            show_thresh=True,
-            xlabel=xlabel,
-            f_out=f_out,
-        )
-
-    return df_ques, df_bad
 
 
 def _prepare_fit_data(df, param, ref_param, zRange=None):
@@ -218,146 +32,12 @@ def _prepare_fit_data(df, param, ref_param, zRange=None):
         ]
 
     good_data["Diff"] = good_data[ref_param] - good_data[param]
-    good_data["Flag"] = flagging.outliers(good_data["Diff"], n_sigma2=4)
+    good_data["Flag"] = outliers(good_data["Diff"], n_sigma2=4)
 
     df_good = good_data[good_data["Flag"] == 2].copy()
     df_bad = good_data[good_data["Flag"] == 4].copy()
 
     return df_good, df_bad
-
-
-def multivariate_fit(y, *args, coef_names=None, const_name="c0"):
-    """
-    Least-squares fit data using multiple dependent variables. Dependent variables must
-    be provided in tuple pairs of (data, order) as positional arguments.
-
-    If coef_names are defined, coefficients will be returned as a dict. Otherwise,
-    coefficients are return as an array in the order of the dependent variables, sorted
-    by decreasing powers.
-
-    Parameters
-    ----------
-    y : array-like
-        Indepedent variable to be fit
-    args : tuple
-        Pairs of dependent variable data and fit order (i.e., (data, order))
-    coef_names : list-like, optional
-        Base names for coefficients (i.e., "a" for 2nd order yields ["a2", "a1"])
-    const_name : str, optional
-        Name for constant offset term
-
-    Returns
-    -------
-    coefs : array-like
-        Least-squares fit coefficients in decreasing powers
-
-    Examples
-    --------
-    Behavior when coef_names is None:
-
-    >>> z = [1, 4, 9]
-    >>> x = [1, 3, 5]
-    >>> y = [1, 2, 3]
-    >>> multivariate_fit(z, (x, 2), (y, 1))
-    array([0.25, 0.375, 0.25, 0.125])  # [c1, c2, c3, c4]
-
-    where z = (c1 * x ** 2) + (c2 * x) + (c3 * y) + c4
-
-    Behavior when coef_names is given:
-
-    >>> z = [1, 4, 9]
-    >>> x = [1, 3, 5]
-    >>> y = [1, 2, 3]
-    >>> multivariate_fit(z, (x, 2), (y, 1), coef_names=["a", "b"])
-    {"a2": 0.25, "a1": 0.375, "b1": 0.25, "c0": 0.125}
-
-    where z = (a2 * x ** 2) + (a1 * x) + (b1 * y) + c0
-    """
-    to_dict = True
-    if coef_names is None:
-        to_dict = False
-        coef_names = [""] * len(args)  # needed to prevent zip() error
-    elif len(args) != len(coef_names):
-        raise ValueError(
-            "length of coef_names must match the number of dependent variables"
-        )
-
-    # iteratively build fit matrix
-    rows, names = [], []
-    for arg, coef_root in zip(args, coef_names):
-        if type(arg) is not tuple:
-            raise TypeError(f"Positional args must be tuples, not {type(arg)}")
-
-        series, order = arg
-        for n in np.arange(1, order + 1)[::-1]:
-            rows.append(series ** n)  # n is np.int64 so series will cast to np.ndarray
-            names.append(f"{coef_root}{n}")
-
-    # add constant offset term
-    rows.append(np.ones(len(y)))
-    names.append(const_name)
-
-    fit_matrix = np.vstack(rows)
-    coefs = np.linalg.lstsq(fit_matrix.T, y, rcond=None)[0]
-
-    return dict(zip(names, coefs)) if to_dict else coefs
-
-
-def apply_polyfit(y, y_coefs, *args):
-    """
-    Apply a polynomial correction to series of data. Coefficients should be provided in
-    increasing order (i.e., a0, a1, a2 for y_fit = y + a2 * y ** 2 + a1 * y + a0)
-
-    For the independent variables (y), coefficients start from the zero-th order (i.e.,
-    constant offset). For dependent variables (args), coefficients start from the first
-    order (i.e., linear term).
-
-    Parameters
-    ----------
-    y : array-like
-        Independent variable data to be corrected
-    y_coefs : tuple of float
-        Independent variable fit coefficients (i.e., (coef0, ..., coefN))
-    args : tuple of (array-like, (float, float, ...))
-        Dependent variable data and fit coefficients (i.e., (data, (coef1, ..., coefN)))
-
-    Returns
-    -------
-    fitted_y : array-like
-        Independent variable data with polynomial fit correction applied
-
-    Examples
-    --------
-    Behavior without additional args:
-
-    >>> y = [2, 4, 6]
-    >>> apply_polyfit(y, (1, 2, 3))  # y0 = 1; y1 = 2; y2 = 3
-    array([ 19.,  61., 127.])
-
-    where fitted_y = y + y0 + (y1 * y) + (y2 * y ** 2)
-
-    Behavior with additional args:
-
-    >>> y = [2, 4, 6]
-    >>> x = [1, 2, 3]
-    >>> apply_polyfit(y, (1,), (x, (2, 3)))  # y0 = 1; x1 = 2; x2 = 3
-    array([ 8., 21., 40.])
-
-    where fitted_y = y + y0 + (x1 * x) + (x2 * x ** 2)
-    """
-    fitted_y = np.copy(y).astype(float)
-    for n, coef in enumerate(y_coefs):
-        fitted_y += coef * np.power(y, n)
-
-    for arg in args:
-        if type(arg) is not tuple:
-            raise TypeError(f"Positional args must be tuples, not {type(arg)}")
-
-        series, coefs = arg
-        for n, coef in enumerate(coefs):
-            fitted_y += coef * np.power(series, n + 1)
-
-    return fitted_y
 
 
 def calibrate_temp(btl_df, time_df):
@@ -543,11 +223,11 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
             columns={"cast_id": "SSSCC", "bottle_num": "btl_fire_num", "value": "SALNTY_FLAG_W"}
         ).drop(columns=["notes"])
         btl_df = btl_df.merge(salt_flags_manual_df, on=["SSSCC", "btl_fire_num"], how="left")
-        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(
+        btl_df["SALNTY_FLAG_W"] = nan_values(
             btl_df["SALNTY"], old_flags=btl_df["SALNTY_FLAG_W"]
         )
     else:
-        btl_df["SALNTY_FLAG_W"] = flagging.nan_values(btl_df["SALNTY"])
+        btl_df["SALNTY_FLAG_W"] = nan_values(btl_df["SALNTY"])
 
     ssscc_subsets = sorted(Path(cfg.dirs["ssscc"]).glob("ssscc_c*.csv"))
     if not ssscc_subsets:  # if no c-segments exists, write one from full list
@@ -681,14 +361,14 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
 
     # flag salinity data
     time_df[cfg.column["sal"] + "_FLAG_W"] = 2
-    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.by_residual(
+    btl_df[cfg.column["sal"] + "_FLAG_W"] = by_residual(
         btl_df[cfg.column["sal"]],
         btl_df["SALNTY"],
         btl_df[cfg.column["p"]],
     )
     bad_rows = btl_df["SALNTY_FLAG_W"].isin([3, 4])
     btl_df.loc[bad_rows, cfg.column["sal"] + "_FLAG_W"] = 2  # bad salts not used for QC
-    btl_df[cfg.column["sal"] + "_FLAG_W"] = flagging.nan_values(
+    btl_df[cfg.column["sal"] + "_FLAG_W"] = nan_values(
         btl_df[cfg.column["sal"]], old_flags=btl_df[cfg.column["sal"] + "_FLAG_W"]
     )
 

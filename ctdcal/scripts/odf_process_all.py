@@ -4,13 +4,13 @@ Process all CTD and bottle data using ODF routines.
 
 # import needed ctdcal modules
 from ctdcal import (
-    fit_ctd,
     odf_io,
     oxy_fitting,
     process_bottle,
     process_ctd,
     rinko,
 )
+from ctdcal.fitting import fit_ctd
 from ctdcal.common import load_user_config, validate_file
 
 import logging

@@ -7,6 +7,7 @@ import inspect
 import logging
 
 import numpy as np
+from scipy.ndimage import shift
 
 
 log = logging.getLogger(__name__)
@@ -172,3 +173,49 @@ def sbe9(freq, t_probe, coefs, decimals=4):
         - 14.7
     )
     return np.around(p_dbar, decimals)
+
+
+def cell_therm_mass_corr(temp, cond, sample_int=1 / 24, alpha=0.03, beta=1 / 7):
+    """Correct conductivity signal for effects of cell thermal mass.
+
+    Parameters
+    ----------
+    temp : array-like
+        CTD temperature [degC]
+    cond : array-like
+        CTD conductivity [mS/cm]
+    sample_int : float, optional
+        CTD sample interval [seconds]
+    alpha : float, optional
+        Thermal anomaly amplitude
+    beta : float, optional
+        Thermal anomaly time constant
+
+    Returns
+    -------
+    cond_corr : array-like
+        Corrected CTD conductivity [mS/cm]
+
+    Notes
+    -----
+    See Sea-Bird Seasoft V2 manual (Section 6, page 93) for equation information.
+    Default alpha/beta values taken from Seasoft manual (page 92).
+    c.f. "Thermal Inertia of Conductivity Cells: Theory" (Lueck 1990) for more info
+    https://doi.org/10.1175/1520-0426(1990)007<0741:TIOCCT>2.0.CO;2
+    """
+    a = 2 * alpha / (sample_int * beta + 2)
+    b = 1 - (2 * a / alpha)
+    dc_dT = 0.1 * (1 + 0.006 * (temp - 20))
+    dT = np.insert(np.diff(temp), 0, 0)  # forward diff reduces len by 1
+
+    def calculate_CTM(b, CTM_0, a, dc_dT, dT):
+        """Return CTM in units of [S/m]"""
+        CTM = -1.0 * b * CTM_0 + a * (dc_dT) * dT
+        return CTM
+
+    CTM = calculate_CTM(b, 0, a, dc_dT, dT)
+    CTM = calculate_CTM(b, shift(CTM, 1, order=0), a, dc_dT, dT)
+    CTM = np.nan_to_num(CTM) * 10.0  # [S/m] to [mS/cm]
+    cond_corr = cond + CTM
+
+    return cond_corr

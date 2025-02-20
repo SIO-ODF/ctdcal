@@ -22,7 +22,7 @@ from bokeh.plotting import figure
 
 from ctdcal import get_ctdcal_config, io
 from ctdcal.common import load_user_config, validate_file
-from ctdcal.fitting.common import df_node_to_BottleFlags, get_node, save_node
+from ctdcal.fitting.fit_common import df_node_to_BottleFlags, get_node, save_node
 
 cfg = get_ctdcal_config()
 USERCONFIG = "ctdcal/cfg.yaml"

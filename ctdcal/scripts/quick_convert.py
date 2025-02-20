@@ -1,7 +1,8 @@
 import logging
 from pathlib import Path
 
-from ctdcal import flagging, get_ctdcal_config, io
+from ctdcal import get_ctdcal_config, io
+from ctdcal.flagging import flag_common as flagging
 
 log = logging.getLogger(__name__)
 

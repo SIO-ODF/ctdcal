@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from ctdcal.fitting.common import NodeNotFoundError, get_node
+from ctdcal.fitting.fit_common import NodeNotFoundError, get_node
 
 from . import flagging as flagging
 from . import get_ctdcal_config
