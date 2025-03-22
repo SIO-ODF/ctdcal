@@ -1,23 +1,20 @@
 """
 Process all CTD and bottle data using ODF routines.
 """
+import logging
 
-# import needed ctdcal modules
 from ctdcal import (
-    odf_io,
     oxy_fitting,
     process_bottle,
     process_ctd,
     rinko,
 )
-from ctdcal.fitting import fit_ctd
 from ctdcal.common import load_user_config, validate_file
-
-import logging
-
+from ctdcal.fitting import fit_ctd
 from ctdcal.processors.cast_tools import make_time_files
 from ctdcal.processors.convert_legacy import hex_to_ctd
 from ctdcal.processors.proc_bottle import make_btl_mean
+from ctdcal.processors.proc_salt_odf import process_salts
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +51,7 @@ def odf_process_all():
     make_btl_mean(ssscc_list)
 
     # generate salt .csv files
-    odf_io.process_salts(ssscc_list, user_cfg)
+    process_salts(ssscc_list, user_cfg)
 
     # generate reftemp .csv files
     process_bottle.process_reft(ssscc_list)
