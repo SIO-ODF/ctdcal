@@ -4,7 +4,6 @@ Oxygen functions for processing sensor data, unit conversions and derived variab
 import gsw
 import numpy as np
 
-from ctdcal.oxy_fitting import oxy_umolkg_to_ml
 from ctdcal.processors.functions_ctd import _check_coefs, _check_volts
 
 
@@ -116,3 +115,141 @@ def sbe43_hysteresis_voltage(volts, p, coefs, sample_freq=24):
     volts_corrected = oxy_volts_new - coefs["offset"]
 
     return volts_corrected
+
+
+def hysteresis_correction(oxygen, pressure, H1=-0.033, H2=5000, H3=1450, freq=24):
+    """
+    Remove hysteresis effects from oxygen concentration values.
+
+    Oxygen hysteresis can be corrected before conversion from volts to oxygen
+    concentration, see equations_sbe.sbe43_hysteresis_voltage()
+
+    Parameters
+    ----------
+    oxygen : array-like
+        Oxygen concentration values
+    pressure : array-like
+        CTD pressure values (dbar)
+    H1 : scalar, optional
+        Amplitude of hysteresis correction function (range: -0.02 to -0.05)
+    H2 : scalar, optional
+        Function constant or curvature function for hysteresis
+    H3 : scalar, optional
+        Time constant for hysteresis (seconds) (range: 1200 to 2000)
+    freq : scalar, optional
+        CTD sampling frequency (Hz)
+
+    Returns
+    -------
+    oxy_corrected : array-like
+        Hysteresis-corrected oxygen concentration values (with same units as input)
+
+    Notes
+    -----
+    See Application Note 64-3 for more information.
+    """
+    dt = 1 / freq
+    D = 1 + H1 * (np.exp(pressure / H2) - 1)
+    C = np.exp(-1 * dt / H3)
+
+    oxy_corrected = np.zeros(oxygen.shape)
+    oxy_corrected[0] = oxygen[0]
+    for i in np.arange(1, len(oxygen)):
+        oxy_corrected[i] = (
+            oxygen[i] + (oxy_corrected[i - 1] * C * D[i]) - (oxygen[i - 1] * C)
+        ) / D[i]
+
+    return oxy_corrected
+
+
+def oxy_ml_to_umolkg(oxy_mL_L, sigma0):
+    """Convert dissolved oxygen from units of mL/L to micromol/kg.
+
+    Parameters
+    ----------
+    oxy_mL_L : array-like
+        Dissolved oxygen in units of [mL/L]
+    sigma0 : array-like
+        Potential density anomaly (i.e. sigma - 1000) referenced to 0 dbar [kg/m^3]
+
+    Returns
+    -------
+    oxy_umol_kg : array-like
+        Dissolved oxygen in units of [umol/kg]
+
+    Notes
+    -----
+    Conversion value 44660 is exact for oxygen gas and derived from the ideal gas law.
+    (c.f. Sea-Bird Application Note 64, pg. 6)
+    """
+
+    oxy_umol_kg = oxy_mL_L * 44660 / (sigma0 + 1000)
+
+    return oxy_umol_kg
+
+
+def oxy_umolkg_to_ml(oxy_umol_kg, sigma0):
+    """Convert dissolved oxygen from units of micromol/kg to mL/L.
+
+    Parameters
+    ----------
+    oxy_umol_kg : array-like
+        Dissolved oxygen in units of [umol/kg]
+    sigma0 : array-like
+        Potential density anomaly (i.e. sigma - 1000) referenced to 0 dbar [kg/m^3]
+
+    Returns
+    -------
+    oxy_mL_L : array-like
+        Dissolved oxygen in units of [mL/L]
+
+    Notes
+    -----
+    Conversion value 44660 is exact for oxygen gas and derived from the ideal gas law.
+    (c.f. Sea-Bird Application Note 64, pg. 6)
+    """
+
+    oxy_mL_L = oxy_umol_kg * (sigma0 + 1000) / 44660
+
+    return oxy_mL_L
+
+
+def calculate_dV_dt(oxy_volts, time, nan_replace=True):
+    """
+    Calculate the time derivative of oxygen voltage.
+
+    Parameters
+    ----------
+    oxy_volts : array-like
+        Oxygen sensor voltage output
+    time : array-like
+        Time from oxygen sensor (must be same length as oxy_volts)
+    nan_replace : bool, optional
+        Replace nans in time derivative with the mean value
+
+    Returns
+    -------
+    dV_dt : array-like
+        Time derivative of oxygen voltage
+    """
+    # Uchida (2008): dV/dt "estimated by linear fits over 2 second intervals"
+    # should dt just be 1 / freq? i.e. 1/24 Hz
+
+    dV = np.diff(oxy_volts)  # central differences shorten vectors by 1
+    dt = np.diff(time)
+    dt[dt == 0] = np.median(dt[dt > 0])  # replace with median to avoid dividing by zero
+
+    dV_dt = dV / dt
+    dV_dt = np.insert(dV_dt, 0, 0)  # add zero in front to match original length
+    dV_dt[np.isinf(dV_dt)] = np.nan  # this check is probably unnecessary
+
+    if nan_replace:
+        dV_dt = np.nan_to_num(dV_dt, nan=np.nanmean(dV_dt))
+
+    # (PMEL does this calculation on binned data already so filtering is not the same)
+    # a = 1
+    # windowsize = 5
+    # b = (1 / windowsize) * np.ones(windowsize)
+    # filtered_dvdt = scipy.signal.filtfilt(b, a, dv_dt)
+
+    return dV_dt  # filtered_dvdt

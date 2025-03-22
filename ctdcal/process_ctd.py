@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from . import get_ctdcal_config, oxy_fitting
+from .processors.functions_oxy import calculate_dV_dt
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -462,7 +463,7 @@ def load_all_ctd_files(ssscc_list):
         time_file = cfg.dirs["time"] + ssscc + "_time.pkl"
         time_data = pd.read_pickle(time_file)
         time_data["SSSCC"] = str(ssscc)
-        time_data["dv_dt"] = oxy_fitting.calculate_dV_dt(
+        time_data["dv_dt"] = calculate_dV_dt(
             time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
         )
         df_list.append(time_data)

@@ -13,6 +13,7 @@ import scipy
 from . import get_ctdcal_config, oxy_fitting, process_ctd
 from ctdcal.flagging import flag_common as flagging
 from ctdcal.plotting.plot_fit import _intermediate_residual_plot
+from .fitting.fit_oxy import calculate_weights
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -351,7 +352,7 @@ def rinko_oxy_fit(
     # )
 
     bad_df = pd.DataFrame()
-    weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
+    weights = calculate_weights(btl_df["CTDPRS"])
     fit_data = (
         btl_df[cfg.column["rinko_oxy"]],
         btl_df[cfg.column["p"]],
@@ -388,7 +389,7 @@ def rinko_oxy_fit(
     while not thrown_values.empty:
 
         p0 = tuple(cfw_coefs)
-        weights = oxy_fitting.calculate_weights(btl_df["CTDPRS"])
+        weights = calculate_weights(btl_df["CTDPRS"])
         fit_data = (
             btl_df[cfg.column["rinko_oxy"]],
             btl_df[cfg.column["p"]],

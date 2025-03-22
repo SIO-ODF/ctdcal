@@ -15,7 +15,7 @@ import pandas as pd
 
 from ctdcal.flagging import flag_common as flagging
 from . import get_ctdcal_config
-from . import oxy_fitting as oxy_fitting
+from .processors.proc_oxy_odf import load_winkler_oxy
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -224,7 +224,7 @@ def load_all_btl_files(ssscc_list, cols=None):
         ### load OXY data
         oxy_file = Path(cfg.dirs["oxygen"] + ssscc)
         try:
-            oxy_data, params = oxy_fitting.load_winkler_oxy(oxy_file)
+            oxy_data, params = load_winkler_oxy(oxy_file)
             if len(oxy_data) > 36:
                 log.error(f"len(oxy_data) > 36 for {ssscc}, check oxygen file")
         except FileNotFoundError:

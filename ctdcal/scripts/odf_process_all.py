@@ -4,16 +4,17 @@ Process all CTD and bottle data using ODF routines.
 import logging
 
 from ctdcal import (
-    oxy_fitting,
     process_bottle,
     process_ctd,
     rinko,
 )
 from ctdcal.common import load_user_config, validate_file
-from ctdcal.fitting import fit_ctd
+from ctdcal.fitting.fit_ctd import calibrate_temp, calibrate_cond
+from ctdcal.fitting.fit_oxy import calibrate_oxy
 from ctdcal.processors.cast_tools import make_time_files
 from ctdcal.processors.convert_legacy import hex_to_ctd
 from ctdcal.processors.proc_bottle import make_btl_mean
+from ctdcal.processors.proc_oxy_ctd import prepare_oxy
 from ctdcal.processors.proc_salt_odf import process_salts
 
 log = logging.getLogger(__name__)
@@ -76,16 +77,16 @@ def odf_process_all():
     process_ctd.make_depth_log(time_data_all)
 
     # calibrate temperature against reference
-    fit_ctd.calibrate_temp(btl_data_all, time_data_all)
+    calibrate_temp(btl_data_all, time_data_all)
 
     # calibrate conductivity against reference
-    btl_data_all, time_data_all = fit_ctd.calibrate_cond(btl_data_all, time_data_all, user_cfg, 'salt')
+    btl_data_all, time_data_all = calibrate_cond(btl_data_all, time_data_all, user_cfg, 'salt')
 
     # calculate params needs for oxy/rinko calibration
-    oxy_fitting.prepare_oxy(btl_data_all, time_data_all, ssscc_list, user_cfg, 'oxygen')
+    prepare_oxy(btl_data_all, time_data_all, ssscc_list, user_cfg, 'oxygen')
 
     # calibrate oxygen against reference
-    oxy_fitting.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
+    calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
     rinko.calibrate_oxy(btl_data_all, time_data_all, ssscc_list)
 
     #####

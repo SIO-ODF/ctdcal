@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from ctdcal import oxy_fitting, rinko
+from ctdcal import rinko
+from ctdcal.fitting.fit_oxy import calculate_weights
 
 #   Coefs from CTDCAL run
 coefs = (2.4837e+0, 1.7548e-1, -1.0020e-3, 3.1672e-2, -1.8098e-1, 2.685e-1, 9.7101e-2)
@@ -90,7 +91,7 @@ def test_Uchida_DO_eq(coefs, inputs):
 @pytest.mark.parametrize("coefs, pressure, inputs, refoxy", [(coefs, pressure, inputs, refoxy)])
 def oxy_weighted_residual(coefs, weights, inputs, refoxy, pressure):
 
-    weights = oxy_fitting.calculate_weights(pressure)
+    weights = calculate_weights(pressure)
     residuals_manual = np.sum(
         (weights * (refoxy - rinko._Uchida_DO_eq(coefs, inputs)) ** 2)
     ) / np.sum(weights ** 2)
