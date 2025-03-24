@@ -4,17 +4,18 @@ Process all CTD and bottle data using ODF routines.
 import logging
 
 from ctdcal import (
-    process_bottle,
     process_ctd,
     rinko,
 )
 from ctdcal.common import load_user_config, validate_file
 from ctdcal.fitting.fit_ctd import calibrate_temp, calibrate_cond
 from ctdcal.fitting.fit_oxy import calibrate_oxy
+from ctdcal.formats.exchange import export_hy1
 from ctdcal.processors.cast_tools import make_time_files
 from ctdcal.processors.convert_legacy import hex_to_ctd
-from ctdcal.processors.proc_bottle import make_btl_mean
+from ctdcal.processors.proc_bottle import make_btl_mean, load_all_btl_files
 from ctdcal.processors.proc_oxy_ctd import prepare_oxy
+from ctdcal.processors.proc_reft import process_reft
 from ctdcal.processors.proc_salt_odf import process_salts
 
 log = logging.getLogger(__name__)
@@ -55,7 +56,7 @@ def odf_process_all():
     process_salts(ssscc_list, user_cfg)
 
     # generate reftemp .csv files
-    process_bottle.process_reft(ssscc_list)
+    process_reft(ssscc_list)
 
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
@@ -63,7 +64,7 @@ def odf_process_all():
 
     # load in all bottle and time data into DataFrame
     time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
-    btl_data_all = process_bottle.load_all_btl_files(ssscc_list)
+    btl_data_all = load_all_btl_files(ssscc_list)
 
     # process pressure offset
     # TODO: these functions return an updated dataframe, which we aren't
@@ -98,7 +99,7 @@ def odf_process_all():
 
     # export to Exchange format
     process_ctd.export_ct1(time_data_all, ssscc_list)
-    process_bottle.export_hy1(btl_data_all)
+    export_hy1(btl_data_all)
 
     # run: ctd_to_bottle.py
 
