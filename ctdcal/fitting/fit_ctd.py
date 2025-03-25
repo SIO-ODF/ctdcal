@@ -11,6 +11,7 @@ import pandas as pd
 from ctdcal.fitting.fit_common import get_node, NodeNotFoundError, multivariate_fit, apply_polyfit
 from ctdcal import get_ctdcal_config
 from ctdcal import process_ctd as process_ctd
+from ctdcal.processors.functions_oxy import calculate_dV_dt
 from ctdcal.processors.functions_salt import CR_to_cond
 from ctdcal.plotting.plot_fit import _intermediate_residual_plot
 from ctdcal.fitting.fit_legacy import load_fit_yaml
@@ -373,3 +374,105 @@ def calibrate_cond(btl_df, time_df, user_cfg, ref_node):
     )
 
     return btl_df, time_df
+
+
+def _get_pressure_offset(start_vals, end_vals):
+    """
+    Finds unique values and calculate mean for pressure offset
+
+    Parameters
+    ----------
+    start_vals : array_like
+        Array of initial ondeck pressure values
+
+    end_vals : array_like
+        Array of ending ondeck pressure values
+    Returns
+    -------
+    p_off : float
+         Average pressure offset
+
+    """
+    p_start = pd.Series(np.unique(start_vals))
+    p_end = pd.Series(np.unique(end_vals))
+    p_start = p_start[p_start.notnull()]
+    p_end = p_end[p_end.notnull()]
+    p_off = p_start.mean() - p_end.mean()
+
+    # JACKSON THINKS THIS METHOD SHOULD BE USED TO KEEP START END PAIRS
+    #    p_df = pd.DataFrame()
+    #    p_df['p_start'] = p_start
+    #    p_df['p_end'] = p_end
+    #    p_df = p_df[p_df['p_end'].notnull()]
+    #    p_df = p_df[p_df['p_start'].notnull()]
+    #    p_off = p_df['p_start'].mean() - p_df['p_end'].mean()
+    ##########################################################
+
+    p_off = np.around(p_off, decimals=4)
+
+    return p_off
+
+
+def apply_pressure_offset(df, p_col="CTDPRS"):
+    """
+    Calculate pressure offset using deck pressure log and apply it to the data.
+    Pressure flag column is added with value 2, indicating the data are calibrated.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing column with pressure values
+    p_col : str, optional
+        Pressure column name in DataFrame (defaults to CTDPRS)
+
+    Returns
+    -------
+    df : DataFrame
+        DataFrame containing updated pressure values and a new flag column
+
+    """
+    p_log = pd.read_csv(
+        cfg.dirs["logs"] + "ondeck_pressure.csv",
+        dtype={"cast_id": str},
+        na_values="Started in Water",
+    )
+    p_offset = _get_pressure_offset(p_log['pressure_start'], p_log['pressure_end'])
+    df[p_col] += p_offset
+    df[p_col + "_FLAG_W"] = 2
+
+    return df
+
+
+def load_all_ctd_files(ssscc_list):
+    """
+    Load CTD files for station/cast list and merge into a dataframe.
+
+    Parameters
+    ----------
+    ssscc_list : list of str
+        List of stations to load
+
+    Returns
+    -------
+    df_data_all : DataFrame
+        Merged dataframe containing all loaded data
+
+    """
+    df_list = []
+    for ssscc in ssscc_list:
+        log.info("Loading TIME data for station: " + ssscc + "...")
+        time_file = cfg.dirs["time"] + ssscc + "_time.pkl"
+        time_data = pd.read_pickle(time_file)
+        time_data["SSSCC"] = str(ssscc)
+        time_data["dv_dt"] = calculate_dV_dt(
+            time_data["CTDOXYVOLTS"], time_data["scan_datetime"]
+        )
+        df_list.append(time_data)
+        # print("** Finished TIME data station: " + ssscc + " **")
+    df_data_all = pd.concat(df_list, axis=0, sort=False)
+
+    df_data_all["master_index"] = range(len(df_data_all))
+
+    return df_data_all
+
+

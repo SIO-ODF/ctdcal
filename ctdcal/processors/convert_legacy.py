@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 import gsw
+import numpy as np
 import pandas as pd
 
 from ctdcal.processors import functions_ctd as sbe_eq
@@ -417,3 +418,154 @@ def to_temperature(raw, manufacturer, sensor, coefs):
             pass
         elif sensor.lower() == "concerto":
             pass
+def _trim_soak_period(df=None):
+    """
+    1) Find pump on/off patterns
+    2) Select pump_on=True group with largest pressure recording
+    3) Find soak period before start of downcast
+    4) Trim cast, return everything after top of cast (i.e. minimum pressure)
+    """
+    df_list = [
+        g for i, g in df.groupby(df["pump_on"].ne(df["pump_on"].shift()).cumsum())
+    ]
+    df_pump_on_list = [df for df in df_list if df["pump_on"].all()]
+    df_cast = df_pump_on_list[np.argmax([df["CTDPRS"].max() for df in df_pump_on_list])]
+    df_cast = df_cast.reset_index(drop=True)
+    # next fn deals w/ edge cases, leave as is for now
+    df_cast = _find_last_soak_period(df_cast)
+    start_ind = df_cast.loc[: len(df) // 4, "CTDPRS"].argmin()
+    df_trimmed = df_cast[start_ind:].reset_index(drop=True).copy()
+
+    return df_trimmed
+
+
+def _find_last_soak_period(df_cast, time_bin=8, P_surface=2, P_downcast=50):
+    """
+    Find the soak period before the downcast starts.
+
+    The algorithm is tuned for repeat hydrography work, specifically US GO-SHIP
+    parameters. This assumes the soak depth will be somewhere between 10 and 30
+    meters, the package will sit at the soak depth for at least 20 to 30 seconds
+    before starting ascent to the surface and descent to target depth.
+
+    The algorithm is not guaranteed to catch the exact start of the soak period,
+    but within a minimum period of time_bin seconds(?) from end of the soak if
+    the soak period assumption is valid. This should be shorter than the total
+    soak period time, and able to catch the following rise and descent of the
+    package that signals the start of the cast.
+
+    The algorithm has been designed to handle four general cases of casts:
+        * A routine cast with pumps turning on in water and normal soak
+        * A cast where the pumps turn on in air/on deck
+        * A cast where the pumps turn on and off due to rosette coming out of water
+        * A cast where there are multiple stops on the downcast to the target depth
+
+    Parameters
+    ----------
+    df_cast : DataFrame
+        DataFrame of the entire cast, from deckbox on to deckbox off
+    time_bin : integer, optional
+        Number of seconds to bin average for descent rate calculation
+    P_surface : integer, optional
+        Minimum surface pressure threshold required to look for soak depth
+        (2 dbar was chosen as an average rosette is roughly 1.5 to 2 meters tall)
+    P_downcast : integer, optional
+        Minimum pressure threshold required to assume downcast has started
+        (50 dbar has been chosen as double the deep soak depth of 20-30 dbar)
+
+    Returns
+    -------
+    df_cast_trimmed : DataFrame
+        DataFrame starting within time_bin seconds of the last soak period.
+    """
+    # Validate user input
+    if time_bin <= 0:
+        raise ValueError("Time bin value should be positive whole seconds.")
+    if P_downcast <= 0:
+        raise ValueError(
+            "Starting downcast pressure threshold must be positive integers."
+        )
+    if P_downcast < P_surface:
+        raise ValueError(
+            "Starting downcast pressure threshold must be greater \
+                        than surface pressure threshold."
+        )
+
+    # If pumps have not turned on until in water, return DataFrame
+    if df_cast.iloc[0]["CTDPRS"] > P_surface:
+        return df_cast
+
+    # Bin the data by time, and compute the average rate of descent
+    df_cast["index"] = df_cast.index  # needed at end to identify start_idx
+    df_cast["bin"] = pd.cut(
+        df_cast.index,
+        np.arange(df_cast.index[0], df_cast.index[-1], time_bin * 24),
+        labels=False,
+        include_lowest=True,
+    )
+    df_binned = df_cast.groupby("bin").mean()
+
+    # Compute difference of descent rates and label bins
+    df_binned["dP"] = df_binned["CTDPRS"].diff().fillna(0).round(0)
+    df_binned["movement"] = pd.cut(
+        df_binned["dP"], [-1000, -0.5, 0.5, 1000], labels=["up", "stop", "down"]
+    )
+
+    # Find all periods where the rosette is not moving
+    df_group = df_binned.groupby(
+        df_binned["movement"].ne(df_binned["movement"].shift()).cumsum()
+    )
+    df_list = [g for i, g in df_group]
+
+    # Find last soak period before starting descent to target depth
+    def find_last(df_list, P_downcast):
+        for idx, df in enumerate(df_list):
+            if df["CTDPRS"].max() < P_downcast:
+                # make sure it's soak, not a stop to switch to autocast (i.e. A20 2021)
+                if df.max()["movement"] == "stop" and len(df) > 1:
+                    last_idx = idx
+            else:
+                return last_idx
+        return last_idx
+
+    # Trim off everything before last soak
+    start_idx = int(df_list[find_last(df_list, P_downcast)].head(1)["index"])
+    df_cast_trimmed = df_cast.loc[start_idx:].reset_index()
+
+    return df_cast_trimmed
+
+
+def ctd_align(inMat=None, col=None, time=0.0):
+    """ctd_align function
+
+    Function takes full NUMPY ndarray with predefined dtype array
+    and adjusts time of sensor responce and water flow relative to
+    the time frame of temperature sensor.
+
+    Originally written by Courtney Schatzman, docstring by Joseph Gum.
+    Need to generate alignment plots in order to properly use ctd_align.
+
+    Args:
+        param1 (ndarray): inMat, numpy ndarray with dtype array
+        param2 (float): col, column to apply time advance to.
+        param3 (float): time, advance in seconds to apply to raw data.
+
+    Returns:
+        Narray: The return value is ndarray with adjusted time of parameter
+          specified.
+
+    """
+    # Num of frames per second.
+    fl = 24
+
+    if (inMat is not None) & (col is not None) & (time > 0.0):
+        # Time to advance
+        advnc = int(fl * time)
+        tmp = np.arange(advnc, dtype=np.float)
+        last = inMat[col][len(inMat) - 1]
+        tmp.fill(float(last))
+        inMat[col] = np.concatenate((inMat[col][advnc:], tmp))
+
+    return inMat
+
+

@@ -13,6 +13,7 @@ import scipy
 from . import get_ctdcal_config, oxy_fitting, process_ctd
 from ctdcal.flagging import flag_common as flagging
 from ctdcal.plotting.plot_fit import _intermediate_residual_plot
+from .common import get_ssscc_list
 from .fitting.fit_oxy import calculate_weights
 
 cfg = get_ctdcal_config()
@@ -200,7 +201,7 @@ def calibrate_oxy(btl_df, time_df, ssscc_list):
         )
         if not Path(cfg.dirs["ssscc"]).exists():
             Path(cfg.dirs["ssscc"]).mkdir()
-        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_list = get_ssscc_list()
         ssscc_subsets = [Path(cfg.dirs["ssscc"] + "ssscc_r1.csv")]
         pd.Series(ssscc_list).to_csv(ssscc_subsets[0], header=None, index=False)
     for f in ssscc_subsets:

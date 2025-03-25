@@ -12,7 +12,7 @@ import pandas as pd
 from ctdcal import get_ctdcal_config
 from ctdcal.fitting.fit_common import get_node, NodeNotFoundError
 from ctdcal.flagging.flag_common import nan_values
-from ctdcal.process_ctd import get_ssscc_list
+from ctdcal.common import get_ssscc_list
 from ctdcal.processors.functions_oxy import oxy_ml_to_umolkg
 from ctdcal.processors.proc_oxy_odf import calculate_bottle_oxygen
 

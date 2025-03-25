@@ -14,8 +14,10 @@ import yaml
 
 from munch import munchify
 
+from ctdcal import get_ctdcal_config
 
 log = logging.getLogger(__name__)
+cfg = get_ctdcal_config()
 
 
 # Function definitions
@@ -296,6 +298,42 @@ def load_exchange_ctd(
         comment="#",
         skipinitialspace=True,
     )
+
+
+## Cast list manipulation
+def make_ssscc_list(fname="data/ssscc.csv"):
+    """
+    Attempt to automatically generate list of station/casts from raw files.
+    """
+    raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
+    ssscc_list = sorted([f.stem for f in raw_files])
+    pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
+
+    return ssscc_list
+
+
+def get_ssscc_list(fname="data/ssscc.csv"):
+    """
+    Load a list of casts from a file.
+
+    Parameters
+    ----------
+    fname : path_like
+        Input file. Type is anything that can be interpreted by Python as a
+        path, such as a string or a Pathlib object.
+
+    Returns
+    -------
+    list
+        Cast names or identifiers, as a list of strings.
+    """
+    ssscc_list = []
+    with open(fname, "r") as lines:
+        for line in lines:
+            # skip comment lines
+            if not line.startswith("#"):
+                ssscc_list.append(line.strip())
+    return ssscc_list
 
 
 # Utilities

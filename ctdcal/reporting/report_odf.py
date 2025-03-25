@@ -1,7 +1,18 @@
 """
 Formats data and generates visuals for ODF-style cruise reports.
 """
+import logging
+
+import gsw
+import numpy as np
+import pandas as pd
+
+from ctdcal import get_ctdcal_config
 from ctdcal.flagging import flag_common as flagging
+
+
+cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
 
 
 def export_report_data(df):
@@ -58,3 +69,47 @@ def export_report_data(df):
     df[cruise_report_cols].to_csv("data/report_data.csv", index=False)
 
     return
+
+
+def make_depth_log(time_df, threshold=80):
+    """
+    Create depth log file from maximum depth of each station/cast in time DataFrame.
+    If rosette does not get within the threshold distance of the bottom, returns NaN.
+
+    Parameters
+    ----------
+    time_df : DataFrame
+        DataFrame containing continuous CTD data
+    threshold : int, optional
+        Maximum altimeter reading to consider cast "at the bottom" (defaults to 80)
+
+    """
+    df = time_df[["SSSCC", "CTDPRS", "GPSLAT", "ALT"]].copy().reset_index()
+    df_group = df.groupby("SSSCC", sort=False)
+    idx_p_max = df_group["CTDPRS"].idxmax()
+    bottom_df = pd.DataFrame(
+        data={
+            "SSSCC": df["SSSCC"].unique(),
+            "max_p": df.loc[idx_p_max, "CTDPRS"],
+            "lat": df.loc[idx_p_max, "GPSLAT"],
+            "alt": df.loc[idx_p_max, "ALT"],
+        }
+    )
+    bottom_df.loc[bottom_df["alt"] > threshold, "alt"] = np.nan
+    # pandas 1.2.1 ufunc issue workaround with pd.to_numpy()
+    bottom_df["DEPTH"] = (
+        (
+            bottom_df["alt"]
+            + np.abs(gsw.z_from_p(bottom_df["max_p"], bottom_df["lat"].to_numpy()))
+        )
+        .fillna(value=-999)
+        .round()
+        .astype(int)
+    )
+    bottom_df[["SSSCC", "DEPTH"]].to_csv(
+        cfg.dirs["logs"] + "depth_log.csv", index=False
+    )
+
+    return True
+
+

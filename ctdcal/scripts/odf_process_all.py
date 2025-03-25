@@ -4,19 +4,19 @@ Process all CTD and bottle data using ODF routines.
 import logging
 
 from ctdcal import (
-    process_ctd,
     rinko,
 )
-from ctdcal.common import load_user_config, validate_file
-from ctdcal.fitting.fit_ctd import calibrate_temp, calibrate_cond
+from ctdcal.common import load_user_config, validate_file, get_ssscc_list, make_ssscc_list
+from ctdcal.fitting.fit_ctd import calibrate_temp, calibrate_cond, load_all_ctd_files, apply_pressure_offset
 from ctdcal.fitting.fit_oxy import calibrate_oxy
-from ctdcal.formats.exchange import export_hy1
+from ctdcal.formats.exchange import export_hy1, export_ct1
 from ctdcal.processors.cast_tools import make_time_files
 from ctdcal.processors.convert_legacy import hex_to_ctd
 from ctdcal.processors.proc_bottle import make_btl_mean, load_all_btl_files
 from ctdcal.processors.proc_oxy_ctd import prepare_oxy
 from ctdcal.processors.proc_reft import process_reft
 from ctdcal.processors.proc_salt_odf import process_salts
+from ctdcal.reporting.report_odf import make_depth_log
 
 log = logging.getLogger(__name__)
 
@@ -38,10 +38,10 @@ def odf_process_all():
 
     # load station/cast list from file
     try:
-        ssscc_list = process_ctd.get_ssscc_list()
+        ssscc_list = get_ssscc_list()
     except FileNotFoundError:
         log.info("No ssscc.csv file found, generating from .hex file list")
-        ssscc_list = process_ctd.make_ssscc_list()
+        ssscc_list = make_ssscc_list()
 
     # convert raw .hex files
     hex_to_ctd(ssscc_list)
@@ -63,7 +63,7 @@ def odf_process_all():
     #####
 
     # load in all bottle and time data into DataFrame
-    time_data_all = process_ctd.load_all_ctd_files(ssscc_list)
+    time_data_all = load_all_ctd_files(ssscc_list)
     btl_data_all = load_all_btl_files(ssscc_list)
 
     # process pressure offset
@@ -71,11 +71,11 @@ def odf_process_all():
     #   assigning or reassigning to anything. Instead we trust that the
     #   updates which happen in the other module are visible by this one
     #   too (they  indeed seem to be). Is this a safe assumption?
-    process_ctd.apply_pressure_offset(btl_data_all)
-    process_ctd.apply_pressure_offset(time_data_all)
+    apply_pressure_offset(btl_data_all)
+    apply_pressure_offset(time_data_all)
 
     # create cast depth log file
-    process_ctd.make_depth_log(time_data_all)
+    make_depth_log(time_data_all)
 
     # calibrate temperature against reference
     calibrate_temp(btl_data_all, time_data_all)
@@ -98,7 +98,7 @@ def odf_process_all():
     # process_bottle.export_report_data(btl_data_all)
 
     # export to Exchange format
-    process_ctd.export_ct1(time_data_all, ssscc_list)
+    export_ct1(time_data_all, ssscc_list)
     export_hy1(btl_data_all)
 
     # run: ctd_to_bottle.py
