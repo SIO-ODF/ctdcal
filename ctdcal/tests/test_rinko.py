@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ctdcal import rinko
+from ctdcal.processors import functions_oxy as rinko
 from ctdcal.fitting.fit_oxy import calculate_weights
 
 #   Coefs from CTDCAL run

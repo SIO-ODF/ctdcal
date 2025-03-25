@@ -3,12 +3,10 @@ Process all CTD and bottle data using ODF routines.
 """
 import logging
 
-from ctdcal import (
-    rinko,
-)
 from ctdcal.common import load_user_config, validate_file, get_ssscc_list, make_ssscc_list
 from ctdcal.fitting.fit_ctd import calibrate_temp, calibrate_cond, load_all_ctd_files, apply_pressure_offset
 from ctdcal.fitting.fit_oxy import calibrate_oxy
+from ctdcal.fitting import fit_oxy_rinko as rinko
 from ctdcal.formats.exchange import export_hy1, export_ct1
 from ctdcal.processors.cast_tools import make_time_files
 from ctdcal.processors.convert_legacy import hex_to_ctd
