@@ -5,7 +5,7 @@ import os
 import sys
 
 from ctdcal.processors.convert_legacy import convertFromSBEReader
-from ctdcal import sbe_reader as sbe_reader
+from ctdcal.processors import sbe_reader as sbe_reader
 
 DEBUG = False
 

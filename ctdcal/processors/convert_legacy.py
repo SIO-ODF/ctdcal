@@ -12,11 +12,10 @@ import gsw
 import numpy as np
 import pandas as pd
 
-from ctdcal.processors import functions_ctd as sbe_eq
+from ctdcal.processors import functions_ctd as sbe_eq, sbe_reader as sbe_rd
 from ctdcal.processors import functions_oxy as oxy_eq
 from ctdcal.processors import functions_aux as aux_eq
 from ctdcal import get_ctdcal_config
-from ctdcal import sbe_reader as sbe_rd
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
