@@ -24,7 +24,7 @@ class Cast(object):
     cast_id : str
         Cast identifier.
     datadir : str or Path-like
-        Data directory.
+        Converted data directory.
     p_col : str
         Name of pressure column.
     proc : DataFrame
@@ -53,7 +53,7 @@ class Cast(object):
         """
         Read the processed data into a dataframe.
         """
-        f = Path(self.datadir, 'converted/%s.pkl' % self.cast_id)
+        f = Path(self.datadir, '%s.pkl' % self.cast_id)
         self.proc = pd.read_pickle(f)
 
     def parse_downcast(self, data):
@@ -290,7 +290,7 @@ class Cast(object):
         self.ondeck_trimmed = data.iloc[start_df.index.max(): end_df.index.min()].copy()
 
 
-def make_time_files(casts, datadir, user_cfg):
+def make_time_files(casts, time_dir, cnv_dir, log_dir, filter_params, soak_params, sample_freq):
     """
     Make continuous time-series files from processed cast data.
 
@@ -303,17 +303,20 @@ def make_time_files(casts, datadir, user_cfg):
     ----------
     casts : list of str
         List of cast ids to process.
-    datadir : str or Path-like
-        Top-level of user data directory
-    user_cfg : Munch object
-        Dictionary of user configuration parameters.
+    time_dir
+    cnv_dir
+    log_dir
+    filter_params
+    soak_params
+    sample_freq
     """
     log.info("Generating time.pkl files")
-    # validate time directory
-    time_dir = validate_dir(Path(datadir, 'time'), create=True)
+    # validate required directories
+    time_dir = validate_dir(Path(time_dir), create=True)
+    log_dir = validate_dir(Path(log_dir), create=True)
     # groundwork for writing any new details or offsets
-    details_file = Path(datadir, 'logs/cast_details.csv')
-    offsets_file = Path(datadir, 'logs/ondeck_pressure.csv')
+    details_file = Path(log_dir, 'cast_details.csv')
+    offsets_file = Path(log_dir, 'ondeck_pressure.csv')
     new_casts = False
     if details_file.exists():
         cast_details_all = pd.read_csv(details_file, dtype='str')
@@ -329,19 +332,19 @@ def make_time_files(casts, datadir, user_cfg):
         time_file = Path(time_dir, '%s_time.pkl' % cast_id)
         if not time_file.exists():
             new_casts = True
-            cast = Cast(cast_id, datadir)
+            cast = Cast(cast_id, cnv_dir)
             cast.p_col = 'CTDPRS'
             # Apply smoothing filter
             cast.filter(cast.proc,
-                        win_size=(user_cfg.filter_win * user_cfg.freq),
-                        win_type=user_cfg.filter_type,
-                        cols=user_cfg.filter_cols)
+                        win_size=(filter_params.filter_win * sample_freq),
+                        win_type=filter_params.filter_type,
+                        cols=filter_params.filter_cols)
             # Parse the downcast from the full cast
             cast.parse_downcast(cast.filtered)
             # Trim the soak period from the downcast
             cast.trim_soak(cast.downcast,
-                           (user_cfg.soak_win * user_cfg.freq),
-                           user_cfg.soak_threshold)
+                           (soak_params.soak_win * sample_freq),
+                           soak_params.soak_threshold)
             # save pkl file
             cast.trimmed.to_pickle(time_file)
 
@@ -361,13 +364,13 @@ def make_time_files(casts, datadir, user_cfg):
                                 .sort_values(by=['cast_id']))
             p_offsets_all = (pd.concat([p_offsets_all,
                                         cast.get_pressure_offsets(cast.proc,
-                                                                  user_cfg.cond_threshold,
-                                                                  user_cfg.freq)])
+                                                                  soak_params.cond_threshold,
+                                                                  sample_freq)])
                              .drop_duplicates(['cast_id'], keep='last')
                              .sort_values(by=['cast_id']))
 
     # Wrap up...
     if new_casts is True:
         log.info("Saving deck pressures and cast details.")
-        cast_details_all.to_csv(Path(datadir, 'logs/cast_details.csv'), index=False)
-        p_offsets_all.to_csv(Path(datadir, 'logs/ondeck_pressure.csv'), index=False)
+        cast_details_all.to_csv(details_file, index=False)
+        p_offsets_all.to_csv(offsets_file, index=False)

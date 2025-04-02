@@ -10,10 +10,33 @@ import numpy as np
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
+from ctdcal.common import validate_dir
+from ctdcal.parsers.parse_sbe35 import parse_sbe35
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
+
+def reft_loader(infile):
+    cols = ['index_memory', 'datetime', 'btl_fire_num', 'diff', 'raw_value', 'T90']
+    dtypes = {
+            'index_memory': int,
+            'datetime': object,
+            'btl_fire_num': int,
+            'diff': int,
+            'raw_value': float,
+            'T90': float
+    }
+    # read csv into a dataframe
+    reft_df = pd.read_csv(infile, header=0, names=cols, dtype=dtypes)
+    # convert to native datetime format
+    reft_df['datetime'] = pd.to_datetime(reft_df['datetime'])
+
+    # assign initial flags (large "diff" = unstable reading, flag questionable)
+    reft_df["REFTMP_FLAG_W"] = 2
+    reft_df.loc[reft_df["diff"].abs() >= 3000, "REFTMP_FLAG_W"] = 3
+
+    return reft_df
 
 def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
     """
@@ -32,6 +55,7 @@ def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
         DataFrame of .CAP file with headers
 
     """
+    log.warning("Use of _reft_loader() is deprecated. Use reft_loader() instead.")
     # semi-flexible search for reft file (in the form of *ssscc.cap)
     try:
         reft_path = sorted(Path(reft_dir).glob(f"*{ssscc}.cap"))[0]
@@ -116,6 +140,38 @@ def _reft_loader(ssscc, reft_dir=cfg.dirs["reft"]):
     return reftDF
 
 
+def proc_reft(casts, raw_dir, parsed_dir, cnv_dir):
+    """
+    This will parse and process all reft data every time it runs, in order to
+    make sure any changes or corrections to raw data are picked up and the
+    parsed and processed files remain in sync.
+
+    Parameters
+    ----------
+    casts
+    raw_dir
+    parsed_dir
+    cnv_dir
+
+    Returns
+    -------
+
+    """
+    parse_sbe35(casts, raw_dir, parsed_dir)
+
+    outdir = validate_dir(cnv_dir, create=True)
+    for cast_id in casts:
+        infile = Path(parsed_dir, '%s.csv' % cast_id)
+        fname = Path(outdir, '%s_reft.csv' % cast_id)
+
+        if infile.exists():
+            reft_df = reft_loader(infile)
+            reft_df.to_csv(fname, index=False)
+        else:
+            log.warning("reft file for cast %s cannot be found. Skipping..." % cast_id)
+
+
+
 def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
     """
     SBE35 reference thermometer processing function. Load in .cap files for given
@@ -130,7 +186,7 @@ def process_reft(ssscc_list, reft_dir=cfg.dirs["reft"]):
 
     """
     for ssscc in ssscc_list:
-        if not Path(reft_dir + ssscc + "_reft.csv").exists():
+        if Path(reft_dir + ssscc + "_reft.csv").exists():
             try:
                 reftDF = _reft_loader(ssscc, reft_dir)
                 reftDF.to_csv(reft_dir + ssscc + "_reft.csv", index=False)

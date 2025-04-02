@@ -8,12 +8,35 @@ from pathlib import Path
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
+from ctdcal.common import validate_dir
 from ctdcal.processors.proc_oxy_odf import load_winkler_oxy
 
-# from ctdcal.process_bottle import retrieveBottleData, bottle_mean
 
-cfg = get_ctdcal_config()
+cfg = get_ctdcal_config()  # legacy config
 log = logging.getLogger(__name__)
+
+
+def make_btl_files(casts, raw_dir, btl_dir, cnv_dir):
+    log.info("Generating btl_mean.pkl files")
+    # validate required directories
+    raw_dir = validate_dir(Path(raw_dir))
+    btl_dir = validate_dir(Path(btl_dir), create=True)
+    cnv_dir = validate_dir(Path(cnv_dir))
+    # log_dir = validate_dir(Path(log_dir))
+
+    for cast_id in casts:
+        btl_file = Path(btl_dir, '%s_btl_mean.pkl' % cast_id)
+        if not btl_file.exists():
+            cnv_file = Path(cnv_dir, '%s.pkl' % cast_id)
+            cnv_df = pd.read_pickle(cnv_file)
+            firing_order = get_bottle_order_from_bl_file(cast_id, raw_dir)
+            bottle_df = get_bottle_data(cnv_df, firing_order)
+            mean_df = bottle_df.groupby('btl_fire_num', as_index=False).mean()
+            mean_df.to_pickle(btl_file)
+
+            # export bottom bottle details
+            # TODO: omit for now, see if can be can be added to exchange export step where it is needed
+    return True
 
 
 def make_btl_mean(ssscc_list):
@@ -30,6 +53,7 @@ def make_btl_mean(ssscc_list):
     boolean
         bottle averaging of mean has finished successfully
     """
+    log.warning("Use of make_btl_mean() is deprecated. Use make_btl_files() instead.")
     log.info("Generating btl_mean.pkl files")
     for ssscc in ssscc_list:
         if not Path(cfg.dirs["bottle"] + ssscc + "_btl_mean.pkl").exists():
@@ -58,6 +82,52 @@ def make_btl_mean(ssscc_list):
     return True
 
 
+def get_bottle_data(cnv, firing_order):
+    if 'btl_fire' in cnv.columns:
+        # find all rows associated with bottle fires
+        cnv['btl_fire_num'] = (
+            (
+                (cnv['btl_fire'])
+                & (
+                    cnv['btl_fire']
+                    != cnv['btl_fire'].shift(1)
+                )
+            )
+            .astype(int)
+            .cumsum()
+        )
+        # label rows according to actual firing order
+        cnv['btl_fire_num'] = firing_order.loc[cnv['btl_fire_num']].values
+        return cnv.loc[cnv['btl_fire']]
+    else:
+        log.error("Bottle fire column not found")
+        return pd.DataFrame()  # empty dataframe
+
+
+def get_bottle_order_from_bl_file(cast_id, raw_dir):
+    """
+    Helper function to get bottle firing order from the Sea Bird .bl file, which
+    is the best source when bottles have been fired non-sequentially.
+
+    :param cast_id: string - cast name
+
+    :return: pandas dataframe object
+    """
+    f = Path(raw_dir, '%s.bl' % cast_id)
+    btl_fire_order = [0]
+    btl_fire_num = [0]
+    with open(f, 'r') as bl:
+        for line in bl:
+            line = line.split(',')
+            try:
+                int(line[0])
+            except ValueError:
+                continue
+            btl_fire_order.append(int(line[0]))  # index of first bottle fired
+            btl_fire_num.append(int(line[1]))  # number of first bottle fired
+    return pd.DataFrame(btl_fire_num, index=btl_fire_order, columns=['btl_fire_num'])
+
+
 def retrieveBottleDataFromFile(converted_file):
     """
     Retrieve the bottle data from a converted file.
@@ -79,6 +149,7 @@ def retrieveBottleData(converted_df):
 
     Looks for changes in the BOTTLE_FIRE_COL column, ready to be averaged in making the CTD bottle file.
     """
+    log.warning("Use of retrieveBottleData() is deprecated. Use get_btl_data() instead.")
     if BOTTLE_FIRE_COL in converted_df.columns:
         converted_df[BOTTLE_FIRE_NUM_COL] = (
             (
