@@ -4,13 +4,14 @@ A module for handling Autosalinomter files, in the ODF format (Carl Mattson).
 import csv
 import io
 import logging
+from json import JSONDecodeError
 from pathlib import Path
 
 import gsw
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
-from ctdcal.common import validate_file
+from ctdcal.common import validate_file, validate_dir
 from ctdcal.fitting.fit_common import get_node, NodeNotFoundError, df_node_to_BottleFlags, save_node
 
 cfg = get_ctdcal_config()
@@ -39,7 +40,7 @@ def _salt_loader(filename):
         )
 
     #   Check on the header
-    date = pd.to_datetime(saltArray[0][-1])
+    date = pd.to_datetime(saltArray[0][-1], format='%d/%m/%Y')
     k15 = float(saltArray[0][8])
     if (date < pd.Timestamp('1985-01-01')) | (date > pd.Timestamp.today()):
         #   Check on the run date - should this be ± a few weeks to confirm that the analyst's computer is set up right?
@@ -151,7 +152,7 @@ def remove_autosal_drift(saltDF, refDF):
 
 
 def _salt_exporter(
-    saltDF, outdir=cfg.dirs["salt"], stn_col="STNNBR", cast_col="CASTNO"
+    saltDF, outdir, stn_col="STNNBR", cast_col="CASTNO"
 ):
     """
     Export salt DataFrame to .csv file. Extra logic is included in the event that
@@ -174,6 +175,56 @@ def _salt_exporter(
             stn_cast_salts.to_csv(outfile, index=False)
 
 
+
+def proc_salt(casts, raw_dir, proc_dir, flag_file):
+    # validate required directories
+    raw_dir = validate_dir(raw_dir)
+    proc_dir = validate_dir(proc_dir, create=True)
+    flags_df = None
+
+    for cast_id in casts:
+        salt_file = Path(raw_dir, cast_id)
+        proc_file = Path(proc_dir, '%s_salts.csv' % cast_id)
+        if proc_file.exists():
+            log.info(f"{cast_id}_salts.csv already exists in {proc_dir}... skipping")
+            continue
+        else:
+            if salt_file.exists():
+                salt_df, ref_df, questionable = _salt_loader(salt_file)
+                salt_df = remove_autosal_drift(salt_df, ref_df)
+                salt_df["SALNTY"] = gsw.SP_salinometer(
+                        (salt_df["CRavg"] / 2.0), salt_df["BathTEMP"]
+                )
+                _salt_exporter(salt_df, proc_dir)
+            else:
+                log.warning(f"Salt file for cast {cast_id} does not exist... skipping")
+                continue
+
+            # compile flags
+            if questionable is not None:
+                if flags_df is None:
+                    flags_df = questionable
+                else:
+                    flags_df = pd.concat([flags_df, questionable], ignore_index=True)
+    # save flags
+    if flags_df is not None:
+        flag_file = validate_file(flag_file, create=True)
+        try:
+            salt = pd.DataFrame.from_dict(get_node(flag_file, 'salt'))
+        except JSONDecodeError:
+            log.warning("Manual flag file %s appears to have no valid contents." % flag_file)
+            salt = None
+        except NodeNotFoundError:
+            log.info("Manual flag file %s contains no salt flags." % flag_file)
+            salt = None
+        flags_df = pd.concat([flags_df, salt], ignore_index=True)
+        new_flags = df_node_to_BottleFlags(flags_df)
+        save_node(flag_file, new_flags, 'salt', create_new=True)
+
+
+
+
+
 def process_salts(ssscc_list, user_cfg=None, salt_dir=cfg.dirs["salt"]):
     """
     Master salt processing function. Load in salt files for given station/cast list,
@@ -189,6 +240,7 @@ def process_salts(ssscc_list, user_cfg=None, salt_dir=cfg.dirs["salt"]):
         Path to folder containing raw salt files (defaults to data/salt/)
 
     """
+    log.warning("Use of process_salts() is deprecated. Use proc_salt() instead.")
     flags_df = None
     for ssscc in ssscc_list:
         if (Path(salt_dir) / f"{ssscc}_salts.csv").exists():

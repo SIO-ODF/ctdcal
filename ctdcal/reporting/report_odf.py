@@ -2,12 +2,14 @@
 Formats data and generates visuals for ODF-style cruise reports.
 """
 import logging
+from pathlib import Path
 
 import gsw
 import numpy as np
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
+from ctdcal.common import validate_dir
 from ctdcal.flagging import flag_common as flagging
 
 
@@ -113,3 +115,6 @@ def make_depth_log(time_df, threshold=80):
     return True
 
 
+def export_bottom_bottle_details(report_dir):
+    report_dir = validate_dir(report_dir, create=True)
+    report_file = Path(report_dir, 'bottom_bottle_details')

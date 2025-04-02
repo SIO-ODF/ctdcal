@@ -20,6 +20,10 @@ log = logging.getLogger(__name__)
 cfg = get_ctdcal_config()
 
 
+# Constants
+# ---------
+
+
 # Function definitions
 # --------------------
 
@@ -38,6 +42,7 @@ def load_user_config(cfgfile):
     -------
     Munch object
     """
+    cfgfile = validate_file(cfgfile)
     with open(cfgfile, 'r') as f:
         cfg = yaml.safe_load(f)
         return munchify(cfg)
@@ -202,6 +207,22 @@ def load_exchange_btl(btl_file: Union[str, Path]) -> pd.DataFrame:
     )
 
 
+# File exports
+def list_to_file(fname, outdir, lst):
+    """
+    Writes a list to a file, one list item to a line.
+
+    Parameters
+    ----------
+    fname : str or Path-like
+    outdir : str or Path-like
+    lst : list
+    """
+    outdir = validate_dir(outdir)
+    outfile = Path(outdir, fname)
+    with open(outfile, 'w') as f:
+        f.write('\n'.join(lst))
+
 def load_exchange_ctd(
     ctd_file: Union[str, Path, BufferedIOBase],
     n_files=None,
@@ -300,17 +321,54 @@ def load_exchange_ctd(
     )
 
 
-## Cast list manipulation
-def make_ssscc_list(fname="data/ssscc.csv"):
+## Cast list functions
+def make_cast_id_list(rawdir, outdir, fname="cast_id_list.csv"):
     """
     Attempt to automatically generate list of station/casts from raw files.
     """
-    raw_files = Path(cfg.dirs["raw"]).glob("*.hex")
-    ssscc_list = sorted([f.stem for f in raw_files])
-    pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
+    search_dir = validate_dir(Path(rawdir))
+    raw_files = Path(search_dir).glob("*.hex")
+    cast_id_list = sorted([f.stem for f in raw_files])
+    if len(cast_id_list) < 1:
+        raise FileNotFoundError('No raw data files found.')
+    # pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
+    outdir = validate_dir(outdir, create=True)
+    list_to_file(fname, outdir, cast_id_list)
+    return cast_id_list
 
-    return ssscc_list
 
+
+def get_cast_id_list(fname, rawdir, outdir, auto_generate=True):
+    """
+    Loads a cast list from a file. If the file is not found, the cast list will be
+    auto-generated from a directory of raw files when auto_generate is True (default
+    behavior).
+
+    Parameters
+    ----------
+    fname
+    auto_generate
+
+    Returns
+    -------
+
+    """
+    fname = Path(outdir, fname)
+    try:
+        # test if file exists
+        fname = validate_file(fname)
+    except FileNotFoundError:
+        # auto-generate or die
+        if auto_generate is True:
+            make_cast_id_list(rawdir, outdir, fname=fname)
+        else:
+            raise
+
+    # file exists or has been auto-generated
+    with open(fname, "r") as f:
+        # skip comment lines
+        id_list = [line.strip() for line in f.readlines() if not line.startswith('#')]
+    return id_list
 
 def get_ssscc_list(fname="data/ssscc.csv"):
     """
@@ -327,6 +385,7 @@ def get_ssscc_list(fname="data/ssscc.csv"):
     list
         Cast names or identifiers, as a list of strings.
     """
+    log.warning("Use of get_ssscc_list() is deprecated. Use get_cast_id_list() instead.")
     ssscc_list = []
     with open(fname, "r") as lines:
         for line in lines:
