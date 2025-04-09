@@ -216,7 +216,7 @@ def list_to_file(fname, outdir, lst):
     ----------
     fname : str or Path-like
     outdir : str or Path-like
-    lst : list
+    lst : iterable
     """
     outdir = validate_dir(outdir)
     outfile = Path(outdir, fname)
@@ -322,21 +322,41 @@ def load_exchange_ctd(
 
 
 ## Cast list functions
-def make_cast_id_list(rawdir, outdir, fname="cast_id_list.csv"):
+def make_cast_id_list(rawdir, outdir=None, pattern='*.hex', fname='cast_id_list.csv'):
     """
     Attempt to automatically generate list of station/casts from raw files.
     """
     search_dir = validate_dir(Path(rawdir))
-    raw_files = Path(search_dir).glob("*.hex")
+    raw_files = Path(search_dir).glob(pattern)
     cast_id_list = sorted([f.stem for f in raw_files])
     if len(cast_id_list) < 1:
         raise FileNotFoundError('No raw data files found.')
     # pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
-    outdir = validate_dir(outdir, create=True)
-    list_to_file(fname, outdir, cast_id_list)
+    if outdir is not None:
+        outdir = validate_dir(outdir, create=True)
+        list_to_file(fname, outdir, cast_id_list)
     return cast_id_list
 
 
+def load_fit_groups(casts, fit_groups):
+    fit_groups_all = dict()
+    for name, fit_group in fit_groups.items():
+        for value in fit_group:
+            ct = casts.count(value)
+            if ct != 1:
+                raise ValueError("Invalid fit group definitions: %s must occur only once, but %s occurrances were found."
+                                 % (value, ct))
+        group_casts = []
+        for starting_cast in fit_group:
+            start_idx = casts.index(starting_cast)
+            if starting_cast == fit_group[-1]:
+                end_idx = None
+            else:
+                next_cast = fit_group[fit_group.index(starting_cast) + 1]
+                end_idx = casts.index(next_cast)
+            group_casts.append([cast for cast in casts[start_idx: end_idx]])
+        fit_groups_all[name] = group_casts
+    return munchify(fit_groups_all)
 
 def get_cast_id_list(fname, rawdir, outdir, auto_generate=True):
     """

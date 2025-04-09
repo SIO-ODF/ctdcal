@@ -32,10 +32,8 @@ def make_btl_files(casts, raw_dir, btl_dir, cnv_dir):
             firing_order = get_bottle_order_from_bl_file(cast_id, raw_dir)
             bottle_df = get_bottle_data(cnv_df, firing_order)
             mean_df = bottle_df.groupby('btl_fire_num', as_index=False).mean()
+            mean_df['cast_id'] = cast_id
             mean_df.to_pickle(btl_file)
-
-            # export bottom bottle details
-            # TODO: omit for now, see if can be can be added to exchange export step where it is needed
     return True
 
 
@@ -249,6 +247,49 @@ def _load_salt_data(salt_file, index_name="SAMPNO"):
     return salt_data
 
 
+def get_bottom_bottle_data(
+        btl_data,
+        report_dir,
+        cols=None,
+        export=False
+):
+    if cols is None:
+        cols = {'cast_id': 'SSSCC', 'date': 'DATE', 'time': 'TIME', 'lat': 'LATITUDE', 'lon': 'LONGITUDE'}
+    datetime_col = "nmea_datetime"
+    if datetime_col not in btl_data.columns:
+        log.debug(
+                f"'{datetime_col}' not found in DataFrame - using 'scan_datetime'"
+        )
+        datetime_col = "scan_datetime"
+
+    # filter bottom bottle data
+    bottom_bottles = btl_data.groupby('cast_id', as_index=False)[[datetime_col, 'GPSLAT', 'GPSLON']].first()
+
+    # convert timestamps
+    bottom_bottles[datetime_col] = pd.to_datetime(bottom_bottles[datetime_col], unit="s")
+    bottom_bottles[cols['date']] = bottom_bottles[datetime_col].dt.strftime("%Y%m%d")
+    bottom_bottles[cols['time']] = bottom_bottles[datetime_col].dt.strftime("%H%M")
+
+    # rename to user cols
+    bottom_bottles.rename(
+            columns={'cast_id': cols['cast_id'],
+                     'GPSLAT': cols['lat'],
+                     'GPSLON': cols['lon'],
+                     },
+            inplace=True,
+    )
+    bottom_bottles.drop(columns=datetime_col, inplace=True)
+
+    # export bottom bottle time/lat/lon info
+    if export is True:
+        bottom_bottle_file = Path(report_dir, 'bottom_bottle_details.csv')
+        bottom_bottles.to_csv(bottom_bottle_file, header=True, index=False)
+
+    return bottom_bottles
+
+
+
+
 def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", decimals=4):
     """
     Adds lat/lon, date, and time to dataframe based on the values in the bottom_bottle_details.csv
@@ -272,6 +313,110 @@ def _add_btl_bottom_data(df, cast, lat_col="LATITUDE", lon_col="LONGITUDE", deci
     return df
 
 
+def load_btl_all(casts, btl_dir, reft_dir, salt_dir, oxy_dir):
+    btl_dir = Path(btl_dir)
+    reft_dir = Path(reft_dir)
+    salt_dir = Path(salt_dir)
+
+    reft_data_all = pd.DataFrame()
+    refc_data_all = pd.DataFrame()
+    oxy_data_all = pd.DataFrame()
+    btl_data_all = pd.DataFrame()
+
+    for cast_id in casts:
+        log.info("Loading BTL data for station: " + cast_id + "...")
+        btl_file = Path(btl_dir, "%s_btl_mean.pkl" % cast_id)
+        btl_data = pd.read_pickle(btl_file)
+
+        ### load REFT data
+        reft_file = Path(reft_dir, "%s_reft.csv" % cast_id)
+        try:
+            reft_data = pd.read_csv(reft_file, dtype={'cast_id': str}, na_values='NaN')
+            if len(reft_data) > 36:
+                log.error(f"len(reft_data) > 36 for {cast_id}, check reftmp file")
+        except FileNotFoundError:
+            log.warning(
+                "Missing (or misnamed) REFT Data Station: "
+                + cast_id
+                + "...filling with NaNs"
+            )
+            reft_data = pd.DataFrame()
+            # reft_data = pd.DataFrame(index=btl_data.index, columns=["REFTMP"], dtype=float)
+            # reft_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
+            # reft_data["cast_id"] = cast_id
+
+            # concatenate with all reft
+        reft_data_all = pd.concat([reft_data_all, reft_data], axis=0, sort=False)
+
+        ### load REFC data
+        refc_file = Path(salt_dir, "%s_salts.csv" % cast_id)
+        try:
+            refc_data = pd.read_csv(refc_file, dtype={'cast_id': str}, na_values='NaN')
+            if len(refc_data) > 36:
+                log.error(f"len(refc_data) > 36 for {cast_id}, check autosal file")
+        except FileNotFoundError:
+            log.warning(
+                "Missing (or misnamed) REFC Data Station: "
+                + cast_id
+                + "...filling with NaNs"
+            )
+            refc_data = pd.DataFrame()
+            # refc_data = pd.DataFrame(
+            #     index=btl_data.index,
+            #     columns=["CRavg", "BathTEMP", "BTLCOND"],
+            #     dtype=float,
+            # )
+            # refc_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
+            # refc_data['cast_id'] = cast_id
+
+        # concatenate with all refc
+        refc_data_all = pd.concat([refc_data_all, refc_data], axis=0, sort=False)
+
+        ### load OXY data
+        oxy_file = Path(oxy_dir, '%s_oxy.csv' % cast_id)
+        try:
+            oxy_data = pd.read_csv(oxy_file, dtype={'cast_id': str, 'FLASKNO': str}, na_values='NaN')
+            if len(oxy_data) > 36:
+                log.error(f"len(oxy_data) > 36 for {cast_id}, check oxygen file")
+        except FileNotFoundError:
+            log.warning(
+                "Missing (or misnamed) REFO Data Station: "
+                + cast_id
+                + "...filling with NaNs"
+            )
+            oxy_data = pd.DataFrame()
+            # oxy_data = pd.DataFrame(
+            #     index=btl_data.index,
+            #     columns=[
+            #         "FLASKNO",
+            #         "TITR_VOL",
+            #         "TITR_TEMP",
+            #         "DRAW_TEMP",
+            #         "TITR_TIME",
+            #         "END_VOLTS",
+            #     ],
+            #     dtype=float,
+            # )
+            # oxy_data["STNNO_OXY"] = cast_id[:3]
+            # oxy_data["CASTNO_OXY"] = cast_id[3:]
+            # oxy_data["btl_fire_num"] = btl_data["btl_fire_num"].astype(int)
+            # oxy_data['cast_id'] = cast_id
+
+        # concatenate with all oxy
+        oxy_data_all = pd.concat([oxy_data_all, oxy_data], axis=0, sort=False)
+
+        # concatenate with all btl
+        btl_data_all = pd.concat([btl_data_all, btl_data], axis=0, sort=False)
+
+    ### build up dataframe
+    # Horizontally concat DFs to have all data in one DF
+    btl_data_all = pd.merge(btl_data_all, reft_data_all, on=['cast_id', 'btl_fire_num'], how='left')
+    btl_data_all = pd.merge(btl_data_all, refc_data_all, on=['cast_id', 'btl_fire_num'], how='left')
+    btl_data_all = pd.merge(btl_data_all, oxy_data_all, on=['cast_id', 'btl_fire_num'], how='left')
+
+    return btl_data_all
+
+
 def load_all_btl_files(ssscc_list, cols=None):
     """
     Load bottle and secondary (e.g. reference temperature, bottle salts, bottle oxygen)
@@ -290,6 +435,7 @@ def load_all_btl_files(ssscc_list, cols=None):
         Merged dataframe containing all loaded data
 
     """
+    log.warning("Use of load_all_btl_files() is deprecated. Use load_btl_all() instead.")
     df_data_all = pd.DataFrame()
 
     for ssscc in ssscc_list:

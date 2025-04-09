@@ -3,15 +3,31 @@ Functions to support importing from, converting to and exporting exchange files.
 """
 import logging
 from datetime import datetime as dt, timezone
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
+from ctdcal.common import validate_dir
 from ctdcal.flagging.flag_common import nan_values
+from ctdcal.processors.proc_bottle import get_bottom_bottle_data
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
+
+
+def export_exchange(
+        time_data_all,
+        btl_data_all,
+        ssscc_list,
+        exchange_settings,
+        outdir=cfg.dirs["pressure"],
+        reportdir=cfg.dirs['logs'],
+        cast_id_col='SSSCC'
+):
+    export_hy1(btl_data_all, outdir, reportdir, cast_id_col, exchange_settings)
+    # export_ct1(time_data_all, ssscc_list, reportdir, outdir, cast_id_col, exchange_settings)
 
 
 def load_hy_file(path_to_hyfile):
@@ -35,10 +51,7 @@ def load_hy_file(path_to_hyfile):
     return df
 
 
-def merge_hy1(
-    df1,
-    df2,
-):
+def merge_hy1(df1, df2,):
     """
     Merges two hy1 files, returning the combined Pandas DataFrame.
     If the hy1 file has not been loaded yet, use load_hy_file.
@@ -96,7 +109,7 @@ def add_btlnbr_cols(df, btl_num_col):
     return df
 
 
-def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
+def export_hy1(df, out_dir, report_dir, cast_id_col, settings, org="ODF"):
     """
     Write out the exchange-lite formatted hy1 bottle file.
 
@@ -111,6 +124,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     """
     log.info("Exporting bottle file")
+
     btl_data = df.copy()
     now = dt.now()
     file_datetime = now.strftime("%Y%m%d")
@@ -146,13 +160,20 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
         "REFTMP_FLAG_W": "",
     }
 
+    # get bottom bottle data
+    bottom_bottles = get_bottom_bottle_data(btl_data, report_dir, export=True)
+
     # rename outputs as defined in user_settings.yaml
-    for param, attrs in cfg.ctd_outputs.items():
+    for param, attrs in settings.ctd_outputs.items():
         if param not in btl_data.columns:
             btl_data.rename(columns={attrs["sensor"]: param}, inplace=True)
+    btl_data.rename(columns={cast_id_col: 'SSSCC'}, inplace=True)
 
-    btl_data["EXPOCODE"] = cfg.expocode
-    btl_data["SECT_ID"] = cfg.section_id
+    # merge bottom bottle data
+    btl_data = pd.merge(btl_data, bottom_bottles, on='SSSCC', how='left')
+
+    btl_data["EXPOCODE"] = settings.expocode
+    btl_data["SECT_ID"] = settings.section_id
     btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
     btl_data["CASTNO"] = [int(x[3:]) for x in btl_data["SSSCC"]]
     btl_data["SAMPNO"] = btl_data["btl_fire_num"].astype(int)
@@ -160,7 +181,7 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     # sort by decreasing sample number (increasing pressure) and reindex
     btl_data = btl_data.sort_values(
-        by=["STNNBR", "SAMPNO"], ascending=[True, False], ignore_index=True
+        by=["STNNBR", "CASTNO", "SAMPNO"], ascending=[True, True, False], ignore_index=True
     )
 
     # switch oxygen primary sensor to rinko
@@ -175,16 +196,21 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     # add depth
     depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        Path(report_dir, "depth_log.csv"), dtype={cast_id_col: str}, na_values=-999
     ).dropna()
-    manual_depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
-    )
+    try:
+        manual_depth_df = pd.read_csv(
+            Path(report_dir, 'manual_depth_log.csv'), dtype={cast_id_col: str}
+        )
+    except FileNotFoundError:
+        log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
+        manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
+        manual_depth_df.to_csv(Path(report_dir, 'manual_depth_log.csv'), index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
-    full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
+    full_depth_df.drop_duplicates(subset=cast_id_col, keep="first", inplace=True)
     btl_data["DEPTH"] = -999
     for index, row in full_depth_df.iterrows():
-        btl_data.loc[btl_data["SSSCC"] == row["SSSCC"], "DEPTH"] = int(row["DEPTH"])
+        btl_data.loc[btl_data["SSSCC"] == row[cast_id_col], "DEPTH"] = int(row["DEPTH"])
 
     # deal with nans
     btl_data["REFTMP_FLAG_W"] = nan_values(
@@ -209,7 +235,8 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
 
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org
-    with open(out_dir + cfg.expocode + "_hy1.csv", mode="w+") as f:
+    outfile = Path(out_dir, '%s_hy1.csv' % settings.expocode)
+    with open(outfile, mode="w+") as f:
         f.write("BOTTLE, %s\n" % (time_stamp))
         f.write(",".join(btl_columns.keys()) + "\n")
         f.write(",".join(btl_columns.values()) + "\n")
@@ -386,7 +413,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list):
+def export_ct1(df, ssscc_list, reportdir, outdir, cast_id_col, settings):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -408,19 +435,31 @@ def export_ct1(df, ssscc_list):
     """
     log.info("Exporting CTD files")
 
+    # validate or create output directory
+    validate_dir(outdir, create=True)
+
     # initial flagging (some of this should be moved)
     df["CTDFLUOR_FLAG_W"] = 1
     df["CTDXMISS_FLAG_W"] = 1
     # df["CTDBACKSCATTER_FLAG_W"] = 1
 
     # rename outputs as defined in user_settings.yaml
-    for param, attrs in cfg.ctd_outputs.items():
+    for param, attrs in settings.ctd_outputs.items():
         if param not in df.columns:
             df.rename(columns={attrs["sensor"]: param}, inplace=True)
 
     # check that all columns are there
+    ctd_col_names, ctd_col_units = [], []
+    for (param, attrs) in settings.ctd_outputs.items():
+        if param == "CTDPRS":
+            ctd_col_names += [param]
+            ctd_col_units += [attrs["units"]]
+        else:
+            ctd_col_names += [param, f"{param}_FLAG_W"]
+            ctd_col_units += [attrs["units"], ""]
+
     try:
-        df[cfg.ctd_col_names]
+        df[ctd_col_names]
         # this is lazy, do better
     except KeyError as err:
         log.info("Column names not configured properly... attempting to correct")
@@ -433,28 +472,27 @@ def export_ct1(df, ssscc_list):
                 log.warning(col + " missing, filling with -999s")
                 df[col] = -999
 
-    df["SSSCC"] = df["SSSCC"].astype(str).copy()
-    cast_details = pd.read_csv(
-        # cfg.dirs["logs"] + "cast_details.csv", dtype={"SSSCC": str}
-        cfg.dirs["logs"] + "bottom_bottle_details.csv",
-        dtype={"SSSCC": str},
-    )
+    df[cast_id_col] = df[cast_id_col].astype(str).copy()
+    # cast_details = pd.read_csv(
+    #     Path(reportdir, 'bottom_bottle_details.csv'),
+    #     dtype={cast_id_col: str},
+    # )
+    df.rename(columns={cast_id_col: 'SSSCC'}, inplace=True)
     depth_df = pd.read_csv(
-        cfg.dirs["logs"] + "depth_log.csv", dtype={"SSSCC": str}, na_values=-999
+        Path(reportdir, 'depth_log.csv'), dtype={'SSSCC': str}, na_values=-999
     ).dropna()
     try:
         manual_depth_df = pd.read_csv(
-            cfg.dirs["logs"] + "manual_depth_log.csv", dtype={"SSSCC": str}
+            Path(reportdir, 'manual_depth_log.csv'), dtype={'SSSCC': str}
         )
     except FileNotFoundError:
         log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
-        manual_depth_df.to_csv(cfg.dirs["logs"] + "manual_depth_log.csv", index=False)
+        manual_depth_df.to_csv(Path(reportdir, 'manual_depth_log.csv'), index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
-    full_depth_df.drop_duplicates(subset="SSSCC", keep="first", inplace=True)
+    full_depth_df.drop_duplicates(subset='SSSCC', keep="first", inplace=True)
 
     for ssscc in ssscc_list:
-
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
@@ -462,7 +500,7 @@ def export_ct1(df, ssscc_list):
         print(f"Using Rinko as CTDOXY for {ssscc}")
         time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
         time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
-        time_data = time_data[cfg.ctd_col_names]
+        time_data = time_data[ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
 
@@ -477,7 +515,6 @@ def export_ct1(df, ssscc_list):
             log.warning(f"No depth logged for {ssscc}, setting to -999")
             depth = -999
 
-        # get cast_details for current SSSCC
         cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("records")[0]
         b_datetime = (
             dt.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc)
@@ -490,7 +527,8 @@ def export_ct1(df, ssscc_list):
         now = dt.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d")  # %H:%M")
         file_datetime = file_datetime + "ODFSIO"
-        with open(f"{cfg.dirs['pressure']}{ssscc}_ct1.csv", "w+") as f:
+        outfile = Path(outdir, '%s_ct1.csv' % ssscc)
+        with open(outfile, 'w+') as f:
             # put in logic to check columns?
             # number_headers should be calculated, not defined
             ctd_header = (  # this is ugly but prevents tabs before label
@@ -504,13 +542,13 @@ def export_ct1(df, ssscc_list):
                 f"TIME = {b_datetime[1]}\n"
                 f"LATITUDE = {btm_lat:.4f}\n"
                 f"LONGITUDE = {btm_lon:.4f}\n"
-                f"INSTRUMENT_ID = {cfg.ctd_serial}\n"
+                f"INSTRUMENT_ID = {settings.ctd_serial}\n"
                 f"DEPTH = {depth:.0f}\n"
             )
             f.write(ctd_header)
-            np.asarray(cfg.ctd_col_names).tofile(f, sep=",", format="%s")
+            np.asarray(ctd_col_names).tofile(f, sep=",", format="%s")
             f.write("\n")
-            np.asarray(cfg.ctd_col_units).tofile(f, sep=",", format="%s")
+            np.asarray(ctd_col_units).tofile(f, sep=",", format="%s")
             f.write("\n")
             time_data.to_csv(f, header=False, index=False)
             f.write("END_DATA")
