@@ -10,6 +10,7 @@ import numpy as np
 from scipy import signal as sig
 
 from ctdcal.common import validate_dir
+from ctdcal.processors.functions_oxy import calculate_dV_dt
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +55,15 @@ class Cast(object):
         Read the processed data into a dataframe.
         """
         f = Path(self.datadir, '%s.pkl' % self.cast_id)
-        self.proc = pd.read_pickle(f)
+        data = pd.read_pickle(f)
+
+        # Moving the following steps here to avoid having to reopen and modify the
+        # pickle files again, one-by-one later
+        data["cast_id"] = self.cast_id
+        data["dv_dt"] = calculate_dV_dt(
+                data["CTDOXYVOLTS"], data["scan_datetime"]
+        )
+        self.proc = data
 
     def parse_downcast(self, data):
         """
@@ -125,6 +134,8 @@ class Cast(object):
         # Find local peaks
         local_min_vals = data.loc[data[self.p_col] == data[self.p_col].rolling(win_size, center=True).min(),
                                   [self.p_col]]
+        if len(local_min_vals) < 1:
+            raise ValueError("Error detecting the soak. Cast %s may be a partial or badly defective cast.")
 
         # apply max_soak threshold to filter false positives...
         i = local_min_vals.index[-1]
@@ -171,17 +182,17 @@ class Cast(object):
         best_full_cast = self.filtered if self.filtered is not None else self.proc
         # TODO: the below uses all very odf/go-ship/seabird-specific column labels
         #   which should ultimately be replaced with standardized names.
-        data['start_time'] = [float(self.trimmed["scan_datetime"].head(1))]
+        data['start_time'] = [self.trimmed['scan_datetime'].iloc[0].astype(float)]
         p_max_ind = best_full_cast[self.p_col].argmax()
-        data['bottom_time'] = [float(best_full_cast["scan_datetime"][p_max_ind])]
-        data['end_time'] = [float(best_full_cast["scan_datetime"].tail(1))]
-        data['start_pressure'] = [float(np.around(self.trimmed[self.p_col].head(1), 4))]
-        data['max_pressure'] = [float(np.around(self.trimmed[self.p_col].max(), 4))]
+        data['bottom_time'] = [best_full_cast["scan_datetime"][p_max_ind].astype(float)]
+        data['end_time'] = [best_full_cast["scan_datetime"].iloc[-1].astype(float)]
+        data['start_pressure'] = [np.around(self.trimmed[self.p_col].iloc[0].astype(float), 4)]
+        data['max_pressure'] = [np.around(self.trimmed[self.p_col].max().astype(float), 4)]
         if 'ALT' in self.proc.columns:
-            data['altimeter_bottom'] = [float(np.around(best_full_cast["ALT"][p_max_ind], 4))]
+            data['altimeter_bottom'] = [np.around(best_full_cast["ALT"][p_max_ind].astype(float), 4)]
         if all(col in self.proc.columns for col in ['GPSLAT', 'GPSLON']):
-            data['latitude'] = [float(np.around(best_full_cast["GPSLAT"][p_max_ind], 4))]
-            data['longitude'] = [float(np.around(best_full_cast["GPSLON"][p_max_ind], 4))]
+            data['latitude'] = [np.around(best_full_cast["GPSLAT"][p_max_ind].astype(float), 4)]
+            data['longitude'] = [np.around(best_full_cast["GPSLON"][p_max_ind].astype(float), 4)]
         return data
 
     def get_pressure_offsets(self, data, threshold, sample_freq):
@@ -345,6 +356,7 @@ def make_time_files(casts, time_dir, cnv_dir, log_dir, filter_params, soak_param
             cast.trim_soak(cast.downcast,
                            (soak_params.soak_win * sample_freq),
                            soak_params.soak_threshold)
+
             # save pkl file
             cast.trimmed.to_pickle(time_file)
 

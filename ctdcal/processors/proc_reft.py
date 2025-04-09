@@ -28,7 +28,7 @@ def reft_loader(infile):
             'T90': float
     }
     # read csv into a dataframe
-    reft_df = pd.read_csv(infile, header=0, names=cols, dtype=dtypes)
+    reft_df = pd.read_csv(infile, header=None, names=cols, dtype=dtypes)
     # convert to native datetime format
     reft_df['datetime'] = pd.to_datetime(reft_df['datetime'])
 
@@ -160,13 +160,16 @@ def proc_reft(casts, raw_dir, parsed_dir, cnv_dir):
     parse_sbe35(casts, raw_dir, parsed_dir)
 
     outdir = validate_dir(cnv_dir, create=True)
+    cols = ['cast_id', 'btl_fire_num', 'REFTMP', 'REFTMP_FLAG_W']
     for cast_id in casts:
         infile = Path(parsed_dir, '%s.csv' % cast_id)
         fname = Path(outdir, '%s_reft.csv' % cast_id)
 
         if infile.exists():
             reft_df = reft_loader(infile)
-            reft_df.to_csv(fname, index=False)
+            reft_df['cast_id'] = cast_id
+            reft_df.rename(columns={'T90': 'REFTMP'}, inplace=True)
+            reft_df.to_csv(fname, index=False, columns=cols)
         else:
             log.warning("reft file for cast %s cannot be found. Skipping..." % cast_id)
 

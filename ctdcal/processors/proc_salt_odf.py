@@ -13,6 +13,7 @@ import pandas as pd
 from ctdcal import get_ctdcal_config
 from ctdcal.common import validate_file, validate_dir
 from ctdcal.fitting.fit_common import get_node, NodeNotFoundError, df_node_to_BottleFlags, save_node
+from ctdcal.processors.functions_salt import CR_to_cond
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -152,7 +153,7 @@ def remove_autosal_drift(saltDF, refDF):
 
 
 def _salt_exporter(
-    saltDF, outdir, stn_col="STNNBR", cast_col="CASTNO"
+    saltDF, outdir, btldir, stn_col="STNNBR", cast_col="CASTNO"
 ):
     """
     Export salt DataFrame to .csv file. Extra logic is included in the event that
@@ -168,15 +169,53 @@ def _salt_exporter(
         for cast in casts:
             stn_cast_salts = stn_salts[stn_salts[cast_col] == cast].copy()
             stn_cast_salts.dropna(axis=1, how="all", inplace=True)  # drop empty columns
-            outfile = Path(outdir) / f"{station:03.0f}{cast:02.0f}_salts.csv"  # SSSCC_*
+
+            # AS 20250404 adding code to replace station/cast with cast_id in export csv,
+            # for consistency and to ease merging with bottle data
+            cast_id = str(int(station)).zfill(3) + str(int(cast)).zfill(2)
+            stn_cast_salts['cast_id'] = cast_id
+            stn_cast_salts.drop(columns=[stn_col, cast_col], inplace=True)
+
+            # 20250404 AS adding code here to calculate BTLCOND since it logically
+            # belongs in processing and to make the generated csv consistent with
+            # what can be exported by non-odf salt processors. Requires importing
+            # ctd bottle data.
+            # ctd_btl_file = Path(btldir, '%s_btl_mean.pkl' % cast_id)
+            # ctd_btl = pd.read_pickle(ctd_btl_file)
+            # log.info("Calculating bottle conductivity")
+            # # calculate BTLCOND values from autosal data
+            # stn_cast_salts['BTLCOND'] = CR_to_cond(
+            #     stn_cast_salts["CRavg"],
+            #     stn_cast_salts["BathTEMP"],
+            #     ctd_btl['CTDTMP1'],
+            #     ctd_btl['CTDPRS'],
+            # )
+
+            # Rename some cols to ease merges that will happen during calibration
+            stn_cast_salts.rename(columns={'SAMPNO': 'btl_fire_num'}, inplace=True)
+
+            # export file
+            cols = ['cast_id', 'btl_fire_num', 'SALNTY', 'CRavg', 'BathTEMP']
+            # cols = ['cast_id', 'btl_fire_num', 'BTLCOND', 'SALNTY']
+            outfile = Path(outdir, '%s_salts.csv' % cast_id)
             if outfile.exists():
                 log.info(str(outfile) + " already exists...skipping")
                 continue
-            stn_cast_salts.to_csv(outfile, index=False)
+            stn_cast_salts.to_csv(outfile, index=False, columns=cols)
 
 
+def proc_salt(casts, raw_dir, proc_dir, btl_dir, flag_file):
+    """
+    Loads raw salinometer data, processes for salinity, adds manual flags
+    and exports to csv.
 
-def proc_salt(casts, raw_dir, proc_dir, flag_file):
+    Parameters
+    ----------
+    casts
+    raw_dir
+    proc_dir
+    flag_file
+    """
     # validate required directories
     raw_dir = validate_dir(raw_dir)
     proc_dir = validate_dir(proc_dir, create=True)
@@ -186,7 +225,7 @@ def proc_salt(casts, raw_dir, proc_dir, flag_file):
         salt_file = Path(raw_dir, cast_id)
         proc_file = Path(proc_dir, '%s_salts.csv' % cast_id)
         if proc_file.exists():
-            log.info(f"{cast_id}_salts.csv already exists in {proc_dir}... skipping")
+            log.info(f"{proc_file} already exists in {proc_dir}... skipping")
             continue
         else:
             if salt_file.exists():
@@ -195,7 +234,9 @@ def proc_salt(casts, raw_dir, proc_dir, flag_file):
                 salt_df["SALNTY"] = gsw.SP_salinometer(
                         (salt_df["CRavg"] / 2.0), salt_df["BathTEMP"]
                 )
-                _salt_exporter(salt_df, proc_dir)
+
+                # export csv
+                _salt_exporter(salt_df, proc_dir, btl_dir)
             else:
                 log.warning(f"Salt file for cast {cast_id} does not exist... skipping")
                 continue
@@ -225,7 +266,7 @@ def proc_salt(casts, raw_dir, proc_dir, flag_file):
 
 
 
-def process_salts(ssscc_list, user_cfg=None, salt_dir=cfg.dirs["salt"]):
+def process_salts(ssscc_list, user_cfg=None, salt_dir=cfg.dirs["salt"], btl_dir=cfg.dirs["bottle"]):
     """
     Master salt processing function. Load in salt files for given station/cast list,
     calculate salinity, and export to .csv files.

@@ -5,7 +5,14 @@ import pytest
 import yaml
 
 import ctdcal.common
-from ctdcal.common import load_user_config, validate_dir, validate_file, make_cast_id_list, get_cast_id_list
+from ctdcal.common import (
+    load_user_config,
+    validate_dir,
+    validate_file,
+    make_cast_id_list,
+    get_cast_id_list,
+    load_fit_groups,
+)
 
 
 class TestUserConfig:
@@ -151,3 +158,34 @@ class TestCastListFunctions:
         id_list = get_cast_id_list('fake_file', None, None, tmp_dir)
         assert len(id_list) == 3
         assert id_list[2] == 'f'
+
+    def test_load_fit_groups(self):
+        fake_groups = {'spam': ['a', 'd']}
+        fake_list = ['a', 'b', 'c', 'd', 'f']
+
+        # happy path
+        # spam has two groups:
+        fit_groups_all = load_fit_groups(fake_list, fake_groups)
+        assert len(fit_groups_all) == 1
+        assert len(fit_groups_all['spam']) == 2
+        assert len(fit_groups_all['spam'][0]) == 3
+        assert 'd' not in fit_groups_all['spam'][0]
+        assert 'd' in fit_groups_all['spam'][1]
+
+        # spam is all one group:
+        fake_groups = {'spam': ['a']}
+        fit_groups_all = load_fit_groups(fake_list, fake_groups)
+        assert len(fit_groups_all['spam']) == 1
+        assert len(fit_groups_all['spam'][0]) == 5
+
+        # sad path
+        # ambiguous slice indexer (duplicate items in list)
+        fake_groups = {'spam': ['a', 'd']}
+        fake_list = ['a', 'b', 'd', 'd', 'f']
+        with pytest.raises(ValueError):
+            fit_groups_all = load_fit_groups(fake_list, fake_groups)
+
+        # slice indexer not found
+        fake_list = ['a', 'b', 'c', 'f']
+        with pytest.raises(ValueError):
+            fit_groups_all = load_fit_groups(fake_list, fake_groups)
