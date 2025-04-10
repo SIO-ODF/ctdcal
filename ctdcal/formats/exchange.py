@@ -27,7 +27,7 @@ def export_exchange(
         cast_id_col='SSSCC'
 ):
     export_hy1(btl_data_all, outdir, reportdir, cast_id_col, exchange_settings)
-    # export_ct1(time_data_all, ssscc_list, reportdir, outdir, cast_id_col, exchange_settings)
+    export_ct1(time_data_all, ssscc_list, reportdir, outdir, cast_id_col, exchange_settings)
 
 
 def load_hy_file(path_to_hyfile):
@@ -413,7 +413,7 @@ def _flag_backfill_data(
     return df
 
 
-def export_ct1(df, ssscc_list, reportdir, outdir, cast_id_col, settings):
+def export_ct1(df, ssscc_list, reportdir, outdir, cast_id_col, settings, org='ODFSIO'):
     """
     Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
     adding quality flags and removing unneeded columns.
@@ -472,32 +472,33 @@ def export_ct1(df, ssscc_list, reportdir, outdir, cast_id_col, settings):
                 log.warning(col + " missing, filling with -999s")
                 df[col] = -999
 
-    df[cast_id_col] = df[cast_id_col].astype(str).copy()
-    # cast_details = pd.read_csv(
-    #     Path(reportdir, 'bottom_bottle_details.csv'),
-    #     dtype={cast_id_col: str},
-    # )
     df.rename(columns={cast_id_col: 'SSSCC'}, inplace=True)
+    df['SSSCC'] = df['SSSCC'].astype(str).copy()
+
+    cast_details = pd.read_csv(
+        Path(reportdir, 'bottom_bottle_details.csv'),
+        dtype={'SSSCC': str},
+    )
     depth_df = pd.read_csv(
-        Path(reportdir, 'depth_log.csv'), dtype={'SSSCC': str}, na_values=-999
+        Path(reportdir, 'depth_log.csv'), dtype={cast_id_col: str}, na_values=-999
     ).dropna()
     try:
         manual_depth_df = pd.read_csv(
-            Path(reportdir, 'manual_depth_log.csv'), dtype={'SSSCC': str}
+            Path(reportdir, 'manual_depth_log.csv'), dtype={cast_id_col: str}
         )
     except FileNotFoundError:
         log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
         manual_depth_df.to_csv(Path(reportdir, 'manual_depth_log.csv'), index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
-    full_depth_df.drop_duplicates(subset='SSSCC', keep="first", inplace=True)
+    full_depth_df.drop_duplicates(subset=cast_id_col, keep="first", inplace=True)
 
     for ssscc in ssscc_list:
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
         # switch oxygen primary sensor to rinko
         # if int(ssscc[:3]) > 35:
-        print(f"Using Rinko as CTDOXY for {ssscc}")
+        log.info(f"Using Rinko as CTDOXY for {ssscc}")
         time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
         time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
         time_data = time_data[ctd_col_names]
@@ -510,23 +511,19 @@ def export_ct1(df, ssscc_list, reportdir, outdir, cast_id_col, settings):
                 time_data[col] = time_data[col].astype(int)
 
         try:
-            depth = full_depth_df.loc[full_depth_df["SSSCC"] == ssscc, "DEPTH"].iloc[0]
+            depth = full_depth_df.loc[full_depth_df[cast_id_col] == ssscc, "DEPTH"].iloc[0]
         except IndexError:
             log.warning(f"No depth logged for {ssscc}, setting to -999")
             depth = -999
 
         cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("records")[0]
-        b_datetime = (
-            dt.fromtimestamp(cast_dict["bottom_time"], tz=timezone.utc)
-            .strftime("%Y%m%d %H%M")
-            .split(" ")
-        )
-        btm_lat = cast_dict["latitude"]
-        btm_lon = cast_dict["longitude"]
+
+        # btm_lat = cast_dict['LATITUDE']
+        # btm_lon = cast_dict['LONGITUDE']
 
         now = dt.now(timezone.utc)
         file_datetime = now.strftime("%Y%m%d")  # %H:%M")
-        file_datetime = file_datetime + "ODFSIO"
+        file_datetime = file_datetime + org
         outfile = Path(outdir, '%s_ct1.csv' % ssscc)
         with open(outfile, 'w+') as f:
             # put in logic to check columns?
@@ -538,10 +535,10 @@ def export_ct1(df, ssscc_list, reportdir, outdir, cast_id_col, settings):
                 f"SECT_ID = {cfg.section_id}\n"
                 f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
                 f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
-                f"DATE = {b_datetime[0]}\n"
-                f"TIME = {b_datetime[1]}\n"
-                f"LATITUDE = {btm_lat:.4f}\n"
-                f"LONGITUDE = {btm_lon:.4f}\n"
+                f"DATE = {cast_dict['DATE']}\n"
+                f"TIME = {cast_dict['TIME']}\n"
+                f"LATITUDE = {cast_dict['LATITUDE']:.4f}\n"
+                f"LONGITUDE = {cast_dict['LONGITUDE']:.4f}\n"
                 f"INSTRUMENT_ID = {settings.ctd_serial}\n"
                 f"DEPTH = {depth:.0f}\n"
             )
