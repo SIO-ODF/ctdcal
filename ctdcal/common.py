@@ -331,7 +331,7 @@ def make_cast_id_list(rawdir, outdir=None, pattern='*.hex', fname='cast_id_list.
     cast_id_list = sorted([f.stem for f in raw_files])
     if len(cast_id_list) < 1:
         raise FileNotFoundError('No raw data files found.')
-    # pd.Series(ssscc_list, dtype=str).to_csv(fname, header=None, index=False, mode="x")
+    # pd.Series(casts, dtype=str).to_csv(fname, header=None, index=False, mode="x")
     if outdir is not None:
         outdir = validate_dir(outdir, create=True)
         list_to_file(fname, outdir, cast_id_list)
