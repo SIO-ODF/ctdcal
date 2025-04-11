@@ -70,6 +70,28 @@ class NodeNotFoundError(Exception):
 
 # BottleFlag wrangling
 # TODO: Move to ctdcal.flagging.common after reorg
+def bf_from_json(fname):
+    """
+    Reads a JSON file and returns the contents as a BottleFlags object.
+
+    Parameters
+    ----------
+    fname : str or Path-like
+
+    Returns
+    -------
+    BottleFlags object
+    """
+    with open(fname, 'r') as f:
+        buf = f.read()
+    if buf == '':
+        # File exists but is empty
+        flags = BottleFlags()
+    else:
+        flags = BottleFlags.fromJSON(buf)
+    return flags
+
+
 def df_node_to_BottleFlags(df):
     """
     Convert a flag node from a DataFrame to a formatted BottleFlags object
@@ -129,13 +151,7 @@ def save_node(fname, node, label, create_new=False):
         If true, create a new node if it does not exist. Default is false.
 
     """
-    with open(fname, 'r') as f:
-        buf = f.read()
-    if buf == '':
-        # File exists but is empty
-        flags = BottleFlags()
-    else:
-        flags = BottleFlags.fromJSON(buf)
+    flags = bf_from_json(fname)
     if label in flags or create_new is True:
         flags[label] = node
     else:
