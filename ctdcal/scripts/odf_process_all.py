@@ -65,7 +65,7 @@ def odf_process_all():
     #####
 
     # load station/cast list from file or make it from all raw data files
-    ssscc_list = get_cast_id_list('ssscc.csv', rawdir, ssscc_dir)
+    ssscc_list = make_cast_id_list(rawdir)
 
     # convert raw .hex files
     hex_to_ctd(ssscc_list, rawdir, cnvdir)
