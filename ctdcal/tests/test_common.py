@@ -140,13 +140,13 @@ class TestCastListFunctions:
     @patch('ctdcal.common.make_cast_id_list')
     def test_get_cast_id_list(self, mock_make, tmp_dir, tmp_file):
         # test happy path
-        id_list = get_cast_id_list(tmp_file, None, None, tmp_dir)
+        id_list = get_cast_id_list(tmp_file, None, tmp_dir)
         assert len(id_list) == 5
         assert id_list[2] == 'c'
 
         # test cast id file not found
         with pytest.raises(FileNotFoundError):
-            get_cast_id_list('fake_file', None, None, tmp_dir, auto_generate=False)
+            get_cast_id_list('fake_file', None, tmp_dir, auto_generate=False)
 
         # test auto-generate
         def side_effect(outdir):
@@ -155,7 +155,7 @@ class TestCastListFunctions:
             return None
 
         mock_make.side_effect = side_effect(tmp_dir)
-        id_list = get_cast_id_list('fake_file', None, None, tmp_dir)
+        id_list = get_cast_id_list('fake_file', None, tmp_dir)
         assert len(id_list) == 3
         assert id_list[2] == 'f'
 
