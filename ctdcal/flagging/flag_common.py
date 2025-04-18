@@ -322,3 +322,21 @@ def by_residual(
         flags[in_bin & (residual > thresh)] = flag_bad
 
     return _merge_flags(flags, old_flags)
+
+
+def quality_by_threshold(values, threshold=1.0):
+    """
+    Flags values that meet or exceed a threshold.
+
+    Parameters
+    ----------
+    values : int or float or array
+        values to flag.
+    threshold : int or float or array
+        flag threshold.
+
+    Returns
+    -------
+    bool
+    """
+    return values >= threshold
