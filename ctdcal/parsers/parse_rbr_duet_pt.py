@@ -8,7 +8,9 @@ from datetime import datetime as dt
 from datetime import timedelta as td
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from scipy.signal import correlate
 
 from ctdcal.common import validate_file
 
@@ -21,15 +23,34 @@ class Parser(object):
         self.cnvdir = cnvdir
         self.btldir = btldir
         self.raw_files = sorted(Path(self.indir).glob('*.rsk'))
-        self.raw_file_timestamps = [dt.strptime(ts.stem[-13:], '%Y%m%d_%H%M') for ts in self.raw_files]
         self.ctd_files = [Path(self.cnvdir, '%s.pkl' % cast) for cast in cast_list]
+        self.raw_file_end_times = {}
+        self.meta = {}
         self.start_times = self.get_start_times()
+        self.get_raw_file_metadata()
+
+    def get_raw_file_metadata(self):
+        # query the db files
+        t_range_query = 'SELECT MIN(tstamp), MAX(tstamp) FROM data'
+        clock_drift_query = 'SELECT loggerTimeDrift FROM deployments'
+        for raw_file in self.raw_files:
+            coeffs = dict()
+            with sqlite3.connect(raw_file) as con:
+                # query for timestamp start and end
+                cur = con.cursor().execute(t_range_query)
+                coeffs['t_range'] = [float(t) for t in cur.fetchone()]
+                # query for clock drift
+                cur = con.cursor().execute(clock_drift_query)
+                coeffs['t_drift'] = int(cur.fetchone()[0])
+            # convert end time to utc datetime
+            self.raw_file_end_times[raw_file.stem] = coeffs['t_range'][1] / 1000
+            # set coeffs attribute for the raw file
+            self.meta[raw_file.stem] = coeffs
 
     def get_start_times(self):
         cast_start_times = dict()
         for ctd_file in self.ctd_files:
-            cast_time = pd.read_pickle(ctd_file).iloc[0]['scan_datetime']
-            cast_start_times[ctd_file.stem] = dt.fromtimestamp(cast_time)
+            cast_start_times[ctd_file.stem] = float(pd.read_pickle(ctd_file).iloc[0]['scan_datetime'])
         return cast_start_times
 
 
@@ -41,6 +62,7 @@ class Cast(object):
     def __init__(self, cast_id):
         self.cast_id = cast_id
         self.raw_file = None
+        # self.start_time = None
         self.bottle_times = None
         self.data = None
 
@@ -74,36 +96,38 @@ class Cast(object):
         """
         # find start time for the cast
         start_time = parser.start_times[self.cast_id]
+
         # sort through raw files by timestamp range and stop at the one which
         # contains the cast time
-        ts = None
-        for ts in sorted(parser.raw_file_timestamps, reverse=True):
-            if start_time > ts:
-                break
-        self.raw_file = parser.raw_files[parser.raw_file_timestamps.index(ts) + 1]
+        for raw_file in sorted(parser.raw_files):
+            if start_time < parser.raw_file_end_times[raw_file.stem]:
+                self.raw_file = raw_file
+                return
 
     def parse_raw(self, start_time):
         """
         Queries RBR raw data files in sqlite3 format for upcast and pressure calibration
         data. Sets the data attribute to a DataFrame of raw upcast data and corrected
         pressure data.
-        TODO: needs some data validation including what happens when the cal interval isn't
-            found or whether the calibrated pressure is better than the factory offset-
-            corrected pressure.
 
         Parameters
         ----------
-        start_time : datetime.datetime
+        start_time : float
             upcast start time
 
         """
+        # TODO: needs some data validation including what happens when the cal interval isn't
+        #     found or whether the calibrated pressure is better than the factory offset-
+        #     corrected pressure.
         # construct the sql queries
         upcast_start = self.bottle_times.min()
         upcast_stop = self.bottle_times.max() + 300   # add 5 min
         cast_query = 'SELECT * FROM data WHERE tstamp BETWEEN ? AND ?'
-        cast_query_params = (upcast_start * 1000, upcast_stop * 1000)
-        pcal_start = (start_time - td(minutes=30)).timestamp()
-        pcal_stop = (start_time - td(minutes=20)).timestamp()
+        # cast_query_params = (upcast_start * 1000, upcast_stop * 1000)
+        # ## selecting the whole cast for troubleshooting 2025-04-22
+        cast_query_params = (start_time * 1000, upcast_stop * 1000)
+        pcal_start = start_time - 1800
+        pcal_stop = start_time - 1200
         cal_query = 'SELECT * FROM data WHERE tstamp BETWEEN ? AND ?'
         cal_query_params = (pcal_start * 1000, pcal_stop * 1000)
         offset_meta_query = 'SELECT value FROM parameterKeys WHERE key="PRESSURE"'
@@ -125,6 +149,39 @@ class Cast(object):
         self.data = data.rename(
                 columns={'channel01': 'temp_raw', 'channel02': 'pressure_raw', 'channel03': 'ptemp_raw'}
         )
+
+    def synchronize_cast_data(self, cnvdir):
+        ctdfile = Path(cnvdir, '%s.pkl' % self.cast_id)
+        reference = pd.read_pickle(ctdfile)[['CTDPRS', 'scan_datetime']]
+        reference['tstamp'] = pd.to_datetime(reference['scan_datetime'], unit='s')
+        reference = reference.set_index('tstamp')['CTDPRS'].resample('1s').mean()
+
+        measured = self.data[['sea_pressure', 'tstamp']]
+        # measured['tstamp'] = pd.to_datetime(measured['tstamp'])
+        measured = measured.set_index('tstamp')['sea_pressure'].resample('1s').mean()
+        #
+        t1 = max(measured.index[0], reference.index[0])
+        t2 = min(measured.index[-1], reference.index[-1])
+        reference = reference[t1:t2]
+        measured = measured[t1:t2]
+
+        # below from https://stackoverflow.com/a/56432463
+        n = len(measured)
+        sr = 1  # sample rate in sec
+        corr = correlate(reference, measured, mode='same', method='direct') / np.sqrt(
+                correlate(measured, measured, mode='same', method='direct')[int(n / 2)] *
+                correlate(reference, reference, mode='same', method='direct')[int(n / 2)]
+        )
+        delay_arr = np.linspace(-0.5 * n / sr, 0.5 * n / sr, n)
+        delay = round(delay_arr[np.argmax(corr)], 2)
+
+        if abs(delay) > 30:
+            log.warning(
+                    "Derived time lag for cast %s seems excessive. Leaving this one uncorrected." % self.cast_id
+            )
+        else:
+            log.info("Correcting %s seconds of lag for cast %s." % (delay, self.cast_id))
+            self.data['tstamp'] += td(seconds=delay)
 
 
 def parse_cast(cast_id, parser):
@@ -148,9 +205,8 @@ def parse_cast(cast_id, parser):
     cast = Cast(cast_id)
     cast.load_bottle_times(parser.btldir, 'scan_datetime')
     # find the source raw file
-    try:
-        cast.select_raw_file(parser)
-    except IndexError:
+    cast.select_raw_file(parser)
+    if cast.raw_file is None:
         log.warning("No RBR duet PT data found for cast %s. Moving along." % cast_id)
         return None
     # parse it

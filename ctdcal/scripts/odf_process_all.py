@@ -17,14 +17,38 @@ from ctdcal.processors.proc_bottle import load_all_btl_files, make_btl_files, lo
 from ctdcal.processors.proc_oxy_ctd import prepare_oxy
 from ctdcal.processors.proc_oxy_odf import proc_oxy
 from ctdcal.processors.proc_reft import process_reft, proc_reft
+from ctdcal.processors.proc_reft_rbr import proc_reft as proc_rbr
 from ctdcal.processors.proc_salt_odf import proc_salt
 from ctdcal.reporting.report_odf import make_depth_log
 
-log = logging.getLogger(__name__)
+# setup logging if not using ctdcal CLI
+logger = logging.getLogger(__name__)
+stream = logging.StreamHandler()
+stream.setLevel(logging.WARNING)
+stream.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
+logfile_FORMAT = "%(asctime)s | %(funcName)s |  %(levelname)s: %(message)s"
+logfile = logging.FileHandler("ctdcal.log")
+logfile.setLevel(logging.NOTSET)
+logfile.addFilter(logging.Filter("ctdcal"))  # filter out msgs from other modules
+logfile.setFormatter(logging.Formatter(logfile_FORMAT))
+FORMAT = "%(funcName)s: %(levelname)s: %(message)s"
+logging.basicConfig(
+    level=logging.DEBUG,
+    format=FORMAT,
+    encoding='utf-8',
+    datefmt="[%X]",
+    handlers=[stream, logfile],
+)
 
 USERCONFIG = '/Users/als026/data/i09n_2025/cfg_i09n.yaml'
 EXCHANGECONFIG = '/Users/als026/data/i09n_2025/i09n_exchange.yaml'
 cfg = load_user_config(USERCONFIG)
+
+# Runtime flags:
+# if this flag is set to True, the calibration routines will be bypassed
+skip_calibrate = False
+# if this flag is set to True, the export routines will be bypassed
+skip_export = False
 
 
 def odf_process_all():
@@ -38,6 +62,7 @@ def odf_process_all():
 
     # single CTD setup
     inst = 'ctd'
+    logdir = Path(datadir, 'log')
     ssscc_dir = Path(datadir, 'ssscc', inst)
     rawdir = Path(datadir, 'raw', inst)
     caldir = Path(datadir, 'cal', inst)
@@ -59,6 +84,10 @@ def odf_process_all():
     oxy_cnvdir = Path(datadir, 'cnv', 'oxy')
     oxy_figdir = Path(plotdir, 'oxy')
     rinko_figdir = Path(plotdir, 'rinko')
+
+    rbr_rawdir = Path('/Users/als026/data/i09n_2025/rbr/raw')
+    rbr_parseddir = Path(datadir, 'parsed', 'rbr')
+    rbr_cnvdir = Path(datadir, 'cnv', 'rbr')
 
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
@@ -82,69 +111,70 @@ def odf_process_all():
 
     # generate reftemp .csv files
     proc_reft(ssscc_list, reft_rawdir, reft_parsedir, reft_cnvdir)
-
+    proc_rbr(ssscc_list, rbr_rawdir, cnvdir, btldir, rbr_cnvdir, sync_times=True)
+    # proc_rbr(ssscc_list, rbr_rawdir, cnvdir, btldir, rbr_cnvdir, export_parsed=True, parsed_dir=rbr_parseddir)
     # generate oxygen .csv files
     proc_oxy(ssscc_list, oxy_rawdir, oxy_cnvdir)
 
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
     #####
+    if not skip_calibrate:
+        # load fit groups by parameter
+        fit_groups = load_fit_groups(ssscc_list, cfg.fit_groups)
 
-    # load fit groups by parameter
-    fit_groups = load_fit_groups(ssscc_list, cfg.fit_groups)
+        # load in all bottle and time data into DataFrame
+        time_data_all = load_time_all(ssscc_list, timedir)
+        btl_data_all = load_btl_all(ssscc_list, btldir, reft_cnvdir, salt_cnvdir, oxy_cnvdir)
 
-    # load in all bottle and time data into DataFrame
-    time_data_all = load_time_all(ssscc_list, timedir)
-    btl_data_all = load_btl_all(ssscc_list, btldir, reft_cnvdir, salt_cnvdir, oxy_cnvdir)
+        # process pressure offset
+        # TODO: these functions return an updated dataframe, which we aren't
+        #   assigning or reassigning to anything. Instead we trust that the
+        #   updates which happen in the other module are visible by this one
+        #   too (they  indeed seem to be). Is this a safe assumption?
+        calibrate_pressure(btl_data_all, time_data_all, fit_groups.pressure, reportdir)
 
-    # process pressure offset
-    # TODO: these functions return an updated dataframe, which we aren't
-    #   assigning or reassigning to anything. Instead we trust that the
-    #   updates which happen in the other module are visible by this one
-    #   too (they  indeed seem to be). Is this a safe assumption?
-    calibrate_pressure(btl_data_all, time_data_all, fit_groups.pressure, reportdir)
+        # create cast depth log file
+        make_depth_log(time_data_all, cast_id_col='cast_id', report_dir=reportdir)
 
-    # create cast depth log file
-    make_depth_log(time_data_all, cast_id_col='cast_id', report_dir=reportdir)
+        # calibrate temperature against reference
+        calibrate_temp(
+                btl_data_all, time_data_all, fit_groups.temperature, fit_coeffs.temperature,
+                reft_figdir, reportdir, cast_id='cast_id'
+        )
 
-    # calibrate temperature against reference
-    calibrate_temp(
-            btl_data_all, time_data_all, fit_groups.temperature, fit_coeffs.temperature,
-            reft_figdir, reportdir, cast_id='cast_id'
-    )
+        # calibrate conductivity against reference
+        btl_data_all, time_data_all = calibrate_cond(
+                btl_data_all, time_data_all, fit_groups.conductivity, fit_coeffs.conductivity,
+                salt_figdir, reportdir, flagfile, cast_id='cast_id'
+        )
 
-    # calibrate conductivity against reference
-    btl_data_all, time_data_all = calibrate_cond(
-            btl_data_all, time_data_all, fit_groups.conductivity, fit_coeffs.conductivity,
-            salt_figdir, reportdir, flagfile, cast_id='cast_id'
-    )
+        # calculate params needs for oxy/rinko calibration
+        oxy_cast_list = make_cast_id_list(oxy_rawdir, pattern='?????')
+        prepare_oxy(btl_data_all, time_data_all, ssscc_list, flagfile, oxy_rawdir, 'oxygen', 'cast_id')
 
-    # calculate params needs for oxy/rinko calibration
-    oxy_cast_list = make_cast_id_list(oxy_rawdir, pattern='?????')
-    prepare_oxy(btl_data_all, time_data_all, ssscc_list, flagfile, oxy_rawdir, 'oxygen', 'cast_id')
-
-    # calibrate oxygen against reference
-    calibrate_oxy(btl_data_all, time_data_all, oxy_figdir, reportdir, caldir, oxy_cast_list, cast_id_col='cast_id')
-    calibrate_rinko(
-            btl_data_all, time_data_all,
-            rinko_figdir, reportdir,
-            oxy_cast_list,
-            fit_groups.rinko,
-            cast_id_col='cast_id',
-            full_cast_list=ssscc_list,
-    )
+        # calibrate oxygen against reference
+        calibrate_oxy(btl_data_all, time_data_all, oxy_figdir, reportdir, caldir, oxy_cast_list, cast_id_col='cast_id')
+        calibrate_rinko(
+                btl_data_all, time_data_all,
+                rinko_figdir, reportdir,
+                oxy_cast_list,
+                fit_groups.rinko,
+                cast_id_col='cast_id',
+                full_cast_list=ssscc_list,
+        )
 
     #####
     # Step 3: export data
     #####
+    if not skip_export:
+        # export files for making cruise report figs
+        # process_bottle.export_report_data(btl_data_all)
 
-    # export files for making cruise report figs
-    # process_bottle.export_report_data(btl_data_all)
-
-    # export to Exchange format
-    exchange_settings = load_user_config(EXCHANGECONFIG)
-    export_exchange(time_data_all, btl_data_all, ssscc_list, exchange_settings, outdir, reportdir, 'cast_id')
-    # run: ctd_to_bottle.py
+        # export to Exchange format
+        exchange_settings = load_user_config(EXCHANGECONFIG)
+        export_exchange(time_data_all, btl_data_all, ssscc_list, exchange_settings, outdir, reportdir, 'cast_id')
+        # run: ctd_to_bottle.py
 
 
 if __name__ == "__main__":
