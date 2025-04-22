@@ -43,29 +43,30 @@ class TestCast:
     def test_select_raw_file(self):
         cast_id = 'spam'
         cast = Cast(cast_id)
-        fake_timestamps = [
-                dt.now(),
-                dt.now() + td(days=1),
-                dt.now() + td(days=2),
-                dt.now() + td(days=3)
-        ]
-        fake_cast_date = fake_timestamps[2] - td(hours=4)
+        fake_timestamps = {
+                'a': dt.now(),
+                'm': dt.now() + td(days=1),
+                'p': dt.now() + td(days=2),
+                's': dt.now() + td(days=3),
+        }
+        fake_cast_date = fake_timestamps['p'] - td(hours=4)
 
         # test that raw_file is set to the third in the list
         parser = Mock()
-        parser.raw_files = ['a', 'm', 'p', 's']
-        parser.raw_file_timestamps = fake_timestamps
+        parser.raw_files = [Path(f) for f in ['a', 'm', 'p', 's']]
+        parser.raw_file_end_times = fake_timestamps
         parser.start_times = {cast_id: fake_cast_date}
         cast.select_raw_file(parser)
-        assert cast.raw_file is 'p'
+        assert cast.raw_file.stem is 'p'
 
         # test cast date more recent than raw files
+        cast.raw_file = None
         fake_cast_date = dt.now() + td(days=10)
         parser.start_times = {cast_id: fake_cast_date}
-        with pytest.raises(IndexError):
-            cast.select_raw_file(parser)
+        cast.select_raw_file(parser)
+        assert cast.raw_file is None
 
         # test no raw files
         parser.raw_files = []
-        with pytest.raises(IndexError):
-            cast.select_raw_file(parser)
+        cast.select_raw_file(parser)
+        assert cast.raw_file is None
