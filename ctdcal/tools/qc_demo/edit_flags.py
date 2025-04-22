@@ -71,7 +71,6 @@ flags = pd.DataFrame.from_dict(
         {'cast_id': str, 'bottle_num': int, 'value': int, 'notes': str}
 )
 
-st.session_state.display_data['added_rows'] = [{"cast_id":"09909","bottle_num":3,"value":9,"notes":"Nine"}]
 st.session_state.edited_data = st.data_editor(
         flags,
         key='display_data',
@@ -102,4 +101,5 @@ if submit and new_node != '':
     st.session_state.flag_data.save(st.session_state.flag_file)
     st.rerun()
 
-st.write(st.session_state.display_data)
+# below is for troubleshooting this code
+# st.write(st.session_state.display_data)
