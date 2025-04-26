@@ -255,7 +255,10 @@ def get_bottom_bottle_data(
 ):
     if cols is None:
         cols = {'cast_id': 'SSSCC', 'date': 'DATE', 'time': 'TIME', 'lat': 'LATITUDE', 'lon': 'LONGITUDE'}
-    datetime_col = "nmea_datetime"
+    # datetime_col = "nmea_datetime"
+    # ## 2025-04-23 doing that clobbers casts without nmea datetime
+    datetime_col = "scan_datetime"
+    # TODO: make this determination cast-by-cast because maybe this wasn't enabled the whole time ; )
     if datetime_col not in btl_data.columns:
         log.debug(
                 f"'{datetime_col}' not found in DataFrame - using 'scan_datetime'"

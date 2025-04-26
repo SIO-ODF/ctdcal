@@ -4,22 +4,22 @@ Process all CTD and bottle data using ODF routines.
 import logging
 from pathlib import Path
 
-from ctdcal.common import load_user_config, get_cast_id_list, load_fit_groups, make_cast_id_list
-from ctdcal.fitting.fit_ctd import calibrate_temp, calibrate_cond, load_all_ctd_files, apply_pressure_offset, \
-    load_time_all, calibrate_pressure
+from ctdcal.common import load_user_config, load_fit_groups, make_cast_id_list
+from ctdcal.fitting.fit_ctd import calibrate_temp, calibrate_cond, load_time_all, calibrate_pressure
 from ctdcal.fitting.fit_oxy import calibrate_oxy
 from ctdcal.fitting.fit_oxy_rinko import calibrate_oxy as calibrate_rinko
-from ctdcal.formats.exchange import export_hy1, export_ct1, export_exchange
+from ctdcal.formats.exchange import export_exchange
 from ctdcal.parsers.parse_ctd_xmlcon import parse_coeffs
 from ctdcal.processors.cast_tools import make_time_files
 from ctdcal.processors.convert_legacy import hex_to_ctd
-from ctdcal.processors.proc_bottle import load_all_btl_files, make_btl_files, load_btl_all
+from ctdcal.processors.proc_bottle import make_btl_files, load_btl_all
 from ctdcal.processors.proc_oxy_ctd import prepare_oxy
 from ctdcal.processors.proc_oxy_odf import proc_oxy
-from ctdcal.processors.proc_reft import process_reft, proc_reft
+from ctdcal.processors.proc_reft import proc_reft
 from ctdcal.processors.proc_reft_rbr import proc_reft as proc_rbr
 from ctdcal.processors.proc_salt_odf import proc_salt
-from ctdcal.reporting.report_odf import make_depth_log
+from ctdcal.reporting.report_odf import make_depth_log, export_report_data, make_odf_report_table
+from ctdcal.scripts.cruise_report_odf import cruise_report
 
 # setup logging if not using ctdcal CLI
 logger = logging.getLogger(__name__)
@@ -46,9 +46,11 @@ cfg = load_user_config(USERCONFIG)
 
 # Runtime flags:
 # if this flag is set to True, the calibration routines will be bypassed
-skip_calibrate = False
-# if this flag is set to True, the export routines will be bypassed
-skip_export = False
+skip_calibrate = True
+# if this and the above flags are set to True, the export routines will be bypassed
+skip_export = True
+# if this flag is set to True, only the cruise report processing will execute
+process_cruise_report = True
 
 
 def odf_process_all():
@@ -111,17 +113,20 @@ def odf_process_all():
 
     # generate reftemp .csv files
     proc_reft(ssscc_list, reft_rawdir, reft_parsedir, reft_cnvdir)
-    proc_rbr(ssscc_list, rbr_rawdir, cnvdir, btldir, rbr_cnvdir, sync_times=True)
+
+    # parse rbr reft
+    # proc_rbr(ssscc_list, rbr_rawdir, cnvdir, btldir, rbr_cnvdir, sync_times=True)
     # proc_rbr(ssscc_list, rbr_rawdir, cnvdir, btldir, rbr_cnvdir, export_parsed=True, parsed_dir=rbr_parseddir)
+
     # generate oxygen .csv files
     proc_oxy(ssscc_list, oxy_rawdir, oxy_cnvdir)
 
     #####
     # Step 2: calibrate pressure, temperature, conductivity, and oxygen
     #####
+    # load fit groups by parameter
+    fit_groups = load_fit_groups(ssscc_list, cfg.fit_groups)
     if not skip_calibrate:
-        # load fit groups by parameter
-        fit_groups = load_fit_groups(ssscc_list, cfg.fit_groups)
 
         # load in all bottle and time data into DataFrame
         time_data_all = load_time_all(ssscc_list, timedir)
@@ -167,14 +172,18 @@ def odf_process_all():
     #####
     # Step 3: export data
     #####
-    if not skip_export:
-        # export files for making cruise report figs
-        # process_bottle.export_report_data(btl_data_all)
+    if process_cruise_report is True:
+        # export files and figs for the cruise report
+        cruise_report_dir = Path(outdir, 'cruise_report')
+        cruise_report(reportdir, cruise_report_dir, fit_groups.pressure)
+        return
+
+    if skip_export is False and skip_calibrate is False:
+        make_odf_report_table(btl_data_all, reportdir)
 
         # export to Exchange format
         exchange_settings = load_user_config(EXCHANGECONFIG)
         export_exchange(time_data_all, btl_data_all, ssscc_list, exchange_settings, outdir, reportdir, 'cast_id')
-        # run: ctd_to_bottle.py
 
 
 if __name__ == "__main__":
