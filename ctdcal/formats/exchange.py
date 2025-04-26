@@ -207,7 +207,10 @@ def export_hy1(df, out_dir, report_dir, cast_id_col, settings, org="ODF"):
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
         manual_depth_df.to_csv(Path(report_dir, 'manual_depth_log.csv'), index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
-    full_depth_df.drop_duplicates(subset=cast_id_col, keep="first", inplace=True)
+    # full_depth_df.drop_duplicates(subset=cast_id_col, keep="first", inplace=True)
+    # ## 2025-04-23 changing to 'last', if there are duplicates we should trust the
+    # manual depths because it probably means ctdcal guessed wrong
+    full_depth_df.drop_duplicates(subset=cast_id_col, keep="last", inplace=True)
     btl_data["DEPTH"] = -999
     for index, row in full_depth_df.iterrows():
         btl_data.loc[btl_data["SSSCC"] == row[cast_id_col], "DEPTH"] = int(row["DEPTH"])
@@ -491,7 +494,10 @@ def export_ct1(df, ssscc_list, reportdir, outdir, cast_id_col, settings, org='OD
         manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
         manual_depth_df.to_csv(Path(reportdir, 'manual_depth_log.csv'), index=False)
     full_depth_df = pd.concat([depth_df, manual_depth_df])
-    full_depth_df.drop_duplicates(subset=cast_id_col, keep="first", inplace=True)
+    # full_depth_df.drop_duplicates(subset=cast_id_col, keep="first", inplace=True)
+    # ## 2025-04-23 changing to 'last', we should be trusting the manual depths because if
+    # there's duplicates it probably means ctdcal guessed wrong
+    full_depth_df.drop_duplicates(subset=cast_id_col, keep="last", inplace=True)
 
     for ssscc in ssscc_list:
         time_data = df[df["SSSCC"] == ssscc].copy()

@@ -76,12 +76,14 @@ def residual_vs_pressure(
     if stn is not None:
         idx, uniques = pd.factorize(stn)  # find unique stations #s and index them
         sc = ax.scatter(diff, prs, c=idx, marker="+")
-        cbar = plt.colorbar(sc, ax=ax, pad=0.1, ticks=range(len(uniques)))  # set cbar ticks to station names
+        cbar = plt.colorbar(sc, ax=ax, pad=0.1, ticks=range(0, len(uniques), 10))  # set cbar ticks to station names
         # cbar = plt.colorbar(sc, ax=ax, pad=0.1)  # set cbar ticks to station names
         # tick_inds = cbar.get_ticks().astype(int)
-        tick_inds = range(len(uniques))
-        cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(tick_inds))
-        cbar.ax.set_yticklabels(uniques[tick_inds])
+        tick_inds = range(0, len(uniques), 10)
+        # cbar.ax.yaxis.set_major_locator(ticker.FixedLocator(uniques[tick_inds]))
+        cbar.ax.yaxis.set_major_locator(ticker.AutoLocator())
+        # cbar.ax.set_yticklabels(uniques[tick_inds])
+        # cbar.ax.get_yticklabels()
         cbar.ax.set_title("Station")
     else:
         sc = ax.scatter(diff, prs, marker="+")

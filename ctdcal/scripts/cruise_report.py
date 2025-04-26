@@ -270,6 +270,9 @@ def calculate_residuals():
 
 def cruise_report_residuals():
     """Do all the things for cruise report"""
+    log.warning(
+            "Use of cruise_report.cruise_report_residuals is deprecated. Use cruise_report_odf.cruise_report instead."
+    )
     plot_residuals()
     pressure_offset()
     fit_coefficients()
