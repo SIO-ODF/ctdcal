@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ctdcal import ctd_plots
+from ctdcal.plotting.plot_ctd import param_vs_param
+from ctdcal.plotting.plot_fit import residual_vs_pressure, residual_vs_station, _intermediate_residual_plot
 
 
 def test_residual_vs_pressure(tmp_path):
@@ -12,7 +13,7 @@ def test_residual_vs_pressure(tmp_path):
     stn = pd.Series(data=[0, 1, 2], name="stn")
 
     # check titles, labels, limits, grid
-    axes = ctd_plots.residual_vs_pressure(param, ref, prs, stn=stn)
+    axes = residual_vs_pressure(param, ref, prs, stn=stn)
     grid_lines = axes.get_xgridlines() + axes.get_ygridlines()
     assert axes.get_title() == "ref-param vs. prs"
     assert axes.get_xlabel() == "Residual"
@@ -23,7 +24,7 @@ def test_residual_vs_pressure(tmp_path):
     assert not all(line.get_visible() for line in grid_lines)
 
     # check titles, labels, limits, grid (with deep setting)
-    deep = ctd_plots.residual_vs_pressure(param, ref, prs, stn=stn, deep=True)
+    deep = residual_vs_pressure(param, ref, prs, stn=stn, deep=True)
     grid_lines = deep.get_xgridlines() + deep.get_ygridlines()
     y_data = deep.collections[0].get_offsets().data[:, 1]
     assert deep.get_title() == "ref-param (>2000 dbar) vs. prs"
@@ -36,7 +37,7 @@ def test_residual_vs_pressure(tmp_path):
     assert all(y_data > 2000)
 
     # check settings are applied properly
-    settings = ctd_plots.residual_vs_pressure(
+    settings = residual_vs_pressure(
         param,
         ref,
         prs,
@@ -59,7 +60,7 @@ def test_residual_vs_pressure(tmp_path):
 
     # check behavior with unlabeled data inputs and no stations
     x = np.array([0, 0, 0])
-    unlabeled = ctd_plots.residual_vs_pressure(x, x, x)
+    unlabeled = residual_vs_pressure(x, x, x)
     assert unlabeled.get_title() == ""
     assert unlabeled.collections[0].colorbar is None
 
@@ -67,7 +68,7 @@ def test_residual_vs_pressure(tmp_path):
     # for ext in [".jpg", ".png", ".pdf"]:
     #     with (tmp_path / "figures" / f"fig1{ext}") as f_out:
     #         assert not f_out.exists()
-    #         ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=f_out)
+    #         residual_vs_pressure(x, x, x, stn=x, f_out=f_out)
     #         assert f_out.exists()
 
     for ext in [".jpg", ".png", ".pdf"]:
@@ -76,7 +77,7 @@ def test_residual_vs_pressure(tmp_path):
         file_path = output_path / f"fig1{ext}"
 
         assert not file_path.exists()
-        ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
+        residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
         assert file_path.exists()   # Verify that the file has been created
 
 
@@ -87,7 +88,7 @@ def test_residual_vs_station(tmp_path):
     stn = pd.Series(data=[0, 1, 2], name="stn")
 
     # check titles, labels, limits
-    axes = ctd_plots.residual_vs_station(param, ref, prs, stn)
+    axes = residual_vs_station(param, ref, prs, stn)
     grid_lines = axes.get_xgridlines() + axes.get_ygridlines()
     assert axes.get_title() == "ref-param vs. stn"
     assert axes.get_xlabel() == "Station Number"
@@ -97,7 +98,7 @@ def test_residual_vs_station(tmp_path):
     assert not all(line.get_visible() for line in grid_lines)
 
     # check titles, labels, limits (with deep setting)
-    deep = ctd_plots.residual_vs_station(param, ref, prs, stn, deep=True)
+    deep = residual_vs_station(param, ref, prs, stn, deep=True)
     grid_lines = deep.get_xgridlines() + deep.get_ygridlines()
     z_data = deep.collections[0].get_array().data
     assert deep.get_title() == "ref-param (>2000 dbar) vs. stn"
@@ -109,7 +110,7 @@ def test_residual_vs_station(tmp_path):
     assert all(z_data > 2000)
 
     # check settings are applied properly
-    settings = ctd_plots.residual_vs_station(
+    settings = residual_vs_station(
         param,
         ref,
         prs,
@@ -127,7 +128,7 @@ def test_residual_vs_station(tmp_path):
 
     # check behavior with unlabeled data inputs
     x = np.array([0, 0, 0])
-    unlabeled = ctd_plots.residual_vs_station(x, x, x, x)
+    unlabeled = residual_vs_station(x, x, x, x)
     assert unlabeled.get_title() == ""
 
     # check figure saving
@@ -141,7 +142,7 @@ def test_residual_vs_station(tmp_path):
         file_path = output_path / f"fig2{ext}"
 
         assert not file_path.exists()
-        ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
+        residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
         assert file_path.exists()   # Verify that the file has been created
 
 
@@ -152,7 +153,7 @@ def test_intermediate_residual_plot(tmp_path):
     stn = pd.Series(data=[0, 1, 2], name="stn")
 
     # check settings are applied properly
-    settings = ctd_plots._intermediate_residual_plot(
+    settings = _intermediate_residual_plot(
         ref - param, prs, stn, xlim=(-1, 1), xlabel="x", show_thresh=True
     )
     grid_lines = settings.get_xgridlines() + settings.get_ygridlines()
@@ -179,7 +180,7 @@ def test_intermediate_residual_plot(tmp_path):
         file_path = output_path / f"fig3{ext}"
 
         assert not file_path.exists()
-        ctd_plots.residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
+        residual_vs_pressure(x, x, x, stn=x, f_out=file_path)
         assert file_path.exists()   # Verify that the file has been created
 
 
@@ -203,27 +204,27 @@ def test_param_vs_param(tmp_path, example_data):
 
         #   Check that the plotted figure generates and is saved as expected
         assert not file_path.exists()
-        ax = ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
+        ax = param_vs_param(example_data["param1"], example_data["label1"],
                                       example_data["param2"], example_data["label2"])   #   Should return figure axis
         assert np.allclose(ax.get_xticks(), [32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. ])
         assert np.allclose(ax.get_yticks(), [-2.5,  0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. , 22.5])
         assert ax.get_xlabel() == example_data["label1"]
         assert ax.get_ylabel() == example_data["label2"]
-        ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
+        param_vs_param(example_data["param1"], example_data["label1"],
                                  example_data["param2"], example_data["label2"], f_out=file_path)
         assert file_path.exists()
 
         #   Now check that the TS contour plotting subroutine works
         file_path = output_path / f"TS{ext}"
         assert not file_path.exists()
-        ax = ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
+        ax = param_vs_param(example_data["param1"], example_data["label1"],
                                       example_data["param2"], example_data["label2"], 
                                       stn=example_data["stn"], tsT=example_data["tsT"], tsS=example_data["tsS"])
         assert np.allclose(ax.get_xticks(), [32.5, 33. , 33.5, 34. , 34.5, 35. , 35.5, 36. ])  #   Should be unchanged
         assert len(ax.collections[-1].get_paths()) == 9 #   Should generate 9 contours
         assert len(ax.collections[-1].labelTexts) == 7  #   Should have text on 7 of the contour lines
         assert ax.collections[-1].labelTexts[4].get_text() == "26.4"    #   The density calculations should have produced specific text on the 5th contour
-        ctd_plots.param_vs_param(example_data["param1"], example_data["label1"], 
+        param_vs_param(example_data["param1"], example_data["label1"],
                                  example_data["param2"], example_data["label2"], 
                                  f_out=file_path, stn=example_data["stn"], tsT=example_data["tsT"], tsS=example_data["tsS"])
         assert file_path.exists()

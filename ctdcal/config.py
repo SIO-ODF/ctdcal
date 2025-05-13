@@ -1,5 +1,6 @@
 ### configuration file for odf_process_all.py
-#
+# 2025-02-07 Deprecating this module and migrating to user-defined settings
+# in yaml files
 from importlib import resources
 
 import yaml

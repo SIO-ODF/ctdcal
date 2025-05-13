@@ -1,5 +1,6 @@
 """
-Tools for cleaning up converted and processed cast data.
+Tools for transforming processed cast data into derivative forms (filtered,
+trimmed, binned, delooped).
 """
 import logging
 from pathlib import Path
@@ -8,13 +9,14 @@ import pandas as pd
 import numpy as np
 from scipy import signal as sig
 
+from ctdcal.common import validate_dir
 
 log = logging.getLogger(__name__)
 
 
 class Cast(object):
     """
-    Cast data container with methods for separating upcast, filtering
+    Cast data object with methods for separating upcast, filtering
     and trimming soak period.
 
     Attributes
@@ -285,4 +287,87 @@ class Cast(object):
             & (upcast['CTDCOND2'] < threshold),
             self.p_col,
         ]
-        self.ondeck_trimmed = data.iloc[start_df.index.max() : end_df.index.min()].copy()
+        self.ondeck_trimmed = data.iloc[start_df.index.max(): end_df.index.min()].copy()
+
+
+def make_time_files(casts, datadir, user_cfg):
+    """
+    Make continuous time-series files from processed cast data.
+
+    Each cast has a smoothing filter applied. Filter parameters and columns
+    to filter are from user-specified configurations.
+
+    The time on deck, the soak, and the upcast are trimmed to provide a continuous downcast.
+
+    Parameters
+    ----------
+    casts : list of str
+        List of cast ids to process.
+    datadir : str or Path-like
+        Top-level of user data directory
+    user_cfg : Munch object
+        Dictionary of user configuration parameters.
+    """
+    log.info("Generating time.pkl files")
+    # validate time directory
+    time_dir = validate_dir(Path(datadir, 'time'), create=True)
+    # groundwork for writing any new details or offsets
+    details_file = Path(datadir, 'logs/cast_details.csv')
+    offsets_file = Path(datadir, 'logs/ondeck_pressure.csv')
+    new_casts = False
+    if details_file.exists():
+        cast_details_all = pd.read_csv(details_file, dtype='str')
+    else:
+        cast_details_all = pd.DataFrame()
+    if offsets_file.exists():
+        p_offsets_all = pd.read_csv(offsets_file, dtype='str')
+    else:
+        p_offsets_all = pd.DataFrame()
+
+    # process new casts one by one
+    for cast_id in casts:
+        time_file = Path(time_dir, '%s_time.pkl' % cast_id)
+        if not time_file.exists():
+            new_casts = True
+            cast = Cast(cast_id, datadir)
+            cast.p_col = 'CTDPRS'
+            # Apply smoothing filter
+            cast.filter(cast.proc,
+                        win_size=(user_cfg.filter_win * user_cfg.freq),
+                        win_type=user_cfg.filter_type,
+                        cols=user_cfg.filter_cols)
+            # Parse the downcast from the full cast
+            cast.parse_downcast(cast.filtered)
+            # Trim the soak period from the downcast
+            cast.trim_soak(cast.downcast,
+                           (user_cfg.soak_win * user_cfg.freq),
+                           user_cfg.soak_threshold)
+            # save pkl file
+            cast.trimmed.to_pickle(time_file)
+
+            # AS: 2024-09-05 - leaving this here for reference. Despiking is currently
+            # TBD for cast_tools post processing...
+            #
+            # Remove any pressure spikes
+            # bad_rows = converted_df["CTDPRS"].abs() > 6500
+            # if bad_rows.any():
+            #     log.debug(f"{cast_id}: {bad_rows.sum()} bad pressure points removed.")
+            # converted_df.loc[bad_rows, :] = np.nan
+            # converted_df.interpolate(limit=24, limit_area="inside", inplace=True)
+
+            # Merge in new details and offsets values
+            cast_details_all = (pd.concat([cast_details_all, cast.get_details()])
+                                .drop_duplicates(['cast_id'], keep='last')
+                                .sort_values(by=['cast_id']))
+            p_offsets_all = (pd.concat([p_offsets_all,
+                                        cast.get_pressure_offsets(cast.proc,
+                                                                  user_cfg.cond_threshold,
+                                                                  user_cfg.freq)])
+                             .drop_duplicates(['cast_id'], keep='last')
+                             .sort_values(by=['cast_id']))
+
+    # Wrap up...
+    if new_casts is True:
+        log.info("Saving deck pressures and cast details.")
+        cast_details_all.to_csv(Path(datadir, 'logs/cast_details.csv'), index=False)
+        p_offsets_all.to_csv(Path(datadir, 'logs/ondeck_pressure.csv'), index=False)

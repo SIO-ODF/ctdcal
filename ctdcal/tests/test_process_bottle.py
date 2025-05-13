@@ -1,7 +1,8 @@
 import pandas as pd
 import pytest
 
-from ctdcal import process_bottle
+from ctdcal.formats.exchange import load_hy_file, merge_hy1
+from ctdcal.processors import proc_bottle as process_bottle
 
 # def test_add_btlnbr_cols():
 #     df = {
@@ -39,7 +40,7 @@ END_DATA
     with open(fname, "w") as f:
         f.write(sample_data)
 
-    df = process_bottle.load_hy_file(fname)
+    df = load_hy_file(fname)
 
     #   Make sure everything is inside that we're expecting
     assert not df.empty
@@ -145,7 +146,7 @@ def df2():
 
 
 def test_merge_hy1(df1, df2):
-    merged_df = process_bottle.merge_hy1(df1, df2)
+    merged_df = merge_hy1(df1, df2)
 
     #   Test for matching columns, dimensions, and contents
     assert list(merged_df.columns) == [
@@ -167,6 +168,6 @@ def test_merge_hy1(df1, df2):
 
     #   Test handling NaNs
     df1.loc[0, "STNNBR"] = None
-    merged_df = process_bottle.merge_hy1(df1, df2)
+    merged_df = merge_hy1(df1, df2)
     assert merged_df["STNNBR"].isna().sum() == 1
     assert merged_df["SAMPNO"].notna().all()  #   No NaNs introduced

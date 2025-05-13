@@ -60,3 +60,84 @@ filter_cols:
 #  - REFTMP
 #  - GPSLAT
 #  - GPSLON
+
+# Legacy Settings
+# ---------------
+# Included for transitional compatibility with legacy configs.
+# Any NEW CODE that uses these is not guaranteed to work in the future!
+# TODO: move, eliminate or redefine these as appropriate
+
+expocode: ""
+section_id: ""
+ctd_serial: ""
+
+# Exchange-format export cols:
+ctd_col_names:
+  - CTDPRS
+  - CTDTMP1
+  - CTDTMP1_FLAG_W
+  - CTDSAL1
+  - CTDSAL1_FLAG_W
+  - CTDOXY1
+  - CTDOXY1_FLAG_W
+#  - CTDRINKO
+#  - CTDRINKO_FLAG_W
+  - CTDXMISS1
+  - CTDXMISS1_FLAG_W
+  - CTDFLUOR1
+  - CTDFLUOR1_FLAG_W
+
+ctd_col_units:
+  - DBAR
+  - ITS-90
+  - ""
+  - PSS-78
+  - ""
+  - UMOL/KG
+  - ""
+#  - UMOL/KG
+#  - ""
+  - 0-5VDC
+  - ""
+  - 0-5VDC
+  - ""
+
+# Legacy data directory structure, incompatible with user-configured datadir
+# above. Use with caution.
+dirs:
+  ssscc: "data/ssscc/"
+  raw: "data/raw/"
+  converted: "data/converted/"
+  time: "data/time/"
+  pressure: "data/pressure/"
+  bottle: "data/bottle/"
+  salt: "data/salt/"
+  reft: "data/reft/"
+  oxygen: "data/oxygen/"
+  logs: "data/logs/"
+  flags: "data/flags/"
+
+fig_dirs:
+    t1: "data/logs/fitting_figs/temp_primary/"
+    t2: "data/logs/fitting_figs/temp_secondary/"
+    c1: "data/logs/fitting_figs/cond_primary/"
+    c2: "data/logs/fitting_figs/cond_secondary/"
+    ox: "data/logs/fitting_figs/oxy_primary/"
+    rinko: "data/logs/fitting_figs/oxy_rinko/"
+
+# Legacy column name lookup
+column:
+    p: "CTDPRS"
+    t1: "CTDTMP1"
+    t2: "CTDTMP2"
+    c1: "CTDCOND1"
+    c2: "CTDCOND2"
+    sal: "CTDSAL"
+    rinko_oxy: "U_DEF_poly1"
+    oxyvolts: "CTDOXYVOLTS"
+    refT: "REFTMP"
+    refC: "BTLCOND"
+    refS: "SALNTY"
+    refO: "OXYGEN"
+    lat: "GPSLAT"
+    lon: "GPSLON"

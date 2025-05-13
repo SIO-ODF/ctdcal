@@ -20,9 +20,9 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
-from ctdcal import get_ctdcal_config, io
-from ctdcal.common import load_user_config, validate_file
-from ctdcal.fitting.common import df_node_to_BottleFlags, get_node, save_node
+from ctdcal import get_ctdcal_config
+from ctdcal.common import load_user_config, validate_file, load_exchange_ctd, load_exchange_btl
+from ctdcal.fitting.fit_common import df_node_to_BottleFlags, get_node, save_node
 
 cfg = get_ctdcal_config()
 USERCONFIG = "ctdcal/cfg.yaml"
@@ -38,14 +38,14 @@ ssscc_list = [ssscc.stem[:5] for ssscc in file_list]
 ctd_data = []
 for f in file_list:
     print(f"Loading {f}")
-    header, df = io.load_exchange_ctd(f)
+    header, df = load_exchange_ctd(f)
     df["SSSCC"] = header["STNNBR"].zfill(3) + header["CASTNO"].zfill(2)
     ctd_data.append(df)
 ctd_data = pd.concat(ctd_data, axis=0, sort=False)
 
 # load bottle file
 fname = list(Path(cfg.dirs["pressure"]).glob("*hy1.csv"))[0]
-btl_data = io.load_exchange_btl(fname).replace(-999, np.nan)
+btl_data = load_exchange_btl(fname).replace(-999, np.nan)
 btl_data["SSSCC"] = btl_data["STNNBR"].apply(lambda x: f"{x:03d}") + btl_data[
     "CASTNO"
 ].apply(lambda x: f"{x:02d}")

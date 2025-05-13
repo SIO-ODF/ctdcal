@@ -4,8 +4,8 @@ import argparse
 import os
 import sys
 
-from . import convert as cnv
-from . import sbe_reader as sbe_reader
+from ctdcal.processors.convert_legacy import convertFromSBEReader
+from ctdcal.processors import sbe_reader as sbe_reader
 
 DEBUG = False
 
@@ -128,7 +128,7 @@ def main(argv):
     #         debugPrint('Success!')
 
     # debugPrint("Converting raw scans to scientific units... ")
-    converted_df = cnv.convertFromSBEReader(sbeReader, False)
+    converted_df = convertFromSBEReader(sbeReader, False)
 
     # convertedfileName  = filename_base + CONVERTED_SUFFIX + '.' + FILE_EXT
     # convertedfilePath = os.path.join(outputDir, convertedfileName)

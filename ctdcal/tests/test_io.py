@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import requests
 
-from ctdcal import io
+from ctdcal import common as io
 
 
 def check_type(to_check, sub_dtype):

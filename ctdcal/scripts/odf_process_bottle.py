@@ -5,7 +5,7 @@ import sys
 
 import pandas as pd
 
-from . import process_bottle as btl
+from ctdcal.processors import proc_bottle as btl
 
 # File extension to use for output files (csv-formatted)
 FILE_EXT = "csv"

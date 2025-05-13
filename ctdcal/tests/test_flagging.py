@@ -1,4 +1,4 @@
-from ctdcal import flagging
+from ctdcal.flagging import flag_common as flagging
 import numpy as np
 import pandas as pd
 import pytest

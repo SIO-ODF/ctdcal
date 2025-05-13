@@ -20,6 +20,10 @@ except PackageNotFoundError:
 
 def get_ctdcal_config():
     """
+    * AS 2025-02-07
+    * Deprecated. Use common.load_user_config()
+    TODO: replace usages with common.load_user_config()
+
     Find and load config file from ctdcal module folder (ctdcal/ctdcal/).
 
     File read mimicked from pallets/flask

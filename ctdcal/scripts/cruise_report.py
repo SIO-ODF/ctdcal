@@ -3,7 +3,8 @@ import logging
 import numpy as np
 import pandas as pd
 
-from .. import ctd_plots, get_ctdcal_config
+from .. import get_ctdcal_config
+from ctdcal.plotting.plot_fit import residual_vs_pressure, residual_vs_station
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
     #################################################################
     log.info("Generating temperature residual plots")
     for param, ref in zip(["t1", "t2", "t2"], ["refT", "refT", "t1"]):
-        ctd_plots.residual_vs_pressure(
+        residual_vs_pressure(
             btl_df[cfg.column[param]],
             btl_df[cfg.column[ref]],
             btl_df["CTDPRS"],
@@ -27,7 +28,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
             xlabel=f"{cfg.column[param]} Residual (T90 C)",
             f_out=f"{outdir}{ref}-{param}_vs_p{ext}",
         )
-        ctd_plots.residual_vs_station(
+        residual_vs_station(
             btl_df[cfg.column[param]],
             btl_df[cfg.column[ref]],
             btl_df["CTDPRS"],
@@ -35,7 +36,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
             ylabel=f"{cfg.column[param]} Residual (T90 C)",
             f_out=f"{outdir}{ref}-{param}_vs_stn{ext}",
         )
-        ctd_plots.residual_vs_station(
+        residual_vs_station(
             btl_df[cfg.column[param]],
             btl_df[cfg.column[ref]],
             btl_df["CTDPRS"],
@@ -50,7 +51,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
     #################################################################
     log.info("Generating conductivity residual plots")
     for param, ref in zip(["c1", "c2", "c2"], ["refC", "refC", "c1"]):
-        ctd_plots.residual_vs_pressure(
+        residual_vs_pressure(
             btl_df[cfg.column[param]],
             btl_df[cfg.column[ref]],
             btl_df["CTDPRS"],
@@ -58,7 +59,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
             xlabel=f"{cfg.column[param]} Residual (mS/cm)",
             f_out=f"{outdir}{ref}-{param}_vs_p{ext}",
         )
-        ctd_plots.residual_vs_station(
+        residual_vs_station(
             btl_df[cfg.column[param]],
             btl_df[cfg.column[ref]],
             btl_df["CTDPRS"],
@@ -66,7 +67,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
             ylabel=f"{cfg.column[param]} Residual (mS/cm)",
             f_out=f"{outdir}{ref}-{param}_vs_stn{ext}",
         )
-        ctd_plots.residual_vs_station(
+        residual_vs_station(
             btl_df[cfg.column[param]],
             btl_df[cfg.column[ref]],
             btl_df["CTDPRS"],
@@ -100,7 +101,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
 
     # salinity plots
     log.info("Generating salinity residual plots")
-    ctd_plots.residual_vs_pressure(
+    residual_vs_pressure(
         btl_df["CTDSAL"],
         btl_df["SALNTY"],
         btl_df["CTDPRS"],
@@ -108,7 +109,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         xlabel="CTDSAL Residual (PSU)",
         f_out=f"{outdir}btlsal-sal_vs_p{ext}",
     )
-    ctd_plots.residual_vs_station(
+    residual_vs_station(
         btl_df["CTDSAL"],
         btl_df["SALNTY"],
         btl_df["CTDPRS"],
@@ -116,7 +117,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         ylabel="CTDSAL Residual (PSU)",
         f_out=f"{outdir}btlsal-sal_vs_stn{ext}",
     )
-    ctd_plots.residual_vs_station(
+    residual_vs_station(
         btl_df["CTDSAL"],
         btl_df["SALNTY"],
         btl_df["CTDPRS"],
@@ -130,7 +131,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
     #################################################################
     # SBE43 oxygen plots
     log.info("Generating oxygen (SBE43) residual plots")
-    ctd_plots.residual_vs_pressure(
+    residual_vs_pressure(
         btl_df["CTDOXY"],
         btl_df["OXYGEN"],
         btl_df["CTDPRS"],
@@ -139,7 +140,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         xlabel="CTDOXY Residual (umol/kg)",
         f_out=f"{outdir}oxy-43_vs_p{ext}",
     )
-    ctd_plots.residual_vs_station(
+    residual_vs_station(
         btl_df["CTDOXY"],
         btl_df["OXYGEN"],
         btl_df["CTDPRS"],
@@ -148,7 +149,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         ylabel="CTDOXY Residual (umol/kg)",
         f_out=f"{outdir}oxy-43_vs_stn{ext}",
     )
-    ctd_plots.residual_vs_station(
+    residual_vs_station(
         btl_df["CTDOXY"],
         btl_df["OXYGEN"],
         btl_df["CTDPRS"],
@@ -161,7 +162,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
 
     # RINKO oxygen plots
     log.info("Generating oxygen (RINKO) residual plots")
-    ctd_plots.residual_vs_pressure(
+    residual_vs_pressure(
         btl_df["CTDRINKO"],
         btl_df["OXYGEN"],
         btl_df["CTDPRS"],
@@ -170,7 +171,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         xlabel="CTDRINKO Residual (umol/kg)",
         f_out=f"{outdir}oxy-rinko_vs_p{ext}",
     )
-    ctd_plots.residual_vs_station(
+    residual_vs_station(
         btl_df["CTDRINKO"],
         btl_df["OXYGEN"],
         btl_df["CTDPRS"],
@@ -179,7 +180,7 @@ def plot_residuals(outdir="data/report_figs/", ext=".pdf"):
         ylabel="CTDRINKO Residual (umol/kg)",
         f_out=f"{outdir}oxy-rinko_vs_stn{ext}",
     )
-    ctd_plots.residual_vs_station(
+    residual_vs_station(
         btl_df["CTDRINKO"],
         btl_df["OXYGEN"],
         btl_df["CTDPRS"],

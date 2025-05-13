@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from ctdcal.fitting.common import BottleFlags, df_node_to_BottleFlags, get_node, save_node, NodeNotFoundError
+from ctdcal.fitting.fit_common import BottleFlags, df_node_to_BottleFlags, get_node, save_node, NodeNotFoundError
 
 
 class TestBottleFlags:

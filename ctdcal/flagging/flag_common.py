@@ -1,9 +1,91 @@
 """
-A module for handling flags for bottle and continuous data.
+Classes and functions for flagging data by all modules.
 """
+import logging
 
 import numpy as np
 import pandas as pd
+
+from ctdcal import get_ctdcal_config
+from ctdcal.plotting.plot_fit import _intermediate_residual_plot
+
+cfg = get_ctdcal_config()
+log = logging.getLogger(__name__)
+
+
+def _flag_btl_data(
+    df,
+    param=None,
+    ref=None,
+    thresh=[0.002, 0.005, 0.010, 0.020],
+    f_out=None,
+):
+    """
+    Flag CTD "btl" data against reference measurement (e.g. SBE35, bottle salts).
+
+    Parameters
+    ----------
+    df : DataFrame,
+        DataFrame containing btl data
+    param : str
+        Name of parameter to calibrate (e.g. "CTDCOND1", "CTDTMP2")
+    ref : str
+        Name of reference parameter to calibrate against (e.g. "BTLCOND", "T90")
+    thresh : list of float, optional
+        Maximum acceptable residual for each pressure range
+    f_out : str, optional
+        Path and filename to save residual vs. pressure plots
+
+    Returns
+    -------
+    df_ques : DataFrame
+        Data flagged as questionable (flag 3s)
+    df_bad : DataFrame
+        Data flagged as bad (flag 4s)
+
+    """
+    prs = cfg.column["p"]
+
+    # Remove extreme outliers and code bad
+    df = df.reset_index(drop=True)
+    df["Diff"] = df[ref] - df[param]
+    df["Flag"] = outliers(df["Diff"])
+
+    # Find values that are above the threshold and code questionable
+    df["Flag"] = by_residual(df[param], df[ref], df[prs], old_flags=df["Flag"])
+    df_good = df[df["Flag"] == 2].copy()
+    df_ques = df[df["Flag"] == 3].copy()
+    df_bad = df[df["Flag"] == 4].copy()
+
+    if f_out is not None:
+        if param == cfg.column["t1"]:
+            xlabel = "T1 Residual (T90 C)"
+        elif param == cfg.column["t2"]:
+            xlabel = "T2 Residual (T90 C)"
+        elif param == cfg.column["c1"]:
+            xlabel = "C1 Residual (mS/cm)"
+        elif param == cfg.column["c2"]:
+            xlabel = "C2 Residual (mS/cm)"
+        f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
+        _intermediate_residual_plot(
+            df["Diff"],
+            df[prs],
+            df["SSSCC"],
+            show_thresh=True,
+            xlabel=xlabel,
+            f_out=f_out,
+        )
+        f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
+        _intermediate_residual_plot(
+            df_good["Diff"],
+            df_good[prs],
+            df_good["SSSCC"],
+            show_thresh=True,
+            xlabel=xlabel,
+            f_out=f_out,
+        )
+
+    return df_ques, df_bad
 
 
 def _merge_flags(new_flags, old_flags, keep_higher=True):
