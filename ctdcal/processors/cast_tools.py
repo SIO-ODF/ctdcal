@@ -10,6 +10,7 @@ import numpy as np
 from scipy import signal as sig
 
 from ctdcal.common import validate_dir
+from ctdcal.processors.functions_oxy import calculate_dV_dt
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class Cast(object):
     cast_id : str
         Cast identifier.
     datadir : str or Path-like
-        Data directory.
+        Converted data directory.
     p_col : str
         Name of pressure column.
     proc : DataFrame
@@ -53,8 +54,16 @@ class Cast(object):
         """
         Read the processed data into a dataframe.
         """
-        f = Path(self.datadir, 'converted/%s.pkl' % self.cast_id)
-        self.proc = pd.read_pickle(f)
+        f = Path(self.datadir, '%s.pkl' % self.cast_id)
+        data = pd.read_pickle(f)
+
+        # Moving the following steps here to avoid having to reopen and modify the
+        # pickle files again, one-by-one later
+        data["cast_id"] = self.cast_id
+        data["dv_dt"] = calculate_dV_dt(
+                data["CTDOXYVOLTS"], data["scan_datetime"]
+        )
+        self.proc = data
 
     def parse_downcast(self, data):
         """
@@ -125,6 +134,8 @@ class Cast(object):
         # Find local peaks
         local_min_vals = data.loc[data[self.p_col] == data[self.p_col].rolling(win_size, center=True).min(),
                                   [self.p_col]]
+        if len(local_min_vals) < 1:
+            raise ValueError("Error detecting the soak. Cast %s may be a partial or badly defective cast.")
 
         # apply max_soak threshold to filter false positives...
         i = local_min_vals.index[-1]
@@ -171,17 +182,17 @@ class Cast(object):
         best_full_cast = self.filtered if self.filtered is not None else self.proc
         # TODO: the below uses all very odf/go-ship/seabird-specific column labels
         #   which should ultimately be replaced with standardized names.
-        data['start_time'] = [float(self.trimmed["scan_datetime"].head(1))]
+        data['start_time'] = [self.trimmed['scan_datetime'].iloc[0].astype(float)]
         p_max_ind = best_full_cast[self.p_col].argmax()
-        data['bottom_time'] = [float(best_full_cast["scan_datetime"][p_max_ind])]
-        data['end_time'] = [float(best_full_cast["scan_datetime"].tail(1))]
-        data['start_pressure'] = [float(np.around(self.trimmed[self.p_col].head(1), 4))]
-        data['max_pressure'] = [float(np.around(self.trimmed[self.p_col].max(), 4))]
+        data['bottom_time'] = [best_full_cast["scan_datetime"][p_max_ind].astype(float)]
+        data['end_time'] = [best_full_cast["scan_datetime"].iloc[-1].astype(float)]
+        data['start_pressure'] = [np.around(self.trimmed[self.p_col].iloc[0].astype(float), 4)]
+        data['max_pressure'] = [np.around(self.trimmed[self.p_col].max().astype(float), 4)]
         if 'ALT' in self.proc.columns:
-            data['altimeter_bottom'] = [float(np.around(best_full_cast["ALT"][p_max_ind], 4))]
+            data['altimeter_bottom'] = [np.around(best_full_cast["ALT"][p_max_ind].astype(float), 4)]
         if all(col in self.proc.columns for col in ['GPSLAT', 'GPSLON']):
-            data['latitude'] = [float(np.around(best_full_cast["GPSLAT"][p_max_ind], 4))]
-            data['longitude'] = [float(np.around(best_full_cast["GPSLON"][p_max_ind], 4))]
+            data['latitude'] = [np.around(best_full_cast["GPSLAT"][p_max_ind].astype(float), 4)]
+            data['longitude'] = [np.around(best_full_cast["GPSLON"][p_max_ind].astype(float), 4)]
         return data
 
     def get_pressure_offsets(self, data, threshold, sample_freq):
@@ -290,7 +301,7 @@ class Cast(object):
         self.ondeck_trimmed = data.iloc[start_df.index.max(): end_df.index.min()].copy()
 
 
-def make_time_files(casts, datadir, user_cfg):
+def make_time_files(casts, time_dir, cnv_dir, log_dir, filter_params, soak_params, sample_freq):
     """
     Make continuous time-series files from processed cast data.
 
@@ -303,17 +314,20 @@ def make_time_files(casts, datadir, user_cfg):
     ----------
     casts : list of str
         List of cast ids to process.
-    datadir : str or Path-like
-        Top-level of user data directory
-    user_cfg : Munch object
-        Dictionary of user configuration parameters.
+    time_dir
+    cnv_dir
+    log_dir
+    filter_params
+    soak_params
+    sample_freq
     """
     log.info("Generating time.pkl files")
-    # validate time directory
-    time_dir = validate_dir(Path(datadir, 'time'), create=True)
+    # validate required directories
+    time_dir = validate_dir(Path(time_dir), create=True)
+    log_dir = validate_dir(Path(log_dir), create=True)
     # groundwork for writing any new details or offsets
-    details_file = Path(datadir, 'logs/cast_details.csv')
-    offsets_file = Path(datadir, 'logs/ondeck_pressure.csv')
+    details_file = Path(log_dir, 'cast_details.csv')
+    offsets_file = Path(log_dir, 'ondeck_pressure.csv')
     new_casts = False
     if details_file.exists():
         cast_details_all = pd.read_csv(details_file, dtype='str')
@@ -329,19 +343,20 @@ def make_time_files(casts, datadir, user_cfg):
         time_file = Path(time_dir, '%s_time.pkl' % cast_id)
         if not time_file.exists():
             new_casts = True
-            cast = Cast(cast_id, datadir)
+            cast = Cast(cast_id, cnv_dir)
             cast.p_col = 'CTDPRS'
             # Apply smoothing filter
             cast.filter(cast.proc,
-                        win_size=(user_cfg.filter_win * user_cfg.freq),
-                        win_type=user_cfg.filter_type,
-                        cols=user_cfg.filter_cols)
+                        win_size=(filter_params.filter_win * sample_freq),
+                        win_type=filter_params.filter_type,
+                        cols=filter_params.filter_cols)
             # Parse the downcast from the full cast
             cast.parse_downcast(cast.filtered)
             # Trim the soak period from the downcast
             cast.trim_soak(cast.downcast,
-                           (user_cfg.soak_win * user_cfg.freq),
-                           user_cfg.soak_threshold)
+                           (soak_params.soak_win * sample_freq),
+                           soak_params.soak_threshold)
+
             # save pkl file
             cast.trimmed.to_pickle(time_file)
 
@@ -361,13 +376,13 @@ def make_time_files(casts, datadir, user_cfg):
                                 .sort_values(by=['cast_id']))
             p_offsets_all = (pd.concat([p_offsets_all,
                                         cast.get_pressure_offsets(cast.proc,
-                                                                  user_cfg.cond_threshold,
-                                                                  user_cfg.freq)])
+                                                                  soak_params.cond_threshold,
+                                                                  sample_freq)])
                              .drop_duplicates(['cast_id'], keep='last')
                              .sort_values(by=['cast_id']))
 
     # Wrap up...
     if new_casts is True:
         log.info("Saving deck pressures and cast details.")
-        cast_details_all.to_csv(Path(datadir, 'logs/cast_details.csv'), index=False)
-        p_offsets_all.to_csv(Path(datadir, 'logs/ondeck_pressure.csv'), index=False)
+        cast_details_all.to_csv(details_file, index=False)
+        p_offsets_all.to_csv(offsets_file, index=False)

@@ -13,13 +13,22 @@ from ctdcal.processors.cast_tools import Cast
 class TestCast:
     @pytest.fixture
     def tmp_df(self, tmp_path):
-        data = {'spam': [1, 2, 3, 2, 1, 2, 3, 4, 5, 4, 3, 2, 1]}
+        # data = {'spam': [1, 2, 3, 2, 1, 2, 3, 4, 5, 4, 3, 2, 1]}
+        # ugly hack to work around the ugly (temporary) hack I made to cast_tools
+        data = {
+                'spam': [1, 2, 3, 2, 1, 2, 3, 4, 5, 4, 3, 2, 1],
+                'CTDOXYVOLTS': [0 for _ in range(13)],
+                'scan_datetime': [0 for _ in range(13)],
+        }
         return pd.DataFrame(data=data)
 
     @pytest.fixture
     def rnd_df(self):
-        cols = ['scan_datetime', 'P', 'GPSLAT', 'GPSLON', 'ALT']
-        data = np.random.randint(10, size=[4, 5])
+        # cols = ['scan_datetime', 'P', 'GPSLAT', 'GPSLON', 'ALT']
+        # data = np.random.randint(10, size=[4, 5])
+        # another ugly hack
+        cols = ['scan_datetime', 'P', 'GPSLAT', 'GPSLON', 'ALT', 'CTDOXYVOLTS']
+        data = np.random.randint(10, size=[4, 6])
         return pd.DataFrame(data, columns=cols)
 
     def test_load_cast(self, tmp_df):

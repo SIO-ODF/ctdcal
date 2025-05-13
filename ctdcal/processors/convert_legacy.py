@@ -12,6 +12,7 @@ import gsw
 import numpy as np
 import pandas as pd
 
+from ctdcal.common import validate_dir
 from ctdcal.processors import functions_ctd as sbe_eq, sbe_reader as sbe_rd
 from ctdcal.processors import functions_oxy as oxy_eq
 from ctdcal.processors import functions_aux as aux_eq
@@ -130,7 +131,7 @@ short_lookup = {
 }
 
 
-def hex_to_ctd(ssscc_list):
+def hex_to_ctd(ssscc_list, rawdir, outdir):
     """
     Convert raw CTD data and export to .pkl files.
 
@@ -145,12 +146,15 @@ def hex_to_ctd(ssscc_list):
     """
     log.info("Converting .hex files")
     for ssscc in ssscc_list:
-        if not Path(cfg.dirs["converted"] + ssscc + ".pkl").exists():
-            hexFile = cfg.dirs["raw"] + ssscc + ".hex"
-            xmlconFile = cfg.dirs["raw"] + ssscc + ".XMLCON"
+        validate_dir(rawdir, create=True)
+        validate_dir(outdir, create=True)
+        outfile = Path(outdir, '%s.pkl' % ssscc)
+        if not outfile.exists():
+            hexFile = Path(rawdir, '%s.hex' % ssscc)
+            xmlconFile = Path(rawdir, '%s.XMLCON' % ssscc)
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader, ssscc)
-            converted_df.to_pickle(cfg.dirs["converted"] + ssscc + ".pkl")
+            converted_df.to_pickle(outfile)
 
     return True
 

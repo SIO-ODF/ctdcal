@@ -17,6 +17,7 @@ def _flag_btl_data(
     df,
     param=None,
     ref=None,
+    cast_id='SSSCC',
     thresh=[0.002, 0.005, 0.010, 0.020],
     f_out=None,
 ):
@@ -44,7 +45,7 @@ def _flag_btl_data(
         Data flagged as bad (flag 4s)
 
     """
-    prs = cfg.column["p"]
+    # prs = cfg.column["p"]
 
     # Remove extreme outliers and code bad
     df = df.reset_index(drop=True)
@@ -52,7 +53,7 @@ def _flag_btl_data(
     df["Flag"] = outliers(df["Diff"])
 
     # Find values that are above the threshold and code questionable
-    df["Flag"] = by_residual(df[param], df[ref], df[prs], old_flags=df["Flag"])
+    df["Flag"] = by_residual(df[param], df[ref], df['CTDPRS'], old_flags=df["Flag"])
     df_good = df[df["Flag"] == 2].copy()
     df_ques = df[df["Flag"] == 3].copy()
     df_bad = df[df["Flag"] == 4].copy()
@@ -66,20 +67,20 @@ def _flag_btl_data(
             xlabel = "C1 Residual (mS/cm)"
         elif param == cfg.column["c2"]:
             xlabel = "C2 Residual (mS/cm)"
-        f_out = f_out.split(".pdf")[0] + "_postfit.pdf"
+        f_out = str(f_out).split(".pdf")[0] + "_postfit.pdf"
         _intermediate_residual_plot(
             df["Diff"],
-            df[prs],
-            df["SSSCC"],
+            df['CTDPRS'],
+            df[cast_id],
             show_thresh=True,
             xlabel=xlabel,
             f_out=f_out,
         )
-        f_out = f_out.split(".pdf")[0] + "_flag2.pdf"
+        f_out = str(f_out).split(".pdf")[0] + "_flag2.pdf"
         _intermediate_residual_plot(
             df_good["Diff"],
-            df_good[prs],
-            df_good["SSSCC"],
+            df_good['CTDPRS'],
+            df_good[cast_id],
             show_thresh=True,
             xlabel=xlabel,
             f_out=f_out,
@@ -321,3 +322,21 @@ def by_residual(
         flags[in_bin & (residual > thresh)] = flag_bad
 
     return _merge_flags(flags, old_flags)
+
+
+def quality_by_threshold(values, threshold=1.0):
+    """
+    Flags values that meet or exceed a threshold.
+
+    Parameters
+    ----------
+    values : int or float or array
+        values to flag.
+    threshold : int or float or array
+        flag threshold.
+
+    Returns
+    -------
+    bool
+    """
+    return values >= threshold
