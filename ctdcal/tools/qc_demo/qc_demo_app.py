@@ -8,7 +8,6 @@ from pathlib import Path
 import streamlit as st
 from munch import munchify
 
-st.session_state.spam = 'Lovely spam!'
 st.session_state.exchange_dir = Path('/Users/als026/data/i09n_2025/cruise_data/save')
 st.session_state.flag_file = Path('/Users/als026/data/i09n_2025/cruise_data/flag/bottle_flags_manual.json')
 st.session_state.range_limits = {
