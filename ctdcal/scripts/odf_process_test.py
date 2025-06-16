@@ -40,7 +40,7 @@ logging.basicConfig(
     handlers=[stream, logfile],
 )
 
-USERCONFIG = '/Users/als026/data/i09n_2025/cfg_i09n.yaml'
+USERCONFIG = '/Users/als026/data/i09n_2025/cfg_i09n_test.yaml'
 EXCHANGECONFIG = '/Users/als026/data/i09n_2025/i09n_exchange.yaml'
 cfg = load_user_config(USERCONFIG)
 
@@ -53,7 +53,7 @@ skip_export = False
 process_cruise_report = False
 
 
-def odf_process_all():
+def odf_process_test():
 
     #####
     # Step 0: Load and define necessary variables
@@ -87,10 +87,6 @@ def odf_process_all():
     oxy_figdir = Path(plotdir, 'oxy')
     rinko_figdir = Path(plotdir, 'rinko')
 
-    rbr_rawdir = Path('/Users/als026/data/i09n_2025/rbr/raw')
-    rbr_parseddir = Path(datadir, 'parsed', 'rbr')
-    rbr_cnvdir = Path(datadir, 'cnv', 'rbr')
-
     #####
     # Step 1: Generate intermediate file formats (.pkl, _salts.csv, _reft.csv)
     #####
@@ -113,10 +109,6 @@ def odf_process_all():
 
     # generate reftemp .csv files
     proc_reft(ssscc_list, reft_rawdir, reft_parsedir, reft_cnvdir)
-
-    # parse rbr reft
-    # proc_rbr(ssscc_list, rbr_rawdir, cnvdir, btldir, rbr_cnvdir, sync_times=True)
-    # proc_rbr(ssscc_list, rbr_rawdir, cnvdir, btldir, rbr_cnvdir, export_parsed=True, parsed_dir=rbr_parseddir)
 
     # generate oxygen .csv files
     proc_oxy(ssscc_list, oxy_rawdir, oxy_cnvdir)
@@ -143,16 +135,16 @@ def odf_process_all():
         make_depth_log(time_data_all, cast_id_col='cast_id', report_dir=reportdir)
 
         # calibrate temperature against reference
-        calibrate_temp(
-                btl_data_all, time_data_all, fit_groups.temperature, fit_coeffs.temperature,
-                reft_figdir, reportdir, cast_id='cast_id'
-        )
+        # calibrate_temp(
+        #         btl_data_all, time_data_all, fit_groups.temperature, fit_coeffs.temperature,
+        #         reft_figdir, reportdir, cast_id='cast_id'
+        # )
 
         # calibrate conductivity against reference
-        btl_data_all, time_data_all = calibrate_cond(
-                btl_data_all, time_data_all, fit_groups.conductivity, fit_coeffs.conductivity,
-                salt_figdir, reportdir, flagfile, cast_id='cast_id'
-        )
+        # btl_data_all, time_data_all = calibrate_cond(
+        #         btl_data_all, time_data_all, fit_groups.conductivity, fit_coeffs.conductivity,
+        #         salt_figdir, reportdir, flagfile, cast_id='cast_id'
+        # )
 
         # calculate params needs for oxy/rinko calibration
         oxy_cast_list = make_cast_id_list(oxy_rawdir, pattern='?????')
@@ -187,4 +179,4 @@ def odf_process_all():
 
 
 if __name__ == "__main__":
-    odf_process_all()
+    odf_process_test()

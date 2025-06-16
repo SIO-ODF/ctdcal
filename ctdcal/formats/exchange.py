@@ -26,6 +26,9 @@ def export_exchange(
         reportdir=cfg.dirs['logs'],
         cast_id_col='SSSCC'
 ):
+    outdir = validate_dir(outdir, create=True)
+    reportdir = validate_dir(reportdir, create=True)
+
     export_hy1(btl_data_all, outdir, reportdir, cast_id_col, exchange_settings)
     export_ct1(time_data_all, ssscc_list, reportdir, outdir, cast_id_col, exchange_settings)
 
@@ -537,8 +540,11 @@ def export_ct1(df, ssscc_list, reportdir, outdir, cast_id_col, settings, org='OD
             ctd_header = (  # this is ugly but prevents tabs before label
                 f"CTD,{file_datetime}\n"
                 f"NUMBER_HEADERS = 11\n"
-                f"EXPOCODE = {cfg.expocode}\n"
-                f"SECT_ID = {cfg.section_id}\n"
+                f"EXPOCODE = {settings.expocode}\n"
+                f"SECT_ID = {settings.section_id}\n"
+                # TODO: the below depends on specific "SSSCC" cast names or slicing will fail. Rethink?
+                # Also, if we stick with this, CCHDO does not keep the leading zeros, so we could trim
+                # them here...
                 f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
                 f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
                 f"DATE = {cast_dict['DATE']}\n"
