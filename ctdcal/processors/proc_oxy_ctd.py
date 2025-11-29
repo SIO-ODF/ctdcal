@@ -66,7 +66,7 @@ def _PMEL_oxy_eq(coefs, inputs, cc=[1.92634e-4, -4.64803e-2]):
 
     return o2
 
-def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
+def prepare_oxy(btl_df, time_df, casts, flag_file, raw_dir, ref_node='oxy', cast_id='SSSCC'):
     """
     Calculate oxygen-related variables needed for calibration:
     sigma, oxygen solubility (OS), and bottle oxygen
@@ -77,7 +77,7 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
         CTD data at bottle stops
     time_df : DataFrame
         Continuous CTD data
-    ssscc_list : list of str
+    casts : list of str
         List of stations to process
     user_cfg : Munch object
         Munch dictionary of user-defined parameters
@@ -90,26 +90,26 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
     """
     # Calculate SA and CT
     btl_df["SA"] = gsw.SA_from_SP(
-        btl_df[cfg.column["sal"]],
-        btl_df[cfg.column["p"]],
-        btl_df[cfg.column["lon"]],
-        btl_df[cfg.column["lat"]],
+        btl_df['CTDSAL'],
+        btl_df['CTDPRS'],
+        btl_df['GPSLON'],
+        btl_df['GPSLAT'],
     )
     btl_df["CT"] = gsw.CT_from_t(
         btl_df["SA"],
-        btl_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
-        btl_df[cfg.column["p"]],
+        btl_df['CTDTMP1'],  # oxygen sensor is on primary line (ie t1)
+        btl_df['CTDPRS'],
     )
     time_df["SA"] = gsw.SA_from_SP(
-        time_df[cfg.column["sal"]],
-        time_df[cfg.column["p"]],
-        time_df[cfg.column["lon"]],
-        time_df[cfg.column["lat"]],
+        time_df['CTDSAL'],
+        time_df['CTDPRS'],
+        time_df['GPSLON'],
+        time_df['GPSLAT'],
     )
     time_df["CT"] = gsw.CT_from_t(
         time_df["SA"],
-        time_df[cfg.column["t1"]],  # oxygen sensor is on primary line (ie t1)
-        time_df[cfg.column["p"]],
+        time_df['CTDTMP1'],  # oxygen sensor is on primary line (ie t1)
+        time_df['CTDPRS'],
     )
 
     # calculate sigma
@@ -120,35 +120,37 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
     btl_df["OS"] = gsw.O2sol(
         btl_df["SA"],
         btl_df["CT"],
-        btl_df[cfg.column["p"]],
-        btl_df[cfg.column["lon"]],
-        btl_df[cfg.column["lat"]],
+        btl_df['CTDPRS'],
+        btl_df['GPSLON'],
+        btl_df['GPSLAT'],
     )
     time_df["OS"] = gsw.O2sol(
         time_df["SA"],
         time_df["CT"],
-        time_df[cfg.column["p"]],
-        time_df[cfg.column["lon"]],
-        time_df[cfg.column["lat"]],
+        time_df['CTDPRS'],
+        time_df['GPSLON'],
+        time_df['GPSLAT'],
     )
     # Convert CTDOXY units
     btl_df["CTDOXY"] = oxy_ml_to_umolkg(btl_df["CTDOXY1"], btl_df["sigma_btl"])
     # Calculate bottle oxygen
     # TODO: this part should be in proc_oxy_btl module
-    btl_df[cfg.column["refO"]] = calculate_bottle_oxygen(
-        ssscc_list,
-        btl_df["SSSCC"],
+    btl_df['OXYGEN'] = calculate_bottle_oxygen(
+        casts,
+        btl_df[cast_id],
+        raw_dir,
         btl_df["TITR_VOL"],
         btl_df["TITR_TEMP"],
-        btl_df["FLASKNO"],
+        btl_df[['FLASKNO']],
+        cast_id='cast_id',
     )
-    btl_df[cfg.column["refO"]] = oxy_ml_to_umolkg(
-        btl_df[cfg.column["refO"]], btl_df["sigma_btl"]
+    btl_df['OXYGEN'] = oxy_ml_to_umolkg(
+        btl_df['OXYGEN'], btl_df["sigma_btl"]
     )
-    btl_df["OXYGEN_FLAG_W"] = nan_values(btl_df[cfg.column["refO"]])
+    btl_df["OXYGEN_FLAG_W"] = nan_values(btl_df['OXYGEN'])
 
     # Load manual OXYGEN flags
-    flag_file = Path(user_cfg.datadir, "flag", user_cfg.bottleflags_man)
+    flag_file = Path(flag_file)
     oxy_flags_manual = None
     if flag_file.exists():
         try:
@@ -165,13 +167,13 @@ def prepare_oxy(btl_df, time_df, ssscc_list, user_cfg, ref_node):
         oxy_flags_manual_df = pd.DataFrame.from_dict(oxy_flags_manual)
         oxy_flags_manual_df = oxy_flags_manual_df.rename(
             columns={
-                "cast_id": "SSSCC",
+                "cast_id": cast_id,
                 "bottle_num": "btl_fire_num",
                 "value": "OXYGEN_FLAG_W",
             }
         )
-        btl_df.set_index(["SSSCC", "btl_fire_num"], inplace=True)
-        btl_df.update(oxy_flags_manual_df.set_index(["SSSCC", "btl_fire_num"]))
+        btl_df.set_index([cast_id, "btl_fire_num"], inplace=True)
+        btl_df.update(oxy_flags_manual_df.set_index([cast_id, "btl_fire_num"]))
         btl_df.reset_index(inplace=True)
 
     return True
