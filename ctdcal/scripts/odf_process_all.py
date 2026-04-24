@@ -40,8 +40,10 @@ logging.basicConfig(
     handlers=[stream, logfile],
 )
 
-USERCONFIG = 'ctdcal/cfg.yaml'
-EXCHANGECONFIG = 'ctdcal/exchange.yaml'
+# USERCONFIG = 'ctdcal/cfg.yaml'
+USERCONFIG = '/Users/als026/data/demo_i08s/cfg_demo_i08s.yaml'
+# EXCHANGECONFIG = 'ctdcal/exchange.yaml'
+EXCHANGECONFIG = '/Users/als026/data/demo_i08s/i08s_demo_exchange.yaml'
 cfg = load_user_config(USERCONFIG)
 
 # Runtime flags:

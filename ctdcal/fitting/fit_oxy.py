@@ -14,7 +14,7 @@ from ctdcal.common import validate_dir
 from ctdcal.flagging.flag_common import by_percent_diff
 from ctdcal.plotting.plot_fit import _intermediate_residual_plot
 from ctdcal.processors.functions_oxy import calculate_dV_dt
-from ctdcal.processors.proc_oxy_ctd import _get_sbe_coef, _PMEL_oxy_eq
+from ctdcal.processors.proc_oxy_ctd import _PMEL_oxy_eq
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
