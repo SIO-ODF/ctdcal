@@ -3,15 +3,34 @@ Functions to support importing from, converting to and exporting exchange files.
 """
 import logging
 from datetime import datetime as dt, timezone
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
+from ctdcal.common import validate_dir
 from ctdcal.flagging.flag_common import nan_values
+from ctdcal.processors.proc_bottle import get_bottom_bottle_data
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
+
+
+def export_exchange(
+        time_data_all,
+        btl_data_all,
+        ssscc_list,
+        exchange_settings,
+        outdir=cfg.dirs["pressure"],
+        reportdir=cfg.dirs['logs'],
+        cast_id_col='SSSCC'
+):
+    outdir = validate_dir(outdir, create=True)
+    reportdir = validate_dir(reportdir, create=True)
+
+    export_hy1_v1(btl_data_all, outdir, reportdir, cast_id_col, exchange_settings)
+    export_ct1_v1(time_data_all, ssscc_list, reportdir, outdir, cast_id_col, exchange_settings)
 
 
 def load_hy_file(path_to_hyfile):
@@ -35,10 +54,7 @@ def load_hy_file(path_to_hyfile):
     return df
 
 
-def merge_hy1(
-    df1,
-    df2,
-):
+def merge_hy1(df1, df2):
     """
     Merges two hy1 files, returning the combined Pandas DataFrame.
     If the hy1 file has not been loaded yet, use load_hy_file.
@@ -94,6 +110,146 @@ def add_btlnbr_cols(df, btl_num_col):
     # default to everything being good
     df["BTLNBR_FLAG_W"] = 2
     return df
+
+
+def export_hy1_v1(df, out_dir, report_dir, cast_id_col, settings, org="ODF"):
+    """
+    Write out the exchange-lite formatted hy1 bottle file.
+
+    Params
+    ------
+    df : Pandas DataFrame
+        Fit bottle data
+    out_dir = String or Path object, optional
+        The path for where to write the hy1 file
+    org : String, optional
+        The organization or group used to determine subroutines
+
+    """
+    log.info("Exporting bottle file")
+
+    btl_data = df.copy()
+    now = dt.now()
+    file_datetime = now.strftime("%Y%m%d")
+
+    btl_columns = {
+        "EXPOCODE": "",
+        "SECT_ID": "",
+        "STNNBR": "",
+        "CASTNO": "",
+        "SAMPNO": "",
+        "BTLNBR": "",
+        "BTLNBR_FLAG_W": "",
+        "DATE": "",
+        "TIME": "",
+        "LATITUDE": "",
+        "LONGITUDE": "",
+        "DEPTH": "METERS",
+        "CTDPRS": "DBAR",
+        "CTDTMP": "ITS-90",
+        "CTDSAL": "PSS-78",
+        "CTDSAL_FLAG_W": "",
+        "SALNTY": "PSS-78",
+        "SALNTY_FLAG_W": "",
+        # "CTDOXY": "UMOL/KG",
+        # "CTDOXY_FLAG_W": "",
+        # "CTDRINKO": "UMOL/KG",
+        # "CTDRINKO_FLAG_W": "",
+        "CTDOXY": "UMOL/KG",
+        "CTDOXY_FLAG_W": "",
+        "OXYGEN": "UMOL/KG",
+        "OXYGEN_FLAG_W": "",
+        "REFTMP": "ITS-90",
+        "REFTMP_FLAG_W": "",
+    }
+
+    # get bottom bottle data
+    bottom_bottles = get_bottom_bottle_data(btl_data, report_dir, export=True)
+
+    # rename outputs as defined in user_settings.yaml
+    for param, attrs in settings.ctd_outputs.items():
+        if param not in btl_data.columns:
+            btl_data.rename(columns={attrs["sensor"]: param}, inplace=True)
+    btl_data.rename(columns={cast_id_col: 'SSSCC'}, inplace=True)
+
+    # merge bottom bottle data
+    btl_data = pd.merge(btl_data, bottom_bottles, on='SSSCC', how='left')
+
+    btl_data["EXPOCODE"] = settings.expocode
+    btl_data["SECT_ID"] = settings.section_id
+    btl_data["STNNBR"] = [int(x[0:3]) for x in btl_data["SSSCC"]]
+    btl_data["CASTNO"] = [int(x[3:]) for x in btl_data["SSSCC"]]
+    btl_data["SAMPNO"] = btl_data["btl_fire_num"].astype(int)
+    btl_data = add_btlnbr_cols(btl_data, btl_num_col="btl_fire_num")
+
+    # sort by decreasing sample number (increasing pressure) and reindex
+    btl_data = btl_data.sort_values(
+        by=["STNNBR", "CASTNO", "SAMPNO"], ascending=[True, True, False], ignore_index=True
+    )
+
+    # switch oxygen primary sensor to rinko
+    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
+    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+
+    # round data
+    # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
+    #     btl_data[col] = btl_data[col].round(4)
+    # for col in ["CTDPRS", "CTDOXY", "OXYGEN"]:
+    #     btl_data[col] = btl_data[col].round(1)
+
+    # add depth
+    depth_df = pd.read_csv(
+        Path(report_dir, "depth_log.csv"), dtype={cast_id_col: str}, na_values=-999
+    ).dropna()
+    try:
+        manual_depth_df = pd.read_csv(
+            Path(report_dir, 'manual_depth_log.csv'), dtype={cast_id_col: str}
+        )
+    except FileNotFoundError:
+        log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
+        manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
+        manual_depth_df.to_csv(Path(report_dir, 'manual_depth_log.csv'), index=False)
+    full_depth_df = pd.concat([depth_df, manual_depth_df])
+    # full_depth_df.drop_duplicates(subset=cast_id_col, keep="first", inplace=True)
+    # ## 2025-04-23 changing to 'last', if there are duplicates we should trust the
+    # manual depths because it probably means ctdcal guessed wrong
+    full_depth_df.drop_duplicates(subset=cast_id_col, keep="last", inplace=True)
+    btl_data["DEPTH"] = -999
+    for index, row in full_depth_df.iterrows():
+        btl_data.loc[btl_data["SSSCC"] == row[cast_id_col], "DEPTH"] = int(row["DEPTH"])
+
+    # deal with nans
+    btl_data["REFTMP_FLAG_W"] = nan_values(
+        btl_data["REFTMP_FLAG_W"], old_flags=btl_data["REFTMP_FLAG_W"]
+    )
+    btl_data = btl_data.where(~btl_data.isnull(), -999)
+
+    # check columns
+    try:
+        btl_data[btl_columns.keys()]
+        # this is lazy, do better
+    except KeyError as err:
+        log.info("Column names not configured properly... attempting to correct")
+        bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
+        for col in bad_cols:
+            if col.endswith("FLAG_W"):
+                log.warning(col + " missing, flagging with 9s")
+                btl_data[col] = 9
+            else:
+                log.warning(col + " missing, filling with -999s")
+                btl_data[col] = -999
+
+    btl_data = btl_data[btl_columns.keys()]
+    time_stamp = file_datetime + org
+    outfile = Path(out_dir, '%s_hy1.csv' % settings.expocode)
+    with open(outfile, mode="w+") as f:
+        f.write("BOTTLE, %s\n" % time_stamp)
+        f.write(",".join(btl_columns.keys()) + "\n")
+        f.write(",".join(btl_columns.values()) + "\n")
+        btl_data.to_csv(f, header=False, index=False)
+        f.write("\n" + "END_DATA")
+
+    return
 
 
 def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
@@ -210,13 +366,14 @@ def export_hy1(df, out_dir=cfg.dirs["pressure"], org="ODF"):
     btl_data = btl_data[btl_columns.keys()]
     time_stamp = file_datetime + org
     with open(out_dir + cfg.expocode + "_hy1.csv", mode="w+") as f:
-        f.write("BOTTLE, %s\n" % (time_stamp))
+        f.write("BOTTLE, %s\n" % time_stamp)
         f.write(",".join(btl_columns.keys()) + "\n")
         f.write(",".join(btl_columns.values()) + "\n")
         btl_data.to_csv(f, header=False, index=False)
         f.write("\n" + "END_DATA")
 
     return
+
 
 def roll_filter(df, p_col="CTDPRS", direction="down"):
     """
@@ -384,6 +541,150 @@ def _flag_backfill_data(
             df.loc[df[flag_bool_col], col] = 6
 
     return df
+
+
+def export_ct1_v1(df, ssscc_list, reportdir, outdir, cast_id_col, settings, org='ODFSIO'):
+    """
+    Export continuous CTD (i.e. time) data to data/pressure/ directory as well as
+    adding quality flags and removing unneeded columns.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Continuous CTD data
+    ssscc_list : list of str
+        List of stations to export
+
+    Returns
+    -------
+
+    Notes
+    -----
+    Needs depth_log.csv and manual_depth_log.csv to run successfully
+
+    """
+    log.info("Exporting CTD files")
+
+    # validate or create output directory
+    validate_dir(outdir, create=True)
+
+    # initial flagging (some of this should be moved)
+    df["CTDFLUOR_FLAG_W"] = 1
+    df["CTDXMISS_FLAG_W"] = 1
+    # df["CTDBACKSCATTER_FLAG_W"] = 1
+
+    # rename outputs as defined in user_settings.yaml
+    for param, attrs in settings.ctd_outputs.items():
+        if param not in df.columns:
+            df.rename(columns={attrs["sensor"]: param}, inplace=True)
+
+    # check that all columns are there
+    ctd_col_names, ctd_col_units = [], []
+    for (param, attrs) in settings.ctd_outputs.items():
+        if param == "CTDPRS":
+            ctd_col_names += [param]
+            ctd_col_units += [attrs["units"]]
+        else:
+            ctd_col_names += [param, f"{param}_FLAG_W"]
+            ctd_col_units += [attrs["units"], ""]
+
+    try:
+        df[ctd_col_names]
+        # this is lazy, do better
+    except KeyError as err:
+        log.info("Column names not configured properly... attempting to correct")
+        bad_cols = err.args[0].split("'")[1::2]  # every other str is a column name
+        for col in bad_cols:
+            if col.endswith("FLAG_W"):
+                log.warning(col + " missing, flagging with 9s")
+                df[col] = 9
+            else:
+                log.warning(col + " missing, filling with -999s")
+                df[col] = -999
+
+    df.rename(columns={cast_id_col: 'SSSCC'}, inplace=True)
+    df['SSSCC'] = df['SSSCC'].astype(str).copy()
+
+    cast_details = pd.read_csv(
+            Path(reportdir, 'bottom_bottle_details.csv'),
+            dtype={'SSSCC': str},
+    )
+    depth_df = pd.read_csv(
+            Path(reportdir, 'depth_log.csv'), dtype={cast_id_col: str}, na_values=-999
+    ).dropna()
+    try:
+        manual_depth_df = pd.read_csv(
+                Path(reportdir, 'manual_depth_log.csv'), dtype={cast_id_col: str}
+        )
+    except FileNotFoundError:
+        log.warning("manual_depth_log.csv not found... duplicating depth_log.csv")
+        manual_depth_df = depth_df.copy()  # write manual_depth_log as copy of depth_log
+        manual_depth_df.to_csv(Path(reportdir, 'manual_depth_log.csv'), index=False)
+    full_depth_df = pd.concat([depth_df, manual_depth_df])
+    # full_depth_df.drop_duplicates(subset=cast_id_col, keep="first", inplace=True)
+    # ## 2025-04-23 changing to 'last', we should be trusting the manual depths because if
+    # there's duplicates it probably means ctdcal guessed wrong
+    full_depth_df.drop_duplicates(subset=cast_id_col, keep="last", inplace=True)
+
+    for ssscc in ssscc_list:
+        time_data = df[df["SSSCC"] == ssscc].copy()
+        time_data = pressure_sequence(time_data)
+        # switch oxygen primary sensor to rinko
+        # if int(ssscc[:3]) > 35:
+        log.info(f"Using Rinko as CTDOXY for {ssscc}")
+        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        time_data = time_data[ctd_col_names]
+        # time_data = time_data.round(4)
+        time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999
+
+        # force flags back to int
+        for col in time_data.columns:
+            if col.endswith("FLAG_W"):
+                time_data[col] = time_data[col].astype(int)
+
+        try:
+            depth = full_depth_df.loc[full_depth_df[cast_id_col] == ssscc, "DEPTH"].iloc[0]
+        except IndexError:
+            log.warning(f"No depth logged for {ssscc}, setting to -999")
+            depth = -999
+
+        cast_dict = cast_details[cast_details["SSSCC"] == ssscc].to_dict("records")[0]
+
+        # btm_lat = cast_dict['LATITUDE']
+        # btm_lon = cast_dict['LONGITUDE']
+
+        now = dt.now(timezone.utc)
+        file_datetime = now.strftime("%Y%m%d")  # %H:%M")
+        file_datetime = file_datetime + org
+        outfile = Path(outdir, '%s_ct1.csv' % ssscc)
+        with open(outfile, 'w+') as f:
+            # put in logic to check columns?
+            # number_headers should be calculated, not defined
+            ctd_header = (  # this is ugly but prevents tabs before label
+                    f"CTD,{file_datetime}\n"
+                    f"NUMBER_HEADERS = 11\n"
+                    f"EXPOCODE = {settings.expocode}\n"
+                    f"SECT_ID = {settings.section_id}\n"
+                    # TODO: the below depends on specific "SSSCC" cast names or slicing will fail. Rethink?
+                    # Also, if we stick with this, CCHDO does not keep the leading zeros, so we could trim
+                    # them here...
+                    f"STNNBR = {ssscc[:3]}\n"  # STNNBR = SSS
+                    f"CASTNO = {ssscc[3:]}\n"  # CASTNO = CC
+                    f"DATE = {cast_dict['DATE']}\n"
+                    f"TIME = {cast_dict['TIME']}\n"
+                    f"LATITUDE = {cast_dict['LATITUDE']:.4f}\n"
+                    f"LONGITUDE = {cast_dict['LONGITUDE']:.4f}\n"
+                    f"INSTRUMENT_ID = {settings.ctd_serial}\n"
+                    f"DEPTH = {depth:.0f}\n"
+            )
+            f.write(ctd_header)
+            np.asarray(ctd_col_names).tofile(f, sep=",", format="%s")
+            f.write("\n")
+            np.asarray(ctd_col_units).tofile(f, sep=",", format="%s")
+            f.write("\n")
+            time_data.to_csv(f, header=False, index=False)
+            f.write("END_DATA")
 
 
 def export_ct1(df, ssscc_list):

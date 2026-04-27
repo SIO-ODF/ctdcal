@@ -1,6 +1,6 @@
 # Example user configuration file
 #
-# To use, call ctdcal.common.load_user_config(<this file>)
+# To use, call ctdcal.common.load_user_config(this_file)
 
 # Application Settings
 # --------------------
@@ -25,119 +25,82 @@ bottleflags_man: bottle_flags_manual.json
 # of different types, it is recommended to use a different
 # configuration file (this file) for each.
 
-# Sample frequency (Hz): int
-freq: 24
+inst_params:
+    # Sample frequency (Hz): int
+    freq: 24
+    # Number of water sampler bottles: int
+    max_bottles: 36
+
+# Fitting Settings
+# ----------------
+
+# Fit groups
+#   To define a new group for a parameter, enter a new line with
+#   the starting cast id (cast name) for the group.
+fit_groups:
+    pressure:
+        - '00101'
+    conductivity:
+        - '00101'
+    temperature:
+        - '00101'
+    rinko:
+        - '00101'
+
+# Fit coeffs
+#   ctdcal will use these values during calibration/fitting stages
+#   for primary and secondary channel sensors, based on the fit
+#   groups defined above. When additional fit groups are defined,
+#   add corresponding lines here for prim_n and secn_n.
+fit_coeffs:
+    temperature:
+        primary:
+            - primary_0: {P_order: 1, T_order: 0, zRange: "1000:6000"}
+#             - primary_n: {P_order: 1, T_order: 0, zRange: "1000:6000"}
+        secondary:
+            - secondary_0: {P_order: 1, T_order: 0, zRange: "1000:6000"}
+#             - secondary_n: {P_order: 1, T_order: 0, zRange: "1000:6000"}
+    conductivity:
+        primary:
+            - primary_0: {P_order: 1, T_order: 0, C_order: 0, zRange: "1000:6000"}
+#            - primary_1: {P_order: 1, T_order: 0, C_order: 0, zRange: "1000:6000"}
+        secondary:
+            - secondary_0: {P_order: 1, T_order: 0, C_order: 0, zRange: "1000:6000"}
+#            - secondary_1: {P_order: 1, T_order: 0, C_order: 0, zRange: "1000:6000"}
 
 # Advanced Settings
 # -----------------
 # These settings are provided for fine-tuning of specific CTDCAL
 # features. These should not normally need to change.
 
-# Conductivity threshold (in cast units): int or float
-#   Used to determine if the instrument is operating in the water
-cond_threshold: 20
-# Soak threshold (in pressure units): int or float
-#   The deepest depth at which the pre-cast soak may occur
-soak_threshold: 20
-# Soak rolling average window (seconds): int
-soak_win: 20
-# Filter window (seconds): int
-#   Used by the cast smoothing filter
-filter_win: 2
-# Filter type: boxcar, hann, triangle
-filter_type: hann
-# Columns to filter:
-filter_cols:
-  - CTDPRS
-  - CTDTMP1
-  - CTDTMP2
-  - CTDCOND1
-  - CTDCOND2
-  - CTDSAL
-  - U_DEF_poly1
-#  - FREE1
-  - CTDOXYVOLTS
-#  - REFTMP
-#  - GPSLAT
-#  - GPSLON
+# Soak parameters - used by ctd soak detection algorithm
+soak_det_params:
+    # Conductivity threshold (in cast units): int or float
+    #   Used to determine if the instrument is operating in the water
+    cond_threshold: 20
+    # Soak threshold (in pressure units): int or float
+    #   The deepest depth at which the pre-cast soak may occur
+    soak_threshold: 20
+    # Soak rolling average window (seconds): int
+    soak_win: 20
 
-# Legacy Settings
-# ---------------
-# Included for transitional compatibility with legacy configs.
-# Any NEW CODE that uses these is not guaranteed to work in the future!
-# TODO: move, eliminate or redefine these as appropriate
-
-expocode: ""
-section_id: ""
-ctd_serial: ""
-
-# Exchange-format export cols:
-ctd_col_names:
-  - CTDPRS
-  - CTDTMP1
-  - CTDTMP1_FLAG_W
-  - CTDSAL1
-  - CTDSAL1_FLAG_W
-  - CTDOXY1
-  - CTDOXY1_FLAG_W
-#  - CTDRINKO
-#  - CTDRINKO_FLAG_W
-  - CTDXMISS1
-  - CTDXMISS1_FLAG_W
-  - CTDFLUOR1
-  - CTDFLUOR1_FLAG_W
-
-ctd_col_units:
-  - DBAR
-  - ITS-90
-  - ""
-  - PSS-78
-  - ""
-  - UMOL/KG
-  - ""
-#  - UMOL/KG
-#  - ""
-  - 0-5VDC
-  - ""
-  - 0-5VDC
-  - ""
-
-# Legacy data directory structure, incompatible with user-configured datadir
-# above. Use with caution.
-dirs:
-  ssscc: "data/ssscc/"
-  raw: "data/raw/"
-  converted: "data/converted/"
-  time: "data/time/"
-  pressure: "data/pressure/"
-  bottle: "data/bottle/"
-  salt: "data/salt/"
-  reft: "data/reft/"
-  oxygen: "data/oxygen/"
-  logs: "data/logs/"
-  flags: "data/flags/"
-
-fig_dirs:
-    t1: "data/logs/fitting_figs/temp_primary/"
-    t2: "data/logs/fitting_figs/temp_secondary/"
-    c1: "data/logs/fitting_figs/cond_primary/"
-    c2: "data/logs/fitting_figs/cond_secondary/"
-    ox: "data/logs/fitting_figs/oxy_primary/"
-    rinko: "data/logs/fitting_figs/oxy_rinko/"
-
-# Legacy column name lookup
-column:
-    p: "CTDPRS"
-    t1: "CTDTMP1"
-    t2: "CTDTMP2"
-    c1: "CTDCOND1"
-    c2: "CTDCOND2"
-    sal: "CTDSAL"
-    rinko_oxy: "U_DEF_poly1"
-    oxyvolts: "CTDOXYVOLTS"
-    refT: "REFTMP"
-    refC: "BTLCOND"
-    refS: "SALNTY"
-    refO: "OXYGEN"
-    lat: "GPSLAT"
-    lon: "GPSLON"
+# Filter parameters - used by the cast smoothing filter
+filter_params:
+    # Filter window (seconds): int
+    filter_win: 2
+    # Filter type: boxcar, hann, triangle
+    filter_type: hann
+    # Columns to filter:
+    filter_cols:
+      - CTDPRS
+      - CTDTMP1
+      - CTDTMP2
+      - CTDCOND1
+      - CTDCOND2
+      - CTDSAL
+      - U_DEF_poly1
+    #  - FREE1
+      - CTDOXYVOLTS
+    #  - REFTMP
+    #  - GPSLAT
+    #  - GPSLON

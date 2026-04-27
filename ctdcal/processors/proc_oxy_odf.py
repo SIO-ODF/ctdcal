@@ -5,15 +5,40 @@ titration software
 import csv
 import logging
 from collections import OrderedDict
+from pathlib import Path
 
 import gsw
 import numpy as np
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
+from ctdcal.common import validate_dir
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
+
+
+def proc_oxy(casts, raw_dir, proc_dir):
+    # validate required directories
+    raw_dir = validate_dir(raw_dir)
+    proc_dir = validate_dir(proc_dir, create=True)
+
+
+    for cast_id in casts:
+        oxy_file = Path(raw_dir, cast_id)
+        outfile = Path(proc_dir, '%s_oxy.csv' % cast_id)
+        if outfile.exists():
+            log.info(f"{outfile} already exists in {proc_dir}... skipping")
+            continue
+        else:
+            if oxy_file.exists():
+                oxy_data, params = load_winkler_oxy(oxy_file)
+                oxy_data.rename(columns={'BOTTLENO_OXY': 'btl_fire_num'}, inplace=True)
+                oxy_data['cast_id'] = cast_id
+                oxy_data.to_csv(outfile, index=False)
+            else:
+                log.warning(f"Oxy file for cast {cast_id} does not exist... skipping")
+                continue
 
 
 def load_winkler_oxy(oxy_file):
@@ -125,7 +150,7 @@ def load_flasks(flask_file=cfg.dirs["oxygen"] + "o2flasks.vol", comment="#"):
         flasks = []
         for line in f:
             is_comment = line.strip().startswith(comment)
-            if ("Volume" in line) or is_comment:
+            if ("Volume" in line) or is_comment or len(line) < 2:
                 continue
             num, vol = line.strip().split()[:2]  # only need first two cols (#, volume)
             flasks.append([str(num), float(vol)])
@@ -201,7 +226,7 @@ def gather_oxy_params(oxy_file):
     return params
 
 
-def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nums):
+def calculate_bottle_oxygen(ssscc_list, ssscc_col, rawdir, titr_vol, titr_temp, flask_nums, cast_id='SSSCC'):
     """
     Wrapper function for collecting parameters and calculating oxygen values from
     Winkler titrations.
@@ -232,12 +257,14 @@ def calculate_bottle_oxygen(ssscc_list, ssscc_col, titr_vol, titr_temp, flask_nu
     """
     params = pd.DataFrame()
     for ssscc in ssscc_list:
-        df = gather_oxy_params(cfg.dirs["oxygen"] + ssscc)
-        df["SSSCC"] = ssscc
+        raw_file = Path(rawdir, ssscc)
+        df = gather_oxy_params(raw_file)
+        df[cast_id] = ssscc
         params = pd.concat([params, df])
 
     # get flask volumes and merge with titration parameters
-    flask_df = load_flasks()
+    flask_file = Path(rawdir, 'o2flasks.vol')
+    flask_df = load_flasks(flask_file=flask_file)
     volumes = pd.merge(flask_nums, flask_df, how="left")["FLASK_VOL"].values
     params = pd.merge(ssscc_col, params, how="left")
 
