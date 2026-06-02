@@ -440,7 +440,7 @@ def rinko_oxy_fit(
     (there's probably a better way – are there physical meanings?)
     """
     bad_df = pd.DataFrame()
-    weights = calculate_weights(btl_df["CTDPRS"])
+    weights = calculate_weights(btl_df["CTDPRS"].mask(btl_df['CTDPRS'] < 0, 0))
     fit_data = (
         btl_df['U_DEF_poly1'],
         btl_df['CTDPRS'],
@@ -477,7 +477,7 @@ def rinko_oxy_fit(
     while not thrown_values.empty:
 
         p0 = tuple(cfw_coefs)
-        weights = calculate_weights(btl_df["CTDPRS"])
+        weights = calculate_weights(btl_df["CTDPRS"].mask(btl_df['CTDPRS'] < 0, 0))
         fit_data = (
             btl_df['U_DEF_poly1'],
             btl_df['CTDPRS'],

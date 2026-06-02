@@ -108,7 +108,8 @@ class Cast(object):
         else:
             raise AttributeError('Error filtering cast %s! No filter of type %s found.' % (self.cast_id, win_type))
         for col in cols:
-            data[col] = sig.convolve(data[col], win, mode="same") / np.sum(win)
+            if col in data.columns:
+                data[col] = sig.convolve(data[col], win, mode="same") / np.sum(win)
         self.filtered = data
 
     def trim_soak(self, data, win_size, max_soak=20):

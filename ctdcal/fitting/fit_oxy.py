@@ -90,7 +90,7 @@ def sbe43_oxy_fit(merged_df, fig_dir, sbe_coef0, f_suffix=None, cast_id_col='SSS
     #     sbe_coef0 = guess_sbe43_coeffs(caldir)  # load initial coefficient guess
 
     # Curve fit (weighted)
-    weights = calculate_weights(merged_df["CTDPRS"])
+    weights = calculate_weights(merged_df["CTDPRS"].mask(merged_df['CTDPRS'] < 0, 0))
     fit_vars = ["CTDOXYVOLTS", "CTDPRS", "CTDTMP", "dv_dt", "OS"]
     fit_data = tuple(merged_df[v] for v in fit_vars)
     res = scipy.optimize.minimize(
@@ -111,7 +111,7 @@ def sbe43_oxy_fit(merged_df, fig_dir, sbe_coef0, f_suffix=None, cast_id_col='SSS
     while not thrown_values.empty:  # runs as long as there are thrown_values
 
         p0 = tuple(cfw_coefs)  # initialize coefficients with previous results
-        weights = calculate_weights(merged_df["CTDPRS"])
+        weights = calculate_weights(merged_df["CTDPRS"].mask(merged_df['CTDPRS'] < 0, 0))
         fit_data = tuple(merged_df[v] for v in fit_vars)  # merged_df changes each loop
         res = scipy.optimize.minimize(
             PMEL_oxy_weighted_residual,

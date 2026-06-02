@@ -187,9 +187,10 @@ def export_hy1_v1(df, out_dir, report_dir, cast_id_col, settings, org="ODF"):
         by=["STNNBR", "CASTNO", "SAMPNO"], ascending=[True, True, False], ignore_index=True
     )
 
-    # switch oxygen primary sensor to rinko
-    btl_data["CTDOXY"] = btl_data.loc[:, "CTDRINKO"]
-    btl_data["CTDOXY_FLAG_W"] = btl_data.loc[:, "CTDRINKO_FLAG_W"]
+    # use rinko oxy except for where seabird oxy is designated
+    btl_data['CTDOXY'] = btl_data['CTDOXY'].where(btl_data['SSSCC'].isin(settings.use_seabird_oxy), btl_data['CTDRINKO'])
+    btl_data['CTDOXY_FLAG_W'] = btl_data['CTDOXY_FLAG_W'].where(btl_data['SSSCC'].isin(settings.use_seabird_oxy), btl_data['CTDRINKO_FLAG_W'])
+
 
     # round data
     # for col in ["CTDTMP", "CTDSAL", "SALNTY", "REFTMP"]:
@@ -629,11 +630,14 @@ def export_ct1_v1(df, ssscc_list, reportdir, outdir, cast_id_col, settings, org=
     for ssscc in ssscc_list:
         time_data = df[df["SSSCC"] == ssscc].copy()
         time_data = pressure_sequence(time_data)
-        # switch oxygen primary sensor to rinko
-        # if int(ssscc[:3]) > 35:
-        log.info(f"Using Rinko as CTDOXY for {ssscc}")
-        time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
-        time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        # use rinko oxy except for where seabird oxy is designated
+        if ssscc not in settings.use_seabird_oxy:
+            log.info(f"Using Rinko as CTDOXY for {ssscc}")
+            time_data.loc[:, "CTDOXY"] = time_data["CTDRINKO"]
+            time_data.loc[:, "CTDOXY_FLAG_W"] = time_data["CTDRINKO_FLAG_W"]
+        else:
+            log.info(f"Using SeaBird oxy as CTDOXY for {ssscc}")
+
         time_data = time_data[ctd_col_names]
         # time_data = time_data.round(4)
         time_data = time_data.where(~time_data.isnull(), -999)  # replace NaNs with -999

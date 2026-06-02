@@ -9,6 +9,7 @@ from ctdcal.fitting.fit_ctd import load_time_all, calibrate_pressure, \
     calibrate_temperature, calibrate_conductivity
 from ctdcal.fitting.fit_oxy import calibrate_oxy
 from ctdcal.fitting.fit_oxy_rinko import calibrate_rinko
+from ctdcal.flagging.flag_common import setup_manual_flags
 from ctdcal.formats.exchange import export_exchange
 from ctdcal.parsers.parse_ctd_xmlcon import parse_coeffs
 from ctdcal.processors.cast_tools import make_time_files
@@ -41,9 +42,9 @@ logging.basicConfig(
 )
 
 # USERCONFIG = 'ctdcal/cfg.yaml'
-USERCONFIG = '/Users/als026/data/demo_i08s/cfg_demo_i08s.yaml'
+USERCONFIG = '/Users/als026/data/p04e/cfg_p04e.yaml'
 # EXCHANGECONFIG = 'ctdcal/exchange.yaml'
-EXCHANGECONFIG = '/Users/als026/data/demo_i08s/i08s_demo_exchange.yaml'
+EXCHANGECONFIG = '/Users/als026/data/p04e/p04e_exchange.yaml'
 cfg = load_user_config(USERCONFIG)
 
 # Runtime flags:
@@ -104,6 +105,10 @@ def odf_process_all():
 
     # process bottle file
     make_btl_files(ssscc_list, rawdir, btldir, cnvdir)
+
+    # set up flagging
+    if not flagfile.exists():
+        setup_manual_flags(flagfile)
 
     # generate salt .csv files
     proc_salt(ssscc_list, salt_rawdir, salt_cnvdir, btldir, flagfile)
