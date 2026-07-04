@@ -13,7 +13,7 @@ from ctdcal.flagging.flag_common import setup_manual_flags
 from ctdcal.formats.exchange import export_exchange
 from ctdcal.parsers.parse_ctd_xmlcon import parse_coeffs
 from ctdcal.processors.cast_tools import make_time_files
-from ctdcal.processors.convert_legacy import hex_to_ctd
+from ctdcal.processors.convert_legacy import hex_to_ctd, switch_primaries
 from ctdcal.processors.proc_bottle import make_btl_files, load_btl_all
 from ctdcal.processors.proc_oxy_ctd import prepare_oxy
 from ctdcal.processors.proc_oxy_odf import proc_oxy
@@ -53,7 +53,7 @@ skip_calibrate = False
 # if this and the above flags are set to True, the export routines will be bypassed
 skip_export = False
 # if this flag is set to True, only the cruise report processing will execute
-process_cruise_report = False
+process_cruise_report = True
 
 
 def odf_process_all():
@@ -63,6 +63,8 @@ def odf_process_all():
     #####
 
     datadir = cfg.datadir
+    switch_primaries = cfg.switch_primaries
+    switch_conds = cfg.switch_conds
     fit_coeffs = cfg.fit_coeffs
 
     # single CTD setup
@@ -97,7 +99,7 @@ def odf_process_all():
     ssscc_list = make_cast_id_list(rawdir)
 
     # convert raw .hex files
-    hex_to_ctd(ssscc_list, rawdir, cnvdir)
+    hex_to_ctd(ssscc_list, rawdir, cnvdir, switch_primaries, switch_conds)
     parse_coeffs(ssscc_list, rawdir, caldir)
 
     # process time files

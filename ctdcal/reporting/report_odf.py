@@ -65,8 +65,8 @@ def make_odf_report_table(df, outdir):
     df["CTDCOND2_FLAG_W"] = flagging.by_residual(
         df["CTDCOND2"], df["BTLCOND"], df["CTDPRS"]
     )
-    df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
-    df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
+    # df["CTDOXY_FLAG_W"] = flagging.by_percent_diff(df["CTDOXY"], df["OXYGEN"])
+    # df["CTDRINKO_FLAG_W"] = flagging.by_percent_diff(df["CTDRINKO"], df["OXYGEN"])
 
     outfile = Path(outdir, 'report_data.csv')
     df[cruise_report_cols].to_csv(outfile, index=False)

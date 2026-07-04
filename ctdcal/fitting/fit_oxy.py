@@ -11,7 +11,7 @@ import scipy
 
 from ctdcal import get_ctdcal_config
 from ctdcal.common import validate_dir
-from ctdcal.flagging.flag_common import by_percent_diff
+from ctdcal.flagging.flag_common import by_percent_diff, quality_by_percent_of_reference
 from ctdcal.plotting.plot_fit import _intermediate_residual_plot
 from ctdcal.processors.functions_oxy import calculate_dV_dt
 from ctdcal.processors.proc_oxy_ctd import _PMEL_oxy_eq
@@ -390,10 +390,12 @@ def calibrate_oxy(btl_df, time_df, fig_dir, report_dir, cal_dir, ssscc_list, cas
         log.info(ssscc + " time data fitting done")
 
     # flag CTDOXY with more than 1% difference
-    time_df["CTDOXY_FLAG_W"] = 2
-    btl_df["CTDOXY_FLAG_W"] = by_percent_diff(
-        btl_df["CTDOXY"], btl_df["OXYGEN"], percent_thresh=1
-    )
+    # AS 30 Jun 2026
+    # Flagging by percent is too aggressive where values are small, so only
+    # apply to values over, say, 100
+    btl_df["CTDOXY_FLAG_W"] = 2
+    full_flags = quality_by_percent_of_reference(btl_df["CTDOXY"], btl_df["OXYGEN"])
+    btl_df["CTDOXY_FLAG_W"] = btl_df["CTDOXY_FLAG_W"].where((btl_df["CTDOXY"] < 100) | (btl_df['OXYGEN_FLAG_W'] != 2), full_flags)
 
     # Plot all post fit data
     f_out = Path(fig_dir, 'sbe43_residual_all_postfit.pdf')

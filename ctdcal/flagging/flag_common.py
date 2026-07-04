@@ -361,3 +361,27 @@ def quality_by_threshold(values, threshold=1.0):
     bool
     """
     return values >= threshold
+
+def quality_by_percent_of_reference(sensor, reference, good=2, bad=3, threshold=0.01):
+    """
+
+    Parameters
+    ----------
+    sensor : array-like
+        sensor values
+    reference : array-like
+        reference values
+    good : int, optional
+        Flag value for good data
+    bad : int, optional
+        Flag value for bad data
+    threshold : float, optional
+        threshold factor between reference and sensor values for bad flags
+
+    Returns
+    -------
+    array-like
+
+    """
+    flagged = abs(sensor - reference) > (reference * 0.1)
+    return np.where(flagged, 3, 2)
