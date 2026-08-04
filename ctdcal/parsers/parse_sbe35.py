@@ -126,8 +126,16 @@ def parse_sbe35(casts, indir, outdir):
     for i, infile in enumerate(raw_files):
         # parse filenames for starting and ending casts
         bounds = infile_list[i].split('-')
-        starting_cast = casts.index(bounds[0])
-        ending_cast = casts.index(bounds[-1])
+        try:
+            starting_cast = casts.index(bounds[0])
+        except ValueError:
+            # reft files with starting casts that don't have raw files
+            continue
+        try:
+            ending_cast = casts.index(bounds[-1])
+        except ValueError:
+            # more reft casts in file than raw casts
+            ending_cast = casts.index(casts[-1])
 
         infile_casts = casts[starting_cast:ending_cast + 1]
 

@@ -9,10 +9,11 @@ from ctdcal.fitting.fit_ctd import load_time_all, calibrate_pressure, \
     calibrate_temperature, calibrate_conductivity
 from ctdcal.fitting.fit_oxy import calibrate_oxy
 from ctdcal.fitting.fit_oxy_rinko import calibrate_rinko
+from ctdcal.flagging.flag_common import setup_manual_flags
 from ctdcal.formats.exchange import export_exchange
 from ctdcal.parsers.parse_ctd_xmlcon import parse_coeffs
 from ctdcal.processors.cast_tools import make_time_files
-from ctdcal.processors.convert_legacy import hex_to_ctd
+from ctdcal.processors.convert_legacy import hex_to_ctd, switch_primaries
 from ctdcal.processors.proc_bottle import make_btl_files, load_btl_all
 from ctdcal.processors.proc_oxy_ctd import prepare_oxy
 from ctdcal.processors.proc_oxy_odf import proc_oxy
@@ -41,9 +42,9 @@ logging.basicConfig(
 )
 
 # USERCONFIG = 'ctdcal/cfg.yaml'
-USERCONFIG = '/Users/als026/data/demo_i08s/cfg_demo_i08s.yaml'
+USERCONFIG = '/Users/als026/data/p04e/cfg_p04e.yaml'
 # EXCHANGECONFIG = 'ctdcal/exchange.yaml'
-EXCHANGECONFIG = '/Users/als026/data/demo_i08s/i08s_demo_exchange.yaml'
+EXCHANGECONFIG = '/Users/als026/data/p04e/p04e_exchange.yaml'
 cfg = load_user_config(USERCONFIG)
 
 # Runtime flags:
@@ -52,7 +53,7 @@ skip_calibrate = False
 # if this and the above flags are set to True, the export routines will be bypassed
 skip_export = False
 # if this flag is set to True, only the cruise report processing will execute
-process_cruise_report = False
+process_cruise_report = True
 
 
 def odf_process_all():
@@ -62,6 +63,8 @@ def odf_process_all():
     #####
 
     datadir = cfg.datadir
+    switch_primaries = cfg.switch_primaries
+    switch_conds = cfg.switch_conds
     fit_coeffs = cfg.fit_coeffs
 
     # single CTD setup
@@ -96,7 +99,7 @@ def odf_process_all():
     ssscc_list = make_cast_id_list(rawdir)
 
     # convert raw .hex files
-    hex_to_ctd(ssscc_list, rawdir, cnvdir)
+    hex_to_ctd(ssscc_list, rawdir, cnvdir, switch_primaries, switch_conds)
     parse_coeffs(ssscc_list, rawdir, caldir)
 
     # process time files
@@ -104,6 +107,10 @@ def odf_process_all():
 
     # process bottle file
     make_btl_files(ssscc_list, rawdir, btldir, cnvdir)
+
+    # set up flagging
+    if not flagfile.exists():
+        setup_manual_flags(flagfile)
 
     # generate salt .csv files
     proc_salt(ssscc_list, salt_rawdir, salt_cnvdir, btldir, flagfile)

@@ -1,0 +1,34 @@
+name: ctdcal+rbr
+channels:
+  - conda-forge
+dependencies:
+  - bokeh
+  - click
+  - furo==2021.9.8
+  - gsw
+  - h5netcdf
+  - ipykernel
+  - ipympl
+  - ipython
+  - jupyter==1.0.0
+  - jupytext==1.12.0
+  - matplotlib
+  - munch
+  - mypy
+  - nbsphinx==0.8.7
+  - numpy[version='<2.0']
+  - openpyxl
+  - pandas
+  - pre-commit
+  - pytest
+  - pytest-cov
+  - python=3.11
+  - pyyaml
+  - requests
+  - scipy
+  - sphinx==4.2.0
+  - streamlit
+  - python-build
+  - ruff
+  - twine
+  - xarray

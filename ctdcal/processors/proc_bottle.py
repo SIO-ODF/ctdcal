@@ -31,7 +31,10 @@ def make_btl_files(casts, raw_dir, btl_dir, cnv_dir):
             cnv_df = pd.read_pickle(cnv_file)
             firing_order = get_bottle_order_from_bl_file(cast_id, raw_dir)
             bottle_df = get_bottle_data(cnv_df, firing_order)
-            mean_df = bottle_df.groupby('btl_fire_num', as_index=False).mean()
+            # mean_df = bottle_df.groupby('btl_fire_num', as_index=False).mean()
+            # 2026/06/24 AS
+            # ignore bottles numbered 99
+            mean_df = bottle_df.loc[bottle_df['btl_fire_num'] != 99].groupby('btl_fire_num', as_index=False).mean()
             mean_df['cast_id'] = cast_id
             mean_df.to_pickle(btl_file)
     return True
