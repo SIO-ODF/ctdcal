@@ -53,7 +53,7 @@ skip_calibrate = False
 # if this and the above flags are set to True, the export routines will be bypassed
 skip_export = False
 # if this flag is set to True, only the cruise report processing will execute
-process_cruise_report = True
+process_cruise_report = False
 
 
 def odf_process_all():
