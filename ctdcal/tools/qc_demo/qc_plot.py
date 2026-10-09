@@ -261,6 +261,6 @@ with page_right:
     )
 
     if st.session_state.selected_plot == 'Param vs Pressure':
-        st.altair_chart(param_vs_p, use_container_width=False)
+        st.altair_chart(param_vs_p, width='content')
     elif st.session_state.selected_plot == 'Residual Plot':
-        st.altair_chart(resid_vs_p + resid_bounds, use_container_width=False)
+        st.altair_chart(resid_vs_p + resid_bounds, width='content')

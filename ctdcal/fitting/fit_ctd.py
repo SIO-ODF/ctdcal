@@ -427,13 +427,13 @@ def calibrate_pressure(btl_data, time_data, fit_groups, report_dir):
         # time_data['CTDPRS'] += offset
 
         # i think we should do this instead
-        btl_data['CTDPRS'] -= offsets['pressure_start']
-        time_data['CTDPRS'] -= offsets['pressure_start']
+        btl_data.loc[btl_data['cast_id'].isin(group), 'CTDPRS'] -= offsets['pressure_start']
+        time_data.loc[time_data['cast_id'].isin(group), 'CTDPRS'] -= offsets['pressure_start']
 
 
-        # add flag cols
-        btl_data['CTDPRS_FLAG_W'] = 2
-        time_data['CTDPRS_FLAG_W'] = 2
+    # add flag cols
+    btl_data['CTDPRS_FLAG_W'] = 2
+    time_data['CTDPRS_FLAG_W'] = 2
 
 
 def apply_pressure_offset(df, p_col="CTDPRS"):

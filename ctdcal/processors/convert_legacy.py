@@ -6,6 +6,7 @@ A module for handling SeaBird raw .HEX files, including the generation of bottle
 downcast isolation, and SBE3/4C handling.
 """
 import logging
+import re
 from pathlib import Path
 
 import gsw
@@ -128,10 +129,16 @@ short_lookup = {
         "units": "0-5VDC",
         "type": "float64",
     },
+    "43": {
+        "short_name": "CTDPH",
+        "long_name": "SBE18 pH Sensor",
+        "units": "0-5VDC",
+        "type": "float64",
+    },
 }
 
 
-def hex_to_ctd(ssscc_list, rawdir=cfg.dirs["raw"], outdir=cfg.dirs["converted"]):
+def hex_to_ctd(ssscc_list, rawdir=cfg.dirs["raw"], outdir=cfg.dirs["converted"], switch_tc=None, switch_cond_only=None):
     """
     Convert raw CTD data and export to .pkl files.
 
@@ -154,9 +161,65 @@ def hex_to_ctd(ssscc_list, rawdir=cfg.dirs["raw"], outdir=cfg.dirs["converted"])
             xmlconFile = Path(rawdir, '%s.XMLCON' % ssscc)
             sbeReader = sbe_rd.SBEReader.from_paths(hexFile, xmlconFile)
             converted_df = convertFromSBEReader(sbeReader, ssscc)
+            # check for conductivities to switch...
+            if switch_cond_only is not None:
+                if ssscc in switch_cond_only:
+                    converted_df = switch_conductivities(converted_df)
+            # check for temp/cond to switch...
+            if switch_tc is not None:
+                if ssscc in switch_tc:
+                    converted_df = switch_primaries(converted_df)
             converted_df.to_pickle(outfile)
 
     return True
+
+def switch_primaries(df):
+    """
+    Switch the primary T and C with the secondaries.
+
+    Parameters
+    ----------
+    df : DataFrame
+        converted cast data
+
+    Returns
+    -------
+    DataFrame
+    """
+    primaries = df[['CTDTMP1', 'CTDCOND1']].copy()
+    df['CTDTMP1'] = df['CTDTMP2']
+    df['CTDCOND1'] = df['CTDCOND2']
+    df['CTDTMP2'] = primaries['CTDTMP1']
+    df['CTDCOND2'] = primaries['CTDCOND1']
+    # recalculate salinity from switched primaries
+    df['CTDSAL'] = gsw.SP_from_C(df['CTDCOND1'], df['CTDTMP1'], df['CTDPRS'])
+
+    return df
+
+
+def switch_conductivities(df):
+    """
+    Switch the primary C with the secondary. Useful only to correct for a miscabled instrument
+    where the T/C sensors on the primary (and secondary) connectors are on opposite sides of
+    instrument and on different plumbing lines.
+
+    Parameters
+    ----------
+    df : DataFrame
+        converted cast data
+
+    Returns
+    -------
+    DataFrame
+    """
+    primary = df[['CTDCOND1']].copy()
+    df['CTDCOND1'] = df['CTDCOND2']
+    df['CTDCOND2'] = primary['CTDCOND1']
+    # recalculate salinity from switched primaries
+    df['CTDSAL'] = gsw.SP_from_C(df['CTDCOND1'], df['CTDTMP1'], df['CTDPRS'])
+
+    return df
+
 
 def convertFromSBEReader(sbeReader, ssscc):
     """Handler to convert engineering data to sci units automatically.
@@ -250,6 +313,10 @@ def convertFromSBEReader(sbeReader, ssscc):
             u_def_e_counter += 1
             channel_pos = u_def_e_counter
             ranking = 6
+
+        elif sensor_id == "43":  # sbe18 pH block
+            channel_pos = ''
+            ranking = 7
 
         else:  # auxiliary block
             channel_pos = ""
@@ -355,7 +422,7 @@ def convertFromSBEReader(sbeReader, ssscc):
 
         ### Rinko block
         elif meta["sensor_id"] == "61":
-            if meta["sensor_info"]["SensorName"] in ("RinkoO2V", "RINKO", "RINKOO2", "Rinko02"):
+            if re.match(r'rinko\s*[o0]2', meta["sensor_info"]["SensorName"].lower()):
                 log.info("Processing Rinko O2")
                 # hysteresis correct then pass through voltage (see Uchida, 2010)
                 coefs = {"H1": 0.0065, "H2": 5000, "H3": 2000, "offset": 0}
@@ -364,7 +431,7 @@ def convertFromSBEReader(sbeReader, ssscc):
                     p_array,
                     coefs,
                 )
-            elif meta["sensor_info"]["SensorName"] in ("RinkoT"):
+            elif re.match(r'rinko\s*t', meta["sensor_info"]["SensorName"].lower()):
                 log.info("Processing Rinko T")
                 converted_df[col] = raw_df[meta["column"]]
 

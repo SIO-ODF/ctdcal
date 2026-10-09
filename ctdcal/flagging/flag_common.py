@@ -7,11 +7,32 @@ import numpy as np
 import pandas as pd
 
 from ctdcal import get_ctdcal_config
+from ctdcal.common import validate_file
+from ctdcal.fitting.fit_common import BottleFlags
 from ctdcal.plotting.plot_fit import _intermediate_residual_plot
 
 cfg = get_ctdcal_config()
 log = logging.getLogger(__name__)
 
+
+def setup_manual_flags(flagfile):
+    """
+    Creates an empty new manual flag file.
+
+    Parameters
+    ----------
+    flagfile : str or path-like
+        path to maunal flag file
+   """
+    flagfile = validate_file(flagfile, create=True)
+
+    nodes = ['salt', 'oxygen']
+    keys = ['cast_id', 'bottle_num', 'value', 'notes']
+    flags = BottleFlags()
+    for node in nodes:
+        flags.add_node(node, keys)
+    flags.save(flagfile)
+    return
 
 def _flag_btl_data(
     df,
@@ -340,3 +361,27 @@ def quality_by_threshold(values, threshold=1.0):
     bool
     """
     return values >= threshold
+
+def quality_by_percent_of_reference(sensor, reference, good=2, bad=3, threshold=0.01):
+    """
+
+    Parameters
+    ----------
+    sensor : array-like
+        sensor values
+    reference : array-like
+        reference values
+    good : int, optional
+        Flag value for good data
+    bad : int, optional
+        Flag value for bad data
+    threshold : float, optional
+        threshold factor between reference and sensor values for bad flags
+
+    Returns
+    -------
+    array-like
+
+    """
+    flagged = abs(sensor - reference) > (reference * 0.1)
+    return np.where(flagged, 3, 2)
