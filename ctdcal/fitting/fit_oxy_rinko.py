@@ -221,14 +221,12 @@ def calibrate_rinko(
                 ),
             )
 
-    # flag CTDRINKO with more than 1% difference
+    # flag CTDRINKO with more than 1% difference only for values over a threshold
+    flag_threshold = 100
     time_df["CTDRINKO_FLAG_W"] = 2
-    # AS 30 Jun 2026
-    # Flagging by percent is too aggressive where values are small, so only
-    # apply to values over, say, 100
     btl_df["CTDRINKO_FLAG_W"] = 2
     full_flags = quality_by_percent_of_reference(btl_df["CTDRINKO"], btl_df["OXYGEN"])
-    btl_df["CTDRINKO_FLAG_W"] = btl_df["CTDRINKO_FLAG_W"].where((btl_df["CTDRINKO"] < 100) | (btl_df['OXYGEN_FLAG_W'] != 2), full_flags)
+    btl_df["CTDRINKO_FLAG_W"] = btl_df["CTDRINKO_FLAG_W"].where((btl_df["CTDRINKO"] < flag_threshold) | (btl_df['OXYGEN_FLAG_W'] != 2), full_flags)
 
     # Plot all post fit data
     f_out = Path(fig_dir, 'rinko_residual_all_postfit.pdf')

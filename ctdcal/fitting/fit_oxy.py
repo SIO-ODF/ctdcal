@@ -389,13 +389,11 @@ def calibrate_oxy(btl_df, time_df, fig_dir, report_dir, cal_dir, ssscc_list, cas
         )
         log.info(ssscc + " time data fitting done")
 
-    # flag CTDOXY with more than 1% difference
-    # AS 30 Jun 2026
-    # Flagging by percent is too aggressive where values are small, so only
-    # apply to values over, say, 100
+    # flag CTDOXY with more than 1% difference only for values over a threshold
+    flag_threshold = 100
     btl_df["CTDOXY_FLAG_W"] = 2
     full_flags = quality_by_percent_of_reference(btl_df["CTDOXY"], btl_df["OXYGEN"])
-    btl_df["CTDOXY_FLAG_W"] = btl_df["CTDOXY_FLAG_W"].where((btl_df["CTDOXY"] < 100) | (btl_df['OXYGEN_FLAG_W'] != 2), full_flags)
+    btl_df["CTDOXY_FLAG_W"] = btl_df["CTDOXY_FLAG_W"].where((btl_df["CTDOXY"] < flag_threshold) | (btl_df['OXYGEN_FLAG_W'] != 2), full_flags)
 
     # Plot all post fit data
     f_out = Path(fig_dir, 'sbe43_residual_all_postfit.pdf')
